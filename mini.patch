@@ -1,0 +1,22 @@
+diff --git a/src/components/AppLayout.tsx b/src/components/AppLayout.tsx
+index 0000000..0000001 100644
+--- a/src/components/AppLayout.tsx
++++ b/src/components/AppLayout.tsx
+@@ -3,12 +3,15 @@
+ import React from "react";
+ import { useAppContext } from "@/contexts/AppContext";
+ import { useIsMobile } from "@/hooks/use-mobile";
+ 
+ const AppLayout: React.FC = () => {
+-  const { sidebarOpen, toggleSidebar } = useAppContext();
+-  const isMobile = useIsMobile();
++  const { sidebarOpen, toggleSidebar } = useAppContext();
++  const isMobile = useIsMobile();
++  void sidebarOpen;
++  void toggleSidebar;
++  void isMobile;
+ 
+   return <></>;
+ };
+ 
+ export default AppLayout;

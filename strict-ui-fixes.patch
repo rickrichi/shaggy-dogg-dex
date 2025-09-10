@@ -1,0 +1,239 @@
+diff --git a/src/components/AppLayout.tsx b/src/components/AppLayout.tsx
+--- a/src/components/AppLayout.tsx
++++ b/src/components/AppLayout.tsx
+@@ -1,12 +1,15 @@
+ import React from "react";
+ import { useAppContext } from "@/contexts/AppContext";
+ import { useIsMobile } from "@/hooks/use-mobile";
+ 
+ const AppLayout: React.FC = () => {
+-  const { sidebarOpen, toggleSidebar } = useAppContext();
+-  const isMobile = useIsMobile();
++  const { sidebarOpen, toggleSidebar } = useAppContext();
++  const isMobile = useIsMobile();
++  void sidebarOpen;
++  void toggleSidebar;
++  void isMobile;
+ 
+   return <></>;
+ };
+ 
+ export default AppLayout;
+diff --git a/src/components/theme-provider.tsx b/src/components/theme-provider.tsx
+--- a/src/components/theme-provider.tsx
++++ b/src/components/theme-provider.tsx
+@@ -1,6 +1,5 @@
+ "use client"
+ 
+-import * as React from "react"
+ import { createContext, useContext, useEffect, useState } from "react"
+ import type { ThemeProviderProps } from "next-themes/dist/types"
+diff --git a/src/components/ui/calendar.tsx b/src/components/ui/calendar.tsx
+--- a/src/components/ui/calendar.tsx
++++ b/src/components/ui/calendar.tsx
+@@ -51,8 +51,8 @@ export function Calendar(props: CalendarProps) {
+       }}
+       components={{
+-        IconLeft: ({ ..._props }) => <ChevronLeft className="h-4 w-4" />,
+-        IconRight: ({ ..._props }) => <ChevronRight className="h-4 w-4" />,
++        IconLeft: () => <ChevronLeft className="h-4 w-4" />,
++        IconRight: () => <ChevronRight className="h-4 w-4" />,
+       }}
+       {...props}
+     />
+diff --git a/src/components/ui/chart.tsx b/src/components/ui/chart.tsx
+--- a/src/components/ui/chart.tsx
++++ b/src/components/ui/chart.tsx
+@@ -134,10 +134,25 @@ export const ChartTooltipContent = ({
+   label,
+   payload,
+   config,
+ }) => {
+-  const [item] = payload
+-  const key = `${labelKey || item.dataKey || item.name || "value"}`
++  const item = payload?.[0]
++  if (!item) {
++    return null
++  }
++
++  const readKeyFromItem = (x: unknown): string | undefined => {
++    if (typeof x === "object" && x !== null) {
++      const candidate = x as { dataKey?: unknown; name?: unknown }
++      if (typeof candidate.dataKey === "string") return candidate.dataKey
++      if (typeof candidate.name === "string") return candidate.name
++    }
++    return undefined
++  }
++
++  const inferred = readKeyFromItem(item)
++  const key = String(labelKey ?? inferred ?? "value")
+ 
+-  const itemConfig = getPayloadConfigFromPayload(config, item, key)
++  const itemConfig = getPayloadConfigFromPayload(config, item, key)
+   const value =
+     !labelKey && typeof label === "string"
+       ? getValueFromPayload(item, label)
+diff --git a/src/components/ui/context-menu.tsx b/src/components/ui/context-menu.tsx
+--- a/src/components/ui/context-menu.tsx
++++ b/src/components/ui/context-menu.tsx
+@@ -90,12 +90,12 @@ const ContextMenuCheckboxItem = React.forwardRef<
+   React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.CheckboxItem>
+ >(({ className, children, checked, ...props }, ref) => (
+   <ContextMenuPrimitive.CheckboxItem
+     ref={ref}
+     className={cn(
+       "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-accent/60 focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 transition-colors",
+       className
+     )}
+-    checked={checked}
++    {...(checked !== undefined ? { checked } : {})}
+     {...props}
+   >
+     <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+       <ContextMenuPrimitive.ItemIndicator>
+diff --git a/src/components/ui/dropdown-menu.tsx b/src/components/ui/dropdown-menu.tsx
+--- a/src/components/ui/dropdown-menu.tsx
++++ b/src/components/ui/dropdown-menu.tsx
+@@ -93,12 +93,12 @@ const DropdownMenuCheckboxItem = React.forwardRef<
+   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.CheckboxItem>
+ >(({ className, children, checked, ...props }, ref) => (
+   <DropdownMenuPrimitive.CheckboxItem
+     ref={ref}
+     className={cn(
+       "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-accent/60 focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+       className
+     )}
+-    checked={checked}
++    {...(checked !== undefined ? { checked } : {})}
+     {...props}
+   >
+     <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+       <DropdownMenuPrimitive.ItemIndicator>
+diff --git a/src/components/ui/form.tsx b/src/components/ui/form.tsx
+--- a/src/components/ui/form.tsx
++++ b/src/components/ui/form.tsx
+@@ -1,9 +1,12 @@
+ import {
+   Controller,
+-  ControllerProps,
+-  FieldPath,
+-  FieldValues,
+   FormProvider,
+   useFormContext,
+ } from "react-hook-form"
++import type {
++  ControllerProps,
++  FieldPath,
++  FieldValues,
++} from "react-hook-form"
+diff --git a/src/components/ui/input-otp.tsx b/src/components/ui/input-otp.tsx
+--- a/src/components/ui/input-otp.tsx
++++ b/src/components/ui/input-otp.tsx
+@@ -30,10 +30,16 @@ export const InputOTPSlot = React.forwardRef<HTMLDivElement, SlotProps>(
+   >(({ index, className, ...props }, ref) => {
+     const inputOTPContext = React.useContext(OTPInputContext)
+-    const { char, hasFakeCaret, isActive } = inputOTPContext.slots[index]
++    const slot = inputOTPContext.slots[index]
++    if (!slot) {
++      return null
++    }
++    const { char, hasFakeCaret, isActive } = slot
+ 
+     return (
+       <div
+         ref={ref}
+         className={cn(
+           "relative",
+           isActive && "ring-2 ring-offset-2",
+           className
+         )}
+         {...props}
+diff --git a/src/components/ui/menubar.tsx b/src/components/ui/menubar.tsx
+--- a/src/components/ui/menubar.tsx
++++ b/src/components/ui/menubar.tsx
+@@ -126,12 +126,12 @@ const MenubarCheckboxItem = React.forwardRef<
+   React.ComponentPropsWithoutRef<typeof MenubarPrimitive.CheckboxItem>
+ >(({ className, children, checked, ...props }, ref) => (
+   <MenubarPrimitive.CheckboxItem
+     ref={ref}
+     className={cn(
+       "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-accent/60 focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 transition-colors",
+       className
+     )}
+-    checked={checked}
++    {...(checked !== undefined ? { checked } : {})}
+     {...props}
+   >
+     <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+       <MenubarPrimitive.ItemIndicator>
+diff --git a/src/components/ui/pagination.tsx b/src/components/ui/pagination.tsx
+--- a/src/components/ui/pagination.tsx
++++ b/src/components/ui/pagination.tsx
+@@ -1,6 +1,7 @@
+ import * as React from "react"
+ import { cn } from "@/lib/utils"
+-import { ButtonProps, buttonVariants } from "@/components/ui/button"
++import { buttonVariants } from "@/components/ui/button"
++import type { ButtonProps } from "@/components/ui/button"
+ 
+ const Pagination = ({ className, ...props }: React.ComponentProps<"nav">) => (
+   <nav
+diff --git a/src/components/ui/sidebar.tsx b/src/components/ui/sidebar.tsx
+--- a/src/components/ui/sidebar.tsx
++++ b/src/components/ui/sidebar.tsx
+@@ -1,17 +1,10 @@
+ import * as React from "react"
+ import { Slot } from "@radix-ui/react-slot"
+-import { VariantProps, cva } from "class-variance-authority"
++import { cva } from "class-variance-authority"
++import type { VariantProps } from "class-variance-authority"
+ import { PanelLeft } from "lucide-react"
+ 
+ import { useIsMobile } from "@/hooks/use-mobile"
+-import { Input } from "@/components/ui/input"
+-import { Separator } from "@/components/ui/separator"
+-import { Sheet, SheetContent } from "@/components/ui/sheet"
+-import { Skeleton } from "@/components/ui/skeleton"
+-import {
+-  Tooltip,
+-  TooltipContent,
+-  TooltipTrigger,
+-} from "@/components/ui/tooltip"
+ 
+ const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
+ const SIDEBAR_WIDTH = "16rem"
+@@ -19,6 +12,5 @@ const SIDEBAR_WIDTH = "16rem"
+ const SIDEBAR_WIDTH_ICON = "3rem"
+ const SIDEBAR_KEYBOARD_SHORTCUT = "b"
+ 
+ // ... component code continues
+diff --git a/src/components/ui/sonner.tsx b/src/components/ui/sonner.tsx
+--- a/src/components/ui/sonner.tsx
++++ b/src/components/ui/sonner.tsx
+@@ -7,9 +7,13 @@ export function Toaster() {
+   const { theme } = useTheme()
+ 
+   return (
+-    <Sonner
+-      theme={theme as ToasterProps["theme"]}
++    <Sonner
++      theme={
++        (theme === "light" || theme === "dark" || theme === "system"
++          ? theme
++          : "system") as ToasterProps["theme"]
++      }
+       className="toaster group"
+       toastOptions={{
+         // ...
+diff --git a/src/contexts/AppContext.tsx b/src/contexts/AppContext.tsx
+--- a/src/contexts/AppContext.tsx
++++ b/src/contexts/AppContext.tsx
+@@ -1,6 +1,4 @@
+ /* eslint-disable react-refresh/only-export-components */
+-import React, { createContext, useContext, useState, useEffect } from 'react';
+-import { v4 as uuidv4 } from 'uuid';
+-import { toast } from '@/components/ui/use-toast';
++import React, { createContext, useContext, useState } from 'react';
+ 
+ interface AppContextType {
+   sidebarOpen: boolean;
