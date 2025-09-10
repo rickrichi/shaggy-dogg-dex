@@ -5,7 +5,7 @@ diff --git a/src/components/AppLayout.tsx b/src/components/AppLayout.tsx
  import React from "react";
  import { useAppContext } from "@/contexts/AppContext";
  import { useIsMobile } from "@/hooks/use-mobile";
- 
+
  const AppLayout: React.FC = () => {
 -  const { sidebarOpen, toggleSidebar } = useAppContext();
 -  const isMobile = useIsMobile();
@@ -14,17 +14,17 @@ diff --git a/src/components/AppLayout.tsx b/src/components/AppLayout.tsx
 +  void sidebarOpen;
 +  void toggleSidebar;
 +  void isMobile;
- 
+
    return <></>;
  };
- 
+
  export default AppLayout;
 diff --git a/src/components/theme-provider.tsx b/src/components/theme-provider.tsx
 --- a/src/components/theme-provider.tsx
 +++ b/src/components/theme-provider.tsx
 @@ -1,6 +1,5 @@
  "use client"
- 
+
 -import * as React from "react"
  import { createContext, useContext, useEffect, useState } from "react"
  import type { ThemeProviderProps } from "next-themes/dist/types"
@@ -67,7 +67,7 @@ diff --git a/src/components/ui/chart.tsx b/src/components/ui/chart.tsx
 +
 +  const inferred = readKeyFromItem(item)
 +  const key = String(labelKey ?? inferred ?? "value")
- 
+
 -  const itemConfig = getPayloadConfigFromPayload(config, item, key)
 +  const itemConfig = getPayloadConfigFromPayload(config, item, key)
    const value =
@@ -138,7 +138,7 @@ diff --git a/src/components/ui/input-otp.tsx b/src/components/ui/input-otp.tsx
 +      return null
 +    }
 +    const { char, hasFakeCaret, isActive } = slot
- 
+
      return (
        <div
          ref={ref}
@@ -175,7 +175,7 @@ diff --git a/src/components/ui/pagination.tsx b/src/components/ui/pagination.tsx
 -import { ButtonProps, buttonVariants } from "@/components/ui/button"
 +import { buttonVariants } from "@/components/ui/button"
 +import type { ButtonProps } from "@/components/ui/button"
- 
+
  const Pagination = ({ className, ...props }: React.ComponentProps<"nav">) => (
    <nav
 diff --git a/src/components/ui/sidebar.tsx b/src/components/ui/sidebar.tsx
@@ -188,7 +188,7 @@ diff --git a/src/components/ui/sidebar.tsx b/src/components/ui/sidebar.tsx
 +import { cva } from "class-variance-authority"
 +import type { VariantProps } from "class-variance-authority"
  import { PanelLeft } from "lucide-react"
- 
+
  import { useIsMobile } from "@/hooks/use-mobile"
 -import { Input } from "@/components/ui/input"
 -import { Separator } from "@/components/ui/separator"
@@ -199,20 +199,20 @@ diff --git a/src/components/ui/sidebar.tsx b/src/components/ui/sidebar.tsx
 -  TooltipContent,
 -  TooltipTrigger,
 -} from "@/components/ui/tooltip"
- 
+
  const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
  const SIDEBAR_WIDTH = "16rem"
 @@ -19,6 +12,5 @@ const SIDEBAR_WIDTH = "16rem"
  const SIDEBAR_WIDTH_ICON = "3rem"
  const SIDEBAR_KEYBOARD_SHORTCUT = "b"
- 
+
  // ... component code continues
 diff --git a/src/components/ui/sonner.tsx b/src/components/ui/sonner.tsx
 --- a/src/components/ui/sonner.tsx
 +++ b/src/components/ui/sonner.tsx
 @@ -7,9 +7,13 @@ export function Toaster() {
    const { theme } = useTheme()
- 
+
    return (
 -    <Sonner
 -      theme={theme as ToasterProps["theme"]}
@@ -234,6 +234,6 @@ diff --git a/src/contexts/AppContext.tsx b/src/contexts/AppContext.tsx
 -import { v4 as uuidv4 } from 'uuid';
 -import { toast } from '@/components/ui/use-toast';
 +import React, { createContext, useContext, useState } from 'react';
- 
+
  interface AppContextType {
    sidebarOpen: boolean;
