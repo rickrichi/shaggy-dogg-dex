@@ -1,0 +1,116 @@
+Here’s a precise read-through of what your `Activity.tsx` does, end-to-end.
+
+What it is
+A read-only React page that pulls your most recent asset transfers (external ETH, ERC-20/721/1155) for the currently connected wagmi address from Alchemy and renders summary stats + a detailed list with explorer links.
+
+Data model & configuration
+Supported chains are hard-allowlisted (`1, 137, 10, 42161, 8453, 11155111`) and mapped to:
+
+  a human name (unused in UI),
+  an explorer base URL (for per-tx links),
+  and the Vite env var key that should hold the Alchemy RPC URL.
+
+Two custom Error types:
+  `ChainNotSupportedError` if the current `chainId` isn’t in the allowlist,
+  `AlchemyApiError` if the JSON-RPC call returns an error object.
+
+Transaction (your internal view model) is normalized to:
+  `hash`, `from`, `to`, numeric `blockNumber`, epoch seconds `timeStamp`,
+  raw `value` as a string (so you can `BigInt` it later),
+  `tokenSymbol`/`tokenDecimal` (strings) inferred from the Alchemy payload,
+  `methodId` heuristic (`0xa9059cbb` for ERC-20 transfers, `'0x'` otherwise),
+  gas fields are placeholders (`'0'`), `isError` is hardcoded to `'0'`.
+
+State machine
+Component state:
+`transactions: Transaction[]`
+`stats: { totalSwaps, totalVolume, gasSpent }`
+`loading: boolean`, `error: string | null`
+
+Fetch lifecycle (network I/O)
+Trigger: once on initial mount (because `useEffect(..., [])`), and on manual click of the Refresh button.
+
+Guardrails:
+  Ensures `address` exists (early return otherwise).
+  Validates `chainId` using the allowlist → throws `ChainNotSupportedError` if unsupported.
+  Loads the Alchemy URL from `import.meta.env[envKey]` and validates it’s a non-empty string.
+
+Request: `POST` JSON-RPC to your Alchemy endpoint with method
+
+  `alchemy_getAssetTransfers`
+  params:
+
+    `fromBlock: '0x0'` to `latest`,
+    `fromAddress: <connected address>`,
+    `category: ['external','erc20','erc721','erc1155']`,
+    `withMetadata: true` (to get `blockTimestamp`),
+    `excludeZeroValue: true`,
+    `maxCount: '0x32'` (50 items).
+
+Response handling:
+  1. If HTTP error → `throw`.
+  2. If JSON-RPC error → `throw AlchemyApiError`.
+  3. If shape invalid → `throw`.
+
+Normalization (`transformAlchemyTransfer`):
+  `blockNum` (hex) → `blockNumber: number` via `parseInt(hex, 16)`.
+  `metadata.blockTimestamp` (ISO) → `timeStamp: epochSeconds`.
+  `value?: number` (Alchemy) → stringified `value` or `'0'`.
+  `tokenSymbol` := `erc20Metadata.symbol ?? asset` (falls back to `'ETH'` in your code via `asset || 'ETH'`).
+  `tokenDecimal` := `(erc20Metadata.decimals ?? 18).toString()`.
+  `methodId` := `'0xa9059cbb'` only for ERC-20 category, else `'0x'`.
+    (Note: `0xa9059cbb` is ERC-20 transfer, not a “swap”.)
+
+State commit:
+  `setTransactions(normalized)`
+  `setStats(calculateStats(normalized))`
+  `loading` flipped appropriately; `error` set if any exception.
+
+Statistics calculation
+
+`totalSwaps`: counts tx where `methodId !== '0x'`.
+  Practically this counts every ERC-20 transfer (because you set `0xa9059cbb` for those), which over-approximates swaps (transfers happen in many contexts; swaps often emit transfers, but not every transfer is a swap).
+`totalVolume`: `sum(parseFloat(tx.value))` over all tx, then `.toFixed(2)`.
+  Since `tx.value` is raw base-units (e.g., wei), this overstates values by 10^decimals unless they’re already small. (For display you correctly use `formatUnits` with `tokenDecimal`; the stat doesn’t.)
+`gasSpent`: hardcoded `'0'` (you noted it would require further API calls).
+
+Rendering logic
+
+Disconnected state: shows a card prompting to connect a wallet.
+Header: title, help text, and Refresh button (disabled while `loading`; click calls `fetchTransactions()`).
+Error banner: red card with the thrown `error` text.
+Stats strip (3 cards):
+
+  *Total Transactions*: `transactions.length`
+  *Total Volume*: `stats.totalVolume` (see caveat above)
+  *Swaps*: `stats.totalSwaps` (really “ERC-20 transfers” per your heuristic)
+List of transactions:
+
+  For each `tx`:
+    Left: avatar icon and value display:
+      `formatValue(tx.value, parseInt(tx.tokenDecimal||'18'), tx.tokenSymbol)`
+      → `BigInt(value)` → `formatUnits(..., decimals)` → 4-dp + symbol.
+    Status badge: `failed` if `isError === '1'`, else `completed` (no pending detection).
+    Meta row: relative age `formatTimeAgo(tx.timeStamp)` and Block: N.
+    Right: monospace hash preview and explorer link:
+
+      Explorer base from `CHAIN_CONFIG[chainId].explorerUrl`, fallback to Etherscan mainnet on error.
+
+Subtle but important behaviors / caveats
+
+Effect dependencies: `useEffect(() => { if (isConnected && address) fetchTransactions(); }, [])`
+  Because the deps array is empty, the fetch runs only once on mount. If the user connects their wallet *afterthe initial render, switches accounts, or changes chains, no automatic refetch happens (only manual Refresh works).
+  If you intended auto-refresh on address/chain change, include `[isConnected, address, chainId]` (and memoize `fetchTransactions`) or call inside wagmi event handlers.
+
+“Swap” detection: using `methodId === '0xa9059cbb'` equates to ERC-20 transfers, not swaps. Accurate swap detection usually requires:
+
+  decoding logs to identify DEX routers/pools,
+  or simulating calls to get value-flow semantics.
+
+Volume statistic unit: you’re summing base units as floats. If you want a correct human-readable volume, you need to normalize per-tx with its decimals (e.g., `sum += Number(formatUnits(BigInt(value), decimals))`). You already do that for individual display; the stat path just needs the same normalization.
+
+Gas placeholders: `gasUsed`/`gasPrice` are `'0'`, so `gasSpent` is not meaningful yet.
+
+Safety: read-only; no writes/signatures; env var is required (`VITE_*`). Errors are surfaced to the user; unsupported chains give a clear message.
+
+

@@ -1,0 +1,232 @@
+Here’s a strict, framework-agnostic chains module with rich type guards, and safe indexing. Drop this folder at `src/config/chains/` and import from `@/config/chains`.
+
+
+src/
+└─ config/
+   └─ chains/
+      ├─ types.ts
+      ├─ config.ts
+      ├─ guards.ts
+      ├─ env.ts
+      ├─ explorer.ts
+      └─ index.ts
+
+
+`src/config/chains/types.ts`
+
+ts
+// Strict types for chain configuration
+
+export const SUPPORTED_CHAIN_IDS = [1, 137, 10, 42161, 8453, 11155111] as const;
+export type SupportedChainId = (typeof SUPPORTED_CHAIN_IDS)[number];
+
+export type ChainKey =
+  | 'ethereum'
+  | 'polygon'
+  | 'optimism'
+  | 'arbitrum'
+  | 'base'
+  | 'sepolia';
+
+export type EnvKey =
+  | 'VITE_ALCHEMY_MAINNET_URL'
+  | 'VITE_ALCHEMY_POLYGON_URL'
+  | 'VITE_ALCHEMY_OPTIMISM_URL'
+  | 'VITE_ALCHEMY_ARBITRUM_URL'
+  | 'VITE_ALCHEMY_BASE_URL'
+  | 'VITE_ALCHEMY_SEPOLIA_URL';
+
+export interface ChainConfig {
+  / EIP-155 chain id */
+  id: SupportedChainId;
+  / Stable machine key */
+  key: ChainKey;
+  / Human name */
+  name: string;
+  / Block explorer base url */
+  explorerUrl: string;
+  / Vite env var key for RPC/Alchemy endpoint */
+  envKey: EnvKey;
+}
+
+
+`src/config/chains/config.ts`
+
+ts
+import { type ChainConfig, type SupportedChainId } from './types';
+
+export const CHAIN_CONFIG: Readonly<Record<SupportedChainId, ChainConfig>> = {
+  1: {
+    id: 1,
+    key: 'ethereum',
+    name: 'Ethereum',
+    explorerUrl: 'https://etherscan.io',
+    envKey: 'VITE_ALCHEMY_MAINNET_URL',
+  },
+  137: {
+    id: 137,
+    key: 'polygon',
+    name: 'Polygon',
+    explorerUrl: 'https://polygonscan.com',
+    envKey: 'VITE_ALCHEMY_POLYGON_URL',
+  },
+  10: {
+    id: 10,
+    key: 'optimism',
+    name: 'Optimism',
+    explorerUrl: 'https://optimistic.etherscan.io',
+    envKey: 'VITE_ALCHEMY_OPTIMISM_URL',
+  },
+  42161: {
+    id: 42161,
+    key: 'arbitrum',
+    name: 'Arbitrum',
+    explorerUrl: 'https://arbiscan.io',
+    envKey: 'VITE_ALCHEMY_ARBITRUM_URL',
+  },
+  8453: {
+    id: 8453,
+    key: 'base',
+    name: 'Base',
+    explorerUrl: 'https://basescan.org',
+    envKey: 'VITE_ALCHEMY_BASE_URL',
+  },
+  11155111: {
+    id: 11155111,
+    key: 'sepolia',
+    name: 'Sepolia',
+    explorerUrl: 'https://sepolia.etherscan.io',
+    envKey: 'VITE_ALCHEMY_SEPOLIA_URL',
+  },
+} as const;
+
+/ Convenience ordered list of configs */
+export const ALL_CHAINS = (Object.keys(CHAIN_CONFIG) as unknown as SupportedChainId[])
+  .sort((a, b) => Number(a) - Number(b))
+  .map((id) => CHAIN_CONFIG[id]);
+
+
+`src/config/chains/guards.ts`
+
+ts
+import { SUPPORTED_CHAIN_IDS, type SupportedChainId } from './types';
+import { CHAIN_CONFIG } from './config';
+
+/ Runtime guard + type predicate for SupportedChainId */
+export function isSupportedChain(id: number): id is SupportedChainId {
+  return SUPPORTED_CHAIN_IDS.includes(id as SupportedChainId);
+}
+
+/ Throws with a helpful message while refining the type */
+export function assertSupportedChain(id: number): asserts id is SupportedChainId {
+  if (!isSupportedChain(id)) {
+    const allowed = SUPPORTED_CHAIN_IDS.join(', ');
+    throw new Error(`Unsupported chain id: ${id}. Supported: [${allowed}]`);
+  }
+}
+
+/ Parse unknown → SupportedChainId | null (no throw) */
+export function parseSupportedChainId(value: unknown): SupportedChainId | null {
+  if (typeof value !== 'number') return null;
+  return isSupportedChain(value) ? value : null;
+}
+
+/ Safe accessors that never let undefined be used as an index */
+export function getChainConfig(id: SupportedChainId) {
+  return CHAIN_CONFIG[id];
+}
+
+/ Strict variant from a number (throws if unsupported) */
+export function getChainConfigStrict(id: number) {
+  assertSupportedChain(id);
+  return CHAIN_CONFIG[id];
+}
+
+
+`src/config/chains/env.ts`
+
+ts
+import { type EnvKey } from './types';
+
+/
+ * Vite: import.meta.env doesn't have an index signature.
+ * Narrow via unknown and validate at runtime. No `any`.
+ */
+export function getEnvString(key: EnvKey): string {
+  const envUnknown = import.meta.env as unknown;
+  const env = (typeof envUnknown === 'object' && envUnknown !== null
+    ? envUnknown
+    : {}) as Record<string, unknown>;
+
+  const val = env[key];
+  if (typeof val !== 'string' || val.trim().length === 0) {
+    throw new Error(`Environment variable ${key} is missing or empty`);
+  }
+  return val;
+}
+
+
+`src/config/chains/explorer.ts`
+
+ts
+import { type SupportedChainId } from './types';
+import { getChainConfig } from './guards';
+
+export function buildExplorerTxUrl(chainId: SupportedChainId, txHash: string): string {
+  const { explorerUrl } = getChainConfig(chainId);
+  return `${explorerUrl}/tx/${txHash}`;
+}
+
+export function buildExplorerAddressUrl(chainId: SupportedChainId, address: string): string {
+  const { explorerUrl } = getChainConfig(chainId);
+  return `${explorerUrl}/address/${address}`;
+}
+
+
+`src/config/chains/index.ts`
+
+ts
+export {
+  SUPPORTED_CHAIN_IDS,
+  type SupportedChainId,
+  type ChainKey,
+  type EnvKey,
+  type ChainConfig,
+} from './types';
+
+export { CHAIN_CONFIG, ALL_CHAINS } from './config';
+
+export {
+  isSupportedChain,
+  assertSupportedChain,
+  parseSupportedChainId,
+  getChainConfig,
+  getChainConfigStrict,
+} from './guards';
+
+export { getEnvString } from './env';
+
+export { buildExplorerTxUrl, buildExplorerAddressUrl } from './explorer';
+
+
+#Example usage (the bit you asked about)
+
+ts
+import {
+  SUPPORTED_CHAIN_IDS,
+  CHAIN_CONFIG,
+  type SupportedChainId,
+} from '@/config/chains';
+
+chainResults.forEach((result, index) => {
+  const chainId: SupportedChainId = SUPPORTED_CHAIN_IDS[index];
+  const chainName = CHAIN_CONFIG[chainId].name; // safe: chainId is refined
+});
+
+
+This structure guarantees:
+
+* No `any`; unions & interfaces everywhere.
+* Unknown → narrowed via dedicated type guards.
+* No accidental `undefined` used as an index (TS2538 avoided by design).
+* Reusable helpers for env and explorer URLs.

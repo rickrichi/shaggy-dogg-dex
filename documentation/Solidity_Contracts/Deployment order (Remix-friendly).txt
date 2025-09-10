@@ -1,0 +1,126 @@
+Deployment order (Remix-friendly)
+
+1. Deploy `ShaggyDoggToken`
+
+   Constructor:
+
+     * `name_`: `"ShaggyDoggToken"`
+     * `symbol_`: `"SDT"`
+     * `initialAdmin`: your Timelock (or your EOA for now)
+     * `initialMinter`: your Timelock (or same EOA for now)
+     * `initialMint`: e.g., `0` or a treasury amount like `1000000e18`
+
+2. Deploy `FeeDiscountStaking`
+
+   Constructor:
+
+     * `token_`: the SDT address from step 1
+     * `admin_`: same admin (Timelock/EOA)
+     * `tierAdmin_`: same admin (or a separate role manager)
+
+3. Post-deploy setup
+
+   (Optional) From your admin, call `setTiers` with ascending thresholds:
+
+     solidity
+
+     // example (units are in wei with 18 decimals)
+     [
+       { minStake: 1_000e18,  discountBps: 50  },  // 0.50%
+       { minStake: 10_000e18, discountBps: 100 },  // 1.00%
+       { minStake: 100_000e18,discountBps: 250 }   // 2.50%
+     ]
+     
+   * (Optional) `setMinimumStakePeriod(seconds)` and `setWithdrawalFee(bps)`.
+
+Final suggested import headers (drop-in)
+
+ShaggyDoggToken.sol
+
+solidity
+
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
+import {ERC20Votes} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
+import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol"; // <-- utils in v5
+import {Nonces} from "@openzeppelin/contracts/utils/Nonces.sol";
+
+
+FeeDiscountStaking.sol
+
+solidity
+
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol"; // <-- utils in v5
+
+=====================================================
+=====================================================
+Great question — this is where “roles” meet deployment reality. Let’s break it down:
+
+
+
+1. What is `initialAdmin`?
+
+* The Admin controls AccessControl roles (can grant/revoke MINTER\_ROLE, PAUSER\_ROLE, etc.).
+* In production, this should be a TimelockController contract (or a DAO multisig like Gnosis Safe).
+* In testing/dev, you can just use your own wallet address (EOA).
+
+👉 You’ll get this from your MetaMask (or other wallet).
+
+* If you’re in Remix connected to MetaMask, you can paste your wallet address in the constructor’s `initialAdmin` field.
+
+
+
+2. What is `initialMinter`?
+* The Minter is allowed to call `mint()` on your token.
+* In production, best practice = the same Timelock/DAO that governs upgrades.
+* In testing/dev = you can also use your own wallet address (the same as `initialAdmin`).
+
+👉 Again, grab your wallet address and paste it into the constructor for `initialMinter`.
+
+
+3. What is `initialMint`?
+* This is the amount of tokens to pre-mint at deployment.
+* Must be ≤ `MAX_SUPPLY` (`1_000_000_000e18`).
+* If you don’t want a premine → set `0`.
+* If you want, say, 1,000,000 tokens to go to treasury/admin at launch:
+
+  * Enter `1000000` but remember decimals.
+  * With 18 decimals, that means:
+
+    ```
+    1000000 * 10^18 = 1000000000000000000000000
+    ```
+
+So you’d paste `1000000000000000000000000` into Remix.
+
+
+4. Practical tip for Remix deployment
+In Remix’s Deploy tab:
+
+Choose your contract (`ShaggyDoggToken`).
+In the constructor fields:
+
+  * `name_`: `"ShaggyDoggToken"`
+  * `symbol_`: `"SDT"`
+  * `initialAdmin`: *paste your MetaMask wallet address*
+  * `initialMinter`: *same wallet address (for now)*
+  * `initialMint`: `0` (if you want no premint) or the big number with 18 decimals.
+
+
+Later, when you’re ready to decentralize:
+* You deploy a TimelockController contract.
+* Transfer `DEFAULT_ADMIN_ROLE` and `MINTER_ROLE` to it.
+* Revoke those roles from your wallet.
+
+That’s how you move from “dev mode” to “production DAO mode.”
+
+
+
+
+

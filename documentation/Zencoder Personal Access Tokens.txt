@@ -1,0 +1,10 @@
+Zencoder Personal Access Tokens
+August 27, 2025
+
+Crypto DEX:
+
+Client ID
+0ab376e4-8f9e-4624-8bc5-c029eb9d3b56
+
+Secret Key
+98fa2f21-fb3a-4214-a17f-6648067ade95

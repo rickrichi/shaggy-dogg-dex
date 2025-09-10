@@ -1,0 +1,13 @@
+ClientID:
+919159561473-eehadlcml02gcppipniq7an5410uj3eg.apps.googleusercontent.com
+
+Client Secret:
+***REMOVED***
+
+
+Client Secret (for OAuth)
+***REMOVED***
+
+Callback URL (for OAuth)
+https://vcbcrvkcfolvskrnxuyd.supabase.co/auth/v1/callback
+

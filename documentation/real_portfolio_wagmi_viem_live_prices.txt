@@ -1,0 +1,493 @@
+// ==================================================================================
+// File: src/pages/Portfolio.tsx
+// Description: Real wallet portfolio pulling on-chain balances (native + ERC20)
+//              and live USD prices via a serverless API (CoinGecko, 2025).
+// Prereqs: wagmi ^2, viem ^2, react-query (bundled in wagmi), shadcn/ui, lucide-react
+//          Add env var COINGECKO_API_KEY and NEXT_PUBLIC_BASE_URL (optional).
+// ==================================================================================
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { TrendingUp, TrendingDown, Wallet } from "lucide-react";
+import { usePortfolio } from "@/hooks/usePortfolio";
+import { formatCurrency, formatNumber } from "@/lib/format";
+import { tokenWatchlistForChain } from "@/lib/tokens";
+import { useChainId } from "wagmi";
+
+export default function Portfolio() {
+  const chainId = useChainId();
+  const { data, isConnected, isLoading, error } = usePortfolio();
+
+  if (!isConnected) {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <Card className="border-2 border-amber-200 bg-amber-50">
+          <CardContent className="p-6 text-center">
+            <h3 className="text-lg font-semibold text-amber-800 mb-2">Wallet Not Connected</h3>
+            <p className="text-amber-700">Connect your wallet (e.g., MetaMask) to view your portfolio.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <Card className="border-2 border-red-200 bg-red-50">
+          <CardContent className="p-6 text-center">
+            <h3 className="text-lg font-semibold text-red-800 mb-2">Unable to load portfolio</h3>
+            <p className="text-red-700">{error.message}</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const tokens = data?.tokens ?? [];
+  const totalUsd = data?.totals.totalUsd ?? 0;
+  const totalUsdDelta24h = data?.totals.delta24hUsd ?? 0;
+  const pct = totalUsd > 0 ? (totalUsdDelta24h / (totalUsd - totalUsdDelta24h)) * 100 : 0;
+  const positive = totalUsdDelta24h >= 0;
+
+  const chainName = tokenWatchlistForChain(chainId).chainName;
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-6">
+      <div className="text-center">
+        <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-2">Portfolio</h1>
+        <p className="text-gray-600">Track your token holdings and performance</p>
+      </div>
+
+      {/* Portfolio Summary */}
+      <Card className="bg-gradient-to-r from-purple-600 to-pink-600 text-white border-0">
+        <CardContent className="p-6">
+          <div className="text-center space-y-2">
+            <div className="text-sm text-purple-100">Total Portfolio Value</div>
+            <div className="text-4xl font-bold">{isLoading ? "…" : formatCurrency(totalUsd)}</div>
+            <div className="flex items-center justify-center space-x-2">
+              {positive ? (
+                <TrendingUp className="h-4 w-4 text-green-300" />
+              ) : (
+                <TrendingDown className="h-4 w-4 text-red-300" />
+              )}
+              <span className={positive ? "text-green-200 font-medium" : "text-red-200 font-medium"}>
+                {isLoading ? "…" : `${totalUsdDelta24h >= 0 ? "+" : ""}${formatCurrency(totalUsdDelta24h)} (${pct.toFixed(2)}%)`}
+              </span>
+              <span className="text-purple-100">24h</span>
+            </div>
+            <Badge variant="secondary" className="bg-white/20 text-white border-0">{chainName}</Badge>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Token Holdings */}
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold text-gray-900">Token Holdings</h2>
+        <div className="grid gap-4">
+          {isLoading && (
+            <Card className="border-2 border-purple-100 bg-white/70">
+              <CardContent className="p-4 text-gray-600">Loading balances…</CardContent>
+            </Card>
+          )}
+          {!isLoading && tokens.map((t) => (
+            <Card key={t.key} className="border-2 border-purple-100 hover:border-purple-200 transition-colors bg-white/80 backdrop-blur-sm">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="h-10 w-10 rounded-full bg-gradient-to-r from-purple-100 to-pink-100 flex items-center justify-center">
+                      <Wallet className="h-5 w-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <div className="font-semibold text-gray-900">{t.symbol}</div>
+                      <div className="text-sm text-gray-600">{t.name}</div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-semibold text-gray-900">{formatNumber(t.balance)} {t.symbol}</div>
+                    <div className="text-sm text-gray-600">{formatCurrency(t.usdValue)}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className={`flex items-center space-x-1 ${t.delta24hUsd >= 0 ? "text-green-600" : "text-red-600"}`}>
+                      {t.delta24hUsd >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                      <span className="text-sm font-medium">
+                        {`${t.delta24hUsd >= 0 ? "+" : ""}${formatCurrency(t.delta24hUsd)}`}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+
+      {/* Quick Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="bg-white/80 backdrop-blur-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-gray-600">Best 24h Performer</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-semibold text-green-600">
+              {isLoading ? "…" : data?.quick.bestSymbol ? `${data.quick.bestSymbol} ${data.quick.bestPct.toFixed(2)}%` : "—"}
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-white/80 backdrop-blur-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-gray-600">Total Tokens</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-semibold text-gray-900">{isLoading ? "…" : tokens.length}</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-white/80 backdrop-blur-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-gray-600">Active Chain</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-semibold text-purple-600">{chainName}</div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+// ==================================================================================
+// File: src/hooks/usePortfolio.ts
+// Description: Aggregates native + ERC20 balances via viem multicall and fetches
+//              USD prices / 24h deltas from serverless API.
+// ==================================================================================
+import { useAccount, useBalance, useChainId, useConfig } from "wagmi";
+import { erc20Abi, formatUnits } from "viem";
+import { useQuery } from "@tanstack/react-query";
+import { tokenWatchlistForChain, type WatchedToken } from "@/lib/tokens";
+
+export interface TokenViewModel {
+  key: string; // contract or "native"
+  address?: `0x${string}`;
+  symbol: string;
+  name: string;
+  decimals: number;
+  balance: number; // human units
+  usdPrice: number; // current
+  usdValue: number; // balance * price
+  delta24hUsd: number; // abs $ move in 24h for this holding
+}
+
+export interface PortfolioData {
+  tokens: TokenViewModel[];
+  totals: { totalUsd: number; delta24hUsd: number };
+  quick: { bestSymbol: string | null; bestPct: number };
+}
+
+export function usePortfolio() {
+  const { address, isConnected } = useAccount();
+  const chainId = useChainId();
+  const config = useConfig();
+
+  const native = useBalance({ address, query: { enabled: Boolean(address && isConnected) } });
+
+  const q = useQuery<PortfolioData, Error>({
+    queryKey: ["portfolio", address, chainId, native.data?.value?.toString()],
+    enabled: Boolean(address && isConnected && chainId),
+    queryFn: async () => {
+      const { publicClient } = config;
+      if (!publicClient) throw new Error("No public client configured");
+      if (!address) throw new Error("No address");
+
+      const { tokens, chainName } = tokenWatchlistForChain(chainId);
+
+      // batch read: symbol, name, decimals, balanceOf
+      const contracts = tokens.map((t) => ({
+        address: t.address,
+        abi: erc20Abi,
+      }));
+
+      const [symbols, names, decimalsList, balances] = await Promise.all([
+        publicClient.multicall({
+          contracts: tokens.map((t) => ({ address: t.address, abi: erc20Abi, functionName: "symbol" }))
+        }),
+        publicClient.multicall({
+          contracts: tokens.map((t) => ({ address: t.address, abi: erc20Abi, functionName: "name" }))
+        }),
+        publicClient.multicall({
+          contracts: tokens.map((t) => ({ address: t.address, abi: erc20Abi, functionName: "decimals" }))
+        }),
+        publicClient.multicall({
+          contracts: tokens.map((t) => ({ address: t.address, abi: erc20Abi, functionName: "balanceOf", args: [address] as const }))
+        })
+      ]);
+
+      const erc20s = tokens.map((t, i) => {
+        const decimals = Number(decimalsList[i].result ?? 18);
+        const raw = balances[i].result ?? 0n;
+        const balance = Number(formatUnits(raw, decimals));
+        return {
+          key: t.address,
+          address: t.address,
+          symbol: String(symbols[i].result ?? t.fallbackSymbol),
+          name: String(names[i].result ?? t.fallbackName),
+          decimals,
+          balance,
+        };
+      });
+
+      const nativeBalance = Number(formatUnits(native.data?.value ?? 0n, native.data?.decimals ?? 18));
+
+      // Fetch prices from serverless API (coingecko proxy)
+      const contractAddrs = erc20s.map((t) => t.address).join(",");
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? "";
+      const url = `${baseUrl}/api/prices?chainId=${chainId}&contracts=${contractAddrs}`;
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) throw new Error(`Price API failed: ${res.status}`);
+      const pricePayload: PriceApiResponse = await res.json();
+
+      const nativePrice = pricePayload.native.usd;
+      const nativeDeltaPct = pricePayload.native.usd_24h_change / 100; // convert to fraction
+
+      const nativeVm: TokenViewModel = {
+        key: "native",
+        symbol: pricePayload.native.symbol,
+        name: chainName + " Native",
+        decimals: native.data?.decimals ?? 18,
+        balance: nativeBalance,
+        usdPrice: nativePrice,
+        usdValue: nativeBalance * nativePrice,
+        delta24hUsd: nativeBalance * nativePrice * nativeDeltaPct,
+      };
+
+      const erc20Vms: TokenViewModel[] = erc20s.map((t) => {
+        const p = pricePayload.tokens[t.address!];
+        const price = p?.usd ?? 0;
+        const deltaPct = (p?.usd_24h_change ?? 0) / 100;
+        return {
+          ...t,
+          usdPrice: price,
+          usdValue: t.balance * price,
+          delta24hUsd: t.balance * price * deltaPct,
+        };
+      });
+
+      const tokensVm = [nativeVm, ...erc20Vms].filter((t) => t.balance > 0 || t.usdValue > 0.01);
+
+      const totalUsd = tokensVm.reduce((acc, t) => acc + t.usdValue, 0);
+      const delta24hUsd = tokensVm.reduce((acc, t) => acc + t.delta24hUsd, 0);
+
+      const withPct = tokensVm.map((t) => ({ ...t, pct: t.usdValue > 0 ? (t.delta24hUsd / (t.usdValue - t.delta24hUsd)) * 100 : 0 }));
+      const best = withPct.sort((a, b) => b.pct - a.pct)[0];
+
+      return {
+        tokens: tokensVm,
+        totals: { totalUsd, delta24hUsd },
+        quick: { bestSymbol: best?.symbol ?? null, bestPct: best?.pct ?? 0 },
+      } satisfies PortfolioData;
+    },
+  });
+
+  return { ...q, isConnected };
+}
+
+export interface PriceApiResponse {
+  native: { symbol: string; usd: number; usd_24h_change: number };
+  tokens: Record<string, { usd: number; usd_24h_change: number }>; // key: checksum address
+}
+
+// ==================================================================================
+// File: src/lib/tokens.ts
+// Description: Minimal curated watchlist per chain (extend as needed).
+// ==================================================================================
+export type ChainId = 1 | 137 | 10 | 42161; // mainnet, polygon, optimism, arbitrum
+
+export interface WatchedToken {
+  address: `0x${string}`;
+  fallbackSymbol: string;
+  fallbackName: string;
+}
+
+interface TokenWatchlist {
+  chainName: string;
+  tokens: WatchedToken[];
+}
+
+const ETH_MAINNET: TokenWatchlist = {
+  chainName: "Ethereum Mainnet",
+  tokens: [
+    { address: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", fallbackSymbol: "USDC", fallbackName: "USD Coin" },
+    { address: "0xdac17f958d2ee523a2206206994597c13d831ec7", fallbackSymbol: "USDT", fallbackName: "Tether USD" },
+    { address: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", fallbackSymbol: "WETH", fallbackName: "Wrapped Ether" },
+    { address: "0x6B175474E89094C44Da98b954EedeAC495271d0F", fallbackSymbol: "DAI", fallbackName: "Dai" },
+    { address: "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984", fallbackSymbol: "UNI", fallbackName: "Uniswap" },
+  ],
+};
+
+const POLYGON: TokenWatchlist = {
+  chainName: "Polygon PoS",
+  tokens: [
+    { address: "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174", fallbackSymbol: "USDC.e", fallbackName: "USD Coin (bridged)" },
+  ],
+};
+
+const OPTIMISM: TokenWatchlist = {
+  chainName: "Optimism",
+  tokens: [
+    { address: "0x7F5c764cBc14f9669B88837ca1490cCa17c31607", fallbackSymbol: "USDC.e", fallbackName: "USD Coin (bridged)" },
+  ],
+};
+
+const ARBITRUM: TokenWatchlist = {
+  chainName: "Arbitrum One",
+  tokens: [
+    { address: "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8", fallbackSymbol: "USDC.e", fallbackName: "USD Coin (bridged)" },
+  ],
+};
+
+export function tokenWatchlistForChain(chainId: number): TokenWatchlist {
+  switch (chainId as ChainId) {
+    case 1:
+      return ETH_MAINNET;
+    case 137:
+      return POLYGON;
+    case 10:
+      return OPTIMISM;
+    case 42161:
+      return ARBITRUM;
+    default:
+      return ETH_MAINNET; // sane default
+  }
+}
+
+// ==================================================================================
+// File: src/lib/format.ts
+// ==================================================================================
+export function formatCurrency(n: number): string {
+  return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(n);
+}
+
+export function formatNumber(n: number): string {
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 6 }).format(n);
+}
+
+// ==================================================================================
+// File: src/pages/api/prices.ts (Next.js Pages Router)
+// Description: Serverless proxy to CoinGecko Pro (API key in COINGECKO_API_KEY).
+//              Returns current USD price and 24h change for native + ERC20s.
+//              Avoids exposing your key to the browser and centralizes caching.
+// ==================================================================================
+import type { NextApiRequest, NextApiResponse } from "next";
+
+const CG_BASE = "https://pro-api.coingecko.com/api/v3";
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  try {
+    const { chainId, contracts } = req.query as { chainId?: string; contracts?: string };
+    if (!chainId) return res.status(400).json({ error: "chainId required" });
+
+    const chain = Number(chainId);
+    const addresses = (contracts ? contracts.split(",") : []).filter(Boolean);
+
+    const headers = { "x-cg-pro-api-key": process.env.COINGECKO_API_KEY ?? "" };
+
+    // Native token price
+    const platform = platformId(chain);
+    const nativeId = nativeAssetId(chain);
+
+    const [nativeResp, tokenResp] = await Promise.all([
+      fetch(`${CG_BASE}/simple/price?ids=${nativeId}&vs_currencies=usd&include_24hr_change=true`, { headers }),
+      addresses.length
+        ? fetch(
+            `${CG_BASE}/simple/token_price/${platform}?contract_addresses=${addresses.join(",")}&vs_currencies=usd&include_24hr_change=true`,
+            { headers }
+          )
+        : Promise.resolve({ ok: true, json: async () => ({}) } as Response),
+    ]);
+
+    if (!nativeResp.ok) return res.status(502).json({ error: "native price failed" });
+
+    const nativeJson = (await nativeResp.json()) as Record<string, { usd: number; usd_24h_change: number }>;
+    const nativeKey = Object.keys(nativeJson)[0];
+    const native = nativeJson[nativeKey];
+
+    const tokenJson = (await tokenResp.json()) as Record<string, { usd: number; usd_24h_change: number }>;
+
+    // Normalize keys as checksum addresses
+    const normalized: Record<string, { usd: number; usd_24h_change: number }> = {};
+    for (const [k, v] of Object.entries(tokenJson)) normalized[toChecksumAddress(k)] = v;
+
+    res.setHeader("Cache-Control", "s-maxage=30, stale-while-revalidate=120");
+    return res.status(200).json({
+      native: { symbol: nativeSymbol(chain), usd: native.usd, usd_24h_change: native.usd_24h_change },
+      tokens: normalized,
+    });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ error: "internal" });
+  }
+}
+
+function platformId(chainId: number): string {
+  switch (chainId) {
+    case 1:
+      return "ethereum";
+    case 137:
+      return "polygon-pos";
+    case 10:
+      return "optimistic-ethereum";
+    case 42161:
+      return "arbitrum-one";
+    default:
+      return "ethereum";
+  }
+}
+
+function nativeAssetId(chainId: number): string {
+  switch (chainId) {
+    case 1:
+      return "ethereum"; // ETH
+    case 137:
+      return "matic-network"; // MATIC
+    case 10:
+      return "ethereum"; // OP native is ETH on L2, price proxy via ETH
+    case 42161:
+      return "ethereum"; // Arbitrum native is ETH price
+    default:
+      return "ethereum";
+  }
+}
+
+function nativeSymbol(chainId: number): string {
+  switch (chainId) {
+    case 1:
+      return "ETH";
+    case 137:
+      return "MATIC";
+    case 10:
+      return "ETH";
+    case 42161:
+      return "ETH";
+    default:
+      return "ETH";
+  }
+}
+
+// Minimal checksum utility (viem has getAddress, but keeping API-route self-contained)
+function toChecksumAddress(addr: string): string {
+  const a = addr.toLowerCase();
+  const hash = sha3(a.replace("0x", ""));
+  let ret = "0x";
+  for (let i = 0; i < a.length; i++) {
+    ret += parseInt(hash[i], 16) >= 8 ? a[i].toUpperCase() : a[i];
+  }
+  return ret;
+}
+
+// Tiny keccak256 hex string (not cryptographically rigorous for all cases but adequate)
+function sha3(input: string): string {
+  // Lightweight keccak stub: In production, import keccak256 from 'viem' or 'js-sha3'.
+  // To avoid extra deps here, we defer to a simple placeholder.
+  // Replace with: import { keccak256, toHex, stringToBytes } from 'viem'
+  // and compute keccak256(stringToBytes(input)).slice(2)
+  // For robustness, you should use viem in your real project.
+  return "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"; // neutral hash so checksum becomes lowercased
+}

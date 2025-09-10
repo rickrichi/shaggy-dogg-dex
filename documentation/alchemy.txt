@@ -1,0 +1,58 @@
+Google.com login
+https://dashboard.alchemy.com/apps/yumirvvyvvswati5/networks
+
+API Key: ***REMOVED***
+
+
+Network URL:
+https://eth-mainnet.g.alchemy.com/v2/***REMOVED***
+
+===========================================================
+===========================================================
+Request:
+
+import { createPublicClient, http, Block } from "viem";
+import { mainnet } from "viem/chains";
+
+const client = createPublicClient({
+  chain: mainnet,
+  transport: http("https://eth-mainnet.g.alchemy.com/v2/***REMOVED***"),
+});
+
+const block: Block = await client.getBlock({
+  blockNumber: 123456n,
+});
+
+console.log(block);
+
+======================================================
+======================================================
+
+ALCHEMY_HTTP_URL="https://eth-mainnet.g.alchemy.com/v2/***REMOVED***" npx tsx scripts/getBlock.ts:
+
+rickrichi@trillion:/mnt/c/Users/money/Desktop/shaggy-dogg-dex$ ALCHEMY_HTTP_URL="https://eth-mainnet.g.alchemy.com/v2/***REMOVED***" npx tsx scripts/getBlock.ts
+{
+  hash: '0xbd4724b58e5cfb067dde370ad228902c93a7e077fc41e68bf3963cc1c7dc7635',
+  parentHash: '0x0c3bf72ee8d03551c5702586ac0a5848d7ad0a5c55a819354696aca3eeef056e',
+  sha3Uncles: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
+  miner: '0x52bc44d5378309ee2abf1539bf71de1b7d7be3b5',
+  stateRoot: '0x10683bde3ab88bd4165387e0ccb855af948ba2939edc3cab47d9a06784df4c4b',
+  transactionsRoot: '0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421',
+  receiptsRoot: '0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421',
+  logsBloom: '0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',    
+  difficulty: 4505282870523n,
+  number: 123456n,
+  gasLimit: 3141592n,
+  gasUsed: 0n,
+  timestamp: 1440211899n,
+  extraData: '0xd783010002844765746887676f312e342e32856c696e7578',
+  mixHash: '0x84d4162717b039a996ffaf59a54158443c62201b76170b02dbad626cca3226d5',
+  nonce: '0xf4b883fed83092b2',
+  size: 541n,
+  uncles: [],
+  transactions: [],
+  baseFeePerGas: null,
+  blobGasUsed: undefined,
+  excessBlobGas: undefined,
+  totalDifficulty: null
+}

@@ -1,0 +1,194 @@
+Deploy `FeeDiscountStaking` in Remix, the constructor will ask for 3 arguments. Here’s exactly what you type in each box:
+
+
+Constructor Inputs
+
+1. `token_`
+
+0x308673cBfc6faDe727bFf74866b4Cc2ADFeF9493
+
+This is your deployed ShaggyDoggToken (SDT) contract address.
+
+2. `admin_`
+
+0x31fcD43a349AdA21F3c5Df51D66f399bE518a912
+
+Your wallet address (EOA).
+Later, you can transfer this role to a Timelock, but for now, keep yourself as admin.
+
+3. `tierAdmin_`
+
+0x31fcD43a349AdA21F3c5Df51D66f399bE518a912
+
+Same as admin (your wallet).
+This role controls staking tiers (discount levels).
+
+
+Example Final Remix Input (when you deploy)
+
+token_      = 0x308673cBfc6faDe727bFf74866b4Cc2ADFeF9493
+admin_      = 0x31fcD43a349AdA21F3c5Df51D66f399bE518a912
+tierAdmin_  = 0x31fcD43a349AdA21F3c5Df51D66f399bE518a912
+
+
+After deployment, do this quick check in Remix:
+* Call `token()` → should return `0x308673cBfc6faDe727bFf74866b4Cc2ADFeF9493`
+* Call `stakedOf(0x31fcD43a349AdA21F3c5Df51D66f399bE518a912)` → should be `0` (until you stake).
+
+================================================
+================================================
+
+Congrats — staking contract is live at 0xbfD5…F05f ✅
+Here are the exact next inputs to wire it up and test end-to-end in Remix.
+
+1) Mint yourself SDT (so you have something to stake)
+
+You are the `MINTER_ROLE` on the token, so mint to your EOA.
+
+Contract: ShaggyDoggToken (0x308673cBfc6faDe727bFf74866b4Cc2ADFeF9493)
+Function: `mint(address to, uint256 amount)`
+Inputs:
+
+`to` = `0x31fcD43a349AdA21F3c5Df51D66f399bE518a912`
+`amount` = `1000000000000000000000`  (this is 1000 SDT, 18 decimals)
+
+(Use any amount you want; examples below use 1000 SDT.)*
+
+2) Approve the Staking contract to pull your SDT
+
+Contract: ShaggyDoggToken
+Function: `approve(address spender, uint256 amount)`
+Inputs:
+
+`spender` = `0xbfd5da945fe6428b3421429778c75cf8e07ef05f`  (FeeDiscountStaking)
+`amount` = `1000000000000000000000`  (1000 SDT)
+
+3) (Optional now, but recommended) Configure discount tiers
+
+Contract: FeeDiscountStaking (0xbfD5…F05f)
+Function: `setTiers((uint256 minStake,uint16 discountBps)[] tiers)`
+Exact Remix array input (copy/paste):
+
+[
+  { "minStake": "1000000000000000000000", "discountBps": 100 },  // 1,000 SDT => 1.00%
+  { "minStake": "5000000000000000000000", "discountBps": 200 },  // 5,000 SDT => 2.00%
+  { "minStake": "20000000000000000000000", "discountBps": 500 }  // 20,000 SDT => 5.00%
+]
+
+
+You (your EOA) have `TIER_ADMIN_ROLE`, so this will succeed.
+
+4) (Optional) Tweak timing/fees
+
+* Minimum stake period:
+  Function: `setMinimumStakePeriod(uint256 period)`
+  Input: `0` (no wait) or e.g. `3600` (1 hour), `86400` (1 day)
+
+* Withdrawal fee (max 500 = 5%):
+  Function: `setWithdrawalFee(uint16 feeBps)`
+  Input: `0` to start (no withdrawal fee)
+
+5) Stake
+
+Contract: FeeDiscountStaking
+Function: `deposit(uint256 amount)`
+Input: `1000000000000000000000`  (stake 1000 SDT)
+
+Checks:
+
+`stakedOf(0x31fc…8a912)` → should return `1000000000000000000000`
+`discountBpsOf(0x31fc…8a912)` → should reflect your tier (100 if you used tiers above)
+
+6) Try the permit path later (gasless approval)
+
+Once front-end is ready, you’ll call `depositWithPermit(amount, deadline, v,r,s)`.
+For now, direct `approve` + `deposit` (steps 2–5) proves the flow.
+
+
+Quick reference: exact numbers (18 decimals)
+
+* 1 SDT = `1000000000000000000`
+* 100 SDT = `100000000000000000000`
+* 1000 SDT = `1000000000000000000000`
+* 20,000 SDT = `20000000000000000000000`
+
+If anything reverts, ping me with the error text and I’ll pinpoint the exact input to change. Want me to also give you one-click JSON for a different tier schedule?
+
+==============================================
+==============================================
+
+First `setTiers` transaction inputs (so you can immediately configure the discount thresholds after deployment:
+
+Here you go — paste one of these directly into Remix for
+`setTiers((uint256 minStake,uint16 discountBps)[] tiers)`.
+
+
+Option A — object style (Remix accepts this)
+[
+  { "minStake": "1000000000000000000000",  "discountBps": 100 },
+  { "minStake": "5000000000000000000000",  "discountBps": 200 },
+  { "minStake": "20000000000000000000000", "discountBps": 500 }
+]
+
+
+Option B — tuple style (also accepted)
+[
+  ["1000000000000000000000", 100],
+  ["5000000000000000000000", 200],
+  ["20000000000000000000000", 500]
+]
+
+
+Meaning (18 decimals):
+* 1,000 SDT → 1.00% (100 bps)
+* 5,000 SDT → 2.00% (200 bps)
+* 20,000 SDT → 5.00% (500 bps)
+
+Notes:
+
+* First tier `minStake` must be > 0 (your contract enforces this).
+* `discountBps` must be ≤ 10000 and non-decreasing down the list (also enforced).
+
+=================================================
+=================================================
+
+
+setTiers((uint256 minStake, uint16 discountBps)[] tiers)
+
+
+Here are inputs that Remix will accept. Paste exactly one of these (no comments, no extra spaces needed) into the parameter box:
+
+Minimal sanity test (one tier)
+
+[[1000000000000000000000,100]]
+
+
+Three tiers (numbers, not strings)
+[
+  [1000000000000000000000,100],
+  [5000000000000000000000,200],
+  [20000000000000000000000,500]
+]
+
+Three tiers (all as strings – also OK)
+[
+  ["1000000000000000000000","100"],
+  ["5000000000000000000000","200"],
+  ["20000000000000000000000","500"]
+]
+
+
+Each inner pair is `[minStake, discountBps]`:
+
+`1000000000000000000000` = 1,000 SDT (18 decimals)
+`100` = 100 bps = 1.00%
+
+
+If it still errors
+1. Make sure you’re on the right contract instance (`FeeDiscountStaking` at `0xbfd5...f05f`).
+2. Your connected wallet must have TIER\_ADMIN\_ROLE (you granted it in the constructor).
+3. Try the single-tier test first (`[[...]]`) to confirm the shape works.
+4. Ensure your ABI matches the deployed bytecode (recompile if you redeployed a different version).
+5. No trailing commas, no comments, no extra fields—just the raw array of tuples.
+
+

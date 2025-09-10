@@ -1,0 +1,95 @@
+Utility and Governance Token
+What kind of token?
+* Utility + governance, not a “profit share.” Safer posture (esp. U.S.): no direct fee dividends/buyback-and-burn promises. Focus on utility hooks (fee discounts, staking boosts, gauges) and governance over parameters.
+* Network choice: deploy on your primary execution chain (e.g., Base/Arbitrum/OP for low gas). Mirror/bridge later—don’t start omnichain on day 1.
+
+Standards & contracts (2025-current)
+
+Use OpenZeppelin v5 stack:
+
+* ERC-20 base
+* EIP-2612 Permit (`ERC20Permit`) for gasless approvals
+* On-chain governance power (`ERC20Votes`, EIP-5805-compliant)
+* AccessControl + Timelock for minting/parameter changes (or immutable supply if you want “hard cap” cred)
+* Prefer non-upgradeable token contract (clean audit surface); put mutability in admins/timelock/governance modules, not the token.
+
+Concrete utilities that tie into your DEX
+
+Pick a subset to start; wire them into your existing Admin + RLS backend:
+
+1. Fee tiers / discounts
+
+   * Tiered maker/taker fee reductions based on staked or vote-escrowed token balance (e.g., 10k = 5% off, 50k = 15% off, caps at 30%).
+   * Implement as a basis points override in your swap quoting path; read a cache from your DB that’s periodically synced from on-chain staking.
+
+2. ve-locking for governance & boosts
+
+   Lock token for t ∈ \[1 week, 2 years] → mint veTOKEN (non-transferable) used for:
+
+     * Governance voting power (time-weighted)
+     * Gauge weights to direct liquidity incentives across pools (like Solidly/Curve)
+     * Optional routing priority / RFQ access in app (UX “pro” features)
+
+3. Liquidity incentives via gauges
+
+   * Emissions distributor pays incentives to pools based on gauge weights (set by ve voters).
+   * Start very small emissions; publish a 24-month decline schedule.
+
+4. Staked utility
+
+   * Staking vault (non-custodial) to earn points or rebate credits (not revenue share). Credits can offset fees at trade time.
+
+5. Governance surface
+
+Token-holders/ve-holders propose & vote on: allowed token lists, default slippage, max gas guardrails, featured tokens, enabling new chains, incentive budgets.
+
+Token economics (a pragmatic template)
+
+* Total supply: 100M (example). Initial mint to treasury; drip-distribute via emissions.
+* Allocation (transparent cliffs/vest):
+
+  * Community incentives (gauges): 45% (emissions over 3–4 years, halving schedule)
+  * Treasury/DAO: 20% (ops, partnerships; 4-year linear)
+  * Core contributors: 15% (1-yr cliff + 3-yr linear; subject to DAO clawback)
+  * Strategic partners/MMs: 10% (6-12 mo locks)
+  * Ecosystem/Grants: 10%
+
+Emissions controller: Timelocked, DAO-governed. Publish a CSV & hash on-chain.
+
+Compliance & safety (non-negotiable)
+
+* No promises of profit, no “dividends.” Avoid words like “yield,” “APY” tied to protocol fee revenue.
+* Terms of Use + Geofencing in your claim/airdrop UI if needed.
+* Multisig (Safe) + Timelock for treasury & admins; 2–3 independent signers; on-chain transparency.
+* Audit the token + escrow + gauges before TGE.
+
+Launch mechanics (low drama, high clarity)
+
+TGE: mint to treasury, immediately seed deep liquidity in your own DEX pool (e.g., TOKEN/WETH) with protocol-owned liquidity (POL). Consider a Balancer LBP or a Dutch auction if you want price discovery before enabling gauges.
+* Airdrop (if any): objective criteria (traders/LPs/contributors), clear anti-sybil, vest/lock.
+
+Minimal technical stack you’ll need (module outline)
+
+* `Token.sol` = `ERC20` + `ERC20Permit` + `ERC20Votes` (+ `AccessControl`)
+* `Staking/Locker.sol` = ve-style escrow (non-transferable, time-decay)
+* `GaugeController.sol` + `Minter.sol` = weights & emissions (optional: bribes module later)
+* `FeePolicy.sol` (or off-chain rules with on-chain proofs later) consumed by your swap router/quote service
+* `AdminTimelock.sol` + Safe multisig
+
+Practical next steps for you (sequenced, no bikeshedding)
+1. Decide “hard cap” vs emissions: If you want simplicity, cap supply and fund incentives from treasury; if not, add `Minter` governed by DAO.
+2. Pick utilities for MVP: I’d start with Permit, Votes, simple staking for fee discounts (no ve yet), and admin timelock.
+3. Write specs (one pager per module): state, roles, invariants, upgrade philosophy.
+4. Implement with OpenZeppelin v5 (non-upgradeable), unit tests (Foundry/Hardhat), fuzz tests for arithmetic & voting snapshots.
+5. Deploy to a testnet (e.g., Base Sepolia). Wire your existing Admin.tsx to read staking balances and render fee tiers.
+6. Audit-lite pass (internal + static analysis) → external audit before mainnet.
+7. TGE + liquidity seeding, then gradually roll out gauges/ve if you choose that path.
+
+Should it be like Uniswap or PancakeSwap?
+* UNI today is mostly governance; no native fee-share. That’s closer to the low-risk governance token model.
+* CAKE has broader utility & emissions with frequent economic changes—more complex, higher maintenance.
+* For a new DEX, I recommend: UNI-like governance + real, immediate utility (fee discounts, access tiers) and optionally ve-locking once you have steady users. Add gauges when you truly need to steer incentives across many pools.
+
+=============================================================
+=============================================================
+

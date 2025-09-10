@@ -1,0 +1,72 @@
+# ── Logs ──────────────────────────────────────────────────────────────────────
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.eslintcache
+
+# ── Dependencies & Build Artifacts ───────────────────────────────────────────
+node_modules/
+dist/
+dist-ssr/
+.out/            # some tools write here
+build/
+coverage/
+*.tsbuildinfo    # TypeScript incremental build info
+
+# ── Next.js ──────────────────────────────────────────────────────────────────
+.next/
+.next/cache/
+out/
+.vercel/         # you already had this; keep it
+
+# ── Env files (keep example checked in) ──────────────────────────────────────
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+!.env.example
+
+# ── Package manager lockfiles ────────────────────────────────────────────────
+# Keep EXACTLY ONE lockfile (commit it) depending on your PM:
+# pnpm:
+pnpm-lock.yaml
+# yarn:
+# yarn.lock
+# npm:
+# package-lock.json
+
+# If you're standardizing on pnpm, ensure you DO NOT ignore pnpm-lock.yaml.
+# (You had package-lock.json ignored; that's fine if you're not using npm.)
+
+# ── Editors & OS junk ────────────────────────────────────────────────────────
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+Thumbs.db
+
+# ── Test tooling (optional but common) ───────────────────────────────────────
+# Playwright
+playwright-report/
+test-results/
+.playwright/
+# Cypress
+cypress/videos/
+cypress/screenshots/
+
+# ── Turbo / Monorepo niceties (safe to include even if unused) ──────────────
+.turbo/
+
+# ── Misc caches ──────────────────────────────────────────────────────────────
+.parcel-cache/
+.cache/

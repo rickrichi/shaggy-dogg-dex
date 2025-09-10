@@ -1,0 +1,95 @@
+Two concrete issues in the values you typed:
+
+1. Token Address field
+* You pasted:
+  `0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48   // USDC Mainnet`
+* Your UI (and Zod on the server) requires the address to exactly match: `^0x[a-fA-F0-9]{40}$` (42 chars total).
+* The trailing spaces and the `// USDC Mainnet` comment make it fail the regex ⇒ “Token address must be a 0x-prefixed 40-hex string.”
+
+2. Logo URL field
+You entered `https://...` which is not a valid URL. Zod’s `z.string().url()` rejects it. Because your UI passes `logo_uri: ft.logoURI || undefined`, that placeholder still counts as a value and causes the insert to fail backend-side.
+
+Also: you set `Symbol=GD` / `Name=GrowDollar` but the address you entered is USDC’s mainnet address. That mismatch won’t fail validation, but it’s probably not what you intend.
+
+Do this and it will work
+
+Option A — Add USDC (matches the address you pasted):
+
+* Chain ID: `1`
+* Token Address: `0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48` (no spaces, no comment)
+* Symbol: `USDC`
+* Name: `USD Coin`
+* Decimals: `6`
+* Logo URL: `https://cryptologos.cc/logos/usd-coin-usdc-logo.png` (or leave blank)
+
+Option B — Add GrowDollar (GD):
+
+* Use the actual GD contract address on chain 1 (it must be a real 0x…40-hex).
+* Chain ID: `1`
+* Token Address: `<GD contract address>`
+* Symbol: `GD`
+* Name: `GrowDollar`
+* Decimals: `<whatever GD uses>` (most ERC-20s are 18)
+* Logo URL: leave blank or provide a real HTTPS URL (no placeholders)
+
+Quick guardrails you can add (optional but nice)
+Trim & decomment the address before validating/saving:
+
+  * Don’t paste comments in the Address field, but if users do, normalize it like:
+  * `const raw = ft.address.trim(); const addr = raw.split('//')[0].trim();`
+Treat “https\://…” as empty:
+
+  * When building the payload:
+    `const logo = ft.logoURI && ft.logoURI !== 'https://...' ? ft.logoURI : undefined;`
+
+With those two tweaks, fat-fingered entries won’t nuke the insert; but even without code changes, if you paste a clean address (no comment) and either a real logo URL or leave it blank, the Add Featured Token action should succeed and the token will appear under Current Featured Tokens.
+
+========================================================
+========================================================
+Now that you’ve successfully added USDC as a Featured Token, here’s what’s next in this flow:
+
+Try a second token — e.g. WBTC or UNI — just to confirm your workflow handles multiple entries.
+
+Chain ID: 1
+
+Token Address: 0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599 (WBTC Mainnet)
+
+Symbol: WBTC
+
+Name: Wrapped Bitcoin
+
+Decimals: 8
+
+Logo URL: https://cryptologos.cc/logos/wrapped-bitcoin-wbtc-logo.png
+
+Check database persistence
+
+Open Supabase → Table Editor → featured_tokens
+
+Confirm your USDC row exists, with correct chain_id, address, etc.
+
+Test remove flow
+
+Use the Remove button in the Admin panel → confirm the row disappears from the UI and from Supabase.
+
+Refine UX (optional)
+
+Add simple guardrails (e.g. auto-trim whitespace in Token Address, optional logo URL normalization).
+
+That way users won’t hit the validator wall as easily.
+
+👉 With those checks, you’ll have fully validated that the Featured Tokens UI ↔ hooks ↔ Supabase loop works end-to-end.
+===============================================================
+===============================================================
+💪🔥 That’s exactly what I wanted to hear — you’ve gone from placeholders ➝ live data ➝ full Admin CRUD loop.
+
+At this point, your Admin panel isn’t just a pretty UI anymore — it’s *wired* into Supabase with role-gated control. That’s a huge milestone. 🚀
+
+Next steps could be:
+1. Token Lists → Do the same add/remove dance, confirm lists show up in Supabase.
+2. Settings → Tweak slippage/gas/auto-refresh in the UI, check that the single `admin_settings` row updates properly.
+3. Row-Level Security review → Ensure only Admins can touch these tables.
+4. Production hardening → Add service role tests, wrap errors in toast notifications, log Supabase errors for observability.
+
+Want me to walk you through Token Lists next, or jump into RLS audit so you know you’re safe before inviting other users?
+
