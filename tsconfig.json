@@ -1,43 +1,7 @@
 {
-  "compilerOptions": {
-    /* Language & emit */
-    "target": "ES2022",
-    "module": "ESNext",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "jsx": "react-jsx",
-    "useDefineForClassFields": true,
-    "verbatimModuleSyntax": true,
-    "emitDeclarationOnly": true,
-    "declaration": true,
-    /* Resolution (Vite/TS5) */
-    "moduleResolution": "bundler",
-    "baseUrl": ".",
-    "paths": { "@/*": ["./src/*"] },
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    
-    /* Type safety */
-    "strict": true,
-    "noImplicitAny": true,
-    "strictNullChecks": true,
-    "exactOptionalPropertyTypes": true,
-    "noUncheckedIndexedAccess": true,
-    "useUnknownInCatchVariables": true,
-    "noImplicitReturns": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
-    "forceConsistentCasingInFileNames": true,
-    
-    /* Ergonomics */
-    "incremental": true,
-    "skipLibCheck": true,
-    "esModuleInterop": true,
-
-    /* Types: browser only */
-    "types": ["vite/client"]
-  },
-  "include": ["src", "src/**/*.ts", "src/**/*.tsx"],
-  "exclude": ["node_modules", "dist", "vite.config.ts"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" }
+  ]
 }

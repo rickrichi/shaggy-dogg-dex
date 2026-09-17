@@ -19,10 +19,10 @@ fetch('/api/users', {
 })
 
 // ❌ Incorrect: Don't use the full backend URL in development
-// fetch('http://localhost:3000/users') // This will cause CORS errors
+// fetch('http://localhost:8787/users') // This can cause CORS errors from the browser
 
 // Environment-based configuration example:
-const apiUrl = import.meta.env.DEV ? '/api' : 'http://localhost:3000'
+const apiUrl = import.meta.env.DEV ? '/api' : import.meta.env.VITE_API_URL
 fetch(`${apiUrl}/users`)
 
 // WebSocket usage (if enabled):

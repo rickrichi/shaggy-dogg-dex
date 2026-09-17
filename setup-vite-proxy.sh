@@ -15,7 +15,7 @@ NC='\033[0m' # No Color
 
 # Default values
 DEFAULT_API_PATH="/api"
-DEFAULT_TARGET="http://localhost:3000"
+DEFAULT_TARGET="http://localhost:8787"
 DEFAULT_CONFIG_FILE="vite.config.js"
 
 # Function to print colored output

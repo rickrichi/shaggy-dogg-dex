@@ -1,31 +1,37 @@
-// tsconfig.node.json
 {
   "compilerOptions": {
-    /* Node-side targets */
+    /* Language & Environment - Node.js */
     "target": "ES2022",
     "lib": ["ES2023"],
-
-    /* ESM + bundler-style resolution */
     "module": "ESNext",
+    "jsx": "preserve",
+
+    /* Modules */
     "moduleResolution": "bundler",
     "moduleDetection": "force",
-
-    /* Project reference target (no output needed) */
-    "composite": true,
-  
-    /* TS ergonomics */
-    "isolatedModules": true,
     "resolveJsonModule": true,
-    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
 
-    /* Linting/strictness for tooling */
+    /* Emit */
+    "noEmit": true,
+    "isolatedModules": true,
+
+    /* Type Checking */
     "strict": true,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
+    "skipLibCheck": true,
     "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
 
-    /* Types: Node only here */
-    "types": ["node"]
+    /* Advanced */
+    "composite": true,
+    "verbatimModuleSyntax": true,
+
+    /* Node Types */
+    "types": ["node"],
+    "esModuleInterop": true
   },
-  "include": ["vite.config.ts"]
+  "include": [
+    "vite.config.ts",
+    "tailwind.config.ts"
+  ]
 }

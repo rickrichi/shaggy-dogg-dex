@@ -1,1 +1,0 @@
-{"abi":[{"type":"function","name":"setUp","inputs":[],"outputs":[],"stateMutability":"nonpayable"},{"type":"function","name":"testForkedUniswapV2MetadataMatchesTheConfiguredMainnetProfile","inputs":[],"outputs":[],"stateMutability":"view"}],"id":3}

@@ -1,1 +1,0 @@
-{"abi":[{"type":"function","name":"getPair","inputs":[{"name":"tokenA","type":"address","internalType":"address"},{"name":"tokenB","type":"address","internalType":"address"}],"outputs":[{"name":"pair","type":"address","internalType":"address"}],"stateMutability":"view"}],"id":3}

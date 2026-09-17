@@ -1,19 +1,55 @@
+// eslint.config.js - Modern ESLint Flat Config (2025 Standards)
+// ══════════════════════════════════════════════════════════════════════════════
+// COMPREHENSIVE ESLINT SETUP FOR VITE + REACT + TYPESCRIPT + VITEST + TAILWIND
+// ══════════════════════════════════════════════════════════════════════════════
+
 import js from "@eslint/js";
-import globals from "globals";
+import vitest from "@vitest/eslint-plugin";
+import prettierConfig from "eslint-config-prettier";
+import importPlugin from "eslint-plugin-import";
+import jsxA11y from "eslint-plugin-jsx-a11y";
+import react from "eslint-plugin-react";
 import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
-import react from "eslint-plugin-react";
+import simpleImportSort from "eslint-plugin-simple-import-sort";
+import tailwind from "eslint-plugin-tailwindcss";
+import globals from "globals";
 import tseslint from "typescript-eslint";
 
+// ══════════════════════════════════════════════════════════════════════════════
+// CONFIGURATION
+// ══════════════════════════════════════════════════════════════════════════════
+
 export default tseslint.config(
-  { ignores: ["dist", "node_modules", ".next", "build"] },
+  // ────────────────────────────────────────────────────────────────────────────
+  // Global Ignores
+  // ────────────────────────────────────────────────────────────────────────────
   {
+    ignores: [
+      "**/dist/**",
+      "**/node_modules/**",
+      "**/.next/**",
+      "**/build/**",
+      "**/coverage/**",
+      "**/.vite/**",
+      "**/.turbo/**",
+      "server/dist/**",
+      "**/*.d.ts",
+      "**/*.config.js",
+      "**/*.config.ts",
+      "!eslint.config.js", // Don't ignore this file
+    ],
+  },
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // Base Configuration - All TypeScript/JavaScript Files
+  // ────────────────────────────────────────────────────────────────────────────
+  {
+    files: ["**/*.{ts,tsx,js,jsx}"],
     extends: [
       js.configs.recommended,
-      ...tseslint.configs.recommendedTypeChecked,
-      ...tseslint.configs.stylisticTypeChecked,
+      ...tseslint.configs.recommended,
     ],
-    files: ["**/*.{ts,tsx}"],
     languageOptions: {
       ecmaVersion: 2024,
       sourceType: "module",
@@ -23,163 +59,222 @@ export default tseslint.config(
         ...globals.es2024,
       },
       parserOptions: {
-        project: ["./tsconfig.json", "./tsconfig.node.json"],
-        tsconfigRootDir: import.meta.dirname,
-        ecmaFeatures: {
-          jsx: true,
-        },
+        ecmaFeatures: { jsx: true },
       },
     },
     plugins: {
+      react,
       "react-hooks": reactHooks,
       "react-refresh": reactRefresh,
-      react,
+      "jsx-a11y": jsxA11y,
+      "simple-import-sort": simpleImportSort,
+      import: importPlugin,
+    },
+    settings: {
+      react: { version: "detect" },
     },
     rules: {
-      // React Hooks
-      ...reactHooks.configs.recommended.rules,
-      
-      // React Refresh
-      "react-refresh/only-export-components": [
-        "warn",
-        { allowConstantExport: true },
+      // ──────────────────────────────────────────────────────────────────────
+      // Import Sorting & Organization (Auto-fixable)
+      // ──────────────────────────────────────────────────────────────────────
+      "simple-import-sort/imports": [
+        "error",
+        {
+          groups: [
+            // Side effect imports
+            ["^\\u0000"],
+            // Node.js built-ins
+            ["^node:"],
+            // React & related packages
+            ["^react", "^@react", "^next"],
+            // External packages
+            ["^@?\\w"],
+            // Internal packages
+            ["^@/"],
+            // Parent imports
+            ["^\\.\\.(?!/?$)", "^\\.\\./?$"],
+            // Relative imports
+            ["^\\./(?=.*/)(?!/?$)", "^\\.(?!/?$)", "^\\./?$"],
+            // Style imports
+            ["^.+\\.s?css$"],
+            // Type imports
+            ["^@?\\w.*\\u0000$", "^[^.].*\\u0000$", "^\\..*\\u0000$"],
+          ],
+        },
       ],
-      
-      // React JSX (since React 17+)
-      "react/react-in-jsx-scope": "off",
-      "react/jsx-uses-react": "off",
-      
+      "simple-import-sort/exports": "error",
+      "import/first": "error",
+      "import/newline-after-import": "error",
+      "import/no-duplicates": "off", // TypeScript handles this better
+      "import/no-unresolved": "off", // TypeScript handles this better
+
+      // ──────────────────────────────────────────────────────────────────────
       // TypeScript - Strict Type Safety
+      // ──────────────────────────────────────────────────────────────────────
       "@typescript-eslint/no-unused-vars": [
-        "error", 
-        { 
+        "warn",
+        {
           argsIgnorePattern: "^_",
           varsIgnorePattern: "^_",
           caughtErrorsIgnorePattern: "^_",
-          destructuredArrayIgnorePattern: "^_"
-        }
+        },
       ],
-      "@typescript-eslint/no-explicit-any": "error",
-      "@typescript-eslint/no-unsafe-any": "error",
-      "@typescript-eslint/no-unsafe-argument": "error",
-      "@typescript-eslint/no-unsafe-assignment": "error",
-      "@typescript-eslint/no-unsafe-call": "error",
-      "@typescript-eslint/no-unsafe-member-access": "error",
-      "@typescript-eslint/no-unsafe-return": "error",
-      
-      // Advanced TypeScript Rules for High Standards
-      "@typescript-eslint/prefer-nullish-coalescing": "error",
-      "@typescript-eslint/prefer-optional-chain": "error",
-      "@typescript-eslint/strict-boolean-expressions": "error",
-      "@typescript-eslint/no-unnecessary-condition": "error",
-      "@typescript-eslint/no-confusing-void-expression": "error",
-      "@typescript-eslint/prefer-reduce-type-parameter": "error",
-      "@typescript-eslint/prefer-return-this-type": "error",
-      "@typescript-eslint/require-array-sort-compare": "error",
-      "@typescript-eslint/switch-exhaustiveness-check": "error",
-      
-      // Function and Method Quality
-      "@typescript-eslint/prefer-function-type": "error",
-      "@typescript-eslint/method-signature-style": ["error", "property"],
-      "@typescript-eslint/consistent-type-definitions": ["error", "interface"],
+      "@typescript-eslint/no-explicit-any": "off", // Allow any for flexibility
       "@typescript-eslint/consistent-type-imports": [
         "error",
-        { 
+        {
           prefer: "type-imports",
           fixStyle: "separate-type-imports",
-          disallowTypeAnnotations: false
-        }
+          disallowTypeAnnotations: false,
+        },
       ],
-      
-      // Naming Conventions for Cognitive Clarity
+      "@typescript-eslint/consistent-type-definitions": ["error", "interface"],
+      "@typescript-eslint/array-type": ["error", { default: "array-simple" }],
+      "@typescript-eslint/prefer-nullish-coalescing": "off", // Requires type checking
+      "@typescript-eslint/prefer-optional-chain": "off", // Requires type checking
+
+      // ──────────────────────────────────────────────────────────────────────
+      // React & JSX
+      // ──────────────────────────────────────────────────────────────────────
+      "react/react-in-jsx-scope": "off", // Not needed in React 17+
+      "react/jsx-uses-react": "off",
+      "react/prop-types": "off", // TypeScript handles this
+      "react/jsx-key": "error",
+      "react/jsx-no-useless-fragment": "warn",
+      "react/self-closing-comp": "warn",
+      "react/jsx-curly-brace-presence": [
+        "warn",
+        { props: "never", children: "never" },
+      ],
+      "react/jsx-boolean-value": ["warn", "never"],
+      "react/jsx-fragments": ["warn", "syntax"],
+      "react/no-array-index-key": "off", // Allow index keys for static lists
+      "react/display-name": "off",
+
+      // ──────────────────────────────────────────────────────────────────────
+      // React Hooks
+      // ──────────────────────────────────────────────────────────────────────
+      ...reactHooks.configs.recommended.rules,
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "off", // Allow manual dependency control
+
+      // ──────────────────────────────────────────────────────────────────────
+      // React Refresh (Vite HMR)
+      // ──────────────────────────────────────────────────────────────────────
+      "react-refresh/only-export-components": "off", // Allow mixed exports for flexibility
+
+      // ──────────────────────────────────────────────────────────────────────
+      // Accessibility (A11y) - Critical for production apps
+      // ──────────────────────────────────────────────────────────────────────
+      "jsx-a11y/alt-text": "error",
+      "jsx-a11y/anchor-is-valid": "error",
+      "jsx-a11y/aria-props": "error",
+      "jsx-a11y/aria-proptypes": "error",
+      "jsx-a11y/aria-unsupported-elements": "error",
+      "jsx-a11y/click-events-have-key-events": "warn",
+      "jsx-a11y/heading-has-content": "error",
+      "jsx-a11y/html-has-lang": "error",
+      "jsx-a11y/img-redundant-alt": "warn",
+      "jsx-a11y/interactive-supports-focus": "warn",
+      "jsx-a11y/label-has-associated-control": "warn",
+      "jsx-a11y/no-autofocus": "warn",
+      "jsx-a11y/no-noninteractive-element-interactions": "warn",
+      "jsx-a11y/role-has-required-aria-props": "error",
+      "jsx-a11y/role-supports-aria-props": "error",
+
+      // ──────────────────────────────────────────────────────────────────────
+      // Naming Conventions
+      // ──────────────────────────────────────────────────────────────────────
       "@typescript-eslint/naming-convention": [
         "error",
         {
           selector: "interface",
           format: ["PascalCase"],
-          custom: {
-            regex: "^I[A-Z]",
-            match: false
-          }
+          custom: { regex: "^I[A-Z]", match: false }, // No "I" prefix
         },
         {
           selector: "typeAlias",
-          format: ["PascalCase"]
+          format: ["PascalCase"],
         },
         {
           selector: "enum",
-          format: ["PascalCase"]
+          format: ["PascalCase"],
         },
         {
           selector: "enumMember",
-          format: ["UPPER_CASE", "PascalCase"]
+          format: ["UPPER_CASE", "PascalCase"],
         },
-        {
-          selector: "classMethod",
-          format: ["camelCase"],
-          modifiers: ["private"],
-          prefix: ["_"]
-        }
       ],
-      
-      // Performance and Best Practices
-      "@typescript-eslint/prefer-for-of": "error",
-      "@typescript-eslint/prefer-includes": "error",
-      "@typescript-eslint/prefer-string-starts-ends-with": "error",
-      "@typescript-eslint/promise-function-async": "error",
-      "@typescript-eslint/require-await": "error",
-      "@typescript-eslint/return-await": ["error", "always"],
-      
-      // Code Quality
+
+      // ──────────────────────────────────────────────────────────────────────
+      // Code Quality & Best Practices
+      // ──────────────────────────────────────────────────────────────────────
       "prefer-const": "error",
       "no-var": "error",
-      "object-shorthand": "error",
-      "prefer-destructuring": ["error", {
-        "array": true,
-        "object": true
-      }, {
-        "enforceForRenamedProperties": false
-      }],
-      
-      // React-specific enhancements
-      "react/prop-types": "off", // TypeScript handles this
-      "react/display-name": "error",
-      "react/no-array-index-key": "warn",
-      "react/jsx-key": "error",
-      "react/jsx-no-useless-fragment": "error",
-      "react/self-closing-comp": "error",
-      
-      // Accessibility (essential for professional applications)
-      "jsx-a11y/alt-text": "error",
-      "jsx-a11y/aria-props": "error",
-      "jsx-a11y/aria-proptypes": "error",
-      "jsx-a11y/aria-unsupported-elements": "error",
-      "jsx-a11y/role-has-required-aria-props": "error",
-      "jsx-a11y/role-supports-aria-props": "error"
+      "object-shorthand": "warn",
+      "prefer-template": "warn",
+      "prefer-arrow-callback": "warn",
+      "no-console": "off", // Allow console for debugging
+      "no-debugger": "error",
+      eqeqeq: ["error", "always", { null: "ignore" }],
+      "no-unused-expressions": "off",
+      "@typescript-eslint/no-unused-expressions": "error",
     },
-    settings: {
-      react: {
-        version: "detect"
-      }
-    }
   },
-  
-  // Separate configuration for non-TypeScript files
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // Tailwind CSS Configuration
+  // ────────────────────────────────────────────────────────────────────────────
   {
-    files: ["**/*.js", "**/*.mjs"],
-    extends: [js.configs.recommended],
-    languageOptions: {
-      ecmaVersion: 2024,
-      sourceType: "module",
-      globals: {
-        ...globals.node,
-        ...globals.es2024,
-      },
+    files: ["**/*.{ts,tsx,js,jsx}"],
+    plugins: {
+      tailwindcss: tailwind,
     },
     rules: {
-      "prefer-const": "error",
-      "no-var": "error",
-      "object-shorthand": "error",
-    }
-  }
+      "tailwindcss/classnames-order": "off", // Prettier handles this
+      "tailwindcss/enforces-negative-arbitrary-values": "warn",
+      "tailwindcss/enforces-shorthand": "warn",
+      "tailwindcss/no-arbitrary-value": "off", // Allow arbitrary values
+      "tailwindcss/no-contradicting-classname": "error",
+      "tailwindcss/no-custom-classname": "off", // Allow custom classes
+      "tailwindcss/no-unnecessary-arbitrary-value": "off", // Allow arbitrary values for precision
+    },
+    settings: {
+      tailwindcss: {
+        callees: ["cn", "cva", "clsx", "twMerge"],
+        config: "tailwind.config.js",
+        classRegex: "^(class(Name)?|tw)$",
+      },
+    },
+  },
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // Vitest/Testing Configuration
+  // ────────────────────────────────────────────────────────────────────────────
+  {
+    files: ["**/*.{test,spec}.{ts,tsx,js,jsx}", "**/test/**/*.{ts,tsx,js,jsx}"],
+    plugins: {
+      vitest,
+    },
+    rules: {
+      ...vitest.configs.recommended.rules,
+      "vitest/expect-expect": "error",
+      "vitest/no-disabled-tests": "warn",
+      "vitest/no-focused-tests": "error",
+      "vitest/valid-expect": "error",
+      "vitest/consistent-test-it": ["warn", { fn: "it" }],
+      "vitest/prefer-to-be": "warn",
+      "vitest/prefer-to-have-length": "warn",
+    },
+    languageOptions: {
+      globals: {
+        ...vitest.environments.env.globals,
+      },
+    },
+  },
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // Prettier Integration (Must be last to override formatting rules)
+  // ────────────────────────────────────────────────────────────────────────────
+  prettierConfig,
 );

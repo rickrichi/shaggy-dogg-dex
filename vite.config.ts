@@ -1,74 +1,95 @@
-// vite.config.ts
-import { defineConfig, loadEnv } from 'vite'
-import react from '@vitejs/plugin-react'
+// vite.config.ts - Shaggy Dogg DEX (2025 Standards)
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react-swc'  // ⚡ Using SWC for 5x faster builds
 import checker from 'vite-plugin-checker'
 import path from 'node:path'
-import type { IncomingMessage } from 'http'
 
 export default defineConfig(({ mode }) => {
-  // Load .env (exposes only VITE_* below via envPrefix)
-  const env = loadEnv(mode, process.cwd(), '')
-  const SUPABASE_URL = (env.VITE_SUPABASE_URL ?? '').replace(/\/+$/, '')
-  const SUPABASE_ANON_KEY = env.VITE_SUPABASE_ANON_KEY ?? ''
-
-  // Helper: forward incoming Authorization if present
-  const getIncomingAuth = (req: IncomingMessage): string | null => {
-    const h = req.headers['authorization']
-    if (typeof h === 'string' && h.trim().length > 0) return h
-    if (Array.isArray(h) && typeof h[0] === 'string') return h[0]
-    return null
-  }
-
   return {
+    // ── Vite 7.x Configuration ──────────────────────────────────────────────
+    appType: 'spa',
+
+    // ── Plugins ─────────────────────────────────────────────────────────────
     plugins: [
-      react(),
+      // Using SWC version for 5x faster refresh and builds
+      react({
+        tsDecorators: true,
+      }),
+      // Type checking in dev mode
       checker({
-        typescript: true,
+        typescript: {
+          tsconfigPath: './tsconfig.app.json',
+        },
         enableBuild: false,
-        overlay: { initialIsOpen: false, position: 'tl' },
+        overlay: {
+          initialIsOpen: false,
+          position: 'tl',
+          badgeStyle: 'z-index: 9999;',
+        },
       }),
     ],
+
+    // ── Module Resolution ───────────────────────────────────────────────────
     resolve: {
-      alias: { '@': path.resolve(__dirname, './src') },
+      alias: {
+        '@': path.resolve(__dirname, './src'),
+        '~': path.resolve(__dirname, './'),
+      },
+      // Modern module resolution (removed deprecated jsnext:main)
       conditions: ['module', 'import', 'browser'],
-      mainFields: ['module', 'jsnext:main', 'browser', 'main'],
+      mainFields: ['module', 'browser', 'main'],
     },
-    // Only expose VITE_* to the client
+
+    // ── Environment Variables ───────────────────────────────────────────────
     envPrefix: 'VITE_',
+    envDir: './',
+
+    // ── Global Constants ────────────────────────────────────────────────────
     define: {
       global: 'globalThis',
-      'process.env': {}, // some web3 libs expect it
+      'process.env': '{}',
+      __DEV__: mode === 'development',
     },
+
+    // ── Development Server ──────────────────────────────────────────────────
     server: {
-      host: 'localhost', // stable HMR in WSL/Windows
-      port: 5173,        // CLI --port overrides this if provided
+      host: 'localhost',
+      port: 5173,
       strictPort: true,
-      // Dev-only CSP so HMR + some SDKs can eval during development
+      open: false,
+
+      // Security headers for dev (Report-Only for HMR compatibility)
       headers: {
-        'Content-Security-Policy': [
-          "default-src 'self' http://localhost:5173",
-          "script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' http://localhost:5173",
-          "style-src 'self' 'unsafe-inline' http://localhost:5173",
-          "img-src 'self' data: blob:",
-          "font-src 'self' data:",
-          "connect-src 'self' http://localhost:8787 http://localhost:5173 ws://localhost:5173 https://api.coingecko.com https://*.alchemy.com https://*.supabase.co https://*.supabase.in",
-          "frame-ancestors 'none'",
+        'Content-Security-Policy-Report-Only': [
+          "default-src 'self'",
+          "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:5173",
+          "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+          "img-src 'self' data: https: blob:",
+          "font-src 'self' data: https://fonts.gstatic.com",
+          "connect-src 'self' http://localhost:5173 http://localhost:8787 ws://localhost:5173 https://*.alchemy.com https://*.infura.io https://*.walletconnect.com https://*.walletconnect.org https://*.supabase.co https://*.supabase.in wss://*.walletconnect.com wss://*.walletconnect.org wss://*.supabase.co wss://*.supabase.in",
+          "object-src 'none'",
+          "base-uri 'self'",
         ].join('; '),
       },
+
+      // HMR Configuration
       hmr: {
-        // Let Vite infer client port from actual URL.
-        // Keeping only explicit host stabilizes WS in WSL.
         host: 'localhost',
         protocol: 'ws',
+        port: 5173,
         overlay: true,
       },
-      // Enable real-time file watching (WSL-friendly)
+
+      // WSL/Windows file watching optimization
       watch: {
         usePolling: true,
         interval: 100,
+        ignored: ['**/node_modules/**', '**/.git/**', '**/dist/**'],
       },
+
+      // ── Proxy Configuration ─────────────────────────────────────────────
       proxy: {
-        // =============== Main API → Hono server on :8787 ===============
+        // Main API → Hono backend on port 8787
         '/api': {
           target: 'http://localhost:8787',
           changeOrigin: true,
@@ -76,187 +97,281 @@ export default defineConfig(({ mode }) => {
           ws: true,
           timeout: 30000,
           configure: (proxy) => {
-            proxy.on('error', (err) => console.log('🔴 API Proxy error:', err.message))
-            proxy.on('proxyReq', (_proxyReq, req) => console.log('🚀 API Request:', req.method, req.url))
-            proxy.on('proxyRes', (proxyRes, req) => console.log('✅ API Response:', proxyRes.statusCode, req.url))
-            proxy.on('open', () => console.log('🔗 API WebSocket connection opened'))
-            proxy.on('close', () => console.log('🔌 API WebSocket connection closed'))
-          },
-        },
-
-        // =============== Optional Auth service on :3005 ===============
-        '/auth': {
-          target: 'http://localhost:3005',
-          changeOrigin: true,
-          secure: false,
-          ws: true,
-          timeout: 15000,
-          configure: (proxy) => {
-            proxy.on('error', (err) => console.log('🔴 Auth Service Proxy error:', err.message))
-            proxy.on('proxyReq', (_proxyReq, req) => console.log('🔐 Auth Request:', req.method, req.url))
-            proxy.on('proxyRes', (proxyRes, req) => console.log('🔓 Auth Response:', proxyRes.statusCode, req.url))
-            proxy.on('open', () => console.log('🔗 Auth WebSocket connection opened'))
-          },
-        },
-
-        // ========================= Supabase Proxies =========================
-        '^/supabase/rest/.*': {
-          target: SUPABASE_URL || 'https://example.supabase.co',
-          changeOrigin: true,
-          secure: true,
-          ws: true,
-          timeout: 30000,
-          rewrite: (p) => p.replace(/^\/supabase\/rest/, '/rest/v1'),
-          configure: (proxy) => {
-            proxy.on('error', (err) => console.log('🔴 Supabase REST proxy error:', err.message))
-            proxy.on('proxyReq', (proxyReq, req) => {
-              proxyReq.setHeader('apikey', SUPABASE_ANON_KEY)
-              proxyReq.setHeader('Prefer', 'return=representation')
-              const incoming = getIncomingAuth(req)
-              proxyReq.setHeader('Authorization', incoming ?? `Bearer ${SUPABASE_ANON_KEY}`)
-              console.log('📊 Supabase REST →', req.method, req.url)
+            proxy.on('error', (err) => {
+              console.error('🔴 API Proxy Error:', err.message)
             })
-            proxy.on('proxyRes', (proxyRes, req) =>
-              console.log('📈 Supabase REST Response:', proxyRes.statusCode, req.url),
-            )
-          },
-        },
-
-        '^/supabase/storage/.*': {
-          target: SUPABASE_URL || 'https://example.supabase.co',
-          changeOrigin: true,
-          secure: true,
-          timeout: 60000,
-          rewrite: (p) => p.replace(/^\/supabase\/storage/, '/storage/v1'),
-          configure: (proxy) => {
-            proxy.on('error', (err) => console.log('🔴 Supabase Storage proxy error:', err.message))
-            proxy.on('proxyReq', (proxyReq, req) => {
-              proxyReq.setHeader('apikey', SUPABASE_ANON_KEY)
-              const incoming = getIncomingAuth(req)
-              proxyReq.setHeader('Authorization', incoming ?? `Bearer ${SUPABASE_ANON_KEY}`)
-              console.log('📁 Supabase Storage →', req.method, req.url)
+            proxy.on('proxyReq', (_proxyReq, req) => {
+              console.log('🚀 API Request:', req.method, req.url)
             })
-            proxy.on('proxyRes', (proxyRes, req) =>
-              console.log('📂 Supabase Storage Response:', proxyRes.statusCode, req.url),
-            )
-          },
-        },
-
-        '^/supabase/functions/.*': {
-          target: SUPABASE_URL || 'https://example.supabase.co',
-          changeOrigin: true,
-          secure: true,
-          timeout: 45000,
-          rewrite: (p) => p.replace(/^\/supabase\/functions/, '/functions/v1'),
-          configure: (proxy) => {
-            proxy.on('error', (err) => console.log('🔴 Supabase Functions proxy error:', err.message))
-            proxy.on('proxyReq', (proxyReq, req) => {
-              proxyReq.setHeader('apikey', SUPABASE_ANON_KEY)
-              const incoming = getIncomingAuth(req)
-              proxyReq.setHeader('Authorization', incoming ?? `Bearer ${SUPABASE_ANON_KEY}`)
-              console.log('⚡ Supabase Functions →', req.method, req.url)
+            proxy.on('proxyRes', (proxyRes, req) => {
+              console.log(`✅ API Response: ${proxyRes.statusCode} ${req.url}`)
             })
-            proxy.on('proxyRes', (proxyRes, req) =>
-              console.log('⚡ Supabase Functions Response:', proxyRes.statusCode, req.url),
-            )
           },
         },
-
-        '^/supabase/realtime/.*': {
-          target: SUPABASE_URL || 'https://example.supabase.co',
+        // Binance price feed proxy to bypass CORS in dev
+        '/proxy/binance': {
+          target: 'https://api.binance.com',
           changeOrigin: true,
           secure: true,
-          ws: true,
-          timeout: 0,
-          rewrite: (p) => p.replace(/^\/supabase\/realtime/, '/realtime/v1'),
+          rewrite: (path) => path.replace(/^\/proxy\/binance/, ''),
           configure: (proxy) => {
-            proxy.on('error', (err) => console.log('🔴 Supabase Realtime proxy error:', err.message))
-            proxy.on('open', () => console.log('🔴 Supabase Realtime WebSocket opened - Live data streaming active'))
-            proxy.on('close', () => console.log('🔴 Supabase Realtime WebSocket closed - Attempting reconnection...'))
-            proxy.on('proxyReqWs', (_proxyReq, req) => console.log('🔴 Supabase Realtime WS →', req.url))
-          },
-        },
-
-        '^/supabase/auth/.*': {
-          target: SUPABASE_URL || 'https://example.supabase.co',
-          changeOrigin: true,
-          secure: true,
-          timeout: 15000,
-          rewrite: (p) => p.replace(/^\/supabase\/auth/, '/auth/v1'),
-          configure: (proxy) => {
-            proxy.on('error', (err) => console.log('🔴 Supabase Auth proxy error:', err.message))
-            proxy.on('proxyReq', (proxyReq, req) => {
-              proxyReq.setHeader('apikey', SUPABASE_ANON_KEY)
-              console.log('🔐 Supabase Auth →', req.method, req.url)
+            proxy.on('error', (err) => {
+              console.error('🔴 Binance Proxy Error:', err.message)
             })
-            proxy.on('proxyRes', (proxyRes, req) =>
-              console.log('🔓 Supabase Auth Response:', proxyRes.statusCode, req.url),
-            )
-          },
-        },
-
-        // Optional WS helpers you had:
-        '/ws': {
-          target: 'http://localhost:3006',
-          changeOrigin: true,
-          secure: false,
-          ws: true,
-          timeout: 0,
-          configure: (proxy) => {
-            proxy.on('error', (err) => console.log('🔴 WebSocket Proxy error:', err.message))
-            proxy.on('open', () => console.log('🔗 Real-time WebSocket connection established'))
-            proxy.on('close', () => console.log('🔌 Real-time WebSocket connection closed'))
-            proxy.on('proxyReqWs', (_proxyReq, req) => console.log('🌐 WebSocket Request:', req.url))
-          },
-        },
-
-        '/realtime': {
-          target: 'http://localhost:3008',
-          changeOrigin: true,
-          secure: false,
-          ws: true,
-          timeout: 0,
-          configure: (proxy) => {
-            proxy.on('error', (err) => console.log('🔴 Real-time Trading Proxy error:', err.message))
-            proxy.on('open', () => console.log('📈 Real-time trading data stream connected'))
-            proxy.on('close', () => console.log('📉 Real-time trading data stream disconnected'))
           },
         },
       },
     },
+
+    // ── Dependency Optimization ─────────────────────────────────────────────
     optimizeDeps: {
-      include: ['viem', 'abitype', 'react', 'react-dom', '@supabase/supabase-js', 'wagmi'],
-      esbuildOptions: { target: 'es2022', keepNames: true },
+      include: [
+        'react',
+        'react-dom',
+        'react/jsx-runtime',
+        'react-router-dom',
+        'viem',
+        'abitype',
+        'wagmi',
+        '@wagmi/core',
+        '@wagmi/connectors',
+        '@tanstack/react-query',
+        '@supabase/supabase-js',
+        'lucide-react',
+        'eventemitter3',  // Fix CommonJS/ESM interop
+        'ua-parser-js',   // Fix CommonJS/ESM interop (WalletConnect dependency)
+      ],
+      exclude: [
+        // Exclude large deps that should be lazy-loaded
+        '@rainbow-me/rainbowkit',
+      ],
+      esbuildOptions: {
+        target: 'es2022',
+        supported: {
+          'top-level-await': true,
+        },
+        keepNames: true,
+        define: {
+          global: 'globalThis',
+        },
+      },
       force: mode === 'development',
     },
+
+    // ── ESBuild Configuration ───────────────────────────────────────────────
     esbuild: {
       target: 'es2022',
       legalComments: 'none',
       keepNames: mode === 'development',
+      logOverride: {
+        'this-is-undefined-in-esm': 'silent',
+      },
     },
+
+    // ── JSON Configuration ──────────────────────────────────────────────────
+    json: {
+      stringify: true, // Faster for large JSON files
+    },
+
+    // ── Worker Configuration ────────────────────────────────────────────────
+    worker: {
+      format: 'es',
+      plugins: () => [react()],
+    },
+
+    // ── Production Build ────────────────────────────────────────────────────
     build: {
       target: 'es2022',
+      outDir: 'dist',
+      assetsDir: 'assets',
       sourcemap: mode !== 'production',
-      minify: 'esbuild',
+      manifest: true,
+      minify: mode === 'production' ? 'esbuild' : false,
       cssCodeSplit: true,
-      chunkSizeWarningLimit: 1000,
+      cssMinify: mode === 'production',
+      chunkSizeWarningLimit: 2000, // Higher limit for Web3 libraries (RainbowKit, Wagmi)
+      reportCompressedSize: false, // Faster builds
+
       rollupOptions: {
         onwarn(warning, warn) {
-          if (warning.code === 'EVAL' || warning.code === 'MODULE_LEVEL_DIRECTIVE') return
+          // Suppress known warnings that don't affect functionality
+          const suppressCodes = ['EVAL', 'MODULE_LEVEL_DIRECTIVE', 'SOURCEMAP_ERROR']
+          if (suppressCodes.includes(warning.code ?? '')) return
           warn(warning)
         },
+
         output: {
-          manualChunks: {
-            vendor: ['react', 'react-dom'],
-            web3: ['viem', 'abitype', 'wagmi'],
-            supabase: ['@supabase/supabase-js'],
+          // Manual chunk splitting for better caching
+          manualChunks: (id) => {
+            // Node modules only
+            if (!id.includes('node_modules')) return
+
+            // Core React
+            if (id.includes('react') || id.includes('react-dom') || id.includes('scheduler')) {
+              return 'vendor-react'
+            }
+            if (id.includes('react-router')) {
+              return 'vendor-router'
+            }
+
+            // Radix UI Components (split into groups for better caching)
+            if (id.includes('@radix-ui')) {
+              // Group by complexity/size
+              if (id.includes('dialog') || id.includes('dropdown') || id.includes('popover') || id.includes('select')) {
+                return 'ui-radix-overlay'
+              }
+              if (id.includes('accordion') || id.includes('tabs') || id.includes('collapsible')) {
+                return 'ui-radix-container'
+              }
+              return 'ui-radix-core'
+            }
+
+            // Form & Validation
+            if (id.includes('react-hook-form') || id.includes('@hookform') || id.includes('zod')) {
+              return 'vendor-forms'
+            }
+
+            // Web3 Core Stack
+            if (id.includes('viem') || id.includes('abitype') || id.includes('/ox/')) {
+              return 'web3-core'
+            }
+            if (id.includes('wagmi') || id.includes('@wagmi')) {
+              return 'web3-wagmi'
+            }
+            // Split WalletConnect ecosystem into separate chunks (very large)
+            if (id.includes('@walletconnect') || id.includes('qrcode')) {
+              return 'web3-walletconnect'
+            }
+            if (id.includes('@reown')) {
+              return 'web3-reown'
+            }
+            if (id.includes('porto')) {
+              return 'web3-porto'
+            }
+            if (id.includes('@rainbow-me')) {
+              return 'web3-rainbowkit'
+            }
+
+            // Data & Query Layer
+            if (id.includes('@tanstack/react-query')) {
+              return 'data-query'
+            }
+            if (id.includes('@supabase')) {
+              return 'data-supabase'
+            }
+
+            // Charts & Visualization
+            if (id.includes('recharts') || id.includes('d3-')) {
+              return 'vendor-charts'
+            }
+
+            // Animation & Motion
+            if (id.includes('framer-motion')) {
+              return 'vendor-motion'
+            }
+
+            // UI Utilities
+            if (id.includes('lucide-react')) {
+              return 'ui-icons'
+            }
+            if (id.includes('date-fns') || id.includes('react-day-picker')) {
+              return 'vendor-dates'
+            }
+            if (id.includes('cmdk') || id.includes('vaul') || id.includes('sonner')) {
+              return 'ui-components'
+            }
+
+            // Carousel & Embla
+            if (id.includes('embla-carousel')) {
+              return 'vendor-carousel'
+            }
+
+            // Markdown & Syntax Highlighting
+            if (id.includes('marked') || id.includes('highlight.js')) {
+              return 'vendor-markdown'
+            }
+
+            // Theme & Styling
+            if (id.includes('next-themes') || id.includes('tailwind') || id.includes('class-variance-authority') || id.includes('clsx')) {
+              return 'vendor-styling'
+            }
+
+            // Utility Libraries
+            if (id.includes('react-resizable-panels') || id.includes('input-otp')) {
+              return 'vendor-utils'
+            }
+
+            // Don't bundle everything else - let Vite decide
+            // This prevents a massive vendor-misc chunk
+          },
+
+          // Clean file names
+          chunkFileNames: (chunkInfo) => {
+            const facadeName = chunkInfo.facadeModuleId
+              ? chunkInfo.facadeModuleId.split('/').pop()?.replace(/\.[^.]+$/, '')
+              : null
+            const safeName = (chunkInfo.name ?? '') === 'index'
+              ? (facadeName ?? 'chunk')
+              : (chunkInfo.name ?? 'chunk')
+            return `js/${safeName}-[hash].js`
+          },
+          entryFileNames: 'js/[name]-[hash].js',
+          assetFileNames: (assetInfo) => {
+            const fileName = assetInfo.name ?? 'asset'
+            // Organize by asset type
+            if (/\.(woff2?|ttf|otf|eot)$/.test(fileName)) {
+              return 'fonts/[name]-[hash][extname]'
+            }
+            if (/\.(png|jpe?g|gif|svg|webp|avif)$/.test(fileName)) {
+              return 'images/[name]-[hash][extname]'
+            }
+            return 'assets/[name]-[hash][extname]'
+          },
+
+          // Compact output
+          compact: mode === 'production',
+          generatedCode: {
+            constBindings: true,
+            objectShorthand: true,
           },
         },
+
+        // Aggressive tree-shaking
         treeshake: {
           moduleSideEffects: false,
           propertyReadSideEffects: false,
           tryCatchDeoptimization: false,
+          unknownGlobalSideEffects: false,
         },
+      },
+    },
+
+    // ── Preview Server ──────────────────────────────────────────────────────
+    preview: {
+      host: 'localhost',
+      port: 4173,
+      strictPort: true,
+      open: false,
+      headers: {
+        // CSP for production preview
+        // NOTE: 'unsafe-eval' required for Web3 libraries (RainbowKit, WalletConnect)
+        // These libraries dynamically evaluate connector code for wallet integrations
+        'Content-Security-Policy': [
+          "default-src 'self'",
+          "script-src 'self' 'unsafe-eval'",  // Required for Web3 wallet connectors
+          "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+          "img-src 'self' data: https: blob:",
+          "font-src 'self' data: https://fonts.gstatic.com",
+          "connect-src 'self' https://*.alchemy.com https://*.infura.io https://*.walletconnect.com https://*.walletconnect.org https://*.supabase.co https://*.supabase.in wss://*.walletconnect.com wss://*.walletconnect.org wss://*.supabase.co wss://*.supabase.in",
+          "worker-src 'self' blob:",
+          "object-src 'none'",
+          "base-uri 'self'",
+          "frame-ancestors 'none'",
+        ].join('; '),
+        'X-Content-Type-Options': 'nosniff',
+        'X-Frame-Options': 'DENY',
+        'X-XSS-Protection': '1; mode=block',
+        'Referrer-Policy': 'strict-origin-when-cross-origin',
       },
     },
   }
