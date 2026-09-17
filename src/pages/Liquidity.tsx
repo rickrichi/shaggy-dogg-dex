@@ -78,7 +78,8 @@ function formatAmountForInput(amount: bigint, decimals: number, fractionDigits =
   const formatted = formatUnits(amount, decimals);
   const [whole, fraction = ""] = formatted.split(".");
   const trimmedFraction = fraction.slice(0, fractionDigits).replace(/0+$/, "");
-  return trimmedFraction ? `${whole}.${trimmedFraction}` : whole;
+  const wholeAmount = whole ?? "0";
+  return trimmedFraction ? `${wholeAmount}.${trimmedFraction}` : wholeAmount;
 }
 
 function formatPercentage(numerator: bigint, denominator: bigint, fractionDigits = 4): string {
@@ -556,7 +557,7 @@ export default function Liquidity() {
                     <div className="flex justify-between border-t pt-2">
                       <span className="text-gray-600">Price Ratio</span>
                       <span className="font-medium">
-                        1 {tokenA.symbol} = {priceRatio.toFixed(6)} {tokenB.symbol}
+                        1 {tokenA.symbol} = {priceRatio} {tokenB.symbol}
                       </span>
                     </div>
                   )}

@@ -15,8 +15,8 @@ production-ready.
 
 1. Install dependencies: `npm install`
 2. Copy `.env.example` to `.env` and fill in your API keys
-3. Run backend API (canonical): `npm run api:dev` (starts Hono server on port 8787)
-4. Run front-end: `npm run dev` (Vite proxies `/api/*` → `http://localhost:8787`)
+3. Run backend API (canonical): `npm run api:dev` (starts Hono server on port 8788)
+4. Run front-end: `npm run dev` (Vite proxies `/api/*` → `http://localhost:8788`)
 
 ## Environment Setup
 
@@ -27,7 +27,7 @@ Required environment variables (front-end):
 - `VITE_SUPABASE_ANON_KEY` - Supabase anonymous key
 
 Required environment variables (API in `server/`):
-- `PORT` (default 8787)
+- `PORT` (default 8788)
 - `ORIGIN` - front-end origin for CORS (default `http://localhost:5173`)
 - `AGGREGATOR_URL` (default `https://api.0x.org`)
 - `AGGREGATOR_API_KEY` (optional)
@@ -39,7 +39,7 @@ Canonical API choice:
 - The `server/` Hono backend is the single source of truth. Public endpoints use the `/api/*`
   namespace, including `/api/health`, `/api/prices`, `/api/quote`, and
   `/api/webhooks/supabase-db`.
-- Vite forwards `/api/*` unchanged to `http://localhost:8787` in development.
+- Vite forwards `/api/*` unchanged to `http://localhost:8788` in development.
 - Vercel Edge shims proxy browser-facing API calls to the deployed Hono service. Set Vercel's
   server-side `API_URL` to that service's public origin; do not put backend credentials in a
   `VITE_*` variable.

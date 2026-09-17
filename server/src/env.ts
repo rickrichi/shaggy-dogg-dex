@@ -6,7 +6,7 @@ import { z } from 'zod';
 
 const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  PORT: z.coerce.number().int().positive().default(8787),
+  PORT: z.coerce.number().int().positive().default(8788),
   ORIGIN: z.url().default('http://localhost:5173'),
 
   // Aggregator (0x-style)

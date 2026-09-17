@@ -66,7 +66,7 @@ export default defineConfig(({ mode }) => {
           "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
           "img-src 'self' data: https: blob:",
           "font-src 'self' data: https://fonts.gstatic.com",
-          "connect-src 'self' http://localhost:5173 http://localhost:8787 ws://localhost:5173 https://*.alchemy.com https://*.infura.io https://*.walletconnect.com https://*.walletconnect.org https://*.supabase.co https://*.supabase.in wss://*.walletconnect.com wss://*.walletconnect.org wss://*.supabase.co wss://*.supabase.in",
+          "connect-src 'self' http://localhost:5173 http://localhost:8788 ws://localhost:5173 https://*.alchemy.com https://*.infura.io https://*.walletconnect.com https://*.walletconnect.org https://*.supabase.co https://*.supabase.in wss://*.walletconnect.com wss://*.walletconnect.org wss://*.supabase.co wss://*.supabase.in",
           "object-src 'none'",
           "base-uri 'self'",
         ].join('; '),
@@ -89,9 +89,9 @@ export default defineConfig(({ mode }) => {
 
       // ── Proxy Configuration ─────────────────────────────────────────────
       proxy: {
-        // Main API → Hono backend on port 8787
+        // Main API → Hono backend on port 8788 (8787 is reserved locally)
         '/api': {
-          target: 'http://localhost:8787',
+          target: 'http://localhost:8788',
           changeOrigin: true,
           secure: false,
           ws: true,

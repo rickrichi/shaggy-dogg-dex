@@ -3,7 +3,7 @@
 const rawBackend =
   process.env.API_URL ||
   process.env.VITE_API_URL ||
-  'http://localhost:8787'
+  'http://localhost:8788'
 
 const backendBase = rawBackend.replace(/\/+$/, '')
 

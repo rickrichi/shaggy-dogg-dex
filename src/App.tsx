@@ -61,7 +61,7 @@ const ApiDiagnostic = (): JSX.Element | null => {
         setIsLoading(true);
         setError(null);
 
-        const base = import.meta.env.VITE_API_URL ?? "http://localhost:8787";
+        const base = import.meta.env.VITE_API_URL ?? "http://localhost:8788";
         const res = await fetch(`${base}/api/block`, {
           method: "GET",
           credentials: "include", // drop if you won't use cookies
@@ -102,7 +102,7 @@ const ApiDiagnostic = (): JSX.Element | null => {
 
       {isLoading && (
         <div className="text-xs text-gray-500 dark:text-gray-400">
-          Connecting to localhost:8787...
+          Connecting to localhost:8788...
         </div>
       )}
 

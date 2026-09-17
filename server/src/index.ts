@@ -82,7 +82,7 @@ if (env.NODE_ENV !== 'production') {
 }
 
 // ----- Start server (single place) -----
-const port = Number(env.PORT ?? process.env.PORT ?? 8787)
+const port = Number(env.PORT ?? process.env.PORT ?? 8788)
 serve({ fetch: app.fetch, port }, () => {
   console.log(`API listening on http://localhost:${port}`)
 })
