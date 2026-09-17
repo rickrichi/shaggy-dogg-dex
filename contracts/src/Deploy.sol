@@ -28,6 +28,10 @@
       function run() external returns (GovernanceToken, FeeDiscountStaking) {
           require(!isDeployed, "Already deployed");
 
+          // Effects before interactions. A revert rolls this assignment back,
+          // while a reentrant call cannot enter the deployment sequence twice.
+          isDeployed = true;
+
           address deployer = msg.sender;
 
           // 1 — Deploy GovernanceToken
@@ -46,6 +50,12 @@
               address(this)  // temporary tierAdmin for atomic configuration
           );
 
+          // Record the immutable deployment result before configuration calls.
+          // If configuration fails, the transaction and this log both revert.
+          // Deployment reentry is blocked by isDeployed before either creation.
+          // forge-lint: disable-next-line(reentrancy-events)
+          emit Deployed(address(token), address(staking));
+
           // 3 — Configure Staking
           FeeDiscountStaking.Tier[] memory tiers = new FeeDiscountStaking.Tier[](4);
           tiers[0] = FeeDiscountStaking.Tier(1_000 * 10**18, 100);
@@ -58,9 +68,6 @@
           staking.setMinimumStakePeriod(MINIMUM_STAKE_PERIOD);
           staking.setTierAdmin(deployer);
           staking.setAdmin(deployer);
-
-          isDeployed = true;
-          emit Deployed(address(token), address(staking));
 
           return (token, staking);
       }

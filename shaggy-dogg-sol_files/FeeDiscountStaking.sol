@@ -8,6 +8,9 @@ import "./GovernanceToken.sol";
  * @notice Stake GovernanceToken to receive fee discount tiers
  */
 contract FeeDiscountStaking {
+    uint256 private constant _NOT_ENTERED = 1;
+    uint256 private constant _ENTERED = 2;
+
     // --- Structs ---
     struct Tier {
         uint256 stakeRequired; // tokens required
@@ -27,6 +30,7 @@ contract FeeDiscountStaking {
     mapping(address => uint256) public stakeTimestamp;
 
     Tier[] public tiers;
+    uint256 private _reentrancyStatus = _NOT_ENTERED;
 
     // --- Events ---
     event Staked(address indexed user, uint256 amount);
@@ -64,6 +68,13 @@ contract FeeDiscountStaking {
         _;
     }
 
+    modifier nonReentrant() {
+        require(_reentrancyStatus != _ENTERED, "Reentrant call");
+        _reentrancyStatus = _ENTERED;
+        _;
+        _reentrancyStatus = _NOT_ENTERED;
+    }
+
     function setTiers(Tier[] memory newTiers) external onlyTierAdmin {
         delete tiers;
         for (uint256 i = 0; i < newTiers.length; i++) {
@@ -97,34 +108,45 @@ contract FeeDiscountStaking {
 
     // --- Staking Logic ---
 
-    function stake(uint256 amount) external {
+    function stake(uint256 amount) external nonReentrant {
         require(amount > 0, "Zero amount");
 
-        token.transferFrom(msg.sender, address(this), amount);
-
+        // Effects and their audit log are applied before the token interaction;
+        // any failed transfer reverts the entire transaction atomically.
+        // forge-lint: disable-next-line(missing-events-access-control)
         stakedBalance[msg.sender] += amount;
+        // forge-lint: disable-next-line(missing-events-access-control)
         stakeTimestamp[msg.sender] = block.timestamp;
-
         emit Staked(msg.sender, amount);
+
+        // Guarded by nonReentrant; the linter does not model modifier state.
+        // forge-lint: disable-next-line(reentrancy-no-eth)
+        require(token.transferFrom(msg.sender, address(this), amount), "Transfer failed");
     }
 
-    function unstake(uint256 amount) external {
+    function unstake(uint256 amount) external nonReentrant {
         require(amount > 0, "Zero amount");
         require(stakedBalance[msg.sender] >= amount, "Insufficient stake");
 
+        // A timestamp is the intended clock for a multi-day stake lock. Miner
+        // drift is negligible relative to the configured seven-day period.
         require(
+            // forge-lint: disable-next-line(block-timestamp)
             block.timestamp >= stakeTimestamp[msg.sender] + minimumStakePeriod,
             "Stake locked"
         );
 
+        // forge-lint: disable-next-line(missing-events-access-control)
         stakedBalance[msg.sender] -= amount;
 
         uint256 fee = (amount * withdrawalFeeBps) / 10_000;
         uint256 payout = amount - fee;
 
-        token.transfer(msg.sender, payout);
-
         emit Unstaked(msg.sender, amount, fee);
+
+        // Guarded by nonReentrant; the linter does not model modifier state.
+        // forge-lint: disable-next-line(reentrancy-no-eth)
+        require(token.transfer(msg.sender, payout), "Transfer failed");
     }
 
     // --- Views ---

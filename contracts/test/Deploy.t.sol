@@ -7,6 +7,9 @@ import {GovernanceToken} from "../src/GovernanceToken.sol";
 
 interface Vm {
     function prank(address sender) external;
+    function startPrank(address sender) external;
+    function stopPrank() external;
+    function warp(uint256 timestamp) external;
 }
 
 abstract contract TestBase {
@@ -49,5 +52,31 @@ contract DeployTest is TestBase {
 
         (bool success,) = address(deployment).call(abi.encodeWithSelector(Deploy.run.selector));
         assertTrue(!success, "second deployment unexpectedly succeeded");
+    }
+
+    function testStakeAndUnstakeSettleExactBalances() external {
+        Deploy deployment = new Deploy();
+        address operator = address(0xA11CE);
+
+        vm.prank(operator);
+        (GovernanceToken token, FeeDiscountStaking staking) = deployment.run();
+
+        uint256 amount = 10_000 * 10 ** 18;
+        vm.startPrank(operator);
+        token.approve(address(staking), amount);
+        staking.stake(amount);
+        vm.stopPrank();
+
+        assertEq(staking.stakedBalance(operator), amount, "stake accounting mismatch");
+        assertEq(token.balanceOf(address(staking)), amount, "staking custody mismatch");
+
+        vm.warp(block.timestamp + 7 days);
+        vm.prank(operator);
+        staking.unstake(amount);
+
+        uint256 fee = amount / 100;
+        assertEq(staking.stakedBalance(operator), 0, "stake was not cleared");
+        assertEq(token.balanceOf(operator), INITIAL_MINT - fee, "withdrawal payout mismatch");
+        assertEq(token.balanceOf(address(staking)), fee, "withdrawal fee mismatch");
     }
 }
