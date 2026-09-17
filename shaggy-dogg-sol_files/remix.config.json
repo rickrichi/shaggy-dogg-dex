@@ -1,0 +1,394 @@
+{
+  "$schema": "https://remix.ethereum.org/schemas/config.schema.json",
+  "version": "1.0.0",
+  "name": "Shaggy Dogg DEX",
+  "description": "Decentralized exchange with governance token and fee discount staking system",
+
+  "compiler": {
+    "version": "0.8.28",
+    "settings": {
+      "optimizer": {
+        "enabled": true,
+        "runs": 200,
+        "details": {
+          "yul": true,
+          "yulDetails": {
+            "stackAllocation": true,
+            "optimizerSteps": "dhfoDgvulfnTUtnIf"
+          }
+        }
+      },
+      "evmVersion": "cancun",
+      "viaIR": false,
+      "metadata": {
+        "bytecodeHash": "ipfs",
+        "appendCBOR": true,
+        "useLiteralContent": true
+      },
+      "outputSelection": {
+        "*": {
+          "*": [
+            "abi",
+            "evm.bytecode",
+            "evm.deployedBytecode",
+            "evm.methodIdentifiers",
+            "metadata",
+            "devdoc",
+            "userdoc",
+            "storageLayout",
+            "evm.gasEstimates"
+          ],
+          "": ["ast"]
+        }
+      },
+      "remappings": [],
+      "libraries": {}
+    }
+  },
+
+  "networks": {
+    "mainnet": {
+      "chainId": 1,
+      "enabled": false,
+      "description": "Ethereum Mainnet - Production deployment"
+    },
+    "sepolia": {
+      "chainId": 11155111,
+      "enabled": true,
+      "description": "Sepolia Testnet - Primary testing network"
+    },
+    "holesky": {
+      "chainId": 17000,
+      "enabled": true,
+      "description": "Holesky Testnet - Alternative testing network"
+    },
+    "base": {
+      "chainId": 8453,
+      "enabled": true,
+      "description": "Base Mainnet - L2 deployment option"
+    },
+    "baseSepolia": {
+      "chainId": 84532,
+      "enabled": true,
+      "description": "Base Sepolia - L2 testing"
+    },
+    "arbitrum": {
+      "chainId": 42161,
+      "enabled": true,
+      "description": "Arbitrum One - L2 deployment option"
+    },
+    "arbitrumSepolia": {
+      "chainId": 421614,
+      "enabled": true,
+      "description": "Arbitrum Sepolia - L2 testing"
+    },
+    "localhost": {
+      "chainId": 31337,
+      "enabled": true,
+      "description": "Local development network"
+    }
+  },
+
+  "contracts": {
+    "GovernanceToken": {
+      "file": "GovernanceToken.sol",
+      "deployment": {
+        "constructor": {
+          "params": [
+            {
+              "name": "name_",
+              "type": "string",
+              "description": "Token name"
+            },
+            {
+              "name": "symbol_",
+              "type": "string",
+              "description": "Token symbol"
+            },
+            {
+              "name": "initialAdmin",
+              "type": "address",
+              "description": "Initial admin address"
+            },
+            {
+              "name": "initialMinter",
+              "type": "address",
+              "description": "Initial minter address"
+            },
+            {
+              "name": "initialMint",
+              "type": "uint256",
+              "description": "Initial mint amount"
+            }
+          ]
+        },
+        "verify": true,
+        "gasLimit": 5000000
+      }
+    },
+    "FeeDiscountStaking": {
+      "file": "FeeDiscountStaking.sol",
+      "deployment": {
+        "constructor": {
+          "params": [
+            {
+              "name": "token_",
+              "type": "address",
+              "description": "Governance token address"
+            },
+            {
+              "name": "admin_",
+              "type": "address",
+              "description": "Admin address"
+            },
+            {
+              "name": "tierAdmin_",
+              "type": "address",
+              "description": "Tier admin address"
+            }
+          ]
+        },
+        "verify": true,
+        "gasLimit": 4000000,
+        "dependsOn": ["GovernanceToken"]
+      }
+    },
+    "Deploy": {
+      "file": "Deploy.sol",
+      "deployment": {
+        "constructor": {
+          "params": []
+        },
+        "verify": false,
+        "gasLimit": 10000000,
+        "description": "Deployment orchestrator contract"
+      }
+    }
+  },
+
+  "deployment": {
+    "sequence": [
+      {
+        "contract": "Deploy",
+        "action": "deploy",
+        "description": "Deploy the orchestrator contract"
+      },
+      {
+        "contract": "Deploy",
+        "action": "call",
+        "method": "run",
+        "description": "Execute deployment of all contracts"
+      }
+    ],
+    "verification": {
+      "enabled": true,
+      "delay": 30000,
+      "maxRetries": 3
+    },
+    "gasPrice": {
+      "strategy": "medium",
+      "maxPriorityFeePerGas": "2000000000",
+      "maxFeePerGas": "100000000000"
+    }
+  },
+
+  "security": {
+    "slither": {
+      "enabled": true,
+      "excludeDetectors": []
+    },
+    "mythril": {
+      "enabled": false
+    },
+    "checks": {
+      "reentrancy": true,
+      "overflow": true,
+      "accessControl": true,
+      "uncheckedCalls": true,
+      "txOrigin": true,
+      "delegatecall": true,
+      "timestamp": true
+    }
+  },
+
+  "testing": {
+    "framework": "remix-tests",
+    "coverage": {
+      "enabled": true,
+      "threshold": 80
+    },
+    "gas": {
+      "reporter": true,
+      "reporterOptions": {
+        "currency": "USD",
+        "gasPrice": 20
+      }
+    }
+  },
+
+  "plugins": {
+    "solhint": {
+      "enabled": true,
+      "rules": {
+        "compiler-version": ["error", "^0.8.28"],
+        "func-visibility": ["error", {"ignoreConstructors": true}],
+        "not-rely-on-time": "off",
+        "avoid-low-level-calls": "warn",
+        "avoid-suicide": "error",
+        "avoid-sha3": "warn",
+        "no-inline-assembly": "off",
+        "code-complexity": ["warn", 8],
+        "max-states-count": ["warn", 15],
+        "gas-custom-errors": "error"
+      }
+    },
+    "prettier": {
+      "enabled": true,
+      "printWidth": 100,
+      "tabWidth": 4,
+      "useTabs": false,
+      "singleQuote": false,
+      "bracketSpacing": true
+    },
+    "etherscan": {
+      "enabled": true,
+      "apiKeys": {
+        "mainnet": "ETHERSCAN_API_KEY",
+        "sepolia": "ETHERSCAN_API_KEY",
+        "base": "BASESCAN_API_KEY",
+        "arbitrum": "ARBISCAN_API_KEY"
+      }
+    },
+    "sourcify": {
+      "enabled": true
+    }
+  },
+
+  "frontend": {
+    "abiExportPath": "../src/abi",
+    "typechain": {
+      "enabled": true,
+      "target": "ethers-v6",
+      "outputPath": "../src/types/contracts"
+    },
+    "wagmi": {
+      "enabled": true,
+      "outputPath": "../src/generated"
+    }
+  },
+
+  "constants": {
+    "TOKEN_NAME": "Protocol Token",
+    "TOKEN_SYMBOL": "PTK",
+    "INITIAL_MINT": "1000000000000000000000000",
+    "MINIMUM_STAKE_PERIOD": "604800",
+    "WITHDRAWAL_FEE_BPS": "100",
+    "TIERS": [
+      {
+        "minStake": "1000000000000000000000",
+        "discountBps": "100"
+      },
+      {
+        "minStake": "10000000000000000000000",
+        "discountBps": "250"
+      },
+      {
+        "minStake": "100000000000000000000000",
+        "discountBps": "500"
+      },
+      {
+        "minStake": "1000000000000000000000000",
+        "discountBps": "1000"
+      }
+    ]
+  },
+
+  "scripts": {
+    "compile": "Compile all Solidity contracts",
+    "deploy:local": "Deploy to local network",
+    "deploy:testnet": "Deploy to Sepolia testnet",
+    "deploy:mainnet": "Deploy to Ethereum mainnet",
+    "verify": "Verify contracts on Etherscan",
+    "test": "Run all tests",
+    "coverage": "Generate coverage report",
+    "lint": "Run Solhint linter",
+    "format": "Format code with Prettier"
+  },
+
+  "documentation": {
+    "natspec": {
+      "enabled": true,
+      "includeDevdoc": true,
+      "includeUserdoc": true
+    },
+    "outputFormats": ["markdown", "html"],
+    "outputPath": "../documentation/contracts"
+  },
+
+  "workspace": {
+    "fileStructure": {
+      "contracts": ".",
+      "tests": "./tests",
+      "scripts": "./scripts",
+      "deployments": "../deployments",
+      "artifacts": "./artifacts"
+    },
+    "autoSave": true,
+    "theme": "dark",
+    "fontSize": 14
+  },
+
+  "git": {
+    "enabled": true,
+    "autoCommit": false,
+    "branches": {
+      "main": "Production deployments",
+      "develop": "Development and testing",
+      "feature/*": "Feature development"
+    }
+  },
+
+  "standards": {
+    "erc": {
+      "ERC20": true,
+      "ERC2612": true,
+      "ERC5805": true,
+      "ERC6372": true
+    },
+    "openzeppelin": {
+      "version": "5.x",
+      "contracts": [
+        "AccessControl",
+        "Pausable",
+        "ReentrancyGuard",
+        "SafeERC20",
+        "ERC20Votes",
+        "ERC20Permit"
+      ]
+    }
+  },
+
+  "metadata": {
+    "author": "Shaggy Dogg DEX Team",
+    "license": "MIT",
+    "repository": "https://github.com/yourusername/shaggy-dogg-dex",
+    "website": "https://shaggydogg.finance",
+    "social": {
+      "twitter": "@ShaggydoggDEX",
+      "discord": "https://discord.gg/shaggydogg",
+      "telegram": "https://t.me/shaggydogg"
+    }
+  },
+
+  "compliance": {
+    "audit": {
+      "required": true,
+      "auditors": [],
+      "reports": []
+    },
+    "licensing": {
+      "spdx": "MIT",
+      "commercial": false
+    }
+  }
+}

@@ -1,0 +1,92 @@
+import type { Address, Hex } from "viem";
+
+import { getAmmProfile } from "./profiles";
+
+export interface LumioroMainnetRelease {
+  readonly releaseStatus: "BLOCKED";
+  readonly execution: "DISABLED";
+  readonly chainId: 1;
+  readonly token: {
+    readonly address: Address;
+    readonly symbol: "LUMIORO";
+    readonly deploymentTransaction: Hex;
+    readonly deploymentBlock: 25_939_316;
+    readonly repositoryVerification: "RECORDED_20_OF_20";
+    readonly runtimeBytecodeSha256: Hex;
+  };
+  readonly sourcePublication: "NOT_EVIDENCED";
+  readonly independentAudit: {
+    readonly status: "ASSERTED_REPORT_NOT_LINKED";
+    readonly claimedAuditor: "Tanaka Minato";
+    readonly reportUrl: null;
+    readonly reportSha256: null;
+    readonly scopedSourceCommit: null;
+  };
+  readonly liquidityEnvelope: {
+    readonly status: "APPROVED_RANGE_EXACT_PLAN_PENDING";
+    readonly lumioroAmountBaseUnits: 250_000_000_000_000_000_000_000_000n;
+    readonly minimumWethWei: 20_000_000_000_000_000n;
+    readonly maximumWethWei: 22_500_000_000_000_000_000n;
+    readonly exactPlanKey: null;
+    readonly reviewer: null;
+  };
+  readonly factory: Address;
+  readonly router: Address;
+  readonly wrappedNative: Address;
+  readonly blockers: readonly [
+    "EXPLORER_SOURCE_PUBLICATION_NOT_EVIDENCED",
+    "INDEPENDENT_AUDIT_REPORT_NOT_LINKED",
+    "EXACT_LIQUIDITY_PLAN_AND_HUMAN_REVIEW_PENDING",
+    "MAINNET_EXECUTION_INTENTIONALLY_DISABLED",
+  ];
+}
+
+const profile = getAmmProfile("mainnet");
+if (!profile.contracts.factory || !profile.contracts.router || !profile.contracts.wrappedNative) {
+  throw new Error("The mainnet Uniswap V2 profile is incomplete.");
+}
+
+/**
+ * Evidence copied from the companion LUMIORO deployment record. It does not
+ * infer explorer publication, an audit pass, or any execution authority.
+ */
+export const LUMIORO_MAINNET_RELEASE: LumioroMainnetRelease = {
+  releaseStatus: "BLOCKED",
+  execution: "DISABLED",
+  chainId: 1,
+  token: {
+    address: "0x14eDBa263054b381A3836d97Ba2e3Fe763f7991E" as Address,
+    symbol: "LUMIORO",
+    deploymentTransaction:
+      "0x0ec287f5fb036f12e68559be1b9a47244553807962e12787d5daee28ca90a201" as Hex,
+    deploymentBlock: 25_939_316,
+    repositoryVerification: "RECORDED_20_OF_20",
+    runtimeBytecodeSha256:
+      "0x60df844cb24eebe0468c53a079a326d77f6769ee75905760ecf9602a2622e696" as Hex,
+  },
+  sourcePublication: "NOT_EVIDENCED",
+  independentAudit: {
+    status: "ASSERTED_REPORT_NOT_LINKED",
+    claimedAuditor: "Tanaka Minato",
+    reportUrl: null,
+    reportSha256: null,
+    scopedSourceCommit: null,
+  },
+  liquidityEnvelope: {
+    status: "APPROVED_RANGE_EXACT_PLAN_PENDING",
+    lumioroAmountBaseUnits: 250_000_000_000_000_000_000_000_000n,
+    minimumWethWei: 20_000_000_000_000_000n,
+    maximumWethWei: 22_500_000_000_000_000_000n,
+    exactPlanKey: null,
+    reviewer: null,
+  },
+  factory: profile.contracts.factory,
+  router: profile.contracts.router,
+  wrappedNative: profile.contracts.wrappedNative,
+  blockers: [
+    "EXPLORER_SOURCE_PUBLICATION_NOT_EVIDENCED",
+    "INDEPENDENT_AUDIT_REPORT_NOT_LINKED",
+    "EXACT_LIQUIDITY_PLAN_AND_HUMAN_REVIEW_PENDING",
+    "MAINNET_EXECUTION_INTENTIONALLY_DISABLED",
+  ],
+};
