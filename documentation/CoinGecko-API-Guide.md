@@ -227,7 +227,6 @@ GET /simple/price
 | Ethereum | `ethereum` |
 | Bitcoin | `bitcoin` |
 | Polygon | `matic-network` |
-| BNB | `binancecoin` |
 | Solana | `solana` |
 
 ### Example Request

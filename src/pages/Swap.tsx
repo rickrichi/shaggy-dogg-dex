@@ -367,7 +367,12 @@ export default function Swap() {
       <div className="mx-auto grid max-w-7xl grid-cols-1 items-start gap-6 lg:grid-cols-3 lg:gap-8">
         {/* Left Column: Chart & Info */}
         <div className="h-full min-h-[400px] lg:col-span-2">
-          <PriceChart baseSymbol={chartBaseSymbol} quoteSymbol={chartQuoteSymbol} />
+          <PriceChart
+            baseToken={MAINNET_TOKENS.find((token) => token.symbol === chartBaseSymbol) ?? sellToken}
+            quoteToken={
+              MAINNET_TOKENS.find((token) => token.symbol === chartQuoteSymbol) ?? buyToken
+            }
+          />
 
           {/* Additional Info Area */}
           <div className="mt-6 grid grid-cols-3 gap-4">

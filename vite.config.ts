@@ -108,18 +108,6 @@ export default defineConfig(({ mode }) => {
             })
           },
         },
-        // Binance price feed proxy to bypass CORS in dev
-        '/proxy/binance': {
-          target: 'https://api.binance.com',
-          changeOrigin: true,
-          secure: true,
-          rewrite: (path) => path.replace(/^\/proxy\/binance/, ''),
-          configure: (proxy) => {
-            proxy.on('error', (err) => {
-              console.error('🔴 Binance Proxy Error:', err.message)
-            })
-          },
-        },
       },
     },
 
