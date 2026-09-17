@@ -1,14 +1,14 @@
 import { useMemo } from "react";
 
 import { ArrowRight, RefreshCw, Route } from "lucide-react";
-import { type Address,formatUnits, parseUnits } from "viem";
+import { type Address, formatUnits, parseUnits } from "viem";
 import { useReadContracts } from "wagmi";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { UNISWAP_V2_ROUTER_ABI } from "@/config/abis";
 import { DEX_VENUES } from "@/config/dexes";
-import { type Token,WRAPPED_NATIVE_ADDRESS } from "@/config/tokens";
+import { type Token, WRAPPED_NATIVE_ADDRESS } from "@/config/tokens";
 
 const resolveAddress = (token: Token): Address =>
   token.address === "native" ? WRAPPED_NATIVE_ADDRESS : token.address;
@@ -62,7 +62,7 @@ export const PriceChart = ({ baseToken, quoteToken }: PriceChartProps) => {
         const amounts = result?.status === "success" ? result.result : undefined;
         const output = Array.isArray(amounts) ? (amounts.at(-1) as bigint | undefined) : undefined;
         const resultError = result?.status === "failure" ? result.error : undefined;
-        const detail = resultError instanceof Error ? resultError.shortMessage ?? resultError.message : undefined;
+        const detail = resultError instanceof Error ? resultError.message : undefined;
         const noRoute = detail?.toLowerCase().includes("revert") ?? false;
         return {
           id: venue.id,

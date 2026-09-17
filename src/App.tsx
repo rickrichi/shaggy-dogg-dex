@@ -125,7 +125,7 @@ const ApiDiagnostic = (): JSX.Element | null => {
         </div>
       )}
 
-      {result && (
+      {result !== null && (
         <pre className="max-h-32 overflow-auto rounded bg-gray-50 p-2 text-xs text-gray-700 dark:bg-gray-900 dark:text-gray-300">
           {JSON.stringify(result, null, 2)}
         </pre>
