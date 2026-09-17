@@ -61,10 +61,12 @@ const ApiDiagnostic = (): JSX.Element | null => {
         setIsLoading(true);
         setError(null);
 
-        const base = import.meta.env.VITE_API_URL ?? "http://localhost:8788";
-        const res = await fetch(`${base}/api/block`, {
+        // Keep diagnostics on the same origin as the app. Vite proxies this in
+        // development and the deployment platform serves the `/api` contract in
+        // production, avoiding stale ports and browser CORS failures.
+        const res = await fetch("/api/block", {
           method: "GET",
-          credentials: "include", // drop if you won't use cookies
+          credentials: "same-origin",
         });
 
         if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
