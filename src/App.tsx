@@ -51,34 +51,51 @@ const queryClient = new QueryClient({
 
 // Diagnostic component for API connectivity testing
 const ApiDiagnostic = (): JSX.Element | null => {
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<unknown>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    (async () => {
+    let cancelled = false;
+
+    const checkApi = async () => {
       try {
-        setIsLoading(true);
-        setError(null);
+        if (!cancelled) setIsLoading(true);
 
         // Keep diagnostics on the same origin as the app. Vite proxies this in
         // development and the deployment platform serves the `/api` contract in
         // production, avoiding stale ports and browser CORS failures.
-        const res = await fetch("/api/block", {
+        const res = await fetch("/api/health", {
           method: "GET",
           credentials: "same-origin",
+          cache: "no-store",
         });
 
         if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-        setResult(await res.json());
+        const payload: unknown = await res.json();
+        if (!cancelled) {
+          setResult(payload);
+          setError(null);
+        }
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : "Request failed";
-        setError(msg);
+        if (!cancelled) {
+          setResult(null);
+          setError(msg);
+        }
         console.error("API Diagnostic Error:", msg);
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
-    })();
+    };
+
+    void checkApi();
+    const interval = window.setInterval(() => void checkApi(), 5_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
   }, []);
 
   if (!import.meta.env.DEV) {
