@@ -91,6 +91,15 @@ export const MAINNET_TOKENS = [
     logoURI: "https://tokens.1inch.io/0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2.png",
     chainId: 1,
   },
+  {
+    kind: "erc20",
+    // Canonical Ethereum-mainnet deployment recorded by LUMIORO_MAINNET_RELEASE.
+    address: "0x14eDBa263054b381A3836d97Ba2e3Fe763f7991E" as Address,
+    symbol: "LUMIORO",
+    name: "LUMIORO Token",
+    decimals: 18,
+    chainId: 1,
+  },
 ] as const satisfies readonly [Token, Token, ...Token[]];
 
 /** Literal union of known symbols inferred from MAINNET_TOKENS */
@@ -132,6 +141,7 @@ export const DEFAULT_TOKEN_PAIRS: ReadonlyArray<{
   { from: "ETH", to: "USDT" },
   { from: "USDC", to: "DAI" },
   { from: "WBTC", to: "ETH" },
+  { from: "ETH", to: "LUMIORO" },
 ] as const;
 
 /** ————— Canonical wrapped native (WETH) ————— */
