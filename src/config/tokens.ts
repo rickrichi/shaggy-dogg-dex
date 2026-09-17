@@ -1,8 +1,8 @@
 // src/config/tokens.ts
-import type { Address } from 'viem';
+import type { Address } from "viem";
 
 /** ————— Core token model (discriminated union) ————— */
-export type NativeSentinel = 'native';
+export type NativeSentinel = "native";
 
 export interface BaseToken {
   readonly symbol: string;
@@ -13,12 +13,12 @@ export interface BaseToken {
 }
 
 export interface NativeToken extends BaseToken {
-  readonly kind: 'native';
+  readonly kind: "native";
   readonly address: NativeSentinel; // 'native'
 }
 
 export interface Erc20Token extends BaseToken {
-  readonly kind: 'erc20';
+  readonly kind: "erc20";
   readonly address: Address; // 0x-prefixed checksummed address
 }
 
@@ -26,11 +26,11 @@ export type Token = NativeToken | Erc20Token;
 
 /** ————— Type guards ————— */
 export function isNativeToken(token: Token): token is NativeToken {
-  return token.kind === 'native';
+  return token.kind === "native";
 }
 
 export function isErc20Token(token: Token): token is Erc20Token {
-  return token.kind === 'erc20';
+  return token.kind === "erc20";
 }
 
 /** ————— Ethereum mainnet tokens —————
@@ -38,84 +38,72 @@ export function isErc20Token(token: Token): token is Erc20Token {
  */
 export const MAINNET_TOKENS = [
   {
-    kind: 'native',
-    address: 'native',
-    symbol: 'ETH',
-    name: 'Ethereum',
+    kind: "native",
+    address: "native",
+    symbol: "ETH",
+    name: "Ethereum",
     decimals: 18,
-    logoURI:
-      'https://tokens.1inch.io/0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.png',
+    logoURI: "https://tokens.1inch.io/0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.png",
     chainId: 1,
   },
   {
-    kind: 'erc20',
-    address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as Address, // USDC
-    symbol: 'USDC',
-    name: 'USD Coin',
+    kind: "erc20",
+    address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48" as Address, // USDC
+    symbol: "USDC",
+    name: "USD Coin",
     decimals: 6,
-    logoURI:
-      'https://tokens.1inch.io/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48.png',
+    logoURI: "https://tokens.1inch.io/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48.png",
     chainId: 1,
   },
   {
-    kind: 'erc20',
-    address: '0xdAC17F958D2ee523a2206206994597C13D831ec7' as Address, // USDT
-    symbol: 'USDT',
-    name: 'Tether USD',
+    kind: "erc20",
+    address: "0xdAC17F958D2ee523a2206206994597C13D831ec7" as Address, // USDT
+    symbol: "USDT",
+    name: "Tether USD",
     decimals: 6,
-    logoURI:
-      'https://tokens.1inch.io/0xdac17f958d2ee523a2206206994597c13d831ec7.png',
+    logoURI: "https://tokens.1inch.io/0xdac17f958d2ee523a2206206994597c13d831ec7.png",
     chainId: 1,
   },
   {
-    kind: 'erc20',
-    address: '0x6B175474E89094C44Da98b954EedeAC495271d0F' as Address, // DAI
-    symbol: 'DAI',
-    name: 'Dai Stablecoin',
+    kind: "erc20",
+    address: "0x6B175474E89094C44Da98b954EedeAC495271d0F" as Address, // DAI
+    symbol: "DAI",
+    name: "Dai Stablecoin",
     decimals: 18,
-    logoURI:
-      'https://tokens.1inch.io/0x6b175474e89094c44da98b954eedeac495271d0f.png',
+    logoURI: "https://tokens.1inch.io/0x6b175474e89094c44da98b954eedeac495271d0f.png",
     chainId: 1,
   },
   {
-    kind: 'erc20',
-    address: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599' as Address, // WBTC
-    symbol: 'WBTC',
-    name: 'Wrapped BTC',
+    kind: "erc20",
+    address: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599" as Address, // WBTC
+    symbol: "WBTC",
+    name: "Wrapped BTC",
     decimals: 8,
-    logoURI:
-      'https://tokens.1inch.io/0x2260fac5e5542a773aa44fbcfedf7c193bc2c599.png',
+    logoURI: "https://tokens.1inch.io/0x2260fac5e5542a773aa44fbcfedf7c193bc2c599.png",
     chainId: 1,
   },
   {
-    kind: 'erc20',
-    address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2' as Address, // WETH
-    symbol: 'WETH',
-    name: 'Wrapped Ether',
+    kind: "erc20",
+    address: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2" as Address, // WETH
+    symbol: "WETH",
+    name: "Wrapped Ether",
     decimals: 18,
-    logoURI:
-      'https://tokens.1inch.io/0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2.png',
+    logoURI: "https://tokens.1inch.io/0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2.png",
     chainId: 1,
   },
 ] as const satisfies readonly [Token, Token, ...Token[]];
 
 /** Literal union of known symbols inferred from MAINNET_TOKENS */
-export type TokenSymbol = (typeof MAINNET_TOKENS)[number]['symbol'];
+export type TokenSymbol = (typeof MAINNET_TOKENS)[number]["symbol"];
 
 /** ————— Helpers (type-safe, no `any`) ————— */
-export function getTokenByAddress(
-  address: Address | NativeSentinel
-): Token | undefined {
-  if (address === 'native') {
+export function getTokenByAddress(address: Address | NativeSentinel): Token | undefined {
+  if (address === "native") {
     // Single equality branch avoids unsafe toString() on discriminated data
-    return MAINNET_TOKENS.find(
-      (t) => t.kind === 'native' && t.address === 'native'
-    );
+    return MAINNET_TOKENS.find((t) => t.kind === "native" && t.address === "native");
   }
   const needle = address.toLowerCase();
-  return MAINNET_TOKENS.find(
-    (t) => t.kind === 'erc20' && t.address.toLowerCase() === needle
-  );
+  return MAINNET_TOKENS.find((t) => t.kind === "erc20" && t.address.toLowerCase() === needle);
 }
 
 export function getTokenBySymbol(symbol: string): Token | undefined {
@@ -140,8 +128,19 @@ export const DEFAULT_TOKEN_PAIRS: ReadonlyArray<{
   readonly from: TokenSymbol;
   readonly to: TokenSymbol;
 }> = [
-  { from: 'ETH', to: 'USDC' },
-  { from: 'ETH', to: 'USDT' },
-  { from: 'USDC', to: 'DAI' },
-  { from: 'WBTC', to: 'ETH' },
+  { from: "ETH", to: "USDC" },
+  { from: "ETH", to: "USDT" },
+  { from: "USDC", to: "DAI" },
+  { from: "WBTC", to: "ETH" },
 ] as const;
+
+/** ————— Canonical wrapped native (WETH) ————— */
+const wrappedNative = MAINNET_TOKENS.find(
+  (token) => token.symbol === "WETH" && token.kind === "erc20"
+);
+
+if (!wrappedNative || wrappedNative.kind !== "erc20") {
+  throw new Error("WETH token configuration is required for swap routing.");
+}
+
+export const WRAPPED_NATIVE_ADDRESS: Address = wrappedNative.address;

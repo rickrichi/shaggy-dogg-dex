@@ -1,29 +1,27 @@
-import { GripVertical } from "lucide-react"
-import * as ResizablePrimitive from "react-resizable-panels"
+import * as ResizablePrimitive from "react-resizable-panels";
 
-import { cn } from "@/lib/utils"
+import { GripVertical } from "lucide-react";
+
+import { cn } from "@/lib/utils";
 
 const ResizablePanelGroup = ({
   className,
   ...props
 }: React.ComponentProps<typeof ResizablePrimitive.PanelGroup>) => (
   <ResizablePrimitive.PanelGroup
-    className={cn(
-      "flex h-full w-full data-[panel-group-direction=vertical]:flex-col",
-      className
-    )}
+    className={cn("flex size-full data-[panel-group-direction=vertical]:flex-col", className)}
     {...props}
   />
-)
+);
 
-const ResizablePanel = ResizablePrimitive.Panel
+const ResizablePanel = ResizablePrimitive.Panel;
 
 const ResizableHandle = ({
   withHandle,
   className,
   ...props
 }: React.ComponentProps<typeof ResizablePrimitive.PanelResizeHandle> & {
-  withHandle?: boolean
+  withHandle?: boolean;
 }) => (
   <ResizablePrimitive.PanelResizeHandle
     className={cn(
@@ -33,11 +31,11 @@ const ResizableHandle = ({
     {...props}
   >
     {withHandle && (
-      <div className="z-10 flex h-4 w-3 items-center justify-center rounded-sm border border-border/50 bg-border/30 hover:bg-border/50 transition-colors">
-        <GripVertical className="h-2.5 w-2.5 text-primary/40" />
+      <div className="z-10 flex h-4 w-3 items-center justify-center rounded-sm border border-border/50 bg-border/30 transition-colors hover:bg-border/50">
+        <GripVertical className="size-2.5 text-primary/40" />
       </div>
     )}
   </ResizablePrimitive.PanelResizeHandle>
-)
+);
 
-export { ResizablePanelGroup, ResizablePanel, ResizableHandle }
+export { ResizableHandle, ResizablePanel, ResizablePanelGroup };

@@ -1,15 +1,15 @@
-import * as React from "react"
-import * as SeparatorPrimitive from "@radix-ui/react-separator"
+import * as React from "react";
 
-import { cn } from "@/lib/utils"
+import * as SeparatorPrimitive from "@radix-ui/react-separator";
 
-interface SeparatorProps extends
-  React.ComponentPropsWithoutRef<typeof SeparatorPrimitive.Root> {
-  variant?: "default" | "muted" | "accent"
+import { cn } from "@/lib/utils";
+
+interface SeparatorProps extends React.ComponentPropsWithoutRef<typeof SeparatorPrimitive.Root> {
+  variant?: "default" | "muted" | "accent";
 }
 
 const Separator = React.forwardRef<
-  React.ElementRef<typeof SeparatorPrimitive.Root>,
+  React.ComponentRef<typeof SeparatorPrimitive.Root>,
   SeparatorProps
 >(
   (
@@ -25,13 +25,13 @@ const Separator = React.forwardRef<
         variant === "default" && "bg-border",
         variant === "muted" && "bg-muted",
         variant === "accent" && "bg-primary/30",
-        orientation === "horizontal" ? "h-[1px] w-full" : "h-full w-[1px]",
+        orientation === "horizontal" ? "h-px w-full" : "h-full w-px",
         className
       )}
       {...props}
     />
   )
-)
-Separator.displayName = SeparatorPrimitive.Root.displayName
+);
+Separator.displayName = SeparatorPrimitive.Root.displayName;
 
-export { Separator }
+export { Separator };

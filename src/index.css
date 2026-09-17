@@ -1,5 +1,4 @@
-
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -93,10 +92,11 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans dark:bg-background dark:text-foreground;
+    @apply bg-background font-sans text-foreground dark:bg-background dark:text-foreground;
   }
 
-  pre, code {
+  pre,
+  code {
     @apply font-mono;
   }
 }
@@ -106,15 +106,15 @@
 }
 
 .markdown-preview {
-  @apply prose max-w-none prose-blue dark:prose-invert;
+  @apply prose prose-blue max-w-none dark:prose-invert;
 }
 
 .markdown-preview pre {
-  @apply bg-secondary p-4 rounded-md overflow-x-auto;
+  @apply overflow-x-auto rounded-md bg-secondary p-4;
 }
 
 .markdown-preview code {
-  @apply text-sm font-mono text-primary;
+  @apply font-mono text-sm text-primary;
 }
 
 .markdown-preview h1,

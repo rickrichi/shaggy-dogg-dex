@@ -1,25 +1,30 @@
 // src/main.tsx
-import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
-import App from './App';
-import './index.css';
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+
+import App from "./App";
+
+import "./index.css";
 
 // Refined DEV-only console and global error filtering
 // - Keeps real app/network errors visible
 // - Suppresses wallet/extension "inpage.js" noise (e.g., chrome.runtime.sendMessage)
 if (import.meta.env.DEV) {
-  type ErrorLike = { message?: unknown; stack?: unknown };
+  interface ErrorLike {
+    message?: unknown;
+    stack?: unknown;
+  }
   const isObject = (v: unknown): v is Record<string, unknown> =>
-    typeof v === 'object' && v !== null;
+    typeof v === "object" && v !== null;
 
   const isErrorLike = (v: unknown): v is ErrorLike =>
-    isObject(v) && ('message' in v || 'stack' in v);
+    isObject(v) && ("message" in v || "stack" in v);
 
   const stringify = (v: unknown): string => {
-    if (typeof v === 'string') return v;
+    if (typeof v === "string") return v;
     if (isErrorLike(v)) {
-      const msg = typeof v.message === 'string' ? v.message : '';
-      const stack = typeof v.stack === 'string' ? v.stack : '';
+      const msg = typeof v.message === "string" ? v.message : "";
+      const stack = typeof v.stack === "string" ? v.stack : "";
       return `${msg}\n${stack}`;
     }
     try {
@@ -29,15 +34,15 @@ if (import.meta.env.DEV) {
     }
   };
 
-  const isExtensionNoise = (...args: ReadonlyArray<unknown>): boolean => {
-    const blob = args.map(stringify).join('\n');
+  const isExtensionNoise = (...args: readonly unknown[]): boolean => {
+    const blob = args.map(stringify).join("\n");
     // Heuristics for common wallet/extension injections
     return (
-      blob.includes('inpage.js') ||
-      blob.includes('chrome.runtime.sendMessage') ||
-      blob.toLowerCase().includes('coinbase') ||
-      blob.toLowerCase().includes('metamask') ||
-      blob.toLowerCase().includes('wallet')
+      blob.includes("inpage.js") ||
+      blob.includes("chrome.runtime.sendMessage") ||
+      blob.toLowerCase().includes("coinbase") ||
+      blob.toLowerCase().includes("metamask") ||
+      blob.toLowerCase().includes("wallet")
     );
   };
 
@@ -53,8 +58,8 @@ if (import.meta.env.DEV) {
   console.error = ((...args: Parameters<typeof console.error>): void => {
     const firstArg: unknown = args[0];
     const isRealNetworkError =
-      (typeof firstArg === 'string' && firstArg.includes('Failed to fetch')) ||
-      stringify(firstArg).includes('Failed to fetch');
+      (typeof firstArg === "string" && firstArg.includes("Failed to fetch")) ||
+      stringify(firstArg).includes("Failed to fetch");
 
     if (isRealNetworkError || !isExtensionNoise(...args)) {
       originalError(...args);
@@ -63,7 +68,7 @@ if (import.meta.env.DEV) {
 
   // Prevent noisy global errors from extensions from bubbling
   window.addEventListener(
-    'error',
+    "error",
     (ev: ErrorEvent): void => {
       const payload: unknown = ev.error ?? ev.message;
       if (isExtensionNoise(payload)) ev.preventDefault();
@@ -71,22 +76,15 @@ if (import.meta.env.DEV) {
     true
   );
 
-  window.addEventListener(
-    'unhandledrejection',
-    (ev: PromiseRejectionEvent): void => {
-      const payload: unknown = ev.reason;
-      if (isExtensionNoise(payload)) ev.preventDefault();
-    }
-  );
+  window.addEventListener("unhandledrejection", (ev: PromiseRejectionEvent): void => {
+    const payload: unknown = ev.reason;
+    if (isExtensionNoise(payload)) ev.preventDefault();
+  });
 }
 
 // App owns the router (no RouterProvider here)
-createRoot(document.getElementById('root')!).render(
+createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <App />
   </StrictMode>
 );
-
-
-
-

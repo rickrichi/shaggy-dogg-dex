@@ -4,26 +4,26 @@
 import { arbitrum, mainnet, optimism, polygon, sepolia } from "wagmi/chains";
 
 // Add new types for the required properties
-export type NativeCurrencyConfig = {
+export interface NativeCurrencyConfig {
   name: string;
   symbol: string;
   decimals: number;
   coinGeckoId: string;
-};
+}
 
-export type TokenConfig = {
+export interface TokenConfig {
   address: `0x${string}`;
   name: string;
   symbol: string;
   decimals: number;
   coinGeckoId: string; // <-- Add this property
-};
+}
 
-export type ChainConfig = {
+export interface ChainConfig {
   chainName: string;
   nativeCurrency: NativeCurrencyConfig; // <-- Add this property
   tokens: TokenConfig[];
-};
+}
 
 // Update the watchlist data with the new properties
 const tokenWatchlist: Record<number, ChainConfig> = {

@@ -1,21 +1,23 @@
 // src/pages/Stake.tsx
-import { useMemo, useState } from 'react';
-import type { Address } from 'viem';
-import { parseUnits } from 'viem';
+import { useMemo, useState } from "react";
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Loader2 } from 'lucide-react';
+import { Loader2 } from "lucide-react";
+import { parseUnits } from "viem";
 
-import { publicClient, walletClient, SDT, FDS } from '../lib/viemClients';
-import type { Account } from 'viem';
-import { signAndDepositWithPermit } from '@/lib/permit';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { signAndDepositWithPermit } from "@/lib/permit";
+
+import { FDS, publicClient, SDT, walletClient } from "../lib/viemClients";
+
+import type { Address } from "viem";
+import type { Account } from "viem";
 
 interface StakeFormState {
-  amount: string;         // human amount, e.g. "1.5"
-  deadlineMins: number;   // minutes from now
+  amount: string; // human amount, e.g. "1.5"
+  deadlineMins: number; // minutes from now
   txHash?: string;
   error?: string;
   isSubmitting: boolean;
@@ -23,21 +25,21 @@ interface StakeFormState {
 
 interface TokenConfig {
   address: Address;
-  decimals: bigint;       // keep as bigint to avoid accidental downcasting
+  decimals: bigint; // keep as bigint to avoid accidental downcasting
   name: string;
-  version: string;        // EIP-2612 domain version (OZ default "1")
+  version: string; // EIP-2612 domain version (OZ default "1")
 }
 
 const DEFAULT_TOKEN: TokenConfig = {
   address: SDT.address,
   decimals: 18n,
-  name: 'ShaggyDoggToken',
-  version: '1',
+  name: "ShaggyDoggToken",
+  version: "1",
 };
 
 export default function Stake() {
   const [form, setForm] = useState<StakeFormState>({
-    amount: '',
+    amount: "",
     deadlineMins: 10,
     isSubmitting: false,
   });
@@ -49,13 +51,13 @@ export default function Stake() {
     setForm((s) => ({ ...s, error: "", txHash: "", isSubmitting: true }));
 
     if (!walletClient || !walletClient.account) {
-      setForm((s) => ({ ...s, isSubmitting: false, error: 'Connect a wallet first.' }));
+      setForm((s) => ({ ...s, isSubmitting: false, error: "Connect a wallet first." }));
       return;
     }
     const owner = (walletClient.account as Account).address;
     const raw = form.amount.trim();
     if (!raw || Number(raw) <= 0) {
-      setForm((s) => ({ ...s, isSubmitting: false, error: 'Enter a positive amount.' }));
+      setForm((s) => ({ ...s, isSubmitting: false, error: "Enter a positive amount." }));
       return;
     }
 
@@ -77,30 +79,30 @@ export default function Stake() {
 
       setForm((s) => ({ ...s, isSubmitting: false, txHash }));
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Failed to stake with permit.';
+      const msg = e instanceof Error ? e.message : "Failed to stake with permit.";
       setForm((s) => ({ ...s, isSubmitting: false, error: msg }));
     }
   }
 
   return (
-    <div className="max-w-xl mx-auto">
+    <div className="mx-auto max-w-xl">
       <Card className="bg-white/80 backdrop-blur-sm">
         <CardHeader>
           <CardTitle>Stake SDT (via Permit)</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {!canStake && (
-            <div className="rounded border border-amber-200 bg-amber-50 text-amber-800 text-sm p-2">
+            <div className="rounded border border-amber-200 bg-amber-50 p-2 text-sm text-amber-800">
               Connect a wallet (e.g., MetaMask) to sign and send the transaction.
             </div>
           )}
           {form.error && (
-            <div className="rounded border border-red-200 bg-red-50 text-red-700 text-sm p-2">
+            <div className="rounded border border-red-200 bg-red-50 p-2 text-sm text-red-700">
               {form.error}
             </div>
           )}
           {form.txHash && (
-            <div className="rounded border border-emerald-200 bg-emerald-50 text-emerald-700 text-sm p-2 break-all">
+            <div className="break-all rounded border border-emerald-200 bg-emerald-50 p-2 text-sm text-emerald-700">
               Sent! Tx: {form.txHash}
             </div>
           )}
@@ -138,22 +140,23 @@ export default function Stake() {
           </div>
 
           <Button
-            className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+            className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700"
             onClick={() => void handleStakeWithPermit()}
             disabled={!canStake || form.isSubmitting}
           >
             {form.isSubmitting ? (
               <span className="inline-flex items-center">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="mr-2 size-4 animate-spin" />
                 Staking…
               </span>
             ) : (
-              'Stake with Permit'
+              "Stake with Permit"
             )}
           </Button>
 
           <p className="text-xs text-gray-500">
-            This uses EIP-2612 to sign an approval and stake in one transaction (`depositWithPermit`).
+            This uses EIP-2612 to sign an approval and stake in one transaction
+            (`depositWithPermit`).
           </p>
         </CardContent>
       </Card>

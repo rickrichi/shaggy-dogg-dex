@@ -1,40 +1,70 @@
-/* eslint-disable react-hooks/exhaustive-deps */
 // src/hooks/useSwap.ts
-import { useState, useCallback, useMemo, useEffect } from 'react';
-import { parseUnits, formatUnits, type Address } from 'viem';
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { toast } from "sonner";
+import { type Address, formatUnits, parseUnits } from "viem";
 import {
   useAccount,
   useBalance,
   useReadContract,
-  useWriteContract,
   useWaitForTransactionReceipt,
-} from 'wagmi';
-import { toast } from 'sonner';
-import type { Token, NativeSentinel } from '@/config/tokens';
-import { CONTRACTS, DEFAULT_SLIPPAGE, SWAP_DEADLINE_BUFFER } from '@/config/contracts';
-import { ERC20_ABI, UNISWAP_V2_ROUTER_ABI } from '@/config/abis';
+  useWriteContract,
+} from "wagmi";
+
+import { ERC20_ABI, UNISWAP_V2_ROUTER_ABI } from "@/config/abis";
+import { CONTRACTS, DEFAULT_SLIPPAGE, SWAP_DEADLINE_BUFFER } from "@/config/contracts";
+import { WRAPPED_NATIVE_ADDRESS } from "@/config/tokens";
+import {
+  trackProtectionAndGas,
+  trackQuoteSourceSelection,
+  trackRouteDecision,
+  trackSwap,
+} from "@/lib/analytics";
+
+import type { NativeSentinel, Token } from "@/config/tokens";
 
 // ---------- Helpers & narrow types ----------
 type EvmAddress = Address;
+type QuoteStatus = "IDLE" | "LOADING" | "SUCCESS" | "NO_ROUTE" | "ERROR";
 
-const isNative = (addr: EvmAddress | NativeSentinel): addr is NativeSentinel =>
-  addr === 'native';
+const isNative = (addr: EvmAddress | NativeSentinel): addr is NativeSentinel => addr === "native";
 
 const resolvePathAddress = (
   current: EvmAddress | NativeSentinel,
-  wrappedFallback: EvmAddress
+  wrappedFallback: EvmAddress = WRAPPED_NATIVE_ADDRESS
 ): EvmAddress => (isNative(current) ? wrappedFallback : current);
+
+const buildRoutePath = (
+  sell: Token,
+  buy: Token,
+  wrappedFallback: EvmAddress = WRAPPED_NATIVE_ADDRESS
+): readonly Address[] => {
+  const from = resolvePathAddress(sell.address, wrappedFallback);
+  const to = resolvePathAddress(buy.address, wrappedFallback);
+
+  if (from === to) return [from];
+
+  const isFromWrapped = from === wrappedFallback;
+  const isToWrapped = to === wrappedFallback;
+
+  if (isFromWrapped || isToWrapped) {
+    return [from, to] as const;
+  }
+
+  // Default bridge through wrapped native for liquidity depth (simple heuristic)
+  return [from, wrappedFallback, to] as const;
+};
 
 const resolveEthValue = (token: Token, amountParsed: bigint): bigint | undefined =>
   isNative(token.address) ? amountParsed : undefined;
 
 // ---------- Public, stable types (used by components) ----------
-export type BalanceData = {
+export interface BalanceData {
   value: bigint;
   decimals: number;
   symbol: string;
   formatted: string;
-};
+}
 
 interface SwapState {
   sellAmount: string;
@@ -43,6 +73,17 @@ interface SwapState {
   buyToken: Token;
   slippage: number;
   isQuoteLoading: boolean;
+}
+
+interface SwapTelemetryContext {
+  sellAmount: string;
+  buyAmount: string;
+  sellToken: Token;
+  buyToken: Token;
+  slippage: number;
+  path: readonly Address[];
+  quoteSource: string;
+  priceImpactBps: number | null;
 }
 
 export interface UseSwapReturn {
@@ -74,20 +115,44 @@ export interface UseSwapReturn {
     rate: number | null;
     minimumReceived: number | null;
     priceImpact: number | null;
+    status: QuoteStatus;
   };
 }
 
 export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwapReturn {
   const { address, isConnected } = useAccount();
+  const lastSwapContextRef = useRef<SwapTelemetryContext | null>(null);
+  const lastRouteRef = useRef<{ path: readonly Address[]; source: string } | null>(null);
+  const [activeRoutePath, setActiveRoutePath] = useState<readonly Address[] | null>(null);
 
   const [state, setState] = useState<SwapState>({
-    sellAmount: '',
-    buyAmount: '',
+    sellAmount: "",
+    buyAmount: "",
     sellToken: initialSellToken,
     buyToken: initialBuyToken,
     slippage: DEFAULT_SLIPPAGE,
     isQuoteLoading: false,
   });
+
+  // Keep internal state aligned with upstream token changes (e.g. URL updates)
+  useEffect(() => {
+    setState((prev) => {
+      const sellChanged = prev.sellToken.address !== initialSellToken.address;
+      const buyChanged = prev.buyToken.address !== initialBuyToken.address;
+
+      if (!sellChanged && !buyChanged) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        sellToken: sellChanged ? initialSellToken : prev.sellToken,
+        buyToken: buyChanged ? initialBuyToken : prev.buyToken,
+        sellAmount: sellChanged ? "" : prev.sellAmount,
+        buyAmount: buyChanged ? "" : prev.buyAmount,
+      };
+    });
+  }, [initialSellToken, initialBuyToken]);
 
   // ---------- Balances ----------
   const { data: rawSellBal } = useBalance({
@@ -123,9 +188,11 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
 
   // ---------- Allowance (only for ERC-20 sells) ----------
   const { data: allowance } = useReadContract({
-    address: isNative(state.sellToken.address) ? undefined : (state.sellToken.address as EvmAddress),
+    address: isNative(state.sellToken.address)
+      ? undefined
+      : (state.sellToken.address as EvmAddress),
     abi: ERC20_ABI,
-    functionName: 'allowance',
+    functionName: "allowance",
     args:
       isConnected && !!address && !isNative(state.sellToken.address)
         ? [address, CONTRACTS.UNISWAP_V2_ROUTER as Address]
@@ -136,29 +203,34 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
   });
 
   // ---------- Quote (Uniswap V2 getAmountsOut) ----------
+  const routePath: readonly Address[] | undefined = useMemo(() => {
+    if (!state.sellAmount) return undefined;
+    return buildRoutePath(state.sellToken, state.buyToken);
+  }, [state.sellAmount, state.sellToken, state.buyToken]);
+
   const amountInForQuote =
     state.sellAmount && parseFloat(state.sellAmount) > 0
       ? parseUnits(state.sellAmount, state.sellToken.decimals)
       : undefined;
 
-  const path: readonly Address[] | undefined =
-    amountInForQuote
-      ? ([
-          resolvePathAddress(state.sellToken.address, initialSellToken.address as Address),
-          resolvePathAddress(state.buyToken.address, initialBuyToken.address as Address),
-        ] as const)
-      : undefined;
-
-  const { data: quoteData, isLoading: isQuoteLoading } = useReadContract({
+  const {
+    data: quoteData,
+    isError: isQuoteError,
+    isLoading: isQuoteLoading,
+  } = useReadContract({
     address: CONTRACTS.UNISWAP_V2_ROUTER as Address,
     abi: UNISWAP_V2_ROUTER_ABI,
-    functionName: 'getAmountsOut',
-    args: amountInForQuote && path ? [amountInForQuote, path] : undefined,
+    functionName: "getAmountsOut",
+    args:
+      amountInForQuote && routePath && routePath.length > 1
+        ? [amountInForQuote, routePath]
+        : undefined,
     query: {
       enabled:
         !!amountInForQuote &&
-        !!path &&
-        path[0] !== path[1], // avoid degenerate route
+        !!routePath &&
+        routePath.length > 1 &&
+        routePath[0] !== routePath[routePath.length - 1], // avoid degenerate route
       refetchInterval: 10_000,
       staleTime: 5_000,
     },
@@ -186,12 +258,19 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
   // ---------- Quote → UI buyAmount ----------
   useEffect(() => {
     if (quoteData && Array.isArray(quoteData) && quoteData.length > 1) {
-      const outputAmount = formatUnits(quoteData[1] as bigint, state.buyToken.decimals);
+      const outputAmount = formatUnits(
+        quoteData[quoteData.length - 1] as bigint,
+        state.buyToken.decimals
+      );
+      if (routePath) {
+        setActiveRoutePath(routePath);
+      }
       setState((prev) => ({ ...prev, buyAmount: outputAmount }));
     } else if (!state.sellAmount) {
-      setState((prev) => ({ ...prev, buyAmount: '' }));
+      setActiveRoutePath(null);
+      setState((prev) => ({ ...prev, buyAmount: "" }));
     }
-  }, [quoteData, state.buyToken.decimals, state.sellAmount]);
+  }, [quoteData, routePath, state.buyToken.decimals, state.sellAmount]);
 
   // ---------- Derived flags ----------
   const needsApproval = useMemo(() => {
@@ -207,6 +286,7 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
       parseFloat(state.sellAmount) > 0 &&
       sellTokenBalance &&
       parseUnits(state.sellAmount, state.sellToken.decimals) <= sellTokenBalance.value &&
+      activeRoutePath &&
       !needsApproval &&
       isConnected
     );
@@ -215,9 +295,21 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
     state.buyAmount,
     state.sellToken.decimals,
     sellTokenBalance,
+    activeRoutePath,
     needsApproval,
     isConnected,
   ]);
+
+  const quoteStatus: QuoteStatus = useMemo(() => {
+    if (!state.sellAmount || parseFloat(state.sellAmount) <= 0) return "IDLE";
+    if (isQuoteLoading) return "LOADING";
+    if (isQuoteError) return "ERROR";
+    if (!routePath || routePath.length < 2 || routePath[0] === routePath[routePath.length - 1]) {
+      return "NO_ROUTE";
+    }
+    if (state.buyAmount && activeRoutePath) return "SUCCESS";
+    return "NO_ROUTE";
+  }, [activeRoutePath, isQuoteError, isQuoteLoading, routePath, state.buyAmount, state.sellAmount]);
 
   const quote = useMemo(() => {
     if (!state.sellAmount || !state.buyAmount || parseFloat(state.sellAmount) === 0) {
@@ -230,6 +322,28 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
     return { rate, minimumReceived, priceImpact };
   }, [state.sellAmount, state.buyAmount, state.slippage]);
 
+  // Track route/quote computations
+  useEffect(() => {
+    if (!quoteData || !amountInForQuote || !routePath) return;
+
+    const routeId = routePath.join("->");
+    lastRouteRef.current = { path: routePath, source: "uniswap_v2" };
+
+    trackRouteDecision({
+      routeId,
+      strategy: "best_price",
+      protocols: ["uniswap_v2"],
+      hops: routePath.length - 1,
+      ...(state.buyAmount ? { estimatedOutput: state.buyAmount } : {}),
+      status: "computed",
+    });
+
+    trackQuoteSourceSelection({
+      primary: "uniswap_v2_router",
+      ...(routePath.length > 2 ? { fallback: "weth_bridge" } : {}),
+    });
+  }, [amountInForQuote, routePath, quoteData, state.buyAmount]);
+
   // ---------- Actions ----------
   const handleApprove = useCallback(async () => {
     if (!state.sellAmount || isNative(state.sellToken.address)) return;
@@ -238,7 +352,7 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
       const hash = await approveToken({
         address: state.sellToken.address as Address,
         abi: ERC20_ABI,
-        functionName: 'approve',
+        functionName: "approve",
         args: [
           CONTRACTS.UNISWAP_V2_ROUTER as Address,
           parseUnits(state.sellAmount, state.sellToken.decimals),
@@ -248,11 +362,11 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
       });
 
       if (hash) {
-        toast.loading('Approval pending...', { id: 'approve' });
+        toast.loading("Approval pending...", { id: "approve" });
       }
     } catch (error) {
-      toast.error('Approval failed. Please try again.');
-      console.error('Approve error:', error);
+      toast.error("Approval failed. Please try again.");
+      console.error("Approve error:", error);
     }
   }, [state.sellAmount, state.sellToken.address, state.sellToken.decimals, approveToken]);
 
@@ -261,14 +375,51 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
 
     const deadline = BigInt(Math.floor(Date.now() / 1000) + SWAP_DEADLINE_BUFFER);
     const amountIn = parseUnits(state.sellAmount, state.sellToken.decimals);
-    const amountOutMin = parseUnits(
-      (parseFloat(state.buyAmount) * (1 - state.slippage / 100)).toString(),
-      state.buyToken.decimals
-    );
+    const quotedAmountOut = quoteData[quoteData.length - 1] as bigint;
+    const slippageBps = BigInt(Math.round(state.slippage * 100));
+    const amountOutMin = (quotedAmountOut * (10_000n - slippageBps)) / 10_000n;
 
-    const sellPath0 = resolvePathAddress(state.sellToken.address, initialSellToken.address as Address);
-    const buyPath1 = resolvePathAddress(state.buyToken.address, initialBuyToken.address as Address);
-    const uniswapPath = [sellPath0, buyPath1] as const;
+    const uniswapPath = activeRoutePath;
+    if (!uniswapPath || uniswapPath.length < 2) {
+      toast.error("Route unavailable. Please try a different pair.");
+      return;
+    }
+
+    const routeContext = lastRouteRef.current;
+    const routingStrategy = routeContext ? "best_price" : undefined;
+    const priceImpactBps =
+      quote.priceImpact !== null ? Math.round(quote.priceImpact * 100) : null;
+
+    lastSwapContextRef.current = {
+      sellAmount: state.sellAmount,
+      buyAmount: state.buyAmount,
+      sellToken: state.sellToken,
+      buyToken: state.buyToken,
+      slippage: state.slippage,
+      path: uniswapPath,
+      quoteSource: routeContext?.source ?? "uniswap_v2",
+      priceImpactBps,
+    };
+
+    trackProtectionAndGas({
+      slippageBps: Math.round(state.slippage * 100),
+    });
+
+    trackSwap({
+      fromToken: state.sellToken.symbol,
+      toToken: state.buyToken.symbol,
+      fromAmount: state.sellAmount,
+      toAmount: state.buyAmount,
+      chainId: state.sellToken.chainId ?? state.buyToken.chainId ?? 1,
+      status: "initiated",
+      routePath: [...uniswapPath],
+      protocols: ["uniswap_v2"],
+      slippageBps: Math.round(state.slippage * 100),
+      mevPath: "public",
+      quoteSource: routeContext?.source ?? "uniswap_v2",
+      ...(routingStrategy ? { routingStrategy } : {}),
+      ...(priceImpactBps !== null ? { priceImpactBps } : {}),
+    });
 
     try {
       let hash: `0x${string}` | undefined;
@@ -278,9 +429,19 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
         hash = await executeSwap({
           address: CONTRACTS.UNISWAP_V2_ROUTER as Address,
           abi: UNISWAP_V2_ROUTER_ABI,
-          functionName: 'swapExactETHForTokens',
-          args: [amountOutMin, uniswapPath, (address as Address), deadline],
+          functionName: "swapExactETHForTokens",
+          args: [amountOutMin, uniswapPath, address as Address, deadline],
           value: resolveEthValue(state.sellToken, amountIn),
+          chain: undefined,
+          account: undefined,
+        });
+      } else if (isNative(state.buyToken.address)) {
+        // token -> native; the V2 router unwraps WETH before sending ETH to the recipient.
+        hash = await executeSwap({
+          address: CONTRACTS.UNISWAP_V2_ROUTER as Address,
+          abi: UNISWAP_V2_ROUTER_ABI,
+          functionName: "swapExactTokensForETH",
+          args: [amountIn, amountOutMin, uniswapPath, address as Address, deadline],
           chain: undefined,
           account: undefined,
         });
@@ -289,19 +450,29 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
         hash = await executeSwap({
           address: CONTRACTS.UNISWAP_V2_ROUTER as Address,
           abi: UNISWAP_V2_ROUTER_ABI,
-          functionName: 'swapExactTokensForTokens',
-          args: [amountIn, amountOutMin, uniswapPath, (address as Address), deadline],
+          functionName: "swapExactTokensForTokens",
+          args: [amountIn, amountOutMin, uniswapPath, address as Address, deadline],
           chain: undefined,
           account: undefined,
         });
       }
 
       if (hash) {
-        toast.loading('Swap pending...', { id: 'swap' });
+        toast.loading("Swap pending...", { id: "swap" });
       }
     } catch (error) {
-      toast.error('Swap failed. Please try again.');
-      console.error('Swap error:', error);
+      toast.error("Swap failed. Please try again.");
+      console.error("Swap error:", error);
+      trackSwap({
+        fromToken: state.sellToken.symbol,
+        toToken: state.buyToken.symbol,
+        fromAmount: state.sellAmount,
+        toAmount: state.buyAmount,
+        chainId: state.sellToken.chainId ?? state.buyToken.chainId ?? 1,
+        status: "failed",
+        quoteSource: routeContext?.source ?? "uniswap_v2",
+        error: error instanceof Error ? error.message : "Swap failed",
+      });
     }
   }, [
     canSwap,
@@ -311,10 +482,10 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
     state.slippage,
     state.sellToken.address,
     state.sellToken.decimals,
+    state.buyToken.address,
     state.buyToken.decimals,
+    activeRoutePath,
     executeSwap,
-    initialSellToken.address,
-    initialBuyToken.address,
     address,
   ]);
 
@@ -340,19 +511,59 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
   // ---------- Notifications ----------
   useEffect(() => {
     if (isApproveSuccess) {
-      toast.success('Token approved!', { id: 'approve' });
+      toast.success("Token approved!", { id: "approve" });
     }
   }, [isApproveSuccess]);
 
   useEffect(() => {
     if (isSwapSuccess) {
-      toast.success('Swap completed!', { id: 'swap' });
-      setState((prev) => ({ ...prev, sellAmount: '', buyAmount: '' }));
+      toast.success("Swap completed!", { id: "swap" });
+      const context = lastSwapContextRef.current;
+      if (context) {
+        trackSwap({
+          fromToken: context.sellToken.symbol,
+          toToken: context.buyToken.symbol,
+          fromAmount: context.sellAmount,
+          toAmount: context.buyAmount,
+          chainId: context.sellToken.chainId ?? context.buyToken.chainId ?? 1,
+          status: "completed",
+          routingStrategy: "best_price",
+          routePath: context.path as unknown as string[],
+          protocols: ["uniswap_v2"],
+          slippageBps: Math.round(context.slippage * 100),
+          mevPath: "public",
+          quoteSource: context.quoteSource,
+          ...(context.priceImpactBps !== null && context.priceImpactBps !== undefined
+            ? { priceImpactBps: context.priceImpactBps }
+            : {}),
+          ...(swapHash ? { txHash: swapHash } : {}),
+        });
+      }
+      setState((prev) => ({ ...prev, sellAmount: "", buyAmount: "" }));
     }
     if (isSwapError) {
-      toast.error('Swap failed', { id: 'swap' });
+      toast.error("Swap failed", { id: "swap" });
+      const context = lastSwapContextRef.current;
+      if (context) {
+        trackSwap({
+          fromToken: context.sellToken.symbol,
+          toToken: context.buyToken.symbol,
+          fromAmount: context.sellAmount,
+          toAmount: context.buyAmount,
+          chainId: context.sellToken.chainId ?? context.buyToken.chainId ?? 1,
+          status: "failed",
+          routingStrategy: "best_price",
+          routePath: context.path as unknown as string[],
+          protocols: ["uniswap_v2"],
+          slippageBps: Math.round(context.slippage * 100),
+          mevPath: "public",
+          quoteSource: context.quoteSource,
+          ...(swapHash ? { txHash: swapHash } : {}),
+          error: "swap_receipt_error",
+        });
+      }
     }
-  }, [isSwapSuccess, isSwapError]);
+  }, [isSwapSuccess, isSwapError, swapHash]);
 
   return {
     state: { ...state, isQuoteLoading },
@@ -375,10 +586,19 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
       setBuyAmount: (amount: string) => setState((prev) => ({ ...prev, buyAmount: amount })),
       setSellToken: (token: Token) => setState((prev) => ({ ...prev, sellToken: token })),
       setBuyToken: (token: Token) => setState((prev) => ({ ...prev, buyToken: token })),
-      setSlippage: (slippage: number) => setState((prev) => ({ ...prev, slippage })),
+      setSlippage: (slippage: number) => {
+        setState((prev) => ({ ...prev, slippage }));
+        trackProtectionAndGas({
+          slippageBps: Math.round(slippage * 100),
+          autoSlippageReason: "user_adjusted",
+        });
+      },
       reverseTokens,
       setMaxSellAmount,
     },
-    quote,
+    quote: {
+      ...quote,
+      status: quoteStatus,
+    },
   };
 }

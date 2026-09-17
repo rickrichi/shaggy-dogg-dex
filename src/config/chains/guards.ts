@@ -1,5 +1,5 @@
-import { SUPPORTED_CHAIN_IDS, type SupportedChainId } from './types';
-import { CHAIN_CONFIG } from './config';
+import { CHAIN_CONFIG } from "./config";
+import { SUPPORTED_CHAIN_IDS, type SupportedChainId } from "./types";
 
 /** Runtime guard + type predicate for SupportedChainId */
 export function isSupportedChain(id: number): id is SupportedChainId {
@@ -9,14 +9,14 @@ export function isSupportedChain(id: number): id is SupportedChainId {
 /** Throws with a helpful message while refining the type */
 export function assertSupportedChain(id: number): asserts id is SupportedChainId {
   if (!isSupportedChain(id)) {
-    const allowed = SUPPORTED_CHAIN_IDS.join(', ');
+    const allowed = SUPPORTED_CHAIN_IDS.join(", ");
     throw new Error(`Unsupported chain id: ${id}. Supported: [${allowed}]`);
   }
 }
 
 /** Parse unknown → SupportedChainId | null (no throw) */
 export function parseSupportedChainId(value: unknown): SupportedChainId | null {
-  if (typeof value !== 'number') return null;
+  if (typeof value !== "number") return null;
   return isSupportedChain(value) ? value : null;
 }
 

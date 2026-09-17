@@ -1,11 +1,13 @@
 // src/pages/Home.tsx
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Link } from 'react-router-dom';
-import { ArrowLeftRight, Shield, Zap, TrendingUp } from 'lucide-react';
-import { SUPPORTED_CHAINS } from '@/lib/config';
-import { useAccount } from 'wagmi';
+import { Link } from "react-router-dom";
+
+import { ArrowLeftRight, Shield, TrendingUp, Zap } from "lucide-react";
+import { useAccount } from "wagmi";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SUPPORTED_CHAINS } from "@/lib/config";
 
 export default function Home() {
   const { isConnected } = useAccount();
@@ -13,35 +15,35 @@ export default function Home() {
   const features = [
     {
       icon: ArrowLeftRight,
-      title: 'Multi-Chain Swaps',
-      description: 'Trade across Ethereum, Base, Arbitrum, Optimism, and Polygon',
+      title: "Multi-Chain Swaps",
+      description: "Trade across Ethereum, Base, Arbitrum, Optimism, and Polygon",
     },
     {
       icon: Shield,
-      title: 'Secure Trading',
-      description: 'Non-custodial with MetaMask integration and smart contract security',
+      title: "Secure Trading",
+      description: "Non-custodial with MetaMask integration and smart contract security",
     },
     {
       icon: Zap,
-      title: 'Best Prices',
-      description: 'Powered by 0x Protocol for optimal routing and minimal slippage',
+      title: "Best Prices",
+      description: "Powered by 0x Protocol for optimal routing and minimal slippage",
     },
     {
       icon: TrendingUp,
-      title: 'Portfolio Tracking',
-      description: 'Monitor your holdings and trading history across all chains',
+      title: "Portfolio Tracking",
+      description: "Monitor your holdings and trading history across all chains",
     },
   ];
 
   return (
     <div className="space-y-12">
       {/* Hero Section */}
-      <div className="text-center space-y-6">
+      <div className="space-y-6 text-center">
         <div className="space-y-4">
-          <h1 className="text-5xl font-bold bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 bg-clip-text text-transparent">
+          <h1 className="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 bg-clip-text text-5xl font-bold text-transparent">
             Welcome to Shaggy Mutt DEX
           </h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+          <p className="mx-auto max-w-2xl text-xl text-gray-600">
             The most adorable multi-chain DEX for swapping tokens across major EVM networks
           </p>
         </div>
@@ -56,29 +58,35 @@ export default function Home() {
 
         {!isConnected && (
           <div className="pt-4">
-            <p className="text-gray-600 mb-4">Connect your MetaMask wallet to get started</p>
+            <p className="mb-4 text-gray-600">Connect your MetaMask wallet to get started</p>
           </div>
         )}
 
         {isConnected && (
           <Link to="/swap">
-            <Button size="lg" className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium px-8">
+            <Button
+              size="lg"
+              className="bg-gradient-to-r from-purple-600 to-pink-600 px-8 font-medium text-white hover:from-purple-700 hover:to-pink-700"
+            >
               Start Trading
-              <ArrowLeftRight className="ml-2 h-5 w-5" />
+              <ArrowLeftRight className="ml-2 size-5" />
             </Button>
           </Link>
         )}
       </div>
 
       {/* Features Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
         {features.map((feature, index) => {
           const Icon = feature.icon;
           return (
-            <Card key={index} className="border-2 border-purple-100 hover:border-purple-200 transition-colors bg-white/80 backdrop-blur-sm">
-              <CardHeader className="text-center pb-3">
-                <div className="mx-auto rounded-full bg-gradient-to-r from-purple-100 to-pink-100 p-3 w-fit">
-                  <Icon className="h-6 w-6 text-purple-600" />
+            <Card
+              key={index}
+              className="border-2 border-purple-100 bg-white/80 backdrop-blur-sm transition-colors hover:border-purple-200"
+            >
+              <CardHeader className="pb-3 text-center">
+                <div className="mx-auto w-fit rounded-full bg-gradient-to-r from-purple-100 to-pink-100 p-3">
+                  <Icon className="size-6 text-purple-600" />
                 </div>
                 <CardTitle className="text-lg">{feature.title}</CardTitle>
               </CardHeader>
@@ -91,9 +99,9 @@ export default function Home() {
       </div>
 
       {/* Stats Section */}
-      <Card className="bg-gradient-to-r from-purple-600 to-pink-600 text-white border-0">
+      <Card className="border-0 bg-gradient-to-r from-purple-600 to-pink-600 text-white">
         <CardContent className="p-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+          <div className="grid grid-cols-1 gap-8 text-center md:grid-cols-3">
             <div>
               <div className="text-3xl font-bold">$0</div>
               <div className="text-purple-100">Total Volume</div>

@@ -1,5 +1,5 @@
-import { type SupportedChainId } from './types';
-import { getChainConfig } from './guards';
+import { getChainConfig } from "./guards";
+import { type SupportedChainId } from "./types";
 
 export function buildExplorerTxUrl(chainId: SupportedChainId, txHash: string): string {
   const { explorerUrl } = getChainConfig(chainId);

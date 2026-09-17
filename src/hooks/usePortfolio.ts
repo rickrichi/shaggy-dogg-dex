@@ -1,23 +1,25 @@
 // src/hooks/usePortfolio.ts
 import { useMemo } from "react";
+
 import { useQuery } from "@tanstack/react-query";
 import { type Address, formatUnits } from "viem";
 import { useAccount, useChainId, usePublicClient } from "wagmi";
+
 import { tokenWatchlistForChain } from "@/lib/tokens";
 
 /* ============ Types ============ */
 export interface Token {
-  key: string;                 // stable React key
+  key: string; // stable React key
   symbol: string;
   name: string;
   address: Address | "0x0000000000000000000000000000000000000000";
   decimals: number;
   chainId: number;
-  balance: string;             // bigint as string
-  balanceFormatted: string;    // human readable
+  balance: string; // bigint as string
+  balanceFormatted: string; // human readable
   usdValue: number;
   priceUsd: number;
-  logo?: string;               // optional; when present must be string (never undefined)
+  logo?: string; // optional; when present must be string (never undefined)
 }
 export interface PortfolioSummary {
   totalValue: number;
@@ -45,7 +47,7 @@ interface WatchlistToken {
 }
 interface Watchlist {
   chainName: string;
-  tokens: ReadonlyArray<WatchlistToken>;
+  tokens: readonly WatchlistToken[];
 }
 interface SimplePrice {
   usd: number;
@@ -70,13 +72,20 @@ const ERC20_BALANCEOF = [
 /* ============ Helpers & Type Guards ============ */
 function nativeMeta(chainId: number): { symbol: string; decimals: number; name: string } {
   switch (chainId) {
-    case 1: return { symbol: "ETH", decimals: 18, name: "Ethereum" };
-    case 137: return { symbol: "MATIC", decimals: 18, name: "Polygon" };
-    case 10: return { symbol: "ETH", decimals: 18, name: "Optimism" };
-    case 42161: return { symbol: "ETH", decimals: 18, name: "Arbitrum" };
-    case 8453: return { symbol: "ETH", decimals: 18, name: "Base" };
-    case 11155111: return { symbol: "ETH", decimals: 18, name: "Sepolia" };
-    default: return { symbol: "ETH", decimals: 18, name: "Ethereum" };
+    case 1:
+      return { symbol: "ETH", decimals: 18, name: "Ethereum" };
+    case 137:
+      return { symbol: "MATIC", decimals: 18, name: "Polygon" };
+    case 10:
+      return { symbol: "ETH", decimals: 18, name: "Optimism" };
+    case 42161:
+      return { symbol: "ETH", decimals: 18, name: "Arbitrum" };
+    case 8453:
+      return { symbol: "ETH", decimals: 18, name: "Base" };
+    case 11155111:
+      return { symbol: "ETH", decimals: 18, name: "Sepolia" };
+    default:
+      return { symbol: "ETH", decimals: 18, name: "Ethereum" };
   }
 }
 function isRecord(u: unknown): u is Record<string, unknown> {
@@ -118,8 +127,8 @@ function coerceWatchlistToken(u: unknown): WatchlistToken | null {
 
   const address = u["address"];
   const symbol = u["symbol"];
-  const name = (u["name"] ?? u["label"]);
-  const decimals = (u["decimals"] ?? u["decimal"] ?? u["dec"]);
+  const name = u["name"] ?? u["label"];
+  const decimals = u["decimals"] ?? u["decimal"] ?? u["dec"];
   const logo = u["logo"];
 
   if (!isHexAddress(address) || !isString(symbol) || !isString(name)) return null;
@@ -172,9 +181,12 @@ function parseApiPricesResponse(u: unknown): ApiPricesResponse {
   return { native, tokens };
 }
 
-function maxBy<T>(xs: ReadonlyArray<T>, f: (x: T) => number): T | null {
+function maxBy<T>(xs: readonly T[], f: (x: T) => number): T | null {
   let best: { v: T; s: number } | null = null;
-  for (const v of xs) { const s = f(v); if (best === null || s > best.s) best = { v, s }; }
+  for (const v of xs) {
+    const s = f(v);
+    if (best === null || s > best.s) best = { v, s };
+  }
   return best?.v ?? null;
 }
 

@@ -1,66 +1,25 @@
 // src/pages/Admin.tsx
-import { useEffect, useMemo, useState } from 'react';
-import { createClient, type Session } from '@supabase/supabase-js';
-import { useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useState } from "react";
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
-import { Settings, Shield, AlertTriangle, Loader2 } from 'lucide-react';
+import { type Session } from "@supabase/supabase-js";
+import { useQueryClient } from "@tanstack/react-query";
+import { AlertTriangle, Copy, Loader2, Settings, Shield } from "lucide-react";
 
-import { SUPPORTED_CHAINS } from '@/lib/config';
-import {
-  useAdminSettings,
-  useFeaturedTokens,
-  useTokenLists,
-} from '@/hooks/useAdminData';
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { useDexSettings, useFeaturedTokens, useTokenLists } from "@/hooks/useAdminData";
+import { SUPPORTED_CHAINS } from "@/lib/config";
+import { DEPLOYMENTS, deploymentsLastUpdated } from "@/lib/deployments";
+import { supabase } from "@/lib/supabase/client";
+
+import type { FeaturedTokenInput, TokenListInput } from "@/lib/adminSchemas";
 
 /** Auth status discriminated union */
-type AuthStatus = 'loading' | 'unauthenticated' | 'authenticated';
-
-/** Strict env accessors (fail-fast, no placeholders) */
-const getEnv = (key: 'VITE_SUPABASE_URL' | 'VITE_SUPABASE_ANON_KEY'): string => {
-  const raw = import.meta.env[key] as unknown;
-  if (typeof raw !== 'string' || raw.trim().length === 0) {
-    throw new Error(`Missing env ${key} (check your .env)`);
-  }
-  return raw;
-};
-
-/** Page-local Supabase client for auth */
-const supabase = createClient(getEnv('VITE_SUPABASE_URL'), getEnv('VITE_SUPABASE_ANON_KEY'));
-
-/** Derived narrow type from your chain config */
-type ChainOption = (typeof SUPPORTED_CHAINS)[number];
-
-/** Input shape for featured token creation */
-interface FeaturedTokenInput {
-  chainId: number;
-  address: string;
-  symbol: string;
-  name: string;
-  decimals: number;
-  logoURI?: string;
-}
-
-/** Payload shape expected by API */
-interface FeaturedTokenPayload {
-  chain_id: number;
-  address: string;
-  symbol: string;
-  name: string;
-  decimals: number;
-  logo_uri?: string;
-}
-
-/** Input shape for token list creation */
-interface TokenListInput {
-  url: string;
-  name?: string;
-}
+type AuthStatus = "loading" | "unauthenticated" | "authenticated";
 
 /** Type guard: EVM address */
 const isHexAddress = (s: string): boolean => /^0x[a-fA-F0-9]{40}$/.test(s);
@@ -71,76 +30,58 @@ const parseNumberOr = (v: string, fallback: number): number => {
   return Number.isFinite(n) ? n : fallback;
 };
 
-/** Validate FeaturedTokenInput -> FeaturedTokenPayload or error string */
-function buildFeaturedTokenPayload(input: FeaturedTokenInput): FeaturedTokenPayload | { error: string } {
+/** Validate FeaturedTokenInput or return error string */
+function validateFeaturedToken(input: FeaturedTokenInput): string | null {
   const errors: string[] = [];
 
-  if (!Number.isInteger(input.chainId) || input.chainId < 1) {
-    errors.push('Chain ID must be a positive integer (e.g. 1 for Ethereum).');
+  if (!input.chain || input.chain.trim().length === 0) {
+    errors.push("Chain is required.");
   }
   if (!isHexAddress(input.address)) {
-    errors.push('Token address must be a 0x-prefixed 40-hex string.');
+    errors.push("Token address must be a valid EVM address (0x + 40 hex characters).");
   }
-  if (input.symbol.trim().length === 0) {
-    errors.push('Symbol is required.');
+  if (!input.symbol || input.symbol.trim().length === 0) {
+    errors.push("Symbol is required.");
   }
-  if (input.name.trim().length === 0) {
-    errors.push('Name is required.');
-  }
-  if (!Number.isInteger(input.decimals) || input.decimals < 0 || input.decimals > 255) {
-    errors.push('Decimals must be an integer between 0 and 255.');
+  if (!input.name || input.name.trim().length === 0) {
+    errors.push("Name is required.");
   }
 
-  let logo_uri: string | undefined;
-  const rawLogo = input.logoURI?.trim() ?? '';
-  if (rawLogo.length > 0) {
-    try {
-      const u = new URL(rawLogo);
-      if (u.protocol !== 'http:' && u.protocol !== 'https:') {
-        errors.push('Logo URL must start with http:// or https://');
-      } else {
-        logo_uri = u.toString();
-      }
-    } catch {
-      errors.push('Logo URL must be a valid URL or left blank.');
-    }
-  }
-
-  if (errors.length > 0) {
-    return { error: errors.join('\n') };
-  }
-
-  return {
-    chain_id: input.chainId,
-    address: input.address,
-    symbol: input.symbol.trim(),
-    name: input.name.trim(),
-    decimals: input.decimals,
-    ...(logo_uri ? { logo_uri } : {}),
-  };
+  return errors.length > 0 ? errors.join("\n") : null;
 }
 
 export default function Admin() {
   // ────────────────────────────── Auth gate ────────────────────────────────
-  const [authStatus, setAuthStatus] = useState<AuthStatus>('loading');
+  const [authStatus, setAuthStatus] = useState<AuthStatus>("loading");
   const [session, setSession] = useState<Session | null>(null);
+  const [supabaseConfigured, setSupabaseConfigured] = useState<boolean>(true);
   const queryClient = useQueryClient();
 
   useEffect(() => {
     let mounted = true;
 
     const init = async (): Promise<void> => {
+      // Check if Supabase is configured
+      const hasSupabaseEnv = !!(
+        import.meta.env.VITE_SUPABASE_URL &&
+        (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY)
+      );
+      if (!hasSupabaseEnv) {
+        setSupabaseConfigured(false);
+        setAuthStatus("unauthenticated");
+        return;
+      }
+
       // Exchange OAuth code if present (reliable social login landing)
-      if (window.location.href.includes('code=')) {
+      if (window.location.href.includes("code=")) {
         try {
           await supabase.auth.exchangeCodeForSession(window.location.href);
           const url = new URL(window.location.href);
-          url.searchParams.delete('code');
-          url.searchParams.delete('state');
-          window.history.replaceState({}, '', url.toString());
+          url.searchParams.delete("code");
+          url.searchParams.delete("state");
+          window.history.replaceState({}, "", url.toString());
         } catch (err) {
-           
-          console.error('[exchangeCodeForSession]', err);
+          console.error("[exchangeCodeForSession]", err);
         }
       }
 
@@ -150,103 +91,115 @@ export default function Admin() {
         if (!mounted) return;
         if (error) {
           setSession(null);
-          setAuthStatus('unauthenticated');
+          setAuthStatus("unauthenticated");
           return;
         }
         setSession(data.session ?? null);
-        setAuthStatus(data.session ? 'authenticated' : 'unauthenticated');
+        setAuthStatus(data.session ? "authenticated" : "unauthenticated");
       } catch (err) {
         if (!mounted) return;
-         
-        console.error('[getSession]', err);
+        console.error("[getSession]", err);
         setSession(null);
-        setAuthStatus('unauthenticated');
+        setAuthStatus("unauthenticated");
       }
     };
 
     void init();
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_evt, s) => {
+    const { data } = supabase.auth.onAuthStateChange((_evt, s) => {
       if (!mounted) return;
       setSession(s);
-      setAuthStatus(s ? 'authenticated' : 'unauthenticated');
+      setAuthStatus(s ? "authenticated" : "unauthenticated");
       // Invalidate admin data on auth boundary changes
-      queryClient.invalidateQueries({ queryKey: ['adminSettings'] }).catch(() => {});
-      queryClient.invalidateQueries({ queryKey: ['featuredTokens'] }).catch(() => {});
-      queryClient.invalidateQueries({ queryKey: ['tokenLists'] }).catch(() => {});
+      void queryClient.invalidateQueries({ queryKey: ["adminSettings"] });
+      void queryClient.invalidateQueries({ queryKey: ["featuredTokens"] });
+      void queryClient.invalidateQueries({ queryKey: ["tokenLists"] });
     });
 
     return () => {
       mounted = false;
-      sub.subscription.unsubscribe();
+      data.subscription.unsubscribe();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const onOAuth = async (provider: 'github' | 'google'): Promise<void> => {
+  const onOAuth = async (provider: "github" | "google"): Promise<void> => {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
         redirectTo: `${window.location.origin}/admin`,
-        queryParams: { prompt: 'select_account' },
-        scopes: provider === 'google' ? 'openid email profile' : 'read:user user:email',
+        queryParams: { prompt: "select_account" },
+        scopes: provider === "google" ? "openid email profile" : "read:user user:email",
       },
     });
     if (error) {
-       
-      console.error('[signInWithOAuth]', error.message);
+      console.error("[signInWithOAuth]", error.message);
       return;
     }
     if (data?.url) window.location.assign(data.url);
   };
 
   // ───────────────────────────── Data hooks wiring ───────────────────────────
-  const { settings, save } = useAdminSettings();
+  const { settings, save } = useDexSettings();
   const { tokens, add, remove } = useFeaturedTokens();
   const { lists, add: addList, remove: removeList } = useTokenLists();
 
   // ───────────────────────────── Local controlled state ──────────────────────
   // Defaults from server (memoized to avoid controlled/uncontrolled flips)
   const defaults = useMemo(() => {
-    return settings.data ?? {
-      id: 1,
-      slippage_bps: 50,
-      max_gas_gwei: 20,
-      auto_refresh: true,
-      updated_at: new Date().toISOString(),
-      updated_by: null as string | null,
-    };
+    return (
+      settings.data ?? {
+        id: "default",
+        default_slippage_bps: 50,
+        max_gas_price_gwei: 20,
+        auto_refresh: true,
+        updated_at: new Date(),
+      }
+    );
   }, [settings.data]);
 
-  const [slippageBps, setSlippageBps] = useState<number>(defaults.slippage_bps);
-  const [maxGasGwei, setMaxGasGwei] = useState<number>(defaults.max_gas_gwei);
+  const [slippageBps, setSlippageBps] = useState<number>(defaults.default_slippage_bps);
+  const [maxGasGwei, setMaxGasGwei] = useState<number>(defaults.max_gas_price_gwei);
   const [autoRefresh, setAutoRefresh] = useState<boolean>(defaults.auto_refresh);
 
   useEffect(() => {
-    setSlippageBps(defaults.slippage_bps);
-    setMaxGasGwei(defaults.max_gas_gwei);
+    setSlippageBps(defaults.default_slippage_bps);
+    setMaxGasGwei(defaults.max_gas_price_gwei);
     setAutoRefresh(defaults.auto_refresh);
-  }, [defaults.slippage_bps, defaults.max_gas_gwei, defaults.auto_refresh]);
+  }, [defaults.default_slippage_bps, defaults.max_gas_price_gwei, defaults.auto_refresh]);
 
   const [ft, setFt] = useState<FeaturedTokenInput>({
-    chainId: 1,
-    address: '',
-    symbol: '',
-    name: '',
-    decimals: 18,
-    logoURI: '',
+    chain: SUPPORTED_CHAINS[0] ?? "ethereum",
+    address: "",
+    symbol: "",
+    name: "",
   });
 
-  const [list, setList] = useState<TokenListInput>({ url: '', name: 'Custom List' });
+  const [list, setList] = useState<TokenListInput>({
+    url: "",
+    name: "Custom List",
+    enabled: true,
+  });
 
   /** Local error banners */
   const [ftError, setFtError] = useState<string | null>(null);
   const [listError, setListError] = useState<string | null>(null);
+  const [copyMessage, setCopyMessage] = useState<string | null>(null);
+
+  const handleCopy = async (value: string) => {
+    try {
+      await navigator.clipboard?.writeText(value);
+      setCopyMessage("Copied");
+      setTimeout(() => setCopyMessage(null), 1200);
+    } catch (err) {
+      console.error("Copy failed", err);
+      setCopyMessage("Copy failed");
+    }
+  };
 
   // ───────────────────────────── Render branches ─────────────────────────────
-  if (authStatus === 'loading') {
+  if (authStatus === "loading") {
     return (
-      <div className="max-w-4xl mx-auto">
+      <div className="mx-auto max-w-4xl">
         <Card className="border-2 border-amber-200 bg-amber-50">
           <CardContent className="p-6 text-center">Checking session…</CardContent>
         </Card>
@@ -254,35 +207,67 @@ export default function Admin() {
     );
   }
 
-  if (authStatus === 'unauthenticated' || !session) {
+  if (authStatus === "unauthenticated" || !session) {
     return (
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="mx-auto max-w-4xl space-y-6">
         <div className="text-center">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-2">
+          <h1 className="mb-2 bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-3xl font-bold text-transparent">
             Admin Panel
           </h1>
           <p className="text-gray-600">Manage DEX settings and configuration</p>
         </div>
 
-        <Card className="border-2 border-amber-200 bg-amber-50">
-          <CardContent className="p-4">
-            <div className="flex items-start space-x-3">
-              <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
-              <div className="text-sm">
-                <p className="font-medium text-amber-800">Admin Access Required</p>
-                <p className="text-amber-700">
-                  This section requires admin authentication via Supabase Auth + RLS policies.
-                </p>
-                <div className="mt-3 flex gap-2">
-                  <Button onClick={() => void onOAuth('github')}>Sign in with GitHub</Button>
-                  <Button variant="outline" onClick={() => void onOAuth('google')}>
-                    Sign in with Google
-                  </Button>
+        {!supabaseConfigured ? (
+          <Card className="border-2 border-red-200 bg-red-50">
+            <CardContent className="p-4">
+              <div className="flex items-start space-x-3">
+                <AlertTriangle className="mt-0.5 size-5 text-red-600" />
+                <div className="text-sm">
+                  <p className="font-medium text-red-800">Supabase Not Configured</p>
+                  <p className="mt-2 text-red-700">
+                    The Admin panel requires Supabase configuration. Add these to your{" "}
+                    <code className="rounded bg-red-100 px-1 py-0.5">.env</code> file:
+                  </p>
+                  <pre className="mt-3 overflow-x-auto rounded bg-red-100 p-3 text-xs">
+                    {`VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=your_publishable_key_here`}
+                  </pre>
+                  <p className="mt-2 text-red-700">
+                    Get your credentials from{" "}
+                    <a
+                      href="https://supabase.com/dashboard"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-medium underline"
+                    >
+                      Supabase Dashboard
+                    </a>
+                  </p>
                 </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="border-2 border-amber-200 bg-amber-50">
+            <CardContent className="p-4">
+              <div className="flex items-start space-x-3">
+                <AlertTriangle className="mt-0.5 size-5 text-amber-600" />
+                <div className="text-sm">
+                  <p className="font-medium text-amber-800">Admin Access Required</p>
+                  <p className="text-amber-700">
+                    This section requires admin authentication via Supabase Auth + RLS policies.
+                  </p>
+                  <div className="mt-3 flex gap-2">
+                    <Button onClick={() => void onOAuth("github")}>Sign in with GitHub</Button>
+                    <Button variant="outline" onClick={() => void onOAuth("google")}>
+                      Sign in with Google
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     );
   }
@@ -292,9 +277,9 @@ export default function Admin() {
   const isLoadingData = settings.isLoading || tokens.isLoading || lists.isLoading;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="mx-auto max-w-4xl space-y-6">
       <div className="text-center">
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-2">
+        <h1 className="mb-2 bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-3xl font-bold text-transparent">
           Admin Panel
         </h1>
         <p className="text-gray-600">Manage DEX settings and configuration</p>
@@ -309,24 +294,24 @@ export default function Admin() {
           </Button>
           {isLoadingData && (
             <span className="inline-flex items-center text-xs text-gray-500">
-              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+              <Loader2 className="mr-1 size-3 animate-spin" />
               syncing…
             </span>
           )}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Supported Chains (UI only; persist later if desired) */}
         <Card className="bg-white/80 backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
-              <Settings className="h-5 w-5" />
+              <Settings className="size-5" />
               <span>Supported Chains</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {SUPPORTED_CHAINS.map((chain: ChainOption) => (
+            {SUPPORTED_CHAINS.map((chain) => (
               <div key={chain} className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <Badge variant="secondary" className="capitalize">
@@ -343,7 +328,7 @@ export default function Admin() {
         <Card className="bg-white/80 backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
-              <Shield className="h-5 w-5" />
+              <Shield className="size-5" />
               <span>DEX Settings</span>
             </CardTitle>
           </CardHeader>
@@ -389,21 +374,21 @@ export default function Admin() {
               <Button
                 onClick={() =>
                   save.mutate({
-                    slippage_bps: slippageBps,
-                    max_gas_gwei: maxGasGwei,
+                    default_slippage_bps: slippageBps,
+                    max_gas_price_gwei: maxGasGwei,
                     auto_refresh: autoRefresh,
                   })
                 }
                 disabled={isSaving}
-                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700"
               >
                 {isSaving ? (
                   <span className="inline-flex items-center">
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="mr-2 size-4 animate-spin" />
                     Saving…
                   </span>
                 ) : (
-                  'Save Settings'
+                  "Save Settings"
                 )}
               </Button>
             </div>
@@ -417,8 +402,8 @@ export default function Admin() {
           </CardHeader>
           <CardContent className="space-y-4">
             {ftError && (
-              <div className="rounded border border-red-200 bg-red-50 text-red-700 text-sm p-2">
-                {ftError.split('\n').map((line) => (
+              <div className="rounded border border-red-200 bg-red-50 p-2 text-sm text-red-700">
+                {ftError.split("\n").map((line) => (
                   <div key={line}>{line}</div>
                 ))}
               </div>
@@ -426,18 +411,19 @@ export default function Admin() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label htmlFor="ft-chain">Chain ID</Label>
-                <Input
+                <Label htmlFor="ft-chain">Chain</Label>
+                <select
                   id="ft-chain"
-                  type="number"
-                  inputMode="numeric"
-                  value={ft.chainId}
-                  onChange={(e) =>
-                    setFt((prev) => ({ ...prev, chainId: parseNumberOr(e.currentTarget.value, prev.chainId) }))
-                  }
-                  placeholder="1"
-                  min={1}
-                />
+                  value={ft.chain}
+                  onChange={(e) => setFt((prev) => ({ ...prev, chain: e.target.value }))}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {SUPPORTED_CHAINS.map((chain) => (
+                    <option key={chain} value={chain}>
+                      {chain.charAt(0).toUpperCase() + chain.slice(1)}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="ft-address">Token Address</Label>
@@ -452,7 +438,7 @@ export default function Admin() {
                 <Label htmlFor="ft-symbol">Symbol</Label>
                 <Input
                   id="ft-symbol"
-                  value={ft.symbol}
+                  value={ft.symbol ?? ""}
                   onChange={(e) => setFt((prev) => ({ ...prev, symbol: e.currentTarget.value }))}
                   placeholder="USDC"
                 />
@@ -461,52 +447,31 @@ export default function Admin() {
                 <Label htmlFor="ft-name">Name</Label>
                 <Input
                   id="ft-name"
-                  value={ft.name}
+                  value={ft.name ?? ""}
                   onChange={(e) => setFt((prev) => ({ ...prev, name: e.currentTarget.value }))}
                   placeholder="USD Coin"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="ft-decimals">Decimals</Label>
-                <Input
-                  id="ft-decimals"
-                  type="number"
-                  inputMode="numeric"
-                  value={ft.decimals}
-                  onChange={(e) =>
-                    setFt((prev) => ({ ...prev, decimals: parseNumberOr(e.currentTarget.value, prev.decimals) }))
-                  }
-                  placeholder="6"
-                  min={0}
-                  max={255}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="ft-logo">Logo URL</Label>
-                <Input
-                  id="ft-logo"
-                  value={ft.logoURI ?? ''}
-                  onChange={(e) => setFt((prev) => ({ ...prev, logoURI: e.currentTarget.value }))}
-                  placeholder="https://..."
                 />
               </div>
             </div>
 
             <Button
-              className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+              className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700"
               onClick={async () => {
                 setFtError(null);
-                const payloadOrError = buildFeaturedTokenPayload(ft);
-                if ('error' in payloadOrError) {
-                  setFtError(payloadOrError.error);
+
+                // Validate input
+                const validationError = validateFeaturedToken(ft);
+                if (validationError) {
+                  setFtError(validationError);
                   return;
                 }
+
                 try {
-                  await add.mutateAsync(payloadOrError);
-                  // reset form on success
-                  setFt((prev) => ({ ...prev, address: '', symbol: '', name: '', logoURI: '' }));
+                  await add.mutateAsync(ft);
+                  // Reset form on success
+                  setFt((prev) => ({ ...prev, address: "", symbol: "", name: "" }));
                 } catch (e: unknown) {
-                  const msg = e instanceof Error ? e.message : 'Failed to add featured token.';
+                  const msg = e instanceof Error ? e.message : "Failed to add featured token.";
                   setFtError(msg);
                 }
               }}
@@ -514,32 +479,37 @@ export default function Admin() {
             >
               {add.isPending ? (
                 <span className="inline-flex items-center">
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="mr-2 size-4 animate-spin" />
                   Adding…
                 </span>
               ) : (
-                'Add Featured Token'
+                "Add Featured Token"
               )}
             </Button>
 
             <div className="space-y-2">
               <h4 className="text-sm font-medium">Current Featured Tokens</h4>
-              <div className="space-y-2 max-h-64 overflow-auto pr-1">
+              <div className="max-h-64 space-y-2 overflow-auto pr-1">
                 {tokens.data?.map((t) => (
                   <div
-                    key={`${t.chain_id}:${t.address}`}
-                    className="flex items-center justify-between p-2 bg-gray-50 rounded"
+                    key={t.id}
+                    className="flex items-center justify-between rounded bg-gray-50 p-2"
                   >
                     <div className="flex items-center gap-2">
-                      <Badge variant="secondary">{t.symbol}</Badge>
+                      <Badge variant="secondary" className="capitalize">
+                        {t.chain}
+                      </Badge>
+                      <Badge variant="outline">{t.symbol}</Badge>
                       <span className="text-xs text-gray-600">{t.name}</span>
-                      <span className="text-[10px] text-gray-400 font-mono">{t.address}</span>
+                      <span className="font-mono text-[10px] text-gray-400">
+                        {t.address.slice(0, 6)}...{t.address.slice(-4)}
+                      </span>
                     </div>
                     <Button
                       variant="ghost"
                       size="sm"
                       className="text-red-600 hover:text-red-700"
-                      onClick={() => remove.mutate({ chain_id: t.chain_id, address: t.address })}
+                      onClick={() => t.id && remove.mutate(t.id)}
                       disabled={remove.isPending}
                     >
                       Remove
@@ -561,7 +531,7 @@ export default function Admin() {
           </CardHeader>
           <CardContent className="space-y-4">
             {listError && (
-              <div className="rounded border border-red-200 bg-red-50 text-red-700 text-sm p-2">
+              <div className="rounded border border-red-200 bg-red-50 p-2 text-sm text-red-700">
                 {listError}
               </div>
             )}
@@ -579,33 +549,35 @@ export default function Admin() {
               <Input
                 id="tokenlist-name"
                 placeholder="Custom List"
-                value={list.name ?? ''}
+                value={list.name ?? ""}
                 onChange={(e) => setList((prev) => ({ ...prev, name: e.currentTarget.value }))}
               />
             </div>
             <Button
-              className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+              className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700"
               onClick={async () => {
                 setListError(null);
                 try {
                   // validate URL
- 
+
                   new URL(list.url);
                 } catch {
-                  setListError('Please enter a valid URL.');
+                  setListError("Please enter a valid URL.");
                   return;
                 }
-                // With exactOptionalPropertyTypes, omit `name` when empty
-                type TokenListPayload = { url: string; name?: string };
-                const trimmed = (list.name ?? '').trim();
-                const payload: TokenListPayload =
-                  trimmed.length > 0 ? { url: list.url, name: trimmed } : { url: list.url };
+                // Prepare payload with cleaned values
+                const trimmed = (list.name ?? "").trim();
+                const payload: TokenListInput = {
+                  url: list.url,
+                  name: trimmed.length > 0 ? trimmed : "Custom List",
+                  enabled: list.enabled ?? true,
+                };
 
                 try {
                   await addList.mutateAsync(payload);
-                  setList({ url: '', name: 'Custom List' });
+                  setList({ url: "", name: "Custom List", enabled: true });
                 } catch (e: unknown) {
-                  const msg = e instanceof Error ? e.message : 'Failed to add token list.';
+                  const msg = e instanceof Error ? e.message : "Failed to add token list.";
                   setListError(msg);
                 }
               }}
@@ -613,28 +585,36 @@ export default function Admin() {
             >
               {addList.isPending ? (
                 <span className="inline-flex items-center">
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="mr-2 size-4 animate-spin" />
                   Adding…
                 </span>
               ) : (
-                'Add Token List'
+                "Add Token List"
               )}
             </Button>
 
             <div className="space-y-2">
               <h4 className="text-sm font-medium">Active Token Lists</h4>
-              <div className="space-y-2 max-h-64 overflow-auto pr-1">
+              <div className="max-h-64 space-y-2 overflow-auto pr-1">
                 {lists.data?.map((l) => (
-                  <div key={l.url} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm">{l.name}</span>
-                      <span className="text-[10px] text-gray-400 break-all">{l.url}</span>
+                  <div
+                    key={l.id}
+                    className="flex items-center justify-between rounded bg-gray-50 p-2"
+                  >
+                    <div className="flex min-w-0 flex-1 items-center gap-2">
+                      <span className="text-sm font-medium">{l.name}</span>
+                      {l.enabled !== undefined && (
+                        <Badge variant={l.enabled ? "default" : "secondary"} className="text-xs">
+                          {l.enabled ? "Active" : "Disabled"}
+                        </Badge>
+                      )}
+                      <span className="truncate text-[10px] text-gray-400">{l.url}</span>
                     </div>
                     <Button
                       variant="ghost"
                       size="sm"
                       className="text-red-600 hover:text-red-700"
-                      onClick={() => removeList.mutate(l.url)}
+                      onClick={() => l.id && removeList.mutate(l.id)}
                       disabled={removeList.isPending}
                     >
                       Remove
@@ -648,25 +628,90 @@ export default function Admin() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Deployed contracts (read-only) */}
+        <Card className="bg-white/80 backdrop-blur-sm">
+          <CardHeader className="flex flex-col gap-1">
+            <CardTitle>Deployed Contracts</CardTitle>
+            <p className="text-xs text-gray-500">
+              Generated from deployment artifacts (deployments/*.json). Run{" "}
+              <code className="rounded bg-gray-100 px-1 py-0.5 font-mono">
+                npm run contracts:update
+              </code>{" "}
+              after new deploys.
+            </p>
+            {deploymentsLastUpdated && (
+              <p className="text-xs text-gray-400">
+                Last updated: {new Date(deploymentsLastUpdated * 1000).toLocaleString()}
+              </p>
+            )}
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {DEPLOYMENTS.length === 0 && (
+              <div className="text-sm text-gray-500">
+                No deployment artifacts found. Add json files under deployments/ or run the update
+                script.
+              </div>
+            )}
+            {DEPLOYMENTS.map((d) => (
+              <div key={d.chainId} className="space-y-2 rounded border border-gray-200 p-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-semibold">
+                    {d.chainName} (Chain {d.chainId})
+                  </div>
+                  {d.deployer && (
+                    <span className="text-xs text-gray-500">Deployer: {d.deployer}</span>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  {Object.entries(d.contracts).map(([name, address]) => (
+                    <div
+                      key={name}
+                      className="flex items-center justify-between gap-3 rounded bg-gray-50 px-2 py-1 font-mono text-sm"
+                    >
+                      <span className="text-gray-600">{name}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="break-all text-gray-800">{address}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleCopy(address)}
+                          title="Copy address"
+                        >
+                          <Copy className="size-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+            {copyMessage && <div className="text-xs text-green-600">{copyMessage}</div>}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Save-All (settings have a dedicated save; this mirrors that CTA) */}
       <div className="flex justify-center">
         <Button
           size="lg"
-          className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium px-8"
+          className="bg-gradient-to-r from-purple-600 to-pink-600 px-8 font-medium text-white hover:from-purple-700 hover:to-pink-700"
           onClick={() =>
-            save.mutate({ slippage_bps: slippageBps, max_gas_gwei: maxGasGwei, auto_refresh: autoRefresh })
+            save.mutate({
+              default_slippage_bps: slippageBps,
+              max_gas_price_gwei: maxGasGwei,
+              auto_refresh: autoRefresh,
+            })
           }
           disabled={isSaving}
         >
           {isSaving ? (
             <span className="inline-flex items-center">
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              <Loader2 className="mr-2 size-5 animate-spin" />
               Saving…
             </span>
           ) : (
-            'Save All Changes'
+            "Save All Changes"
           )}
         </Button>
       </div>
