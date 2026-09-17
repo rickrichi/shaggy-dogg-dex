@@ -1,9 +1,11 @@
 // server/src/env.ts
 
 import 'dotenv/config';
+
 import { z } from 'zod';
 
 const EnvSchema = z.object({
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().int().positive().default(8787),
   ORIGIN: z.url().default('http://localhost:5173'),
 
@@ -21,6 +23,9 @@ const EnvSchema = z.object({
   // Rate limiting
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(60),
+
+  // SSR client entry (used by server-side renderer)
+  SSR_CLIENT_ENTRY: z.string().default('/src/main.tsx'),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

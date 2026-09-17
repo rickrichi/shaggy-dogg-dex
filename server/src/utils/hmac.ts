@@ -1,6 +1,6 @@
 // server/src/utils/hmac.ts
 
-import { timingSafeEqual, createHmac } from 'node:crypto'
+import { createHmac, randomBytes,timingSafeEqual } from 'node:crypto'
 
 /**
  * Constant-time string equality comparison to prevent timing attack vectors.
@@ -125,7 +125,6 @@ export function generateHmacSecret(
   if (length <= 0 || !Number.isInteger(length)) {
     throw new Error('Secret length must be a positive integer')
   }
-  
-  const { randomBytes } = require('node:crypto')
+
   return randomBytes(length).toString(encoding)
 }

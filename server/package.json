@@ -1,28 +1,33 @@
 {
   "name": "shaggy-dogg-server",
   "version": "1.0.0",
-  "description": "Shaggy Dogg DEX backend API (Hono, Node 20, ESM)",
+  "description": "Shaggy Dogg DEX backend API (Hono 4.x, Node 20+, TypeScript ESM)",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=20.10.0" },
+  "engines": {
+    "node": ">=20.10.0"
+  },
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsup src/index.ts --format esm --dts --minify --clean",
+    "build:tsc": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
-    "typecheck": "tsc -p tsconfig.server.json --noEmit"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@hono/node-server": "^1.19.1",
+    "@hono/node-server": "^1.19.6",
     "@hono/zod-validator": "^0.7.2",
     "dotenv": "^17.2.2",
-    "hono": "^4.9.6",
-    "zod": "^4.1.5"
+    "hono": "^4.10.6",
+    "zod": "^4.1.12"
   },
   "devDependencies": {
-    "@types/node": "^22.8.1",
+    "@types/node": "^22.13.1",
     "tsup": "^8.5.0",
-    "tsx": "^4.20.5",
-    "typescript": "^5.9.2"
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
   }
 }

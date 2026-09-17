@@ -1,6 +1,6 @@
 // server/src/middleware/rateLimit.ts
 
-import type { MiddlewareHandler, Context } from 'hono'
+import type { Context,MiddlewareHandler } from 'hono'
 
 export interface RateLimitOptions {
   readonly windowMs: number
@@ -11,7 +11,7 @@ export interface RateLimitOptions {
   readonly skipFailedRequests?: boolean
 }
 
-type Bucket = {
+interface Bucket {
   count: number
   resetAt: number
 }
@@ -112,13 +112,49 @@ export const rateLimit = (options: RateLimitOptions): MiddlewareHandler => {
 export const cleanupExpiredBuckets = (store: Map<string, Bucket>): number => {
   const now = Date.now()
   let cleaned = 0
-  
+
   for (const [key, bucket] of store.entries()) {
     if (bucket.resetAt <= now) {
       store.delete(key)
       cleaned++
     }
   }
-  
+
   return cleaned
 }
+
+/**
+ * Automatic cleanup scheduler for the default rate limit store
+ * Runs every 5 minutes to prevent memory leaks in production
+ */
+let cleanupInterval: NodeJS.Timeout | null = null
+
+export const startCleanupScheduler = (
+  store: Map<string, Bucket> = defaultStore,
+  intervalMs: number = 5 * 60 * 1000 // 5 minutes
+): void => {
+  if (cleanupInterval) {
+    console.warn('[RateLimit] Cleanup scheduler already running')
+    return
+  }
+
+  cleanupInterval = setInterval(() => {
+    const cleaned = cleanupExpiredBuckets(store)
+    if (cleaned > 0) {
+      console.log(`[RateLimit] Cleaned ${cleaned} expired buckets`)
+    }
+  }, intervalMs)
+
+  // Prevent interval from blocking Node.js exit
+  cleanupInterval.unref()
+}
+
+export const stopCleanupScheduler = (): void => {
+  if (cleanupInterval) {
+    clearInterval(cleanupInterval)
+    cleanupInterval = null
+  }
+}
+
+// Auto-start cleanup scheduler for default store
+startCleanupScheduler()

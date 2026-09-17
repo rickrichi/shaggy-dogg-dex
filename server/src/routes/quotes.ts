@@ -1,8 +1,10 @@
-import type { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
+import { z } from 'zod'
+
 import { env } from '../env.js'
 import { makeTtlCache } from '../utils/cache.js'
-import { z } from 'zod'
+
+import type { Hono } from 'hono'
 
 const Address = z.string().regex(/^0x[0-9a-fA-F]{40}$/).transform(a => `0x${a.slice(2).toLowerCase()}`)
 const QuoteReq = z.object({
@@ -16,15 +18,15 @@ const QuoteReq = z.object({
 }).refine(v => (v.sellAmount ? !v.buyAmount : !!v.buyAmount),
   { path: ['sellAmount'], message: 'Provide exactly one of sellAmount or buyAmount' })
 
-type QuoteData = {
+interface QuoteData {
   to: string; data: string; value: string
   allowanceTarget?: string
   buyAmount: string; sellAmount: string
   gas?: string; gasPrice?: string
-  sources?: { name: string; proportion: string }[]
+  sources?: Array<{ name: string; proportion: string }>
 }
-type Ok = { success: true; data: QuoteData }
-type Fail = { success: false; error: string; chainId?: number }
+interface Ok { success: true; data: QuoteData }
+interface Fail { success: false; error: string; chainId?: number }
 
 const cache = makeTtlCache<Ok>(8_000)
 
@@ -56,20 +58,25 @@ export function mountQuoteRoutes(app: Hono): void {
     }
 
     const j = await r.json() as Record<string, unknown>
-    const out: Ok = {
-      success: true,
-      data: {
-        to: String(j['to'] ?? ''),
-        data: String(j['data'] ?? ''),
-        value: String(j['value'] ?? '0'),
-        allowanceTarget: typeof j['allowanceTarget'] === 'string' ? j['allowanceTarget'] : undefined,
-        buyAmount: String(j['buyAmount'] ?? '0'),
-        sellAmount: String(j['sellAmount'] ?? '0'),
-        gas: typeof j['gas'] === 'string' ? j['gas'] : undefined,
-        gasPrice: typeof j['gasPrice'] === 'string' ? j['gasPrice'] : undefined,
-        sources: Array.isArray(j['sources']) ? (j['sources'] as QuoteData['sources']) : undefined,
-      },
+
+    // Build data object with exact optional properties (no undefined assignment)
+    const data: QuoteData = {
+      to: String(j['to'] ?? ''),
+      data: String(j['data'] ?? ''),
+      value: String(j['value'] ?? '0'),
+      buyAmount: String(j['buyAmount'] ?? '0'),
+      sellAmount: String(j['sellAmount'] ?? '0'),
     }
+
+    // Conditionally add optional properties only if they exist
+    if (typeof j['allowanceTarget'] === 'string') data.allowanceTarget = j['allowanceTarget']
+    if (typeof j['gas'] === 'string') data.gas = j['gas']
+    if (typeof j['gasPrice'] === 'string') data.gasPrice = j['gasPrice']
+    if (Array.isArray(j['sources']) && j['sources'].length > 0) {
+      data.sources = j['sources'] as Array<{ name: string; proportion: string }>
+    }
+
+    const out: Ok = { success: true, data }
 
     cache.set(key, out)
     return c.json(out)

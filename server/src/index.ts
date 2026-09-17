@@ -1,32 +1,90 @@
-import { Hono } from 'hono';
-import { serve } from '@hono/node-server';
-import { env } from './env.js';
-import { withCors, withSecurityHeaders } from './middleware/security.js';
-import { logRequests } from './middleware/log.js';
-import { rateLimit } from './middleware/rateLimit.js';
-import { normalizeIp } from './utils/ip.js';
-import { mountHealth } from './routes/health.js';
-import { mountPriceRoutes } from './routes/prices.js';
-import { mountSupabaseDbWebhook } from './routes/webhooks/supabase_db.js';
+// server/src/index.ts
+import { serve } from '@hono/node-server'
+import { Hono } from 'hono'
 
-const app = new Hono();
-
-// global middleware
-app.use('*', logRequests);
-app.use('*', withSecurityHeaders);
-app.use('*', withCors(env.ORIGIN));
-app.use('/api/*', rateLimit({
-  windowMs: env.RATE_LIMIT_WINDOW_MS,
-  max: env.RATE_LIMIT_MAX,
-  identify: (ip) => `api:${normalizeIp(ip)}`
-}));
-
+import { corsActual } from './cors/actual.js'
+// CORS
+import { preflight } from './cors/preflight.js'
+import { logRequests } from './middleware/log.js'
+import { rateLimit } from './middleware/rateLimit.js'
+import { withSecurityHeaders } from './middleware/security.js'
 // routes
-mountHealth(app);
-mountPriceRoutes(app);
-mountSupabaseDbWebhook(app);
+import { mountHealth } from './routes/health.js'
+import { mountPriceRoutes } from './routes/prices.js'
+import { mountQuoteRoutes } from './routes/quotes.js'
+import { mountSsr } from './routes/ssr.js'
+import { mountSupabaseDbWebhook } from './routes/webhooks/supabase_db.js'
+import { normalizeIp } from './utils/ip.js'
+// env & middleware
+import { env } from './env.js'
 
-// start (Node adapter keeps the process alive)
-serve({ fetch: app.fetch, port: env.PORT });
-// eslint-disable-next-line no-console
-console.log(`api listening on http://localhost:${env.PORT}`);
+const app = new Hono()
+
+// Helpful diagnostics
+app.onError((err, c) => {
+  console.error('UNHANDLED ERROR:', err)
+  return c.text('Internal Server Error', 500)
+})
+app.notFound((c) => c.text('Not Found', 404))
+
+// ----- Middleware order (top → bottom = run order) -----
+// 1) request logging
+app.use('*', logRequests)
+// 2) preflight: short-circuits OPTIONS
+app.use('*', preflight())
+// 3) security headers
+app.use('*', withSecurityHeaders)
+// 4) CORS headers for non-OPTIONS
+app.use('*', corsActual())
+
+// ----- Test endpoint (for CORS verification) -----
+app.get('/api/block', (c) => c.json({ ok: true, now: Date.now() }))
+
+// ----- Health -----
+mountHealth(app)
+
+// ----- Prices with rate limiting -----
+app.use(
+  '/api/prices/*',
+  rateLimit({
+    windowMs: env.RATE_LIMIT_WINDOW_MS,
+    max: env.RATE_LIMIT_MAX,
+    identify: (ip) => `prices:${normalizeIp(ip)}`,
+  }),
+)
+mountPriceRoutes(app) // paths at /api/prices/*
+
+// ----- Quote Routes with rate limiting -----
+app.use(
+  '/api/quote',
+  rateLimit({
+    windowMs: env.RATE_LIMIT_WINDOW_MS,
+    max: env.RATE_LIMIT_MAX,
+    identify: (ip) => `quote:${normalizeIp(ip)}`,
+  }),
+)
+mountQuoteRoutes(app) // POST /api/quote
+
+// ----- Webhooks -----
+mountSupabaseDbWebhook(app)
+
+// ----- SSR catch-all (after API routes) -----
+mountSsr(app)
+
+// ----- Dev route listing (optional) -----
+if (env.NODE_ENV !== 'production') {
+  try {
+    const { showRoutes } = await import('hono/dev')
+    showRoutes(app)
+  } catch (error) {
+    console.warn('Dev route listing unavailable:', error instanceof Error ? error.message : error)
+  }
+}
+
+// ----- Start server (single place) -----
+const port = Number(env.PORT ?? process.env.PORT ?? 8787)
+serve({ fetch: app.fetch, port }, () => {
+  console.log(`API listening on http://localhost:${port}`)
+})
+
+export default app

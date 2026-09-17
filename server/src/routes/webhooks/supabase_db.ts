@@ -1,9 +1,11 @@
 // server/src/routes/webhooks/supabase_db.ts
-import type { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
-import { SupabaseDbWebhookSchema, type SupabaseDbWebhook } from '../../schemas/webhooks.js'
+
 import { env } from '../../env.js'
+import { type SupabaseDbWebhook,SupabaseDbWebhookSchema } from '../../schemas/webhooks.js'
 import { constantTimeEqual } from '../../utils/hmac.js'
+
+import type { Hono } from 'hono'
 
 function verifySupabaseAuth(header: string | undefined, secret: string): boolean {
   if (!header) return false
@@ -14,7 +16,7 @@ function verifySupabaseAuth(header: string | undefined, secret: string): boolean
 
 export function mountSupabaseDbWebhook(app: Hono): void {
   app.post(
-    '/webhooks/supabase-db',
+    '/api/webhooks/supabase-db',
     // Validate JSON body up front; return 400 on failure
     zValidator('json', SupabaseDbWebhookSchema, (result, c) => {
       if (!result.success) {
@@ -33,8 +35,6 @@ export function mountSupabaseDbWebhook(app: Hono): void {
       }
 
       const payload = c.req.valid('json') as SupabaseDbWebhook
-
-      // eslint-disable-next-line no-console
       console.log(`[supabase-db] ${payload.type} ${(payload.schema ?? 'public')}.${payload.table}`)
 
       // TODO: handle INSERT/UPDATE/DELETE for your target tables
