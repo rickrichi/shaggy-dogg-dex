@@ -374,22 +374,6 @@ export default function Swap() {
             }
           />
 
-          {/* Additional Info Area */}
-          <div className="mt-6 grid grid-cols-3 gap-4">
-            <Card className="border-none bg-slate-50 p-4 shadow-none">
-              <p className="text-xs text-slate-500">24h Volume</p>
-              <p className="text-lg font-bold text-slate-800">$12.4M</p>
-            </Card>
-            <Card className="border-none bg-slate-50 p-4 shadow-none">
-              <p className="text-xs text-slate-500">Liquidity</p>
-              <p className="text-lg font-bold text-slate-800">$45.2M</p>
-            </Card>
-            <Card className="border-none bg-slate-50 p-4 shadow-none">
-              <p className="text-xs text-slate-500">Fees (24h)</p>
-              <p className="text-lg font-bold text-slate-800">$34K</p>
-            </Card>
-          </div>
-
           <Card className="mt-6 border-slate-200/70 bg-white/70 p-4 shadow-sm backdrop-blur-sm">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>

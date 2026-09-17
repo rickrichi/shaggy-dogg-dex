@@ -32,6 +32,8 @@ interface VenueQuote {
   readonly id: string;
   readonly name: string;
   readonly output: bigint | null;
+  readonly status: "quoted" | "no-route" | "rpc-error" | "loading";
+  readonly detail?: string;
 }
 
 export const PriceChart = ({ baseToken, quoteToken }: PriceChartProps) => {
@@ -39,7 +41,7 @@ export const PriceChart = ({ baseToken, quoteToken }: PriceChartProps) => {
   const amountIn = useMemo(() => parseUnits("1", baseToken.decimals), [baseToken.decimals]);
   const canQuote = path.length > 1 && path[0] !== path[path.length - 1];
 
-  const { data, isFetching, refetch } = useReadContracts({
+  const { data, error: readError, isError, isFetching, refetch } = useReadContracts({
     contracts: DEX_VENUES.map((venue) => ({
       address: venue.router,
       abi: UNISWAP_V2_ROUTER_ABI,
@@ -59,9 +61,24 @@ export const PriceChart = ({ baseToken, quoteToken }: PriceChartProps) => {
         const result = data?.[index];
         const amounts = result?.status === "success" ? result.result : undefined;
         const output = Array.isArray(amounts) ? (amounts.at(-1) as bigint | undefined) : undefined;
-        return { id: venue.id, name: venue.name, output: output ?? null };
+        const resultError = result?.status === "failure" ? result.error : undefined;
+        const detail = resultError instanceof Error ? resultError.shortMessage ?? resultError.message : undefined;
+        const noRoute = detail?.toLowerCase().includes("revert") ?? false;
+        return {
+          id: venue.id,
+          name: venue.name,
+          output: output ?? null,
+          status: output
+            ? "quoted"
+            : isFetching
+              ? "loading"
+              : noRoute
+                ? "no-route"
+                : "rpc-error",
+          ...(detail ? { detail } : {}),
+        };
       }),
-    [data]
+    [data, isFetching]
   );
 
   const bestOutput = quotes.reduce<bigint | null>(
@@ -109,9 +126,23 @@ export const PriceChart = ({ baseToken, quoteToken }: PriceChartProps) => {
               </div>
               <div className="text-right">
                 {quote.output === null ? (
-                  <p className="text-sm font-medium text-slate-400">
-                    {isFetching ? "Checking…" : "No route"}
-                  </p>
+                  <>
+                    <p className="text-sm font-medium text-slate-400">
+                      {quote.status === "loading"
+                        ? "Checking…"
+                        : quote.status === "no-route"
+                          ? "No liquidity route"
+                          : "RPC unavailable"}
+                    </p>
+                    {quote.detail && (
+                      <p
+                        className="mt-1 max-w-64 truncate text-xs text-red-500"
+                        title={quote.detail}
+                      >
+                        {quote.detail}
+                      </p>
+                    )}
+                  </>
                 ) : (
                   <>
                     <p className="font-mono font-semibold text-slate-900">
@@ -128,6 +159,12 @@ export const PriceChart = ({ baseToken, quoteToken }: PriceChartProps) => {
             </div>
           );
         })}
+
+        {isError && (
+          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+            Router reads failed: {readError?.message ?? "Unknown RPC error"}
+          </div>
+        )}
 
         <p className="pt-2 text-xs leading-relaxed text-slate-500">
           Read-only router quotes refresh every 15 seconds. A listed token is tradable only when

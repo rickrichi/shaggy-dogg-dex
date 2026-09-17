@@ -21,6 +21,6 @@ export const DEX_VENUES: readonly DexVenue[] = [
   {
     id: "pancakeswap-v2",
     name: "PancakeSwap V2",
-    router: "0xEfF92A263d31888d860bE5a8933aF9007801A4C",
+    router: "0xEfF92A263d31888d860bD50809A8D171709b7b1c",
   },
 ] as const;
