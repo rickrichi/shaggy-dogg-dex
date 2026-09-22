@@ -1,4 +1,4 @@
-import { type Address,getAddress } from "viem";
+import { type Address, getAddress } from "viem";
 
 export const AMM_PROFILE_IDS = ["local", "sepolia", "mainnet"] as const;
 export type AmmProfileId = (typeof AMM_PROFILE_IDS)[number];
@@ -46,8 +46,7 @@ export const AMM_PROFILES: Readonly<Record<AmmProfileId, AmmProfile>> = {
     supportsPairCreation: false,
     supportsLiquiditySubmission: false,
     rpcEnvironmentVariable: "AMM_FORK_RPC_URL",
-    note:
-      "Local configuration only. Addresses are produced by an isolated test deployment and must never be promoted automatically.",
+    note: "Local configuration only. Addresses are produced by an isolated test deployment and must never be promoted automatically.",
   },
   sepolia: {
     configurationVersion: 1,
@@ -60,8 +59,7 @@ export const AMM_PROFILES: Readonly<Record<AmmProfileId, AmmProfile>> = {
     supportsPairDiscovery: false,
     supportsPairCreation: false,
     supportsLiquiditySubmission: false,
-    note:
-      "No AMM address is trusted by default. Choose a protocol and verify its deployment record before enabling read-only discovery.",
+    note: "No AMM address is trusted by default. Choose a protocol and verify its deployment record before enabling read-only discovery.",
   },
   mainnet: {
     configurationVersion: 1,
@@ -79,8 +77,7 @@ export const AMM_PROFILES: Readonly<Record<AmmProfileId, AmmProfile>> = {
     supportsPairCreation: false,
     supportsLiquiditySubmission: false,
     rpcEnvironmentVariable: "AMM_FORK_RPC_URL",
-    note:
-      "Read-only reference to the canonical Uniswap V2 deployment. Pair creation and liquidity submission are intentionally disabled.",
+    note: "Read-only reference to the canonical Uniswap V2 deployment. Pair creation and liquidity submission are intentionally disabled.",
   },
 } as const;
 
@@ -95,5 +92,7 @@ export function getAmmProfile(profileId: AmmProfileId): AmmProfile {
 export function hasAmmContractAddresses(profile: AmmProfile): profile is AmmProfile & {
   readonly contracts: Required<AmmContracts>;
 } {
-  return Boolean(profile.contracts.factory && profile.contracts.router && profile.contracts.wrappedNative);
+  return Boolean(
+    profile.contracts.factory && profile.contracts.router && profile.contracts.wrappedNative
+  );
 }

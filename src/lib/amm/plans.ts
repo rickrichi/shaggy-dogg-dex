@@ -1,9 +1,6 @@
-import { type Address,getAddress } from "viem";
+import { type Address, getAddress } from "viem";
 
-import {
-  type AmmProfile,
-  hasAmmContractAddresses,
-} from "@/config/amm/profiles";
+import { type AmmProfile, hasAmmContractAddresses } from "@/config/amm/profiles";
 
 const BPS_DENOMINATOR = 10_000n;
 const MAX_SLIPPAGE_BPS = 1_000n;
@@ -61,7 +58,7 @@ export interface BuildLiquidityPlanInput {
 function normalizeAsset(asset: AmmAsset): AmmAsset {
   if (!asset.symbol.trim()) throw new Error("AMM asset symbol is required.");
   if (!Number.isInteger(asset.decimals) || asset.decimals < 0 || asset.decimals > 255) {
-    throw new Error(`Invalid decimals for ${  asset.symbol  }.`);
+    throw new Error(`Invalid decimals for ${asset.symbol}.`);
   }
 
   return { ...asset, address: getAddress(asset.address) };
@@ -88,7 +85,9 @@ function assertPlanOnly(profile: AmmProfile): void {
     throw new Error("AMM execution is not available through the plan builder.");
   }
   if (profile.supportsPairCreation || profile.supportsLiquiditySubmission) {
-    throw new Error("AMM plan profiles must not grant pair-creation or liquidity-submission authority.");
+    throw new Error(
+      "AMM plan profiles must not grant pair-creation or liquidity-submission authority."
+    );
   }
 }
 
@@ -114,9 +113,10 @@ export function buildPairPlan(profile: AmmProfile, tokenA: AmmAsset, tokenB: Amm
     canonicalPairKey,
     token0,
     token1,
-    action: profile.supportsPairDiscovery && contractsConfigured
-      ? "DISCOVER_EXISTING_PAIR"
-      : "CONFIGURE_PROTOCOL_FIRST",
+    action:
+      profile.supportsPairDiscovery && contractsConfigured
+        ? "DISCOVER_EXISTING_PAIR"
+        : "CONFIGURE_PROTOCOL_FIRST",
     ...(contractsConfigured ? { factory: profile.contracts.factory } : {}),
     rationale: contractsConfigured
       ? "The plan can perform read-only pair discovery only. It cannot create a pair."
@@ -131,11 +131,12 @@ export function buildLiquidityPlan(input: BuildLiquidityPlanInput): LiquidityPla
     throw new Error("Liquidity plan amounts must both be greater than zero.");
   }
   if (slippageBps < 0n || slippageBps > MAX_SLIPPAGE_BPS) {
-    throw new Error(`Slippage must be between 0 and ${  MAX_SLIPPAGE_BPS  } basis points.`);
+    throw new Error(`Slippage must be between 0 and ${MAX_SLIPPAGE_BPS} basis points.`);
   }
 
   const pair = buildPairPlan(profile, tokenA, tokenB);
-  const tokenAIsToken0 = pair.token0.address.toLowerCase() === getAddress(tokenA.address).toLowerCase();
+  const tokenAIsToken0 =
+    pair.token0.address.toLowerCase() === getAddress(tokenA.address).toLowerCase();
   const amount0Desired = tokenAIsToken0 ? amountADesired : amountBDesired;
   const amount1Desired = tokenAIsToken0 ? amountBDesired : amountADesired;
   const amount0Minimum = minimumAfterSlippage(amount0Desired, slippageBps);

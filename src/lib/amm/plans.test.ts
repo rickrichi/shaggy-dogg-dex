@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { getAmmProfile } from "@/config/amm/profiles";
 
-import { type AmmAsset,buildLiquidityPlan, buildPairPlan } from "./plans";
+import { type AmmAsset, buildLiquidityPlan, buildPairPlan } from "./plans";
 
 const WETH: AmmAsset = {
   address: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",

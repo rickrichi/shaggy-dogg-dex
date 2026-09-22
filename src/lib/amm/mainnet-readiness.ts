@@ -1,9 +1,4 @@
-import {
-  type Address,
-  getAddress,
-  type PublicClient,
-  zeroAddress,
-} from "viem";
+import { type Address, getAddress, type PublicClient, zeroAddress } from "viem";
 
 import {
   MAINNET_RELEASE_MANIFEST,
@@ -11,11 +6,7 @@ import {
 } from "@/config/amm/mainnet-readiness";
 import { getAmmProfile } from "@/config/amm/profiles";
 
-import {
-  type AmmAsset,
-  buildLiquidityPlan,
-  type LiquidityPlan,
-} from "./plans";
+import { type AmmAsset, buildLiquidityPlan, type LiquidityPlan } from "./plans";
 
 const UNISWAP_V2_FACTORY_ABI = [
   {
@@ -125,9 +116,7 @@ export async function discoverUniswapV2Pair(
  * Produces an exact, deterministic review artifact. It does not inspect a
  * wallet, request an approval, or construct a transaction.
  */
-export function buildSdLiquidityReview(
-  input: BuildSdLiquidityReviewInput
-): SdLiquidityReview {
+export function buildSdLiquidityReview(input: BuildSdLiquidityReviewInput): SdLiquidityReview {
   const plan = buildLiquidityPlan({
     profile: getAmmProfile("mainnet"),
     tokenA: input.sdToken,

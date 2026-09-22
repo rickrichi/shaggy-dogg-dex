@@ -5,10 +5,7 @@ import {
   MAINNET_RELEASE_MANIFEST,
 } from "@/config/amm/mainnet-readiness";
 
-import {
-  buildSdLiquidityReview,
-  getMainnetReadinessReport,
-} from "./mainnet-readiness";
+import { buildSdLiquidityReview, getMainnetReadinessReport } from "./mainnet-readiness";
 
 describe("Uniswap V2 mainnet readiness", () => {
   it("starts blocked with mainnet execution structurally disabled", () => {
@@ -26,12 +23,8 @@ describe("Uniswap V2 mainnet readiness", () => {
   });
 
   it("pins the read-only profile to the reviewed Uniswap V2 infrastructure", () => {
-    expect(MAINNET_RELEASE_MANIFEST.factory).toBe(
-      "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f"
-    );
-    expect(MAINNET_RELEASE_MANIFEST.router).toBe(
-      "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D"
-    );
+    expect(MAINNET_RELEASE_MANIFEST.factory).toBe("0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f");
+    expect(MAINNET_RELEASE_MANIFEST.router).toBe("0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D");
     expect(MAINNET_RELEASE_MANIFEST.wrappedNative).toBe(
       "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
     );

@@ -48,8 +48,7 @@ const createDummyClient = (): SupabaseClient => {
 const initializeSupabase = (): SupabaseClient => {
   // Get credentials from environment
   const supabaseUrl = getEnv("VITE_SUPABASE_URL");
-  const supabaseKey =
-    getEnv("VITE_SUPABASE_PUBLISHABLE_KEY") ?? getEnv("VITE_SUPABASE_ANON_KEY");
+  const supabaseKey = getEnv("VITE_SUPABASE_PUBLISHABLE_KEY") ?? getEnv("VITE_SUPABASE_ANON_KEY");
 
   // Validate credentials are present
   if (!supabaseUrl || !supabaseKey) {

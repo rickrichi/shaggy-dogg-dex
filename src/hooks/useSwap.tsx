@@ -387,8 +387,7 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
 
     const routeContext = lastRouteRef.current;
     const routingStrategy = routeContext ? "best_price" : undefined;
-    const priceImpactBps =
-      quote.priceImpact !== null ? Math.round(quote.priceImpact * 100) : null;
+    const priceImpactBps = quote.priceImpact !== null ? Math.round(quote.priceImpact * 100) : null;
 
     lastSwapContextRef.current = {
       sellAmount: state.sellAmount,

@@ -32,11 +32,7 @@ export interface MainnetReleaseManifest {
  */
 const mainnet = getAmmProfile("mainnet");
 
-if (
-  !mainnet.contracts.factory ||
-  !mainnet.contracts.router ||
-  !mainnet.contracts.wrappedNative
-) {
+if (!mainnet.contracts.factory || !mainnet.contracts.router || !mainnet.contracts.wrappedNative) {
   throw new Error("The mainnet Uniswap V2 profile must contain verified infrastructure addresses.");
 }
 

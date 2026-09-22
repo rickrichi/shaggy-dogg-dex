@@ -4,13 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircle, Droplet, Loader2, Minus, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { type Address, formatUnits, type Hash, parseUnits } from "viem";
-import {
-  useAccount,
-  useBalance,
-  usePublicClient,
-  useReadContract,
-  useWriteContract,
-} from "wagmi";
+import { useAccount, useBalance, usePublicClient, useReadContract, useWriteContract } from "wagmi";
 import { mainnet } from "wagmi/chains";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -188,7 +182,9 @@ export default function Liquidity() {
   const waitForConfirmation = useCallback(
     async (hash: Hash) => {
       if (!publicClient) {
-        throw new Error("A mainnet RPC client is unavailable. Reconnect your wallet and try again.");
+        throw new Error(
+          "A mainnet RPC client is unavailable. Reconnect your wallet and try again."
+        );
       }
 
       const receipt = await publicClient.waitForTransactionReceipt({ hash });
@@ -425,28 +421,14 @@ export default function Liquidity() {
           address: CONTRACTS.UNISWAP_V2_ROUTER,
           abi: UNISWAP_V2_ROUTER_ABI,
           functionName: "removeLiquidityETH",
-          args: [
-            resolveAddress(tokenB),
-            liquidity,
-            amountBMin,
-            amountAMin,
-            userAddress,
-            deadline,
-          ],
+          args: [resolveAddress(tokenB), liquidity, amountBMin, amountAMin, userAddress, deadline],
         });
       } else if (isNative(tokenB.address)) {
         removeHash = await removeLiq({
           address: CONTRACTS.UNISWAP_V2_ROUTER,
           abi: UNISWAP_V2_ROUTER_ABI,
           functionName: "removeLiquidityETH",
-          args: [
-            resolveAddress(tokenA),
-            liquidity,
-            amountAMin,
-            amountBMin,
-            userAddress,
-            deadline,
-          ],
+          args: [resolveAddress(tokenA), liquidity, amountAMin, amountBMin, userAddress, deadline],
         });
       } else {
         removeHash = await removeLiq({
@@ -521,9 +503,7 @@ export default function Liquidity() {
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Pool Share</p>
-                    <p className="text-xl font-bold text-blue-600">
-                      {poolInfo.poolShare}%
-                    </p>
+                    <p className="text-xl font-bold text-blue-600">{poolInfo.poolShare}%</p>
                   </div>
                   <div className="border-t pt-2">
                     <p className="mb-1 text-xs text-gray-500">{tokenA.symbol} Balance</p>

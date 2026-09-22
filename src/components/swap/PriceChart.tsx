@@ -41,7 +41,13 @@ export const PriceChart = ({ baseToken, quoteToken }: PriceChartProps) => {
   const amountIn = useMemo(() => parseUnits("1", baseToken.decimals), [baseToken.decimals]);
   const canQuote = path.length > 1 && path[0] !== path[path.length - 1];
 
-  const { data, error: readError, isError, isFetching, refetch } = useReadContracts({
+  const {
+    data,
+    error: readError,
+    isError,
+    isFetching,
+    refetch,
+  } = useReadContracts({
     contracts: DEX_VENUES.map((venue) => ({
       address: venue.router,
       abi: UNISWAP_V2_ROUTER_ABI,
@@ -68,13 +74,7 @@ export const PriceChart = ({ baseToken, quoteToken }: PriceChartProps) => {
           id: venue.id,
           name: venue.name,
           output: output ?? null,
-          status: output
-            ? "quoted"
-            : isFetching
-              ? "loading"
-              : noRoute
-                ? "no-route"
-                : "rpc-error",
+          status: output ? "quoted" : isFetching ? "loading" : noRoute ? "no-route" : "rpc-error",
           ...(detail ? { detail } : {}),
         };
       }),
@@ -167,8 +167,8 @@ export const PriceChart = ({ baseToken, quoteToken }: PriceChartProps) => {
         )}
 
         <p className="pt-2 text-xs leading-relaxed text-slate-500">
-          Read-only router quotes refresh every 15 seconds. A listed token is tradable only when
-          the selected venue has sufficient liquidity along the displayed path.
+          Read-only router quotes refresh every 15 seconds. A listed token is tradable only when the
+          selected venue has sufficient liquidity along the displayed path.
         </p>
       </CardContent>
     </Card>

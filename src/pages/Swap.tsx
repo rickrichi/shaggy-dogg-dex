@@ -368,7 +368,9 @@ export default function Swap() {
         {/* Left Column: Chart & Info */}
         <div className="h-full min-h-[400px] lg:col-span-2">
           <PriceChart
-            baseToken={MAINNET_TOKENS.find((token) => token.symbol === chartBaseSymbol) ?? sellToken}
+            baseToken={
+              MAINNET_TOKENS.find((token) => token.symbol === chartBaseSymbol) ?? sellToken
+            }
             quoteToken={
               MAINNET_TOKENS.find((token) => token.symbol === chartQuoteSymbol) ?? buyToken
             }

@@ -1,7 +1,4 @@
-import {
-  LUMIORO_MAINNET_RELEASE,
-  releaseBlockersFor,
-} from "@/config/amm/lumioro-mainnet-release";
+import { LUMIORO_MAINNET_RELEASE, releaseBlockersFor } from "@/config/amm/lumioro-mainnet-release";
 
 /**
  * Static evidence only. No RPC call, wallet read, approval, or transaction is

@@ -58,7 +58,8 @@ export const SwapCard = memo<SwapCardProps>(
     };
 
     const swapButtonLabel = (() => {
-      if (!isCorrectNetwork) return isSwitchingNetwork ? "Switching network..." : "Switch to Ethereum";
+      if (!isCorrectNetwork)
+        return isSwitchingNetwork ? "Switching network..." : "Switch to Ethereum";
       if (swapActions.isSwapping) return "Swapping...";
       if (!state.sellAmount) return "Enter amount";
       if (quote.status === "LOADING") return "Fetching best price...";

@@ -442,10 +442,7 @@ export const LimitOrderCard = memo<LimitOrderCardProps>(
 
           {/* Action Buttons */}
           <div className="space-y-2">
-            <Button
-              className="w-full bg-slate-400 py-3 font-medium text-white"
-              disabled
-            >
+            <Button className="w-full bg-slate-400 py-3 font-medium text-white" disabled>
               Limit orders are not available in this build
             </Button>
           </div>

@@ -133,12 +133,16 @@ export function hasValidHumanApprovedLiquidityPlan(
   );
 }
 
-export function releaseBlockersFor(release: LumioroMainnetRelease): readonly LumioroReleaseBlocker[] {
+export function releaseBlockersFor(
+  release: LumioroMainnetRelease
+): readonly LumioroReleaseBlocker[] {
   const blockers: LumioroReleaseBlocker[] = [];
   if (release.sourcePublication !== "EVIDENCED") {
     blockers.push("EXPLORER_SOURCE_PUBLICATION_NOT_EVIDENCED");
   }
-  if (!hasValidIndependentAuditEvidence(release.independentAudit, release.token.runtimeBytecodeSha256)) {
+  if (
+    !hasValidIndependentAuditEvidence(release.independentAudit, release.token.runtimeBytecodeSha256)
+  ) {
     blockers.push("INDEPENDENT_AUDIT_REPORT_NOT_LINKED");
   }
   if (!hasValidHumanApprovedLiquidityPlan(release.liquidityEnvelope)) {
