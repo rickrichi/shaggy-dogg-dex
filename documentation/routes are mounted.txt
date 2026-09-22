@@ -1,0 +1,57 @@
+Nice! Your server is up and the routes are mounted correctly:
+
+
+GET   /health
+GET   /prices
+POST  /webhooks/supabase-db
+
+
+Quick verify (direct to the API)
+
+bash
+# health
+curl -i http://localhost:8787/health
+
+# prices (native symbol probe)
+curl -i "http://localhost:8787/prices?symbol=ETH"
+
+
+Expected: `200 OK` with `content-type: application/json` for `/prices` and a JSON body like:
+
+json
+{"symbol":"ETH","priceUsd":1234.56,"change24hPercent":0}
+
+
+(Values depend on your fallback/stub.)
+
+Verify through Vite proxy
+
+Make sure your Vite dev server is running and your proxy rewrites `/api` → \`\`:
+
+bash
+curl -i "http://localhost:5173/api/prices?symbol=ETH"
+
+
+If it 404s, double-check this line in `vite.config.ts`:
+
+ts
+rewrite: (p) => p.replace(/^\/api(\/|$)/, '/'),
+
+
+…and watch your API logs — you should see `GET /prices` when the proxy hits it.
+
+Frontend fetch example
+
+ts
+const res = await fetch('/api/prices?symbol=ETH');
+const json = await res.json();
+console.log(json);
+
+
+Gotchas (fast)
+
+* Query param is `symbol` (not `token` or `id`).
+* If `prices` still returns 502, set `PRICE_API_FALLBACK` (and optionally `COINGECKO_API_KEY`) in your server `.env`.
+* CORS doesn’t affect `curl`; browser calls do, but your middleware already sets CORS.
+
+You’re ready to roll—try the curls above and you should be good.

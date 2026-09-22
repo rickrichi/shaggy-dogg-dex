@@ -1,0 +1,35 @@
+Based on your package.json, you need to run two separate processes for full development:
+
+  Quick Start (Two Terminals):
+
+  Terminal 1 - Backend API (Hono server on port 8787):
+  npm run api:dev
+
+  Terminal 2 - Frontend (Vite dev server on port 5173):
+  npm run dev
+
+  Then open http://localhost:5173 in your browser.
+
+  ---
+  Alternative: Run Both in One Terminal
+
+  If you want to run both simultaneously in one terminal, you can use:
+
+  npm run api:dev & npm run dev
+
+  Or create a new npm script for convenience. Would you like me to add a combined script to your package.json?
+
+  ---
+  Available Scripts:
+
+  - npm run dev - Frontend Vite dev server (port 5173)
+  - npm run api:dev - Backend Hono server (port 8787)
+  - npm run api:start - Backend in production mode
+  - npm run build - Production build
+  - npm run type-check - Type checking
+  - npm run preview - Preview production build
+
+  Notes:
+
+  - Your Vite config already has a proxy set up: /api requests → http://localhost:8787
+  - Make sure you have a .env file with your environment variables (check .env.example or .env.README.md)

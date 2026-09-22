@@ -1,13 +1,17 @@
-ClientID:
-919159561473-eehadlcml02gcppipniq7an5410uj3eg.apps.googleusercontent.com
+Current Google OAuth setup is documented in:
 
-Client Secret:
-***REMOVED***
+docs/google-auth-setup.md
 
+Client ID:
+711227544056-78o8o3bedflr88ms1e1imk14dibfe7pt.apps.googleusercontent.com
 
-Client Secret (for OAuth)
-***REMOVED***
+Client secrets must not be committed. Store the Google OAuth client secret only in:
 
-Callback URL (for OAuth)
-https://vcbcrvkcfolvskrnxuyd.supabase.co/auth/v1/callback
+Supabase Dashboard -> Authentication -> Sign In / Providers -> Google
+
+Callback URL (for OAuth):
+https://kedtpoczmattmsagnpkp.supabase.co/auth/v1/callback
+
+Authorized JavaScript origin:
+http://localhost:5173
 

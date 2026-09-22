@@ -1,0 +1,18 @@
+reinstall with npm install (and npm install --prefix server if the backend has its own deps). Keep your lockfiles (package-lock.json/yarn.lock) so reinstalls are reproducible.
+
+Give me the start commands for my application, please.
+
+
+- Frontend (Vite): npm run dev (serves http://localhost:5173).
+- Backend API (Hono): npm run api:dev (or npm --prefix server run dev) — listens on http://localhost:8787.
+- For production build of the frontend: npm run build then serve dist with your host of choice.   
+
+1. One-time setup (or after a fresh clone):                                                                                                    
+                                                                                                                                                 
+  - npm install
+  - npm install --prefix server
+                                                                                                                                                 
+2. Each dev session:                                                                                                                           
+
+  - npm run api:dev (start backend)                                                                                                              
+  - npm run dev (start frontend)      

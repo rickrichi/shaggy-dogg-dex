@@ -1,0 +1,4 @@
+ Each dev session:                                                                                                                           
+
+  - npm run api:dev (start backend)                                                                                                              
+  - npm run dev (start frontend)    

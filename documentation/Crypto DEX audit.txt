@@ -1,0 +1,29 @@
+A Crypto DEX audit is a comprehensive security review of the smart contracts and code that run a Decentralized Exchange (DEX).
+
+Because DEXs operate autonomously using code (smart contracts) rather than a central authority (like a bank), a single bug can allow hackers to drain millions of dollars in seconds. An audit is an attempt to find and fix these errors before the exchange goes live.
+
+Here is a breakdown of exactly what it entails:
+1. The Core Purpose
+The primary goal is to verify that the code does exactly what it claims to do and nothing else.
+* Security: ensuring no "backdoors" exist for developers to steal funds (rug pulls).
+* Safety: Ensuring hackers cannot exploit logic errors to drain liquidity pools.
+* Accuracy: Verifying that math calculations (fees, slippage, token swaps) are correct.
+
+2. The Audit Process
+A professional security firm (like CertiK, Hacken, or Trail of Bits) typically performs the audit in four phases:
+
+* Automated Analysis: They run the code through specialized software (like Slither or Mythril) that scans for known vulnerability patterns.
+* Manual Review: Senior security engineers read the code line-by-line. This is the most critical step, as human logic is needed to spot complex economic exploits that machines miss.
+* Testing: They simulate attacks on a private version of the DEX to see if they can break it (Penetration Testing).
+* Reporting & Fixing: The auditors produce a report classifying risks as *Critical, Major, Medium,* or *Minor*. The DEX developers must fix these issues, after which a "Final Audit" is released publicly.
+
+3. What Auditors Look For
+They are hunting for specific "exploits" common in DeFi:
+* Reentrancy Attacks: Can a hacker withdraw funds repeatedly before the system updates their balance? (The exploit that famously destroyed The DAO).
+* Front-Running / Sandwich Attacks: Can a bot see a user's transaction in the queue and jump ahead of it to manipulate the price?
+* Integer Overflow: Does the code break if a number gets too large (e.g., a token balance larger than the system can count)?
+* Centralization Risks: Does the "admin" key have too much power? (e.g., Can the owner pause trading or blacklist wallets at will?)
+
+4. Important Limitation
+An audit is not a guarantee of safety.
+It is merely a snapshot in time. A "stamped" audit means professionals checked the code *at that specific moment*. If the developers upgrade the contract later, or if the auditors simply missed a complex bug, the DEX can still be hacked. Always check the date of the audit and whether the current code matches the audited version.
