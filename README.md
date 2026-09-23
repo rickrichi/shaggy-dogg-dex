@@ -44,6 +44,29 @@ Canonical API choice:
   server-side `API_URL` to that service's public origin; do not put backend credentials in a
   `VITE_*` variable.
 
+## CeDeFi Bridge Integration (AlpacaOrderDesk)
+
+The ShaggyDogg DEX server serves as the decentralized liquidity and execution target for **AlpacaOrderDesk**:
+
+- **CeDeFi Status Endpoint**: `GET /api/cedefi/status` reports network health, supported chains (Base `8453`, Base Sepolia `84532`, Ethereum `1`), canonical token contracts (`LUMIORO` at `0x14eDBa263054b381A3836d97Ba2e3Fe763f7991E`), and settlement asset designation (`USDC`).
+- **CeDeFi Quote Endpoint**: `GET /api/cedefi/quote` provides real-time effective DEX swap pricing, AMM pool friction, estimated slippage, and L2 gas fee calculation for cross-venue arbitrage against Alpaca centralized books.
+
+### How to Run:
+1. **Start the ShaggyDogg DEX Server**:
+   ```powershell
+   cd C:\Users\fbada\source\repos\shaggy-dogg-dex\server
+   npm run start
+   ```
+   *(Listens on `http://localhost:8788`)*
+
+2. **Launch AlpacaOrderDesk**:
+   ```powershell
+   cd C:\Users\fbada\source\repos\AlpacaOrderDesk\src\AlpacaOrderDesk
+   dotnet run
+   ```
+   - Click on the new **CeDeFi Bridge** tab.
+   - Click **🔄 Refresh Bridge Spreads** to stream live cross-venue spreads and identify arbitrage opportunities between Alpaca and Base!
+
 ## Minimal Acceptance Checklist
 
 - [ ] App builds and runs without errors
