@@ -12,6 +12,7 @@ import { withSecurityHeaders } from './middleware/security.js'
 import { mountHealth } from './routes/health.js'
 import { mountPriceRoutes } from './routes/prices.js'
 import { mountQuoteRoutes } from './routes/quotes.js'
+import { mountCeDeFiRoutes } from './routes/cedefi.js'
 import { mountSsr } from './routes/ssr.js'
 import { mountSupabaseDbWebhook } from './routes/webhooks/supabase_db.js'
 import { normalizeIp } from './utils/ip.js'
@@ -64,6 +65,9 @@ app.use(
   }),
 )
 mountQuoteRoutes(app) // POST /api/quote
+
+// ----- CeDeFi Bridge Routes -----
+mountCeDeFiRoutes(app) // GET /api/cedefi/status, GET /api/cedefi/quote
 
 // ----- Webhooks -----
 mountSupabaseDbWebhook(app)
