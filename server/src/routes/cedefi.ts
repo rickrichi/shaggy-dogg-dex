@@ -1,5 +1,5 @@
 // server/src/routes/cedefi.ts
-import { env } from '../env.js';
+import { LUMIORO_TOKEN, USDC_TOKEN } from '../config/lumioro-token.js';
 
 import type { Hono } from 'hono';
 
@@ -18,7 +18,14 @@ export interface CeDeFiStatusResponse {
   tokens: {
     lumioro: {
       symbol: string;
-      baseMainnet: string;
+      /** Chain 1. The deployed, independently reviewed LUMIORO token. */
+      ethereumMainnet: string;
+      /**
+       * Chain 8453. Always null — LUMIORO is not deployed on Base Mainnet.
+       * Consumers must refuse rather than substitute another chain's address.
+       */
+      baseMainnet: string | null;
+      /** Chain 84532. */
       baseSepolia: string;
       decimals: number;
     };
@@ -47,15 +54,16 @@ export function mountCeDeFiRoutes(app: Hono): void {
       ],
       tokens: {
         lumioro: {
-          symbol: 'LUMIORO',
-          baseMainnet: '0x14eDBa263054b381A3836d97Ba2e3Fe763f7991E',
-          baseSepolia: '0x23297A5062F8a99049A89cfe8A5acb2A3b4a8729',
-          decimals: 18,
+          symbol: LUMIORO_TOKEN.symbol,
+          ethereumMainnet: LUMIORO_TOKEN.ethereumMainnet,
+          baseMainnet: LUMIORO_TOKEN.baseMainnet,
+          baseSepolia: LUMIORO_TOKEN.baseSepolia,
+          decimals: LUMIORO_TOKEN.decimals,
         },
         usdc: {
-          symbol: 'USDC',
-          baseMainnet: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-          decimals: 6,
+          symbol: USDC_TOKEN.symbol,
+          baseMainnet: USDC_TOKEN.baseMainnet,
+          decimals: USDC_TOKEN.decimals,
         },
       },
       settlementAsset: 'USDC',

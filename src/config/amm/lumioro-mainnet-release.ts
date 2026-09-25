@@ -29,7 +29,40 @@ export interface UnlinkedIndependentAudit {
   readonly scopedSourceCommit: null;
 }
 
-export type IndependentAuditEvidence = PassedIndependentAudit | UnlinkedIndependentAudit;
+/**
+ * A completed independent review that PASSED and is cryptographically
+ * authenticated, but whose report is a repository memorandum rather than a
+ * published URL.
+ *
+ * This is deliberately distinct from both neighbours. It is not
+ * `ASSERTED_REPORT_NOT_LINKED`, because nothing here is merely asserted: the
+ * memorandum is hash-bound and the reviewer's own EIP-191 signature verifies
+ * over the record. It is not `PASSED` either, because a consumer of this API
+ * cannot fetch the report and check it, and an evidence gate should not call
+ * unfetchable evidence linked.
+ *
+ * It therefore does NOT clear `INDEPENDENT_AUDIT_REPORT_NOT_LINKED` on its own
+ * — that blocker is named for linkage, and the report genuinely is not linked.
+ * Publish the memorandum at an HTTPS URL and promote this to
+ * `PassedIndependentAudit` to clear it.
+ */
+export interface PassedUnpublishedIndependentAudit {
+  readonly status: "PASSED_REPORT_NOT_PUBLISHED";
+  readonly auditor: string;
+  readonly reviewedAt: string;
+  readonly memorandumPath: string;
+  readonly memorandumSha256: Hex;
+  readonly authenticationRecord: string;
+  readonly scopedSourceCommit: string;
+  readonly deployedRuntimeBytecodeSha256: Hex;
+  readonly unresolvedCriticalHighOrMedium: number;
+  readonly finalVerdict: "PASSED";
+}
+
+export type IndependentAuditEvidence =
+  | PassedIndependentAudit
+  | PassedUnpublishedIndependentAudit
+  | UnlinkedIndependentAudit;
 
 export interface ApprovedLiquidityPlan {
   readonly status: "EXACT_PLAN_HUMAN_APPROVED";
@@ -118,6 +151,35 @@ export function hasValidIndependentAuditEvidence(
   );
 }
 
+/**
+ * True when an independent review has actually been completed and passed,
+ * whether or not its report is published at a fetchable URL.
+ *
+ * Use this to answer "has this been audited?". Use
+ * `hasValidIndependentAuditEvidence` to answer the narrower release-gate
+ * question "is a passing report linked and verifiable by a third party?".
+ * Conflating the two is what let this config report a signed PASS as an
+ * unevidenced assertion.
+ */
+export function hasAuthenticatedIndependentAuditPass(
+  audit: IndependentAuditEvidence,
+  expectedRuntimeDigest: Hex = LUMIORO_DEPLOYED_RUNTIME_BYTECODE_SHA256
+): audit is PassedIndependentAudit | PassedUnpublishedIndependentAudit {
+  if (hasValidIndependentAuditEvidence(audit, expectedRuntimeDigest)) {
+    return true;
+  }
+  return (
+    audit.status === "PASSED_REPORT_NOT_PUBLISHED" &&
+    isNonEmpty(audit.auditor) &&
+    isSha256(audit.memorandumSha256) &&
+    isNonEmpty(audit.memorandumPath) &&
+    isGitCommit(audit.scopedSourceCommit) &&
+    audit.deployedRuntimeBytecodeSha256.toLowerCase() === expectedRuntimeDigest.toLowerCase() &&
+    audit.unresolvedCriticalHighOrMedium === 0 &&
+    audit.finalVerdict === "PASSED"
+  );
+}
+
 export function hasValidHumanApprovedLiquidityPlan(
   envelope: LiquidityEnvelopeEvidence
 ): envelope is ApprovedLiquidityPlan {
@@ -172,12 +234,25 @@ export const LUMIORO_MAINNET_RELEASE: LumioroMainnetRelease = {
     runtimeBytecodeSha256: LUMIORO_DEPLOYED_RUNTIME_BYTECODE_SHA256,
   },
   sourcePublication: "NOT_EVIDENCED",
+  // Transcribed from deployments/lumioro-token-build-2026-08-30.json in the
+  // lumioro registry repository, authenticated 2026-09-19T08:19:19Z by Tanaka
+  // Minato's EIP-191 signature over that record and the memorandum hash below.
+  // The memorandum is a repository file, not a published URL, so this is
+  // PASSED_REPORT_NOT_PUBLISHED and the release gate still reports
+  // INDEPENDENT_AUDIT_REPORT_NOT_LINKED. That blocker is about linkage, not
+  // about whether the review happened — it did, and it passed.
   independentAudit: {
-    status: "ASSERTED_REPORT_NOT_LINKED",
-    claimedAuditor: "Tanaka Minato",
-    reportUrl: null,
-    reportSha256: null,
-    scopedSourceCommit: null,
+    status: "PASSED_REPORT_NOT_PUBLISHED",
+    auditor: "Tanaka Minato",
+    reviewedAt: "2026-09-19",
+    memorandumPath: "docs/INDEPENDENT-REVIEW-MEMORANDUM-LUMIORO-TOKEN.md",
+    memorandumSha256:
+      "0x828b2ddeee5521bd4e4ebf6b2e68b8d642dc4245fc2f883e6fd6442a8f5ba3c7" as Hex,
+    authenticationRecord: "deployments/lumioro-token-build-2026-08-30.json",
+    scopedSourceCommit: "7f359ab44a8636632ea8d07e36ba3a174271d26c",
+    deployedRuntimeBytecodeSha256: LUMIORO_DEPLOYED_RUNTIME_BYTECODE_SHA256,
+    unresolvedCriticalHighOrMedium: 0,
+    finalVerdict: "PASSED",
   },
   liquidityEnvelope: {
     status: "APPROVED_RANGE_EXACT_PLAN_PENDING",

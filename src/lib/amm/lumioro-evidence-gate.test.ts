@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  hasAuthenticatedIndependentAuditPass,
   hasValidHumanApprovedLiquidityPlan,
   hasValidIndependentAuditEvidence,
   LUMIORO_MAINNET_RELEASE,
@@ -28,20 +29,72 @@ describe("LUMIORO mainnet evidence gate", () => {
     expect(report.token.repositoryVerification).toBe("RECORDED_20_OF_20");
   });
 
-  it("does not treat an asserted auditor name as final audit evidence", () => {
+  it("records the authenticated 2026-09-19 review pass", () => {
     const report = getLumioroMainnetEvidenceGateReport();
 
     expect(report.independentAudit).toEqual({
-      status: "ASSERTED_REPORT_NOT_LINKED",
+      status: "PASSED_REPORT_NOT_PUBLISHED",
+      auditor: "Tanaka Minato",
+      reviewedAt: "2026-09-19",
+      memorandumPath: "docs/INDEPENDENT-REVIEW-MEMORANDUM-LUMIORO-TOKEN.md",
+      memorandumSha256:
+        "0x828b2ddeee5521bd4e4ebf6b2e68b8d642dc4245fc2f883e6fd6442a8f5ba3c7",
+      authenticationRecord: "deployments/lumioro-token-build-2026-08-30.json",
+      scopedSourceCommit: "7f359ab44a8636632ea8d07e36ba3a174271d26c",
+      deployedRuntimeBytecodeSha256: LUMIORO_MAINNET_RELEASE.token.runtimeBytecodeSha256,
+      unresolvedCriticalHighOrMedium: 0,
+      finalVerdict: "PASSED",
+    });
+    expect(hasAuthenticatedIndependentAuditPass(report.independentAudit)).toBe(true);
+  });
+
+  it("still withholds the release: a signed pass is not a linked report", () => {
+    const report = getLumioroMainnetEvidenceGateReport();
+
+    // The review passed, but its memorandum is a repository file rather than a
+    // fetchable URL, so the linkage blocker correctly stays up.
+    expect(hasValidIndependentAuditEvidence(report.independentAudit)).toBe(false);
+    expect(report.liquidityEnvelope.status).toBe("APPROVED_RANGE_EXACT_PLAN_PENDING");
+    expect(report.blockers).toContain("INDEPENDENT_AUDIT_REPORT_NOT_LINKED");
+    expect(report.blockers).toContain("EXACT_LIQUIDITY_PLAN_AND_HUMAN_REVIEW_PENDING");
+    expect(report.blockers).toContain("MAINNET_EXECUTION_INTENTIONALLY_DISABLED");
+    expect(canSubmitLumioroMainnetLiquidity()).toBe(false);
+  });
+
+  it("does not treat an asserted auditor name as an audit pass", () => {
+    const asserted = {
+      status: "ASSERTED_REPORT_NOT_LINKED" as const,
       claimedAuditor: "Tanaka Minato",
       reportUrl: null,
       reportSha256: null,
       scopedSourceCommit: null,
-    });
-    expect(report.liquidityEnvelope.status).toBe("APPROVED_RANGE_EXACT_PLAN_PENDING");
-    expect(report.blockers).toContain("INDEPENDENT_AUDIT_REPORT_NOT_LINKED");
-    expect(report.blockers).toContain("EXACT_LIQUIDITY_PLAN_AND_HUMAN_REVIEW_PENDING");
-    expect(canSubmitLumioroMainnetLiquidity()).toBe(false);
+    };
+
+    expect(hasAuthenticatedIndependentAuditPass(asserted)).toBe(false);
+    expect(hasValidIndependentAuditEvidence(asserted)).toBe(false);
+    expect(releaseBlockersFor(candidateRelease({ independentAudit: asserted }))).toContain(
+      "INDEPENDENT_AUDIT_REPORT_NOT_LINKED"
+    );
+  });
+
+  it("rejects an unpublished pass whose runtime digest does not match the deployment", () => {
+    const wrongDigest = {
+      ...LUMIORO_MAINNET_RELEASE.independentAudit,
+      status: "PASSED_REPORT_NOT_PUBLISHED" as const,
+      auditor: "Tanaka Minato",
+      reviewedAt: "2026-09-19",
+      memorandumPath: "docs/INDEPENDENT-REVIEW-MEMORANDUM-LUMIORO-TOKEN.md",
+      memorandumSha256:
+        "0x828b2ddeee5521bd4e4ebf6b2e68b8d642dc4245fc2f883e6fd6442a8f5ba3c7" as const,
+      authenticationRecord: "deployments/lumioro-token-build-2026-08-30.json",
+      scopedSourceCommit: "7f359ab44a8636632ea8d07e36ba3a174271d26c",
+      deployedRuntimeBytecodeSha256:
+        "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd" as const,
+      unresolvedCriticalHighOrMedium: 0,
+      finalVerdict: "PASSED" as const,
+    };
+
+    expect(hasAuthenticatedIndependentAuditPass(wrongDigest)).toBe(false);
   });
 
   it("accepts complete final-audit evidence only when it binds to the deployed runtime", () => {
