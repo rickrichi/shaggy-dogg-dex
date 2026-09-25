@@ -87,48 +87,37 @@ export function mountCeDeFiRoutes(app: Hono): void {
       return c.json({ ok: false, error: 'valid amountUsd is required' }, 400);
     }
 
-    // LUMIORO is deliberately not quoted here.
-    //
-    // This endpoint used to return a flat $10.00 "base NAV peg". LUMIORO has no
-    // pegged value to report. LUMIOROToken pays a pro-rata share of whatever
-    // ETH is in its reserve (payout = reserve * amount / totalSupply); the
-    // reserve starts empty, nobody is obliged to fund it, and the contract
-    // documentation states that it must not be described as backed,
-    // collateralised, or redeemable at any particular value. A constant cannot
-    // track a quantity that moves with the reserve.
-    //
-    // Deleting the peg is not sufficient on its own: with no price set, the
-    // heuristic table below would assign `?? 1.0` and quote LUMIORO at $1.00,
-    // which is the same defect wearing a different number. So refuse before any
-    // price can be synthesised. A caller that receives no quote can decline to
-    // act; a caller handed an invented price cannot tell that it was invented,
-    // and this response feeds CeDeFi spread rows that stage order tickets.
-    //
-    // Quoting this pair honestly needs a live read of reserve() and
-    // totalSupply() on chain 1, which this endpoint does not perform. The
-    // mainnet release is BLOCKED with execution DISABLED regardless; see
-    // src/config/amm/lumioro-mainnet-release.ts.
-    if (cleanSymbol === LUMIORO_TOKEN.symbol || cleanSymbol === 'LUMI') {
-      return c.json(
+    const noObservedPrice = (detail: string) =>
+      c.json(
         {
           ok: false,
           symbol: cleanSymbol,
-          error: 'LUMIORO has no quotable price on this endpoint',
+          error: 'No observed market price is available for this symbol',
           reason: 'NO_OBSERVED_PRICE',
-          detail:
-            'LUMIORO redeems for a pro-rata share of its ETH reserve, which is not ' +
-            'a pegged or fixed value. This endpoint does not read that reserve on ' +
-            'chain 1, so it has no price to report and will not synthesise one.',
+          detail,
         },
         409
       );
+
+    // LUMIORO is deliberately not quoted here. It has no configured, verified
+    // market pool on Ethereum Mainnet and is not deployed on Base Mainnet. Its
+    // pro-rata redemption reserve is not a DEX market price, so neither a
+    // reserve read nor a fixed "NAV peg" is an acceptable substitute. A future
+    // listing must provide verified, chain-qualified pool evidence and use an
+    // executable pool or aggregator quote before this symbol becomes available.
+    if (cleanSymbol === LUMIORO_TOKEN.symbol || cleanSymbol === 'LUMI') {
+      return noObservedPrice(
+        'LUMIORO has no configured, verified market pool on this endpoint. ' +
+          'The endpoint will not substitute a redemption value or a fixed price.'
+      );
     }
 
-    // Default reference prices / rates for Base DEX settlement
+    // Use an observed reference price only. This bridge never substitutes a
+    // heuristic value when its price source does not have one.
     let priceUsd = 0;
     let change24h = 0;
 
-    // Query internal price endpoint or fallback
+    // Query the internal observed-price endpoint.
     try {
       const priceRes = await app.request(`/api/prices?symbol=${cleanSymbol}`);
       if (priceRes.ok) {
@@ -140,18 +129,11 @@ export function mountCeDeFiRoutes(app: Hono): void {
       // graceful degradation
     }
 
-    if (priceUsd <= 0) {
-      // Fallback heuristics for common symbols if pricing API is offline
-      const fallbacks: Record<string, number> = {
-        BTC: 65000,
-        ETH: 3450,
-        SOL: 150,
-        AVAX: 30,
-        LINK: 14,
-        UNI: 8,
-        USDC: 1.0,
-      };
-      priceUsd = fallbacks[cleanSymbol] ?? 1.0;
+    if (!Number.isFinite(priceUsd) || priceUsd <= 0) {
+      return noObservedPrice(
+        'The configured price source did not return a positive observed price. ' +
+          'The endpoint will not synthesize a fallback value.'
+      );
     }
 
     // DEX AMM simulation: 0.3% pool fee + 0.1% estimated slippage for $1000
