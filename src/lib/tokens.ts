@@ -1,7 +1,7 @@
 // File: src/lib/tokens.ts
 // Description: Defines token watchlists for different chains
 // ==================================================================================
-import { arbitrum, mainnet, optimism, polygon, sepolia } from "wagmi/chains";
+import { arbitrum, baseSepolia, mainnet, optimism, polygon, sepolia } from "wagmi/chains";
 
 // Add new types for the required properties
 export interface NativeCurrencyConfig {
@@ -114,6 +114,38 @@ const tokenWatchlist: Record<number, ChainConfig> = {
       coinGeckoId: "ethereum",
     },
     tokens: [],
+  },
+  [baseSepolia.id]: {
+    chainName: "Base Sepolia",
+    nativeCurrency: {
+      name: "Sepolia Ether",
+      symbol: "ETH",
+      decimals: 18,
+      coinGeckoId: "ethereum",
+    },
+    tokens: [
+      {
+        address: "0x051c758521971f5c5a84edaf18eea12854375469",
+        name: "Shaggy Dogg",
+        symbol: "SD",
+        decimals: 18,
+        coinGeckoId: "shaggy-dogg",
+      },
+      {
+        address: "0x4200000000000000000000000000000000000006",
+        name: "Wrapped Ether",
+        symbol: "WETH",
+        decimals: 18,
+        coinGeckoId: "weth",
+      },
+      {
+        address: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+        name: "USD Coin",
+        symbol: "USDC",
+        decimals: 6,
+        coinGeckoId: "usd-coin",
+      },
+    ],
   },
 };
 

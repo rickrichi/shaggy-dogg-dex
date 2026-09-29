@@ -34,6 +34,6 @@ export const walletClient = ethProvider
     })
   : null;
 
-// Deployed contracts (your addresses)
-export const SDT = { address: "0x308673cBfc6faDe727bFf74866b4Cc2ADFeF9493" as Address };
-export const FDS = { address: "0xbfd5da945fe6428b3421429778c75cf8e07ef05f" as Address };
+// Deployed contracts (Base Sepolia)
+export const SDT = { address: "0x051c758521971f5c5a84edaf18eea12854375469" as Address };
+export const FDS = { address: "0x42134ccc6c41149cf71c7b4994e33ee66758af20" as Address };
