@@ -53,6 +53,27 @@ export const WalletConnect = () => {
     );
   };
 
+  const handleAddSdToken = async () => {
+    const eth = (window as unknown as { ethereum?: { request: (args: unknown) => Promise<unknown> } })?.ethereum;
+    if (eth) {
+      try {
+        await eth.request({
+          method: "wallet_watchAsset",
+          params: {
+            type: "ERC20",
+            options: {
+              address: "0x051c758521971f5c5a84edaf18eea12854375469",
+              symbol: "SD",
+              decimals: 18,
+            },
+          },
+        });
+      } catch (err) {
+        console.error("Failed to watch asset:", err);
+      }
+    }
+  };
+
   if (isConnected && address) {
     return (
       <Card className="border-2 border-purple-200 bg-gradient-to-r from-purple-50 to-pink-50">
@@ -75,14 +96,25 @@ export const WalletConnect = () => {
                 </div>
               </div>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => disconnect()}
-              className="hover:border-red-200 hover:bg-red-50"
-            >
-              <LogOut className="size-4" />
-            </Button>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleAddSdToken}
+                title="Add SD token to MetaMask"
+                className="h-8 border-purple-300 bg-white/80 px-2 text-xs font-semibold text-purple-700 hover:bg-purple-100"
+              >
+                + SD
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => disconnect()}
+                className="h-8 hover:border-red-200 hover:bg-red-50"
+              >
+                <LogOut className="size-4" />
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
