@@ -122,6 +122,22 @@ export async function runDeployment(options: DeploymentOptions) {
       transport: http(endpoint),
     });
 
+    const balance = await publicClient.getBalance({ address: deployerAccount.address });
+    if (balance === 0n) {
+      console.log(`\n❌ INSUFFICIENT GAS: Deployer wallet has 0 ETH on ${network}.`);
+      console.log(`   Wallet Address: ${deployerAccount.address}`);
+      console.log(`\n👉 Action Required:`);
+      if (network === "base-sepolia") {
+        console.log(`   1. Open: https://www.coinbase.com/faucets/base-ethereum-sepolia-faucet`);
+        console.log(`   2. Paste: ${deployerAccount.address}`);
+        console.log(`   3. Click "Request funds" (Free testnet ETH arrives in ~5 seconds)`);
+      } else {
+        console.log(`   Send ~$0.50 of ETH to ${deployerAccount.address} on Base Mainnet to cover gas.`);
+      }
+      console.log(`\n   Once funded, re-run this command to complete deployment!`);
+      return;
+    }
+
     console.log(`\n[1/2] Broadcasting GovernanceToken (SD) deployment...`);
     const govTxHash = await walletClient.deployContract({
       abi: govTokenArtifact.abi,
