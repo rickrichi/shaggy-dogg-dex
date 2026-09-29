@@ -158,5 +158,27 @@ describe("Aave Flash Liquidity & Yield Staking Vault Integrations", () => {
       expect(artifact.abi.some((item: { name?: string }) => item.name === "withdraw")).toBe(true);
       expect(artifact.abi.some((item: { name?: string }) => item.name === "totalAssets")).toBe(true);
     });
+
+    it("verifies CompoundYieldVault artifact compiled cleanly with bytecode", () => {
+      const artifactPath = path.resolve(process.cwd(), "contracts/out/CompoundYieldVault.json");
+      expect(fs.existsSync(artifactPath)).toBe(true);
+
+      const artifact = JSON.parse(fs.readFileSync(artifactPath, "utf8"));
+      expect(artifact.contractName).toBe("CompoundYieldVault");
+      expect(artifact.bytecode.length).toBeGreaterThan(100);
+      expect(artifact.abi.some((item: { name?: string }) => item.name === "deposit")).toBe(true);
+      expect(artifact.abi.some((item: { name?: string }) => item.name === "withdraw")).toBe(true);
+      expect(artifact.abi.some((item: { name?: string }) => item.name === "totalAssets")).toBe(true);
+    });
+
+    it("verifies DeployEcosystem master factory artifact compiled cleanly with bytecode", () => {
+      const artifactPath = path.resolve(process.cwd(), "contracts/out/DeployEcosystem.json");
+      expect(fs.existsSync(artifactPath)).toBe(true);
+
+      const artifact = JSON.parse(fs.readFileSync(artifactPath, "utf8"));
+      expect(artifact.contractName).toBe("DeployEcosystem");
+      expect(artifact.bytecode.length).toBeGreaterThan(1000);
+      expect(artifact.abi.some((item: { name?: string }) => item.name === "run")).toBe(true);
+    });
   });
 });

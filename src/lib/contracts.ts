@@ -1,7 +1,7 @@
 // Auto-generated from deployments/ - DO NOT EDIT MANUALLY
 // Last updated: 2026-09-29T06:28:33.544Z
 
-import { Address } from 'viem';
+import type { Address } from 'viem';
 
 export interface DeployedContracts {
   GovernanceToken: Address;
