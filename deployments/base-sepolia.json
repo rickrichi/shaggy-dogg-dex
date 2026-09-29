@@ -9,7 +9,8 @@
     "FeeDiscountStaking": "0x42134ccc6c41149cf71c7b4994e33ee66758af20",
     "AaveFlashBorrower": "0xa5b50037a8d2fda22805f750252268adaeb36480",
     "YieldStakingVault": "0x8531807ef36560cd7db230c95db85791aa586dda",
-    "CompoundYieldVault": "0x38cccafb4ae96a8ef187f07fb17d18eb63e43782"
+    "CompoundYieldVault": "0x38cccafb4ae96a8ef187f07fb17d18eb63e43782",
+    "UniswapV2Pair_SD_WETH": "0x63D504336d01BcCa615B23AD393E5812Dc646BF8"
   },
   "verification": {
     "solcVersion": "0.8.36",

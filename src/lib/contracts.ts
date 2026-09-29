@@ -9,6 +9,7 @@ export interface DeployedContracts {
   AaveFlashBorrower?: Address;
   YieldStakingVault?: Address;
   CompoundYieldVault?: Address;
+  UniswapV2Pair_SD_WETH?: Address;
   deployedAt: number;
   deployer: Address;
 }
@@ -26,6 +27,7 @@ export const CONTRACTS: Record<number, DeployedContracts> = {
     "AaveFlashBorrower": "0xa5b50037a8d2fda22805f750252268adaeb36480",
     "YieldStakingVault": "0x8531807ef36560cd7db230c95db85791aa586dda",
     "CompoundYieldVault": "0x38cccafb4ae96a8ef187f07fb17d18eb63e43782",
+    "UniswapV2Pair_SD_WETH": "0x63D504336d01BcCa615B23AD393E5812Dc646BF8",
     "deployedAt": 1790673576071,
     "deployer": "0xc1c3d6552231DB22A22Bdf513C0833024FF3f42B"
   },
