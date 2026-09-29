@@ -86,10 +86,16 @@ export async function runDeployment(options: DeploymentOptions) {
 
   const govTokenArtifact = loadArtifact("GovernanceToken");
   const stakingArtifact = loadArtifact("FeeDiscountStaking");
+  const flashBorrowerArtifact = loadArtifact("AaveFlashBorrower");
+  const yieldVaultArtifact = loadArtifact("YieldStakingVault");
+  const compoundVaultArtifact = loadArtifact("CompoundYieldVault");
 
   console.log(`Loaded compiled bytecode:`);
   console.log(` - GovernanceToken   : ${govTokenArtifact.bytecode.length} hex chars`);
   console.log(` - FeeDiscountStaking: ${stakingArtifact.bytecode.length} hex chars`);
+  console.log(` - AaveFlashBorrower : ${flashBorrowerArtifact.bytecode.length} hex chars`);
+  console.log(` - YieldStakingVault : ${yieldVaultArtifact.bytecode.length} hex chars`);
+  console.log(` - CompoundYieldVault: ${compoundVaultArtifact.bytecode.length} hex chars`);
 
   const deployerAccount = privateKey
     ? privateKeyToAccount(privateKey)
@@ -104,17 +110,43 @@ export async function runDeployment(options: DeploymentOptions) {
 
   let govTokenAddress: Address;
   let stakingAddress: Address;
+  let flashBorrowerAddress: Address;
+  let yieldVaultAddress: Address;
+  let compoundVaultAddress: Address;
   let blockNumber = 0;
-  let timestamp = Date.now();
+  const timestamp = Date.now();
+
+  const networkConfig = {
+    "base-sepolia": {
+      aavePool: "0x07eA79F68B2B3df564D0A34F8e19D9B1e339814b" as Address,
+      usdc: "0x036CbD53842c5426634e7929541eC2318f3dCF7e" as Address,
+      comet: "0x6d88c0352A9D114B5CeeC8a82dE9Ff9F5D21f2dC" as Address,
+    },
+    "base-mainnet": {
+      aavePool: "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5" as Address,
+      usdc: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as Address,
+      comet: "0xb125E6687d4313864e53df431d5425969c15Eb2F" as Address,
+    },
+    "localhost": {
+      aavePool: "0x0000000000000000000000000000000000000001" as Address,
+      usdc: "0x0000000000000000000000000000000000000002" as Address,
+      comet: "0x0000000000000000000000000000000000000003" as Address,
+    },
+  }[network];
 
   if (simulate || !privateKey) {
     console.log(`\n[PREFLIGHT] Validating constructor inputs and simulating bytecode packing...`);
-    // Deterministic preview / simulation addresses
     govTokenAddress = "0x8453200000000000000000000000000000000001";
     stakingAddress = "0x8453200000000000000000000000000000000002";
+    flashBorrowerAddress = "0x8453200000000000000000000000000000000003";
+    yieldVaultAddress = "0x8453200000000000000000000000000000000004";
+    compoundVaultAddress = "0x8453200000000000000000000000000000000005";
     blockNumber = 18_500_000;
     console.log(` Simulated GovernanceToken  : ${govTokenAddress}`);
     console.log(` Simulated FeeDiscountStaking: ${stakingAddress}`);
+    console.log(` Simulated AaveFlashBorrower : ${flashBorrowerAddress}`);
+    console.log(` Simulated YieldStakingVault : ${yieldVaultAddress}`);
+    console.log(` Simulated CompoundYieldVault: ${compoundVaultAddress}`);
   } else {
     const walletClient = createWalletClient({
       account: deployerAccount,
@@ -138,7 +170,7 @@ export async function runDeployment(options: DeploymentOptions) {
       return;
     }
 
-    console.log(`\n[1/2] Broadcasting GovernanceToken (SD) deployment...`);
+    console.log(`\n[1/5] Broadcasting GovernanceToken (SD) deployment...`);
     const govTxHash = await walletClient.deployContract({
       abi: govTokenArtifact.abi,
       bytecode: govTokenArtifact.bytecode,
@@ -153,7 +185,7 @@ export async function runDeployment(options: DeploymentOptions) {
     blockNumber = Number(govReceipt.blockNumber);
     console.log(`  Confirmed at Block ${blockNumber}: ${govTokenAddress}`);
 
-    console.log(`\n[2/2] Broadcasting FeeDiscountStaking deployment...`);
+    console.log(`\n[2/5] Broadcasting FeeDiscountStaking deployment...`);
     const stakingTxHash = await walletClient.deployContract({
       abi: stakingArtifact.abi,
       bytecode: stakingArtifact.bytecode,
@@ -166,6 +198,61 @@ export async function runDeployment(options: DeploymentOptions) {
     }
     stakingAddress = stakingReceipt.contractAddress;
     console.log(`  Confirmed at Block ${stakingReceipt.blockNumber}: ${stakingAddress}`);
+
+    console.log(`\n[3/5] Broadcasting AaveFlashBorrower deployment...`);
+    const flashTxHash = await walletClient.deployContract({
+      abi: flashBorrowerArtifact.abi,
+      bytecode: flashBorrowerArtifact.bytecode,
+      args: [networkConfig.aavePool, effectiveAdmin],
+    });
+    console.log(`  Tx Hash: ${flashTxHash}`);
+    const flashReceipt = await publicClient.waitForTransactionReceipt({ hash: flashTxHash });
+    if (!flashReceipt.contractAddress) {
+      throw new Error("Failed to retrieve deployed AaveFlashBorrower address from receipt.");
+    }
+    flashBorrowerAddress = flashReceipt.contractAddress;
+    console.log(`  Confirmed at Block ${flashReceipt.blockNumber}: ${flashBorrowerAddress}`);
+
+    console.log(`\n[4/5] Broadcasting YieldStakingVault deployment...`);
+    const yieldTxHash = await walletClient.deployContract({
+      abi: yieldVaultArtifact.abi,
+      bytecode: yieldVaultArtifact.bytecode,
+      args: [
+        networkConfig.usdc,
+        networkConfig.aavePool,
+        "0x0000000000000000000000000000000000000000",
+        stakingAddress,
+        effectiveAdmin,
+        effectiveAdmin,
+      ],
+    });
+    console.log(`  Tx Hash: ${yieldTxHash}`);
+    const yieldReceipt = await publicClient.waitForTransactionReceipt({ hash: yieldTxHash });
+    if (!yieldReceipt.contractAddress) {
+      throw new Error("Failed to retrieve deployed YieldStakingVault address from receipt.");
+    }
+    yieldVaultAddress = yieldReceipt.contractAddress;
+    console.log(`  Confirmed at Block ${yieldReceipt.blockNumber}: ${yieldVaultAddress}`);
+
+    console.log(`\n[5/5] Broadcasting CompoundYieldVault deployment...`);
+    const compoundTxHash = await walletClient.deployContract({
+      abi: compoundVaultArtifact.abi,
+      bytecode: compoundVaultArtifact.bytecode,
+      args: [
+        networkConfig.usdc,
+        networkConfig.comet,
+        stakingAddress,
+        effectiveAdmin,
+        effectiveAdmin,
+      ],
+    });
+    console.log(`  Tx Hash: ${compoundTxHash}`);
+    const compoundReceipt = await publicClient.waitForTransactionReceipt({ hash: compoundTxHash });
+    if (!compoundReceipt.contractAddress) {
+      throw new Error("Failed to retrieve deployed CompoundYieldVault address from receipt.");
+    }
+    compoundVaultAddress = compoundReceipt.contractAddress;
+    console.log(`  Confirmed at Block ${compoundReceipt.blockNumber}: ${compoundVaultAddress}`);
   }
 
   // Record deployment artifact
@@ -182,6 +269,9 @@ export async function runDeployment(options: DeploymentOptions) {
     contracts: {
       GovernanceToken: govTokenAddress,
       FeeDiscountStaking: stakingAddress,
+      AaveFlashBorrower: flashBorrowerAddress,
+      YieldStakingVault: yieldVaultAddress,
+      CompoundYieldVault: compoundVaultAddress,
     },
     verification: {
       solcVersion: "0.8.36",

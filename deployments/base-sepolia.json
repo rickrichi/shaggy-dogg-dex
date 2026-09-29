@@ -1,12 +1,15 @@
 {
   "chainId": 84532,
   "network": "base-sepolia",
-  "timestamp": 1790664409519,
+  "timestamp": 1790668654215,
   "blockNumber": 18500000,
   "deployer": "0xc1c3d6552231DB22A22Bdf513C0833024FF3f42B",
   "contracts": {
     "GovernanceToken": "0x8453200000000000000000000000000000000001",
-    "FeeDiscountStaking": "0x8453200000000000000000000000000000000002"
+    "FeeDiscountStaking": "0x8453200000000000000000000000000000000002",
+    "AaveFlashBorrower": "0x8453200000000000000000000000000000000003",
+    "YieldStakingVault": "0x8453200000000000000000000000000000000004",
+    "CompoundYieldVault": "0x8453200000000000000000000000000000000005"
   },
   "verification": {
     "solcVersion": "0.8.36",
