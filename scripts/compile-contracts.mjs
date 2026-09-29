@@ -15,7 +15,13 @@ if (!fs.existsSync(outDir)) {
 
 console.log("Compiling Shaggy-Dogg-DEX contracts with solc " + solc.version() + "...");
 
-const files = ["GovernanceToken.sol", "FeeDiscountStaking.sol", "Deploy.sol"];
+const files = [
+  "GovernanceToken.sol",
+  "FeeDiscountStaking.sol",
+  "Deploy.sol",
+  "AaveFlashBorrower.sol",
+  "YieldStakingVault.sol",
+];
 const sources = {};
 
 for (const file of files) {

@@ -6,6 +6,8 @@ const pairs = [
   ["contracts/src/GovernanceToken.sol", "shaggy-dogg-sol_files/GovernanceToken.sol"],
   ["contracts/src/FeeDiscountStaking.sol", "shaggy-dogg-sol_files/FeeDiscountStaking.sol"],
   ["contracts/src/Deploy.sol", "shaggy-dogg-sol_files/Shaggy-Dogg-Dex.sol"],
+  ["contracts/src/AaveFlashBorrower.sol", "shaggy-dogg-sol_files/AaveFlashBorrower.sol"],
+  ["contracts/src/YieldStakingVault.sol", "shaggy-dogg-sol_files/YieldStakingVault.sol"],
 ];
 
 const drifted = pairs.filter(([canonical, mirror]) => {

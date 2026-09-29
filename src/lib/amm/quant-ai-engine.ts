@@ -9,7 +9,9 @@
  *  - Directive 337: Concentrated Liquidity Virtual Reserves & Capital Efficiency
  *  - Directive 338: Cross-DEX Triangular Arbitrage Solver & Decentralized Spread Optimizer
  *  - Directive 339: L2 Execution Gas & Priority Fee Optimizer (EIP-1559 Base L2)
+ *  - Directive 340: Uncollateralized Flash Liquidity (Aave v3) & Staking Discount Arb Optimizer
  *  - Directive 341: Impermanent Loss & Volatility Divergence Risk Matrix
+ *  - Directive 342: Aave Yield-Staking Vault Share & Protocol Performance Fee Projection
  *
  * NOTE: Shaggy-Dogg-DEX is strictly decentralized on Base L2 and operates
  * completely independent of the Alpaca API and centralized broker rails.
@@ -94,6 +96,58 @@ export interface ImpermanentLossResult {
   readonly impermanentLossPct: number; // negative percentage
   readonly holdValueUsd: number;
   readonly lpValueUsd: number;
+}
+
+export interface AaveFlashArbitrageInput {
+  readonly borrowAsset: "WETH" | "USDC" | string;
+  readonly borrowAmount: number;
+  readonly flashPremiumBps?: number; // default 5 (0.05% on Aave v3 Base)
+  readonly sdStakedTier?: number; // 0: None, 1: 100 bps (10%), 2: 250 bps (25%), 3: 500 bps (50%), 4: 1000 bps (100%)
+  readonly triangularRoute: {
+    readonly wethUsdcPrice: number;
+    readonly usdcDaiRate: number;
+    readonly daiWethRate: number;
+    readonly basePoolFeeBps?: number; // default 30 (0.30%)
+  };
+  readonly gasCostUsd?: number; // default 0.15 on Base L2
+}
+
+export interface AaveFlashArbitrageResult {
+  readonly borrowAsset: string;
+  readonly borrowAmount: number;
+  readonly flashLoanPremium: number;
+  readonly repaymentRequired: number;
+  readonly basePoolFeeBps: number;
+  readonly feeDiscountBps: number;
+  readonly effectivePoolFeeBps: number;
+  readonly grossArbitrageReturn: number;
+  readonly grossProfit: number;
+  readonly gasCostUsd: number;
+  readonly netProfit: number;
+  readonly netProfitUsd: number;
+  readonly roiBps: number;
+  readonly isProfitable: boolean;
+  readonly decision: "EXECUTE_FLASH_ARBITRAGE" | "ARBITRAGE_UNPROFITABLE_AFTER_FEES";
+}
+
+export interface YieldVaultProjectionInput {
+  readonly depositAmount: number;
+  readonly aaveApyPct: number; // e.g. 4.5%
+  readonly durationDays?: number; // default 365
+  readonly sdStakedTier?: number; // 0 to 4
+  readonly basePerformanceFeeBps?: number; // default 1000 (10%)
+}
+
+export interface YieldVaultProjectionResult {
+  readonly depositAmount: number;
+  readonly durationDays: number;
+  readonly grossYield: number;
+  readonly basePerformanceFeeBps: number;
+  readonly sdDiscountBps: number;
+  readonly effectivePerformanceFeeBps: number;
+  readonly creatorTreasuryRevenue: number;
+  readonly netYieldToDepositor: number;
+  readonly netApyPct: number;
 }
 
 export class ShaggyDoggQuantAiEngine {
@@ -307,6 +361,123 @@ export class ShaggyDoggQuantAiEngine {
       impermanentLossPct,
       holdValueUsd,
       lpValueUsd,
+    };
+  }
+
+  /**
+   * Directive 340: Uncollateralized Flash Liquidity (Aave v3) & Staking Discount Arb Optimizer
+   * Computes multi-hop triangular arbitrage powered by Aave v3 flash loans with SD staking fee discounts.
+   */
+  public static calculateAaveFlashArbitrage(input: AaveFlashArbitrageInput): AaveFlashArbitrageResult {
+    const {
+      borrowAsset,
+      borrowAmount,
+      flashPremiumBps = 5,
+      sdStakedTier = 0,
+      triangularRoute,
+      gasCostUsd = 0.15,
+    } = input;
+
+    if (borrowAmount <= 0) {
+      throw new Error("Borrow amount must be strictly positive.");
+    }
+    const { wethUsdcPrice, usdcDaiRate, daiWethRate, basePoolFeeBps = 30 } = triangularRoute;
+    if (wethUsdcPrice <= 0 || usdcDaiRate <= 0 || daiWethRate <= 0) {
+      throw new Error("Exchange rates and prices must be positive.");
+    }
+
+    // Determine SD staking discount in basis points (out of 1000 = 100% discount)
+    // Tier 0: 0, Tier 1: 100 (10%), Tier 2: 250 (25%), Tier 3: 500 (50%), Tier 4: 1000 (100%)
+    const discountMap: Record<number, number> = {
+      0: 0,
+      1: 100,
+      2: 250,
+      3: 500,
+      4: 1000,
+    };
+    const feeDiscountBps = discountMap[sdStakedTier] ?? 0;
+    const effectivePoolFeeBps = basePoolFeeBps * (1 - feeDiscountBps / 1000);
+    const poolFeeFactor = 1 - effectivePoolFeeBps / 10_000;
+
+    // Triangular route: WETH -> USDC -> DAI -> WETH
+    const usdc = borrowAmount * wethUsdcPrice * poolFeeFactor;
+    const dai = usdc * usdcDaiRate * poolFeeFactor;
+    const grossArbitrageReturn = dai * daiWethRate * poolFeeFactor;
+
+    // Aave Flash loan premium
+    const flashLoanPremium = borrowAmount * (flashPremiumBps / 10_000);
+    const repaymentRequired = borrowAmount + flashLoanPremium;
+
+    const grossProfit = grossArbitrageReturn - repaymentRequired;
+    const gasInAsset = gasCostUsd / wethUsdcPrice;
+    const netProfit = grossProfit - gasInAsset;
+    const netProfitUsd = netProfit * wethUsdcPrice;
+    const roiBps = (netProfit / borrowAmount) * 10_000;
+    const isProfitable = netProfit > 0;
+
+    return {
+      borrowAsset,
+      borrowAmount,
+      flashLoanPremium,
+      repaymentRequired,
+      basePoolFeeBps,
+      feeDiscountBps,
+      effectivePoolFeeBps,
+      grossArbitrageReturn,
+      grossProfit,
+      gasCostUsd,
+      netProfit,
+      netProfitUsd,
+      roiBps,
+      isProfitable,
+      decision: isProfitable ? "EXECUTE_FLASH_ARBITRAGE" : "ARBITRAGE_UNPROFITABLE_AFTER_FEES",
+    };
+  }
+
+  /**
+   * Directive 342: Aave Yield-Staking Vault Share & Protocol Performance Fee Projection
+   * Computes yield accumulation and creator equity revenue share based on SD staking tier.
+   */
+  public static calculateYieldVaultProjection(input: YieldVaultProjectionInput): YieldVaultProjectionResult {
+    const {
+      depositAmount,
+      aaveApyPct,
+      durationDays = 365,
+      sdStakedTier = 0,
+      basePerformanceFeeBps = 1000, // 10%
+    } = input;
+
+    if (depositAmount <= 0 || aaveApyPct < 0 || durationDays <= 0) {
+      throw new Error("Deposit, APY, and duration must be valid positive numbers.");
+    }
+
+    const discountMap: Record<number, number> = {
+      0: 0,
+      1: 100, // 10% off performance fee
+      2: 250, // 25% off
+      3: 500, // 50% off
+      4: 1000, // 100% off (zero performance fee for stakers)
+    };
+    const sdDiscountBps = discountMap[sdStakedTier] ?? 0;
+    const effectivePerformanceFeeBps = basePerformanceFeeBps * (1 - sdDiscountBps / 1000);
+
+    const yearFraction = durationDays / 365;
+    const grossYield = depositAmount * (aaveApyPct / 100) * yearFraction;
+
+    const creatorTreasuryRevenue = grossYield * (effectivePerformanceFeeBps / 10_000);
+    const netYieldToDepositor = grossYield - creatorTreasuryRevenue;
+    const netApyPct = (netYieldToDepositor / depositAmount) * (365 / durationDays) * 100;
+
+    return {
+      depositAmount,
+      durationDays,
+      grossYield,
+      basePerformanceFeeBps,
+      sdDiscountBps,
+      effectivePerformanceFeeBps,
+      creatorTreasuryRevenue,
+      netYieldToDepositor,
+      netApyPct,
     };
   }
 }
