@@ -40,7 +40,7 @@ export interface CeDeFiStatusResponse {
 }
 
 export function mountCeDeFiRoutes(app: Hono): void {
-  // GET /api/cedefi/status - Health & configuration for CeDeFi bridges (e.g. AlpacaOrderDesk)
+  // GET /api/cedefi/status - Health & configuration for CeDeFi bridges (e.g. Lumioro Desk & decentralized observers)
   app.get('/api/cedefi/status', (c) => {
     const response: CeDeFiStatusResponse = {
       ok: true,

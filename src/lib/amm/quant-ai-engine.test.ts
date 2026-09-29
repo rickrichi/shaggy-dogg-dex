@@ -27,37 +27,73 @@ describe("ShaggyDoggQuantAiEngine (Quant Manual Directives 336-341)", () => {
     expect(multiplier).toBeLessThan(6.0);
   });
 
-  it("Directive 338: solves CeDeFi triangular arbitrage net edge across Alpaca and Base AMM", () => {
-    // Case 1: Profitable spread (DEX higher by $15)
-    const profitable = ShaggyDoggQuantAiEngine.calculateCeDeFiArbitrageSpread({
-      alpacaPrice: 3450.0,
-      dexPrice: 3465.0,
+  it("Directive 338: executes authentic on-chain cross-DEX triangular arbitrage solver (WETH->USDC->DAI->WETH)", () => {
+    // Chapter 4 Directive 338 canonical test vector
+    const arb = ShaggyDoggQuantAiEngine.calculateCrossDexTriangularArbitrage({
+      wethUsdcPrice: 2500.0,
+      usdcDaiRate: 1.002,
+      daiWethRate: 0.000405,
+      initialWeth: 10.0,
+      poolFeeBps: 30.0,
+      gasCostUsd: 25.0,
+    });
+
+    expect(arb.pairRoute).toBe("WETH->USDC->DAI->WETH");
+    expect(arb.initialCapital).toBe(10.0);
+    expect(arb.terminalCapital).toBeCloseTo(10.0542, 3);
+    expect(arb.grossProfit).toBeCloseTo(0.0542, 3);
+    expect(arb.gasCostUsd).toBe(25.0);
+    expect(arb.netProfit).toBeCloseTo(0.0442, 3);
+    expect(arb.roiBps).toBeCloseTo(44.22, 1);
+    expect(arb.arbitrageDetected).toBe(true);
+    expect(arb.decision).toBe("EXECUTE_TRIANGULAR_ARBITRAGE");
+
+    // Negative case: low exchange rate leads to unprofitable path
+    const unprofitable = ShaggyDoggQuantAiEngine.calculateCrossDexTriangularArbitrage({
+      wethUsdcPrice: 2500.0,
+      usdcDaiRate: 1.000,
+      daiWethRate: 0.000398,
+      initialWeth: 10.0,
+      poolFeeBps: 30.0,
+      gasCostUsd: 25.0,
+    });
+
+    expect(unprofitable.arbitrageDetected).toBe(false);
+    expect(unprofitable.decision).toBe("ARBITRAGE_UNPROFITABLE_AFTER_GAS");
+  });
+
+  it("evaluates decentralized dual-pool cross-DEX spread across Base on-chain pools", () => {
+    // Comparison between Uniswap V2 and Aerodrome on Base L2
+    const narrowSpread = ShaggyDoggQuantAiEngine.calculateDualPoolCrossDexSpread({
+      poolAPrice: 3450.0,
+      poolBPrice: 3465.0,
       amountUnits: 1.0,
-      takerFeeRate: 0.0015,
-      poolFeeRate: 0.003,
+      poolAFeeRate: 0.0030,
+      poolBFeeRate: 0.0030,
       l2GasUsd: 0.08,
     });
 
-    expect(profitable.grossSpread).toBe(15.0);
-    expect(profitable.takerFeeUsd).toBeCloseTo(5.175, 2);
-    expect(profitable.poolFeeUsd).toBeCloseTo(10.35, 2);
-    // Net profit = 15 - 5.175 - 10.35 - 0.08 = -0.605 (fees exceed spread!)
-    expect(profitable.isProfitable).toBe(false);
+    expect(narrowSpread.grossSpread).toBe(15.0);
+    expect(narrowSpread.poolAFeeUsd).toBeCloseTo(10.35, 2);
+    expect(narrowSpread.poolBFeeUsd).toBeCloseTo(10.35, 2);
+    // Net profit = 15 - 10.35 - 10.35 - 0.08 = -5.78 (pool fees exceed spread)
+    expect(narrowSpread.isProfitable).toBe(false);
+    expect(narrowSpread.optimalRoute).toBe("NONE");
 
-    // Case 2: Sufficient spread to cover all fees and gas ($25 spread)
-    const wideSpread = ShaggyDoggQuantAiEngine.calculateCeDeFiArbitrageSpread({
-      alpacaPrice: 3450.0,
-      dexPrice: 3475.0,
+    // Wide spread scenario where net profit exceeds dual pool fees and L2 gas
+    const wideSpread = ShaggyDoggQuantAiEngine.calculateDualPoolCrossDexSpread({
+      poolAPrice: 3450.0,
+      poolBPrice: 3485.0,
       amountUnits: 1.0,
-      takerFeeRate: 0.0015,
-      poolFeeRate: 0.003,
+      poolAFeeRate: 0.0030,
+      poolBFeeRate: 0.0030,
       l2GasUsd: 0.08,
     });
 
-    expect(wideSpread.grossSpread).toBe(25.0);
-    expect(wideSpread.netProfitUsd).toBeGreaterThan(9.0);
+    expect(wideSpread.grossSpread).toBe(35.0);
+    expect(wideSpread.netProfitUsd).toBeGreaterThan(14.0);
     expect(wideSpread.isProfitable).toBe(true);
-    expect(wideSpread.optimalRoute).toBe("BUY_ALPACA_SELL_DEX");
+    expect(wideSpread.optimalRoute).toBe("BUY_POOL_A_SELL_POOL_B");
   });
 
   it("Directive 339: calculates L2 gas and priority fee estimates for Base L2", () => {

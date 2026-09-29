@@ -7,9 +7,12 @@
  *
  *  - Directive 336: Constant Product AMM Slippage & Execution Yield (R_in * R_out = k)
  *  - Directive 337: Concentrated Liquidity Virtual Reserves & Capital Efficiency
- *  - Directive 338: Cross-DEX & CeDeFi Triangular Arbitrage Spread Solver
+ *  - Directive 338: Cross-DEX Triangular Arbitrage Solver & Decentralized Spread Optimizer
  *  - Directive 339: L2 Execution Gas & Priority Fee Optimizer (EIP-1559 Base L2)
  *  - Directive 341: Impermanent Loss & Volatility Divergence Risk Matrix
+ *
+ * NOTE: Shaggy-Dogg-DEX is strictly decentralized on Base L2 and operates
+ * completely independent of the Alpaca API and centralized broker rails.
  */
 
 export interface AmmSlippageInput {
@@ -28,25 +31,46 @@ export interface AmmSlippageResult {
   readonly feePaid: number;
 }
 
-export interface CeDeFiArbitrageInput {
-  readonly alpacaPrice: number;
-  readonly dexPrice: number;
+export interface CrossDexArbitrageInput {
+  readonly wethUsdcPrice: number;
+  readonly usdcDaiRate: number;
+  readonly daiWethRate: number;
+  readonly initialWeth?: number;
+  readonly poolFeeBps?: number;
+  readonly gasCostUsd?: number;
+}
+
+export interface CrossDexArbitrageResult {
+  readonly pairRoute: "WETH->USDC->DAI->WETH";
+  readonly initialCapital: number;
+  readonly terminalCapital: number;
+  readonly grossProfit: number;
+  readonly gasCostUsd: number;
+  readonly netProfit: number;
+  readonly roiBps: number;
+  readonly arbitrageDetected: boolean;
+  readonly decision: "EXECUTE_TRIANGULAR_ARBITRAGE" | "ARBITRAGE_UNPROFITABLE_AFTER_GAS";
+}
+
+export interface DualPoolCrossDexInput {
+  readonly poolAPrice: number;
+  readonly poolBPrice: number;
   readonly amountUnits?: number;
-  readonly takerFeeRate?: number; // default 0.0015 (0.15%)
-  readonly poolFeeRate?: number;  // default 0.0030 (0.30%)
+  readonly poolAFeeRate?: number; // default 0.0030 (0.30%)
+  readonly poolBFeeRate?: number; // default 0.0030 (0.30%)
   readonly l2GasUsd?: number;     // default 0.08 ($0.08)
 }
 
-export interface CeDeFiArbitrageResult {
+export interface DualPoolCrossDexResult {
   readonly grossSpread: number;
   readonly grossSpreadPct: number;
-  readonly takerFeeUsd: number;
-  readonly poolFeeUsd: number;
+  readonly poolAFeeUsd: number;
+  readonly poolBFeeUsd: number;
   readonly l2GasUsd: number;
   readonly netProfitUsd: number;
   readonly netSpreadPct: number;
   readonly isProfitable: boolean;
-  readonly optimalRoute: "BUY_ALPACA_SELL_DEX" | "BUY_DEX_SELL_ALPACA" | "NONE";
+  readonly optimalRoute: "BUY_POOL_A_SELL_POOL_B" | "BUY_POOL_B_SELL_POOL_A" | "NONE";
 }
 
 export interface L2GasEstimateInput {
@@ -124,35 +148,81 @@ export class ShaggyDoggQuantAiEngine {
   }
 
   /**
-   * Directive 338: CeDeFi Triangular Arbitrage Solver
-   * Computes net cross-venue spread between Alpaca centralized books and Base on-chain DEX pools.
+   * Directive 338: Cross-DEX Triangular Arbitrage Solver
+   * Solves cyclical cyclic liquidity path WETH -> USDC -> DAI -> WETH accounting for multi-pool fee drag
+   * and L2 execution gas cost. Formulated directly from Chapter 4 Directive 338 of the Lumioro Quant Manual.
    */
-  public static calculateCeDeFiArbitrageSpread(input: CeDeFiArbitrageInput): CeDeFiArbitrageResult {
+  public static calculateCrossDexTriangularArbitrage(
+    input: CrossDexArbitrageInput
+  ): CrossDexArbitrageResult {
     const {
-      alpacaPrice,
-      dexPrice,
+      wethUsdcPrice,
+      usdcDaiRate,
+      daiWethRate,
+      initialWeth = 10.0,
+      poolFeeBps = 30.0,
+      gasCostUsd = 25.0,
+    } = input;
+
+    if (wethUsdcPrice <= 0 || usdcDaiRate <= 0 || daiWethRate <= 0 || initialWeth <= 0) {
+      throw new Error("Prices, exchange rates, and initial capital must be strictly positive.");
+    }
+
+    const feeFactor = 1.0 - (poolFeeBps / 10000.0);
+    const usdc = initialWeth * wethUsdcPrice * feeFactor;
+    const dai = usdc * usdcDaiRate * feeFactor;
+    const termWeth = dai * daiWethRate * feeFactor;
+
+    const grossProfit = termWeth - initialWeth;
+    const gasWeth = gasCostUsd / wethUsdcPrice;
+    const netProfit = grossProfit - gasWeth;
+    const roiBps = (netProfit / initialWeth) * 10000.0;
+    const arbitrageDetected = netProfit > 0.0;
+
+    return {
+      pairRoute: "WETH->USDC->DAI->WETH",
+      initialCapital: initialWeth,
+      terminalCapital: termWeth,
+      grossProfit,
+      gasCostUsd,
+      netProfit,
+      roiBps,
+      arbitrageDetected,
+      decision: arbitrageDetected ? "EXECUTE_TRIANGULAR_ARBITRAGE" : "ARBITRAGE_UNPROFITABLE_AFTER_GAS",
+    };
+  }
+
+  /**
+   * Decentralized Dual-Pool Cross-DEX Spread Solver
+   * Computes net cross-venue spread between two decentralized on-chain liquidity pools
+   * (e.g. Uniswap V2 vs Aerodrome on Base L2) strictly independent of centralized broker APIs.
+   */
+  public static calculateDualPoolCrossDexSpread(input: DualPoolCrossDexInput): DualPoolCrossDexResult {
+    const {
+      poolAPrice,
+      poolBPrice,
       amountUnits = 1.0,
-      takerFeeRate = 0.0015,
-      poolFeeRate = 0.0030,
+      poolAFeeRate = 0.0030,
+      poolBFeeRate = 0.0030,
       l2GasUsd = 0.08,
     } = input;
 
-    if (alpacaPrice <= 0 || dexPrice <= 0 || amountUnits <= 0) {
-      throw new Error("Prices and units must be positive.");
+    if (poolAPrice <= 0 || poolBPrice <= 0 || amountUnits <= 0) {
+      throw new Error("Pool prices and trade units must be positive.");
     }
 
-    const priceDiff = dexPrice - alpacaPrice;
-    let optimalRoute: CeDeFiArbitrageResult["optimalRoute"] = "NONE";
-    let basePriceForFees = alpacaPrice;
+    const priceDiff = poolBPrice - poolAPrice;
+    let optimalRoute: DualPoolCrossDexResult["optimalRoute"] = "NONE";
+    let basePriceForFees = poolAPrice;
 
     if (priceDiff > 0) {
-      // DEX is higher: Buy on Alpaca, sell on DEX
-      optimalRoute = "BUY_ALPACA_SELL_DEX";
-      basePriceForFees = alpacaPrice;
+      // Pool B is higher: Buy on Pool A, sell on Pool B
+      optimalRoute = "BUY_POOL_A_SELL_POOL_B";
+      basePriceForFees = poolAPrice;
     } else if (priceDiff < 0) {
-      // Alpaca is higher: Buy on DEX, sell on Alpaca
-      optimalRoute = "BUY_DEX_SELL_ALPACA";
-      basePriceForFees = dexPrice;
+      // Pool A is higher: Buy on Pool B, sell on Pool A
+      optimalRoute = "BUY_POOL_B_SELL_POOL_A";
+      basePriceForFees = poolBPrice;
     }
 
     const grossSpreadPerUnit = Math.abs(priceDiff);
@@ -160,17 +230,17 @@ export class ShaggyDoggQuantAiEngine {
     const grossSpreadPct = (grossSpreadPerUnit / basePriceForFees) * 100;
 
     const notional = basePriceForFees * amountUnits;
-    const takerFeeUsd = notional * takerFeeRate;
-    const poolFeeUsd = notional * poolFeeRate;
-    const netProfitUsd = grossSpreadTotal - takerFeeUsd - poolFeeUsd - l2GasUsd;
+    const poolAFeeUsd = notional * poolAFeeRate;
+    const poolBFeeUsd = notional * poolBFeeRate;
+    const netProfitUsd = grossSpreadTotal - poolAFeeUsd - poolBFeeUsd - l2GasUsd;
     const netSpreadPct = (netProfitUsd / notional) * 100;
     const isProfitable = netProfitUsd > 0;
 
     return {
       grossSpread: grossSpreadTotal,
       grossSpreadPct,
-      takerFeeUsd,
-      poolFeeUsd,
+      poolAFeeUsd,
+      poolBFeeUsd,
       l2GasUsd,
       netProfitUsd,
       netSpreadPct,

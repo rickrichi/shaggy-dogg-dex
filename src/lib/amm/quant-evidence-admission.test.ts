@@ -31,7 +31,7 @@ function sampleEvidence() {
       module: "DeFiFlashLiquidityEngine",
       directive_range: "Directives 336-355",
       maturity: "RESEARCH_ONLY",
-      app_targets: ["shaggy-dogg-dex", "AlpacaOrderDesk"],
+      app_targets: ["shaggy-dogg-dex", "lumioro-desk"],
     },
     execution: {
       mode: "READ_ONLY_LIVE",
@@ -48,7 +48,7 @@ function sampleEvidence() {
       reference_price: 3450.0,
       base_dex_price: 3465.0,
       spread: 15.0,
-      optimal_route: "BUY_ALPACA_SELL_DEX",
+      optimal_route: "BUY_POOL_A_SELL_POOL_B",
     },
   };
   const digest = computeCanonicalDigest(document);

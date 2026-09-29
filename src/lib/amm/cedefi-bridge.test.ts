@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { LUMIORO_MAINNET_RELEASE } from '@/config/amm/lumioro-mainnet-release';
 
-describe('CeDeFi Bridge Integration', () => {
+describe('CeDeFi Bridge Integration & Decentralized Settlement', () => {
   it('aligns LUMIORO token addresses across CeFi and DeFi rails', () => {
     expect(LUMIORO_MAINNET_RELEASE.token.symbol).toBe('LUMIORO');
     expect(LUMIORO_MAINNET_RELEASE.token.address).toBe('0x14eDBa263054b381A3836d97Ba2e3Fe763f7991E');
@@ -12,11 +12,11 @@ describe('CeDeFi Bridge Integration', () => {
     expect(settlementAsset).toBe('USDC');
   });
 
-  it('verifies CeDeFi spread calculation arithmetic', () => {
-    const alpacaPrice = 3450.00;
-    const dexPrice = 3465.00;
-    const spread = dexPrice - alpacaPrice;
-    const spreadPercent = (spread / alpacaPrice) * 100;
+  it('verifies decentralized cross-pool spread calculation arithmetic', () => {
+    const referencePrice = 3450.00;
+    const secondaryPoolPrice = 3465.00;
+    const spread = secondaryPoolPrice - referencePrice;
+    const spreadPercent = (spread / referencePrice) * 100;
     const gasFee = 0.08;
     const poolFee = 3450 * 0.003;
     const netProfit = spread - gasFee - poolFee;
