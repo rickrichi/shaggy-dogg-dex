@@ -1,9 +1,9 @@
 {
   "chainId": 84532,
   "network": "base-sepolia",
-  "timestamp": 1790663300489,
+  "timestamp": 1790664409519,
   "blockNumber": 18500000,
-  "deployer": "0xD22a4ab6aA4e3e5B0e588368aD0DDfe27394AfD1",
+  "deployer": "0xc1c3d6552231DB22A22Bdf513C0833024FF3f42B",
   "contracts": {
     "GovernanceToken": "0x8453200000000000000000000000000000000001",
     "FeeDiscountStaking": "0x8453200000000000000000000000000000000002"

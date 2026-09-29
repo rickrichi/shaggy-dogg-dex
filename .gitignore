@@ -28,6 +28,8 @@ out/
 # ── Env files (keep example checked in) ──────────────────────────────────────
 .env
 .env.local
+.env.deployer
+.env.*.local
 .env.development.local
 .env.test.local
 .env.production.local

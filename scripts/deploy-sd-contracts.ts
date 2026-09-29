@@ -193,8 +193,19 @@ if (isDirectCall) {
   const networkArg = (args.find((a) => a.startsWith("--network="))?.split("=")[1] ||
     args[0] ||
     "base-sepolia") as "base-sepolia" | "base-mainnet" | "localhost";
-  const isSimulate = args.includes("--simulate") || !process.env.PRIVATE_KEY;
-  const privateKey = process.env.PRIVATE_KEY as Hex | undefined;
+  let privateKey = process.env.PRIVATE_KEY as Hex | undefined;
+  if (!privateKey) {
+    const deployerEnvPath = path.resolve(root, ".env.deployer");
+    if (fs.existsSync(deployerEnvPath)) {
+      const match = fs.readFileSync(deployerEnvPath, "utf8").match(/PRIVATE_KEY=(0x[0-9a-fA-F]{64})/);
+      if (match) {
+        privateKey = match[1] as Hex;
+        console.log(` Loaded deployer private key from ${deployerEnvPath}`);
+      }
+    }
+  }
+
+  const isSimulate = args.includes("--simulate") || !privateKey;
 
   runDeployment({
     network: networkArg,
