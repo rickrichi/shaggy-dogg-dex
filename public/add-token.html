@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Import SD Token into MetaMask</title>
   <style>
+    * { box-sizing: border-box; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background: linear-gradient(135deg, #f5f3ff 0%, #fdf2f8 50%, #eff6ff 100%);
@@ -13,6 +14,7 @@
       justify-content: center;
       min-height: 100vh;
       margin: 0;
+      padding: 1.5rem;
       color: #1e293b;
     }
     .card {
@@ -20,16 +22,16 @@
       padding: 2.5rem;
       border-radius: 1.5rem;
       box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-      max-width: 520px;
-      width: 90%;
+      max-width: 560px;
+      width: 100%;
       text-align: center;
     }
     .icon {
       font-size: 3.5rem;
-      margin-bottom: 1rem;
+      margin-bottom: 0.5rem;
     }
     h1 {
-      font-size: 1.75rem;
+      font-size: 1.85rem;
       margin: 0 0 0.5rem;
       background: linear-gradient(to right, #9333ea, #db2777);
       -webkit-background-clip: text;
@@ -37,8 +39,76 @@
     }
     p {
       color: #64748b;
-      line-height: 1.6;
+      line-height: 1.5;
       margin-bottom: 1.5rem;
+    }
+    .btn {
+      background: linear-gradient(to right, #9333ea, #db2777);
+      color: white;
+      border: none;
+      padding: 1rem 1.75rem;
+      font-size: 1.15rem;
+      font-weight: 700;
+      border-radius: 0.75rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      width: 100%;
+      box-shadow: 0 4px 6px -1px rgba(147, 51, 234, 0.3);
+    }
+    .btn:hover {
+      opacity: 0.95;
+      transform: translateY(-1px);
+    }
+    .btn:active {
+      transform: translateY(0);
+    }
+    .btn-secondary {
+      background: #0284c7;
+      margin-top: 0.75rem;
+      font-size: 1rem;
+      padding: 0.75rem;
+      box-shadow: 0 4px 6px -1px rgba(2, 132, 199, 0.3);
+    }
+    .btn-copy {
+      background: #f1f5f9;
+      color: #334155;
+      border: 1px solid #cbd5e1;
+      padding: 0.5rem 1rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      border-radius: 0.5rem;
+      cursor: pointer;
+      margin-top: 0.5rem;
+    }
+    .btn-copy:hover {
+      background: #e2e8f0;
+    }
+    .status {
+      margin-top: 1.25rem;
+      padding: 1rem;
+      border-radius: 0.75rem;
+      font-weight: 600;
+      font-size: 0.95rem;
+      line-height: 1.4;
+      display: none;
+    }
+    .status.info {
+      display: block;
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
+    }
+    .status.success {
+      display: block;
+      background: #f0fdf4;
+      color: #15803d;
+      border: 1px solid #bbf7d0;
+    }
+    .status.error {
+      display: block;
+      background: #fef2f2;
+      color: #b91c1c;
+      border: 1px solid #fecaca;
     }
     .token-box {
       background: #f8fafc;
@@ -46,118 +116,122 @@
       border-radius: 0.75rem;
       padding: 1rem;
       text-align: left;
-      font-family: monospace;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       font-size: 0.85rem;
-      margin-bottom: 1.5rem;
+      margin: 1.5rem 0;
       word-break: break-all;
     }
     .token-box div {
-      margin-bottom: 0.35rem;
+      margin-bottom: 0.4rem;
     }
-    .btn {
-      background: linear-gradient(to right, #9333ea, #db2777);
-      color: white;
-      border: none;
-      padding: 0.85rem 1.75rem;
-      font-size: 1.1rem;
-      font-weight: 600;
+    .token-box strong {
+      color: #0f172a;
+    }
+    .tip-box {
+      margin-top: 1.5rem;
+      padding: 1rem;
+      background: #fffbeb;
+      border: 1px solid #fde68a;
       border-radius: 0.75rem;
-      cursor: pointer;
-      transition: opacity 0.2s, transform 0.1s;
-      width: 100%;
-      margin-bottom: 0.75rem;
+      text-align: left;
+      font-size: 0.85rem;
+      color: #92400e;
+      line-height: 1.45;
     }
-    .btn:hover {
-      opacity: 0.92;
-      transform: translateY(-1px);
-    }
-    .status {
-      margin-top: 1rem;
-      font-weight: 500;
-      font-size: 0.95rem;
-    }
-    .status.success { color: #16a34a; }
-    .status.error { color: #dc2626; }
   </style>
 </head>
 <body>
   <div class="card">
     <div class="icon">🐕</div>
     <h1>Import Shaggy Dogg (SD)</h1>
-    <p>Click the button below to automatically register the SD token in your MetaMask wallet.</p>
+    <p>Add your <strong>1,000,000 SD</strong> token balance directly into your MetaMask display on <strong>Base Sepolia</strong>.</p>
+
+    <button id="addBtn" class="btn" onclick="startImport()">🦊 1-Click Add SD to MetaMask</button>
+
+    <div id="status" class="status"></div>
 
     <div class="token-box">
-      <div><strong>Network:</strong> Base Sepolia (84532)</div>
+      <div><strong>Network:</strong> Base Sepolia (Chain ID: 84532)</div>
       <div><strong>Token Name:</strong> Shaggy Dogg</div>
       <div><strong>Symbol:</strong> SD</div>
       <div><strong>Decimals:</strong> 18</div>
-      <div><strong>Contract:</strong> 0x051c758521971f5c5a84edaf18eea12854375469</div>
+      <div><strong>Contract Address:</strong><br/><span id="addr">0x051c758521971f5c5a84edaf18eea12854375469</span></div>
+      <button class="btn-copy" onclick="copyAddress()">📋 Copy Contract Address</button>
     </div>
 
-    <button id="addBtn" class="btn" onclick="addSdToken()">🦊 Add SD to MetaMask</button>
-    <button id="switchBtn" class="btn" style="background: #3b82f6; display: none;" onclick="switchToBaseSepolia()">Switch Network to Base Sepolia</button>
-
-    <div id="status" class="status"></div>
+    <div class="tip-box">
+      <strong>💡 If nothing popped up on your screen:</strong>
+      <ol style="margin: 0.5rem 0 0 1.25rem; padding: 0;">
+        <li>Look at your browser's top-right toolbar — click the <strong>MetaMask Fox icon</strong>. There may be a notification badge waiting for your approval!</li>
+        <li>Make sure your MetaMask is unlocked (enter your password if it's locked).</li>
+      </ol>
+    </div>
   </div>
 
   <script>
     const SD_ADDRESS = "0x051c758521971f5c5a84edaf18eea12854375469";
     const BASE_SEPOLIA_CHAIN_ID = "0x14a34"; // 84532 in hex
 
-    async function switchToBaseSepolia() {
-      if (!window.ethereum) {
-        setStatus("MetaMask not found. Please install or open MetaMask extension.", "error");
-        return;
-      }
-      try {
-        await window.ethereum.request({
-          method: "wallet_switchEthereumChain",
-          params: [{ chainId: BASE_SEPOLIA_CHAIN_ID }],
-        });
-        document.getElementById("switchBtn").style.display = "none";
-        setStatus("Switched to Base Sepolia! Now click 'Add SD to MetaMask'.", "success");
-      } catch (switchError) {
-        if (switchError.code === 4902) {
-          try {
-            await window.ethereum.request({
-              method: "wallet_addEthereumChain",
-              params: [
-                {
-                  chainId: BASE_SEPOLIA_CHAIN_ID,
-                  chainName: "Base Sepolia Testnet",
-                  nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
-                  rpcUrls: ["https://sepolia.base.org"],
-                  blockExplorerUrls: ["https://sepolia.basescan.org"],
-                },
-              ],
-            });
-            document.getElementById("switchBtn").style.display = "none";
-            setStatus("Base Sepolia network added! Now click 'Add SD to MetaMask'.", "success");
-          } catch (addError) {
-            setStatus("Failed to add Base Sepolia: " + addError.message, "error");
-          }
-        } else {
-          setStatus("Failed to switch network: " + switchError.message, "error");
-        }
-      }
+    function copyAddress() {
+      navigator.clipboard.writeText(SD_ADDRESS);
+      alert("Copied SD Token Address to clipboard:\n" + SD_ADDRESS);
     }
 
-    async function addSdToken() {
-      const statusEl = document.getElementById("status");
-      if (!window.ethereum) {
-        setStatus("MetaMask extension not found in your browser.", "error");
+    function getEthereumProvider() {
+      if (window.ethereum?.providers?.length) {
+        // If multiple wallets (e.g. MetaMask + Coinbase + Phantom), find MetaMask specifically
+        return window.ethereum.providers.find((p) => p.isMetaMask) || window.ethereum;
+      }
+      return window.ethereum;
+    }
+
+    async function startImport() {
+      const provider = getEthereumProvider();
+
+      if (!provider) {
+        showStatus("MetaMask extension not found in this browser. Please ensure you are opening this page in Chrome, Brave, or Edge where MetaMask is installed.", "error");
         return;
       }
 
       try {
-        const chainId = await window.ethereum.request({ method: "eth_chainId" });
-        if (chainId !== BASE_SEPOLIA_CHAIN_ID) {
-          document.getElementById("switchBtn").style.display = "block";
-          setStatus("Your wallet is currently on a different network. Please switch to Base Sepolia first.", "error");
-          return;
+        showStatus("Connecting to MetaMask... Check your MetaMask extension if a popup does not appear.", "info");
+
+        // Step 1: Request account access
+        await provider.request({ method: "eth_requestAccounts" });
+
+        // Step 2: Ensure on Base Sepolia
+        const currentChain = await provider.request({ method: "eth_chainId" });
+        if (currentChain !== BASE_SEPOLIA_CHAIN_ID) {
+          showStatus("Switching network to Base Sepolia...", "info");
+          try {
+            await provider.request({
+              method: "wallet_switchEthereumChain",
+              params: [{ chainId: BASE_SEPOLIA_CHAIN_ID }],
+            });
+          } catch (switchError) {
+            // If chain not added, add it
+            if (switchError.code === 4902) {
+              await provider.request({
+                method: "wallet_addEthereumChain",
+                params: [
+                  {
+                    chainId: BASE_SEPOLIA_CHAIN_ID,
+                    chainName: "Base Sepolia Testnet",
+                    nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
+                    rpcUrls: ["https://sepolia.base.org"],
+                    blockExplorerUrls: ["https://sepolia.basescan.org"],
+                  },
+                ],
+              });
+            } else {
+              throw switchError;
+            }
+          }
         }
 
-        const wasAdded = await window.ethereum.request({
+        // Step 3: Call wallet_watchAsset to import SD
+        showStatus("Requesting MetaMask to import SD token... Please approve the prompt in MetaMask!", "info");
+        const wasAdded = await provider.request({
           method: "wallet_watchAsset",
           params: {
             type: "ERC20",
@@ -165,24 +239,24 @@
               address: SD_ADDRESS,
               symbol: "SD",
               decimals: 18,
-              image: "https://raw.githubusercontent.com/feathericons/feather/master/icons/award.svg",
             },
           },
         });
 
         if (wasAdded) {
-          setStatus("🎉 SD Token successfully imported into MetaMask! You can now see your 1,000,000 SD balance.", "success");
+          showStatus("🎉 SUCCESS! Shaggy Dogg (SD) is now imported into your MetaMask. Check your assets to see your 1,000,000 SD balance!", "success");
         } else {
-          setStatus("Import cancelled by user.", "error");
+          showStatus("Import was dismissed in MetaMask.", "error");
         }
-      } catch (error) {
-        setStatus("Error: " + error.message, "error");
+      } catch (err) {
+        console.error(err);
+        showStatus("MetaMask notice: " + (err.message || err) + ". (Check your MetaMask extension popup in the top-right toolbar!)", "error");
       }
     }
 
-    function setStatus(msg, type) {
+    function showStatus(text, type) {
       const el = document.getElementById("status");
-      el.textContent = msg;
+      el.textContent = text;
       el.className = "status " + type;
     }
   </script>

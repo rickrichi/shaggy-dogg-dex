@@ -11,6 +11,22 @@ Foundry still reports security warnings for unchecked ERC-20 return values and r
 ordering. Resolve those warnings and complete a security review before treating the contracts as
 production-ready.
 
+## Live Base Sepolia Deployments (Chain ID 84532)
+
+As of 2026-09-29, the Shaggy Dogg DEX ecosystem is deployed live on **Base Sepolia** with active Uniswap V2 liquidity:
+
+| Contract | Address | BaseScan |
+| :--- | :--- | :--- |
+| **GovernanceToken (`SD`)** | `0x051c758521971f5c5a84edaf18eea12854375469` | [BaseScan](https://sepolia.basescan.org/address/0x051c758521971f5c5a84edaf18eea12854375469) |
+| **FeeDiscountStaking** | `0x42134ccc6c41149cf71c7b4994e33ee66758af20` | [BaseScan](https://sepolia.basescan.org/address/0x42134ccc6c41149cf71c7b4994e33ee66758af20) |
+| **AaveFlashBorrower** | `0xa5b50037a8d2fda22805f750252268adaeb36480` | [BaseScan](https://sepolia.basescan.org/address/0xa5b50037a8d2fda22805f750252268adaeb36480) |
+| **YieldStakingVault** | `0x8531807ef36560cd7db230c95db85791aa586dda` | [BaseScan](https://sepolia.basescan.org/address/0x8531807ef36560cd7db230c95db85791aa586dda) |
+| **CompoundYieldVault** | `0x38cccafb4ae96a8ef187f07fb17d18eb63e43782` | [BaseScan](https://sepolia.basescan.org/address/0x38cccafb4ae96a8ef187f07fb17d18eb63e43782) |
+| **Uniswap V2 SD/WETH Pair** | `0x63D504336d01BcCa615B23AD393E5812Dc646BF8` | [BaseScan](https://sepolia.basescan.org/address/0x63D504336d01BcCa615B23AD393E5812Dc646BF8) |
+
+- **Active Pool Reserves**: `800,000 SD` / `0.001 WETH`
+- **Full Report**: See [docs/current-session-2026-09-29-base-sepolia-live.md](docs/current-session-2026-09-29-base-sepolia-live.md)
+
 ## Quick Start
 
 1. Install dependencies: `npm install`
