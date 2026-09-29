@@ -15,12 +15,18 @@ interface DeploymentInfo {
   contracts: {
     GovernanceToken: string;
     FeeDiscountStaking: string;
+    AaveFlashBorrower?: string;
+    YieldStakingVault?: string;
+    CompoundYieldVault?: string;
   };
 }
 
 type ContractsConfig = Record<number, {
   GovernanceToken: string;
   FeeDiscountStaking: string;
+  AaveFlashBorrower?: string;
+  YieldStakingVault?: string;
+  CompoundYieldVault?: string;
   deployedAt: number;
   deployer: string;
 }>;
@@ -53,6 +59,9 @@ async function loadDeployments(): Promise<ContractsConfig> {
       config[deployment.chainId] = {
         GovernanceToken: deployment.contracts.GovernanceToken,
         FeeDiscountStaking: deployment.contracts.FeeDiscountStaking,
+        ...(deployment.contracts.AaveFlashBorrower && { AaveFlashBorrower: deployment.contracts.AaveFlashBorrower }),
+        ...(deployment.contracts.YieldStakingVault && { YieldStakingVault: deployment.contracts.YieldStakingVault }),
+        ...(deployment.contracts.CompoundYieldVault && { CompoundYieldVault: deployment.contracts.CompoundYieldVault }),
         deployedAt: deployment.timestamp,
         deployer: deployment.deployer,
       };
@@ -75,11 +84,14 @@ function generateTypeScriptFile(config: ContractsConfig): string {
   return `// Auto-generated from deployments/ - DO NOT EDIT MANUALLY
 // Last updated: ${timestamp}
 
-import { Address } from 'viem';
+import type { Address } from 'viem';
 
 export interface DeployedContracts {
   GovernanceToken: Address;
   FeeDiscountStaking: Address;
+  AaveFlashBorrower?: Address;
+  YieldStakingVault?: Address;
+  CompoundYieldVault?: Address;
   deployedAt: number;
   deployer: Address;
 }
