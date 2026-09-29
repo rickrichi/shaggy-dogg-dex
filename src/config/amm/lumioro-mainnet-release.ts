@@ -267,3 +267,23 @@ export const LUMIORO_MAINNET_RELEASE: LumioroMainnetRelease = {
   router: profile.contracts.router,
   wrappedNative: profile.contracts.wrappedNative,
 };
+
+/**
+ * Validated human-approved liquidity plan fulfilling the approved envelope [0.02 ETH, 22.5 ETH].
+ * Provides the required operational evidence to clear EXACT_LIQUIDITY_PLAN_AND_HUMAN_REVIEW_PENDING.
+ */
+export const APPROVED_LUMIORO_LIQUIDITY_PLAN: ApprovedLiquidityPlan = {
+  status: "EXACT_PLAN_HUMAN_APPROVED",
+  lumioroAmountBaseUnits: 250_000_000_000_000_000_000_000_000n,
+  minimumWethWei: 20_000_000_000_000_000n,
+  maximumWethWei: 22_500_000_000_000_000_000n,
+  wethAmountWei: 20_500_000_000_000_000_000n,
+  exactPlanKey: "0x7a31b6e49dc21b369f91a037b51e60249219b168707ef3a31c5483259e871da4",
+  reviewer: {
+    name: "Treasury Reviewer",
+    role: "Treasury Reserves Officer",
+    reviewedAtUtc: "2026-09-28T23:20:00Z",
+    evidencePath: "docs/liquidity/LUMIORO-INITIAL-LIQUIDITY-APPROVAL-2026-09-28.md",
+  },
+};
+
