@@ -101,7 +101,9 @@ export async function runDeployment(options: DeploymentOptions) {
     ? privateKeyToAccount(privateKey)
     : privateKeyToAccount("***REMOVED***");
 
-  const effectiveAdmin = adminAddress || deployerAccount.address;
+  // User's dedicated ShaggyDogg admin account
+  const userShaggyDoggAddress: Address = "0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98";
+  const effectiveAdmin = adminAddress || userShaggyDoggAddress;
   const initialMint = parseEther("1000000"); // 1,000,000 SD
 
   console.log(`Deployer Address : ${deployerAccount.address}`);
@@ -120,7 +122,7 @@ export async function runDeployment(options: DeploymentOptions) {
     "base-sepolia": {
       aavePool: "0x07eA79F68B2B3df564D0A34F8e19D9B1e339814b" as Address,
       usdc: "0x036CbD53842c5426634e7929541eC2318f3dCF7e" as Address,
-      comet: "0x6d88c0352A9D114B5CeeC8a82dE9Ff9F5D21f2dC" as Address,
+      comet: "0x6D88c0352a9d114b5cEeC8a82de9ff9F5D21f2dc" as Address,
     },
     "base-mainnet": {
       aavePool: "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5" as Address,
@@ -158,81 +160,84 @@ export async function runDeployment(options: DeploymentOptions) {
     if (balance === 0n) {
       console.log(`\n❌ INSUFFICIENT GAS: Deployer wallet has 0 ETH on ${network}.`);
       console.log(`   Wallet Address: ${deployerAccount.address}`);
-      console.log(`\n👉 Action Required:`);
-      if (network === "base-sepolia") {
-        console.log(`   1. Open: https://www.coinbase.com/faucets/base-ethereum-sepolia-faucet`);
-        console.log(`   2. Paste: ${deployerAccount.address}`);
-        console.log(`   3. Click "Request funds" (Free testnet ETH arrives in ~5 seconds)`);
-      } else {
-        console.log(`   Send ~$0.50 of ETH to ${deployerAccount.address} on Base Mainnet to cover gas.`);
-      }
-      console.log(`\n   Once funded, re-run this command to complete deployment!`);
       return;
     }
 
-    console.log(`\n[1/5] Broadcasting GovernanceToken (SD) deployment...`);
-    const govTxHash = await walletClient.deployContract({
-      abi: govTokenArtifact.abi,
-      bytecode: govTokenArtifact.bytecode,
-      args: ["Shaggy Dogg", "SD", effectiveAdmin, effectiveAdmin, initialMint],
-    });
-    console.log(`  Tx Hash: ${govTxHash}`);
-    const govReceipt = await publicClient.waitForTransactionReceipt({ hash: govTxHash });
-    if (!govReceipt.contractAddress) {
-      throw new Error("Failed to retrieve deployed GovernanceToken address from receipt.");
-    }
-    govTokenAddress = govReceipt.contractAddress;
-    blockNumber = Number(govReceipt.blockNumber);
-    console.log(`  Confirmed at Block ${blockNumber}: ${govTokenAddress}`);
+    if (network === "base-sepolia") {
+      govTokenAddress = "0x051c758521971f5c5a84edaf18eea12854375469";
+      stakingAddress = "0x42134ccc6c41149cf71c7b4994e33ee66758af20";
+      flashBorrowerAddress = "0xa5b50037a8d2fda22805f750252268adaeb36480";
+      yieldVaultAddress = "0x8531807ef36560cd7db230c95db85791aa586dda";
+      console.log(`\nReusing already-confirmed Base Sepolia deployments:`);
+      console.log(`  [1/5] GovernanceToken (SD)  : ${govTokenAddress}`);
+      console.log(`  [2/5] FeeDiscountStaking    : ${stakingAddress}`);
+      console.log(`  [3/5] AaveFlashBorrower     : ${flashBorrowerAddress}`);
+      console.log(`  [4/5] YieldStakingVault     : ${yieldVaultAddress}`);
+    } else {
+      console.log(`\n[1/5] Broadcasting GovernanceToken (SD) deployment...`);
+      const govTxHash = await walletClient.deployContract({
+        abi: govTokenArtifact.abi,
+        bytecode: govTokenArtifact.bytecode,
+        args: ["Shaggy Dogg", "SD", effectiveAdmin, effectiveAdmin, initialMint],
+      });
+      console.log(`  Tx Hash: ${govTxHash}`);
+      const govReceipt = await publicClient.waitForTransactionReceipt({ hash: govTxHash });
+      if (!govReceipt.contractAddress) {
+        throw new Error("Failed to retrieve deployed GovernanceToken address from receipt.");
+      }
+      govTokenAddress = govReceipt.contractAddress;
+      blockNumber = Number(govReceipt.blockNumber);
+      console.log(`  Confirmed at Block ${blockNumber}: ${govTokenAddress}`);
 
-    console.log(`\n[2/5] Broadcasting FeeDiscountStaking deployment...`);
-    const stakingTxHash = await walletClient.deployContract({
-      abi: stakingArtifact.abi,
-      bytecode: stakingArtifact.bytecode,
-      args: [govTokenAddress, effectiveAdmin, effectiveAdmin],
-    });
-    console.log(`  Tx Hash: ${stakingTxHash}`);
-    const stakingReceipt = await publicClient.waitForTransactionReceipt({ hash: stakingTxHash });
-    if (!stakingReceipt.contractAddress) {
-      throw new Error("Failed to retrieve deployed FeeDiscountStaking address from receipt.");
-    }
-    stakingAddress = stakingReceipt.contractAddress;
-    console.log(`  Confirmed at Block ${stakingReceipt.blockNumber}: ${stakingAddress}`);
+      console.log(`\n[2/5] Broadcasting FeeDiscountStaking deployment...`);
+      const stakingTxHash = await walletClient.deployContract({
+        abi: stakingArtifact.abi,
+        bytecode: stakingArtifact.bytecode,
+        args: [govTokenAddress, effectiveAdmin, effectiveAdmin],
+      });
+      console.log(`  Tx Hash: ${stakingTxHash}`);
+      const stakingReceipt = await publicClient.waitForTransactionReceipt({ hash: stakingTxHash });
+      if (!stakingReceipt.contractAddress) {
+        throw new Error("Failed to retrieve deployed FeeDiscountStaking address from receipt.");
+      }
+      stakingAddress = stakingReceipt.contractAddress;
+      console.log(`  Confirmed at Block ${stakingReceipt.blockNumber}: ${stakingAddress}`);
 
-    console.log(`\n[3/5] Broadcasting AaveFlashBorrower deployment...`);
-    const flashTxHash = await walletClient.deployContract({
-      abi: flashBorrowerArtifact.abi,
-      bytecode: flashBorrowerArtifact.bytecode,
-      args: [networkConfig.aavePool, effectiveAdmin],
-    });
-    console.log(`  Tx Hash: ${flashTxHash}`);
-    const flashReceipt = await publicClient.waitForTransactionReceipt({ hash: flashTxHash });
-    if (!flashReceipt.contractAddress) {
-      throw new Error("Failed to retrieve deployed AaveFlashBorrower address from receipt.");
-    }
-    flashBorrowerAddress = flashReceipt.contractAddress;
-    console.log(`  Confirmed at Block ${flashReceipt.blockNumber}: ${flashBorrowerAddress}`);
+      console.log(`\n[3/5] Broadcasting AaveFlashBorrower deployment...`);
+      const flashTxHash = await walletClient.deployContract({
+        abi: flashBorrowerArtifact.abi,
+        bytecode: flashBorrowerArtifact.bytecode,
+        args: [networkConfig.aavePool, effectiveAdmin],
+      });
+      console.log(`  Tx Hash: ${flashTxHash}`);
+      const flashReceipt = await publicClient.waitForTransactionReceipt({ hash: flashTxHash });
+      if (!flashReceipt.contractAddress) {
+        throw new Error("Failed to retrieve deployed AaveFlashBorrower address from receipt.");
+      }
+      flashBorrowerAddress = flashReceipt.contractAddress;
+      console.log(`  Confirmed at Block ${flashReceipt.blockNumber}: ${flashBorrowerAddress}`);
 
-    console.log(`\n[4/5] Broadcasting YieldStakingVault deployment...`);
-    const yieldTxHash = await walletClient.deployContract({
-      abi: yieldVaultArtifact.abi,
-      bytecode: yieldVaultArtifact.bytecode,
-      args: [
-        networkConfig.usdc,
-        networkConfig.aavePool,
-        "0x0000000000000000000000000000000000000000",
-        stakingAddress,
-        effectiveAdmin,
-        effectiveAdmin,
-      ],
-    });
-    console.log(`  Tx Hash: ${yieldTxHash}`);
-    const yieldReceipt = await publicClient.waitForTransactionReceipt({ hash: yieldTxHash });
-    if (!yieldReceipt.contractAddress) {
-      throw new Error("Failed to retrieve deployed YieldStakingVault address from receipt.");
+      console.log(`\n[4/5] Broadcasting YieldStakingVault deployment...`);
+      const yieldTxHash = await walletClient.deployContract({
+        abi: yieldVaultArtifact.abi,
+        bytecode: yieldVaultArtifact.bytecode,
+        args: [
+          networkConfig.usdc,
+          networkConfig.aavePool,
+          "0x0000000000000000000000000000000000000000",
+          stakingAddress,
+          effectiveAdmin,
+          effectiveAdmin,
+        ],
+      });
+      console.log(`  Tx Hash: ${yieldTxHash}`);
+      const yieldReceipt = await publicClient.waitForTransactionReceipt({ hash: yieldTxHash });
+      if (!yieldReceipt.contractAddress) {
+        throw new Error("Failed to retrieve deployed YieldStakingVault address from receipt.");
+      }
+      yieldVaultAddress = yieldReceipt.contractAddress;
+      console.log(`  Confirmed at Block ${yieldReceipt.blockNumber}: ${yieldVaultAddress}`);
     }
-    yieldVaultAddress = yieldReceipt.contractAddress;
-    console.log(`  Confirmed at Block ${yieldReceipt.blockNumber}: ${yieldVaultAddress}`);
 
     console.log(`\n[5/5] Broadcasting CompoundYieldVault deployment...`);
     const compoundTxHash = await walletClient.deployContract({

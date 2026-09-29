@@ -1,5 +1,5 @@
 // Auto-generated from deployments/ - DO NOT EDIT MANUALLY
-// Last updated: 2026-09-29T08:00:00.619Z
+// Last updated: 2026-09-29T09:19:46.599Z
 
 import type { Address } from 'viem';
 
@@ -21,12 +21,12 @@ export const CONTRACTS: Record<number, DeployedContracts> = {
     "deployer": "0x0000000000000000000000000000000000000000"
   },
   "84532": {
-    "GovernanceToken": "0x8453200000000000000000000000000000000001",
-    "FeeDiscountStaking": "0x8453200000000000000000000000000000000002",
-    "AaveFlashBorrower": "0x8453200000000000000000000000000000000003",
-    "YieldStakingVault": "0x8453200000000000000000000000000000000004",
-    "CompoundYieldVault": "0x8453200000000000000000000000000000000005",
-    "deployedAt": 1790668654215,
+    "GovernanceToken": "0x051c758521971f5c5a84edaf18eea12854375469",
+    "FeeDiscountStaking": "0x42134ccc6c41149cf71c7b4994e33ee66758af20",
+    "AaveFlashBorrower": "0xa5b50037a8d2fda22805f750252268adaeb36480",
+    "YieldStakingVault": "0x8531807ef36560cd7db230c95db85791aa586dda",
+    "CompoundYieldVault": "0x38cccafb4ae96a8ef187f07fb17d18eb63e43782",
+    "deployedAt": 1790673576071,
     "deployer": "0xc1c3d6552231DB22A22Bdf513C0833024FF3f42B"
   },
   "11155111": {
