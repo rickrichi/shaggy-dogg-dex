@@ -11,6 +11,21 @@ Foundry still reports security warnings for unchecked ERC-20 return values and r
 ordering. Resolve those warnings and complete a security review before treating the contracts as
 production-ready.
 
+## Live Base Mainnet Deployments (Chain ID 8453)
+
+As of 2026-09-30, the Shaggy Dogg DEX ecosystem is deployed live in production on **Base Mainnet**:
+
+| Contract | Address | BaseScan | Blockscout |
+| :--- | :--- | :--- | :--- |
+| **GovernanceToken (`SD`)** | `0x051c758521971f5c5a84edaf18eea12854375469` | [BaseScan](https://basescan.org/address/0x051c758521971f5c5a84edaf18eea12854375469) | [Blockscout](https://base.blockscout.com/address/0x051c758521971f5c5a84edaf18eea12854375469) |
+| **FeeDiscountStaking** | `0x42134ccc6c41149cf71c7b4994e33ee66758af20` | [BaseScan](https://basescan.org/address/0x42134ccc6c41149cf71c7b4994e33ee66758af20) | [Blockscout](https://base.blockscout.com/address/0x42134ccc6c41149cf71c7b4994e33ee66758af20) |
+| **AaveFlashBorrower** | `0xa5b50037a8d2fda22805f750252268adaeb36480` | [BaseScan](https://basescan.org/address/0xa5b50037a8d2fda22805f750252268adaeb36480) | [Blockscout](https://base.blockscout.com/address/0xa5b50037a8d2fda22805f750252268adaeb36480) |
+| **YieldStakingVault** | `0x8531807ef36560cd7db230c95db85791aa586dda` | [BaseScan](https://basescan.org/address/0x8531807ef36560cd7db230c95db85791aa586dda) | [Blockscout](https://base.blockscout.com/address/0x8531807ef36560cd7db230c95db85791aa586dda) |
+| **CompoundYieldVault** | `0x38cccafb4ae96a8ef187f07fb17d18eb63e43782` | [BaseScan](https://basescan.org/address/0x38cccafb4ae96a8ef187f07fb17d18eb63e43782) | [Blockscout](https://base.blockscout.com/address/0x38cccafb4ae96a8ef187f07fb17d18eb63e43782) |
+
+- **Root Admin & Token Holder**: `0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98` (holds 1,000,000 SD)
+- **Full Mainnet Report**: See [docs/current-session-2026-09-30-base-mainnet-live.md](docs/current-session-2026-09-30-base-mainnet-live.md)
+
 ## Live Base Sepolia Deployments (Chain ID 84532)
 
 As of 2026-09-29, the Shaggy Dogg DEX ecosystem is deployed live on **Base Sepolia** with active Uniswap V2 liquidity:
