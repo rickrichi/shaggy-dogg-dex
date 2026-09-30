@@ -116,7 +116,7 @@ export default function Swap() {
   const { data: gasPrice } = useGasPrice();
   const { isPending: isSwitchingChain, switchChain } = useSwitchChain();
   const [searchParams, setSearchParams] = useSearchParams();
-  const isCorrectNetwork = !isConnected || chain?.id === mainnet.id;
+  const isCorrectNetwork = !isConnected || chain?.id === mainnet.id || chain?.id === 8453;
 
   // ────────────────────────────────────────────────────────────────────────────
   // URL State Management

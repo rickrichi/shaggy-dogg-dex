@@ -100,6 +100,15 @@ export const MAINNET_TOKENS = [
     decimals: 18,
     chainId: 1,
   },
+  {
+    kind: "erc20",
+    address: "0x051c758521971f5c5a84edaf18eea12854375469" as Address,
+    symbol: "SD",
+    name: "Shaggy Dogg",
+    decimals: 18,
+    logoURI: "https://tokens.1inch.io/0x051c758521971f5c5a84edaf18eea12854375469.png",
+    chainId: 8453,
+  },
 ] as const satisfies readonly [Token, Token, ...Token[]];
 
 export const BASE_MAINNET_TOKENS = [
@@ -187,6 +196,7 @@ export const DEFAULT_TOKEN_PAIRS: ReadonlyArray<{
   { from: "USDC", to: "DAI" },
   { from: "WBTC", to: "ETH" },
   { from: "ETH", to: "LUMIORO" },
+  { from: "ETH", to: "SD" },
 ] as const;
 
 /** ————— Canonical wrapped native (WETH) ————— */
