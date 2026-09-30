@@ -1,0 +1,100 @@
+### The Shaggy Dogg Ecosystem: Token & Contract Utilities
+
+Your deployment on Base Mainnet forms a complete Decentralized Finance (DeFi) Flywheel. You have two primary token assets in your wallet and four utility smart contracts working together in a closed-loop economy.
+
+                      ┌──────────────────────────────────────┐
+                      │     ShaggyDogg Admin Wallet          │
+                      │  (0x9dC0...47C98 - 100% Root Owner)  │
+                      └──────────────┬───────────────────────┘
+                                     │
+         ┌───────────────────────────┴───────────────────────────┐
+         ▼                                                       ▼
+┌──────────────────┐                                   ┌──────────────────┐
+│  500,000 SD      │                                   │ 15.81 UNI-V2 LP  │
+│ (Governance &    │                                   │ (100% Ownership  │
+│  Utility Token)  │                                   │  of DEX Pool)    │
+└────────┬─────────┘                                   └────────┬─────────┘
+         │                                                       │
+         ▼                                                       ▼
+┌──────────────────┐       ┌──────────────────┐        ┌──────────────────┐
+│FeeDiscountStaking│◄─────►│YieldStakingVaults│        │ Uniswap V2 Pool  │
+│(Staking Tiers &  │       │(Aave & Compound  │        │ (Earns 0.30% fee │
+│ Fee Discounts)   │       │ Yield + Treasury)│        │  on every trade) │
+└──────────────────┘       └──────────────────┘        └──────────────────┘
+
+---
+
+### 1. GovernanceToken (SD)
+* Contract Address: 0x051c758521971f5c5a84edaf18eea12854375469 (https://basescan.org/address/0x051c758521971f5c5a84edaf18eea12854375469)
+* Total Supply: Hard-capped at 1,000,000 SD (no more can ever be minted).
+* Current Balances: ~500,000 SD in your personal wallet; ~497,000 SD active in the liquidity pool.
+
+#### Main Uses:
+1. DEX Trading Asset: The native quote/base currency of the Shaggy Mutt DEX. Users buy SD with ETH, creating market demand and price appreciation.
+2. Fee Discount Staking: Users who hold SD can lock it in the staking contract to reduce their trading fees and vault performance fees.
+3. Governance & Voting Rights: Token holders can vote on protocol upgrades, new pool additions, fee parameters, and treasury allocations.
+4. Community Incentives & Airdrops: You hold 500,000 SD in reserve that can be distributed to early liquidity providers, community members, or marketing campaigns.
+
+---
+
+### 2. Uniswap V2 LP Tokens (SD/WETH UNI-V2)
+* Pair Contract Address: 0xC3D1e0b1CD05081bD7Af4cf87f681512E3E90917 (https://basescan.org/address/0xC3D1e0b1CD05081bD7Af4cf87f681512E3E90917)
+* Your Holdings: 15.811388 LP tokens (100.000000% of the entire circulating supply).
+
+#### Main Uses:
+1. Automated Trading Fee Collection (Your Revenue Engine):
+   * Every time anyone swaps ETH for SD or SD for ETH on Base, Uniswap V2 automatically deducts a 0.30% trading fee.
+   * That fee remains inside the pool, compounding the reserves. Because you own 100% of the LP tokens, 100% of all generated fees belong to you.
+2. Instant Capital Redemption:
+   * At any time, you can go to the Liquidity tab, select Remove Liquidity, and burn your LP tokens to withdraw your deposited ETH and SD plus all accumulated trading fees.
+3. Yield Farming & Gauge Incentives:
+   * LP tokens can be staked in third-party yield farms or reward gauges to earn secondary rewards.
+
+---
+
+### 3. FeeDiscountStaking Contract
+* Contract Address: 0x42134ccc6c41149cf71c7b4994e33ee66758af20 (https://basescan.org/address/0x42134ccc6c41149cf71c7b4994e33ee66758af20)
+
+#### Main Uses:
+1. Tiered Fee Discounts (Incentivizes Holding):
+   * Users stake SD to unlock VIP tiers (e.g. 10%, 25%, 50%, or 100% fee discounts).
+   * Creates organic demand to buy SD off the market and lock it away, reducing circulating sell pressure.
+2. Anti-Dump Lock Period:
+   * Features a configurable lock period (e.g., 7 days) and early exit fee (e.g., 1%) that prevents flash-loan exploitation and rewards long-term stakers.
+
+---
+
+### 4. Yield Staking Vaults (Aave v3 & Compound v3)
+* Aave Vault: 0x8531807ef36560cd7db230c95db85791aa586dda (https://basescan.org/address/0x8531807ef36560cd7db230c95db85791aa586dda)
+* Compound Vault: 0x38cccafb4ae96a8ef187f07fb17d18eb63e43782 (https://basescan.org/address/0x38cccafb4ae96a8ef187f07fb17d18eb63e43782)
+
+#### Main Uses:
+1. CeDeFi Yield Aggregation:
+   * Users deposit stablecoins (native Base USDC 0x833589...), which are supplied to Aave v3 or Compound Comet to earn institutional lending interest.
+2. Protocol Treasury Streaming:
+   * Collects a configurable performance fee (default 10%, up to 30%) on generated interest, streaming passive revenue directly into your admin treasury wallet.
+3. Synergy with SD Staking:
+   * Vault depositors who stake SD in FeeDiscountStaking receive fee reductions on their yield, connecting your token directly to institutional DeFi lending.
+
+---
+
+### 5. AaveFlashBorrower (Uncollateralized Flash Loans)
+* Contract Address: 0xa5b50037a8d2fda22805f750252268adaeb36480 (https://basescan.org/address/0xa5b50037a8d2fda22805f750252268adaeb36480)
+
+#### Main Uses:
+1. Zero-Capital Arbitrage:
+   * Borrows uncollateralized capital (e.g., $100,000+ in WETH or USDC) directly from Aave v3 within a single block.
+   * If SD trades at a different price on your Uniswap pool vs. Aerodrome or Uniswap V3, this contract executes triangular arbitrage, repays Aave, and keeps the net profit in your wallet.
+2. Pool Rebalancing & MEV Defense:
+   * Can be triggered to rebalance pool reserves or liquidate underwater positions across Base.
+
+---
+
+### Summary of the Economic Flywheel
+
+| User Action | What Happens Under the Hood | How You Benefit |
+| :--- | :--- | :--- |
+| Trader swaps ETH ➔ SD | 0.30% fee is added to pool reserves | Your LP tokens appreciate in value |
+| User stakes SD for discounts | SD tokens are locked out of circulation | Circulating supply drops; scarcity increases |
+| User deposits USDC in Vault | Yield is earned from Aave/Compound | 10% performance fee streams to your Treasury |
+| Price discrepancy occurs | Flash loan arbitrage restores balance | Net arbitrage profit deposits into your wallet |
