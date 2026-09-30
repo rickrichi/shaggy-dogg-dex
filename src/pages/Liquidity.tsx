@@ -21,8 +21,8 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ERC20_ABI, UNISWAP_V2_PAIR_ABI, UNISWAP_V2_ROUTER_ABI } from "@/config/abis";
-import { CONTRACTS } from "@/config/contracts";
-import { MAINNET_TOKENS, type Token, WRAPPED_NATIVE_ADDRESS } from "@/config/tokens";
+import { getUniswapV2Factory, getUniswapV2Router } from "@/config/contracts";
+import { getTokensForChain, type Token, WRAPPED_NATIVE_ADDRESS } from "@/config/tokens";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -104,26 +104,42 @@ function resolveAddress(token: Token): Address {
 
 export default function Liquidity() {
   const { address: userAddress, chainId, isConnected } = useAccount();
-  const publicClient = usePublicClient({ chainId: mainnet.id });
-  const isMainnet = chainId === mainnet.id;
+  const publicClient = usePublicClient();
+  const isSupportedChain = chainId === 1 || chainId === 8453;
+  const isMainnet = isSupportedChain;
+
+  const availableTokens = useMemo(() => getTokensForChain(chainId), [chainId]);
+  const factoryAddress = useMemo(() => getUniswapV2Factory(chainId), [chainId]);
+  const routerAddress = useMemo(() => getUniswapV2Router(chainId), [chainId]);
 
   // ────────────────────────────────────────────────────────────────────────────
   // State
   // ────────────────────────────────────────────────────────────────────────────
 
   const [mode, setMode] = useState<LiquidityMode>("add");
-  const [tokenA, setTokenA] = useState<Token>(MAINNET_TOKENS[0]);
-  const [tokenB, setTokenB] = useState<Token>(MAINNET_TOKENS[1]);
+  const [tokenA, setTokenA] = useState<Token>(() => availableTokens[0]);
+  const [tokenB, setTokenB] = useState<Token>(() => availableTokens[1]);
   const [amountA, setAmountA] = useState<string>("");
   const [amountB, setAmountB] = useState<string>("");
   const [lpTokenAmount, setLpTokenAmount] = useState<string>("");
+
+  useEffect(() => {
+    if (chainId === 8453) {
+      setTokenA(availableTokens[0]); // ETH
+      setTokenB(availableTokens[1]); // SD
+    } else {
+      setTokenA(availableTokens[0]);
+      setTokenB(availableTokens[1]);
+    }
+  }, [chainId, availableTokens]);
+
   // ────────────────────────────────────────────────────────────────────────────
   // Contract Reads
   // ────────────────────────────────────────────────────────────────────────────
 
   // Get pair address
   const { data: pairAddress } = useReadContract({
-    address: UNISWAP_V2_FACTORY,
+    address: factoryAddress,
     abi: FACTORY_ABI,
     functionName: "getPair",
     args: [resolveAddress(tokenA), resolveAddress(tokenB)],
@@ -279,7 +295,7 @@ export default function Liquidity() {
   const handleAddLiquidity = useCallback(async () => {
     if (!amountA || !amountB || !userAddress) return;
     if (!isMainnet) {
-      toast.error("Switch to Ethereum mainnet before managing this Uniswap V2 liquidity position.");
+      toast.error("Switch to Base or Ethereum mainnet before managing this Uniswap V2 liquidity position.");
       return;
     }
     if (resolveAddress(tokenA) === resolveAddress(tokenB)) {
@@ -300,7 +316,7 @@ export default function Liquidity() {
           address: tokenA.address,
           abi: ERC20_ABI,
           functionName: "approve",
-          args: [CONTRACTS.UNISWAP_V2_ROUTER, amountADesired],
+          args: [routerAddress, amountADesired],
         });
         await waitForConfirmation(approvalHash);
       }
@@ -310,7 +326,7 @@ export default function Liquidity() {
           address: tokenB.address,
           abi: ERC20_ABI,
           functionName: "approve",
-          args: [CONTRACTS.UNISWAP_V2_ROUTER, amountBDesired],
+          args: [routerAddress, amountBDesired],
         });
         await waitForConfirmation(approvalHash);
       }
@@ -318,7 +334,7 @@ export default function Liquidity() {
       let liquidityHash: Hash;
       if (isNative(tokenA.address)) {
         liquidityHash = await addLiq({
-          address: CONTRACTS.UNISWAP_V2_ROUTER,
+          address: routerAddress,
           abi: UNISWAP_V2_ROUTER_ABI,
           functionName: "addLiquidityETH",
           args: [
@@ -333,7 +349,7 @@ export default function Liquidity() {
         });
       } else if (isNative(tokenB.address)) {
         liquidityHash = await addLiq({
-          address: CONTRACTS.UNISWAP_V2_ROUTER,
+          address: routerAddress,
           abi: UNISWAP_V2_ROUTER_ABI,
           functionName: "addLiquidityETH",
           args: [
@@ -348,7 +364,7 @@ export default function Liquidity() {
         });
       } else {
         liquidityHash = await addLiq({
-          address: CONTRACTS.UNISWAP_V2_ROUTER,
+          address: routerAddress,
           abi: UNISWAP_V2_ROUTER_ABI,
           functionName: "addLiquidity",
           args: [
@@ -379,6 +395,7 @@ export default function Liquidity() {
     tokenB,
     userAddress,
     isMainnet,
+    routerAddress,
     approveA,
     approveB,
     addLiq,
@@ -411,28 +428,28 @@ export default function Liquidity() {
         address: pairAddress as Address,
         abi: ERC20_ABI,
         functionName: "approve",
-        args: [CONTRACTS.UNISWAP_V2_ROUTER, liquidity],
+        args: [routerAddress, liquidity],
       });
       await waitForConfirmation(approvalHash);
 
       let removeHash: Hash;
       if (isNative(tokenA.address)) {
         removeHash = await removeLiq({
-          address: CONTRACTS.UNISWAP_V2_ROUTER,
+          address: routerAddress,
           abi: UNISWAP_V2_ROUTER_ABI,
           functionName: "removeLiquidityETH",
           args: [resolveAddress(tokenB), liquidity, amountBMin, amountAMin, userAddress, deadline],
         });
       } else if (isNative(tokenB.address)) {
         removeHash = await removeLiq({
-          address: CONTRACTS.UNISWAP_V2_ROUTER,
+          address: routerAddress,
           abi: UNISWAP_V2_ROUTER_ABI,
           functionName: "removeLiquidityETH",
           args: [resolveAddress(tokenA), liquidity, amountAMin, amountBMin, userAddress, deadline],
         });
       } else {
         removeHash = await removeLiq({
-          address: CONTRACTS.UNISWAP_V2_ROUTER,
+          address: routerAddress,
           abi: UNISWAP_V2_ROUTER_ABI,
           functionName: "removeLiquidity",
           args: [
@@ -464,6 +481,7 @@ export default function Liquidity() {
     tokenA,
     tokenB,
     isMainnet,
+    routerAddress,
     approveA,
     removeLiq,
     waitForConfirmation,
@@ -591,7 +609,7 @@ export default function Liquidity() {
                       <Select
                         value={tokenA.symbol}
                         onValueChange={(sym) => {
-                          const token = MAINNET_TOKENS.find((t) => t.symbol === sym);
+                          const token = availableTokens.find((t) => t.symbol === sym);
                           if (token) setTokenA(token);
                         }}
                       >
@@ -599,7 +617,7 @@ export default function Liquidity() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {MAINNET_TOKENS.map((t) => (
+                          {availableTokens.map((t) => (
                             <SelectItem key={t.symbol} value={t.symbol}>
                               {t.symbol}
                             </SelectItem>
@@ -629,7 +647,7 @@ export default function Liquidity() {
                       <Select
                         value={tokenB.symbol}
                         onValueChange={(sym) => {
-                          const token = MAINNET_TOKENS.find((t) => t.symbol === sym);
+                          const token = availableTokens.find((t) => t.symbol === sym);
                           if (token) setTokenB(token);
                         }}
                       >
@@ -637,7 +655,7 @@ export default function Liquidity() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {MAINNET_TOKENS.map((t) => (
+                          {availableTokens.map((t) => (
                             <SelectItem key={t.symbol} value={t.symbol}>
                               {t.symbol}
                             </SelectItem>

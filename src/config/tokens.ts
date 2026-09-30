@@ -9,7 +9,7 @@ export interface BaseToken {
   readonly name: string;
   readonly decimals: number;
   readonly logoURI?: string;
-  readonly chainId: 1; // Ethereum mainnet only in this file
+  readonly chainId: number;
 }
 
 export interface NativeToken extends BaseToken {
@@ -101,6 +101,51 @@ export const MAINNET_TOKENS = [
     chainId: 1,
   },
 ] as const satisfies readonly [Token, Token, ...Token[]];
+
+export const BASE_MAINNET_TOKENS = [
+  {
+    kind: "native",
+    address: "native",
+    symbol: "ETH",
+    name: "Ether",
+    decimals: 18,
+    logoURI: "https://tokens.1inch.io/0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.png",
+    chainId: 8453,
+  },
+  {
+    kind: "erc20",
+    address: "0x051c758521971f5c5a84edaf18eea12854375469" as Address,
+    symbol: "SD",
+    name: "Shaggy Dogg",
+    decimals: 18,
+    chainId: 8453,
+  },
+  {
+    kind: "erc20",
+    address: "0x4200000000000000000000000000000000000006" as Address,
+    symbol: "WETH",
+    name: "Wrapped Ether",
+    decimals: 18,
+    logoURI: "https://tokens.1inch.io/0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2.png",
+    chainId: 8453,
+  },
+  {
+    kind: "erc20",
+    address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as Address,
+    symbol: "USDC",
+    name: "USD Coin",
+    decimals: 6,
+    logoURI: "https://tokens.1inch.io/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48.png",
+    chainId: 8453,
+  },
+] as const satisfies readonly [Token, Token, ...Token[]];
+
+export function getTokensForChain(chainId?: number): readonly [Token, Token, ...Token[]] {
+  if (chainId === 8453) {
+    return BASE_MAINNET_TOKENS;
+  }
+  return MAINNET_TOKENS;
+}
 
 /** Literal union of known symbols inferred from MAINNET_TOKENS */
 export type TokenSymbol = (typeof MAINNET_TOKENS)[number]["symbol"];
