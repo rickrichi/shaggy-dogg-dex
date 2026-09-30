@@ -112,7 +112,7 @@ export function computeCanonicalDigest(document: Record<string, unknown>): strin
 export class QuantEvidenceVerifier {
   public static verify(
     document: Record<string, unknown>,
-    expectedAppTarget: string = "shaggy-dogg-dex"
+    _expectedAppTarget: string = "shaggy-dogg-dex"
   ): VerifiedQuantEvidence {
     if (document.quant_evidence_version !== "1.0.0") {
       throw new QuantEvidenceRejectedError("Unsupported quant evidence version; expected 1.0.0.");
@@ -167,7 +167,7 @@ export interface ReplayLedgerEntry {
 
 export class DurableDexReplayLedger {
   private readonly _usedNonces = new Set<string>();
-  private readonly _filePath?: string;
+  private readonly _filePath: string | undefined;
   private readonly _clock: () => number;
 
   constructor(filePath?: string, clock: () => number = () => Math.floor(Date.now() / 1000)) {

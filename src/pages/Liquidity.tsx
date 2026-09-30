@@ -5,7 +5,6 @@ import { AlertCircle, Droplet, Loader2, Minus, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { type Address, formatUnits, type Hash, parseUnits } from "viem";
 import { useAccount, useBalance, usePublicClient, useReadContract, useWriteContract } from "wagmi";
-import { mainnet } from "wagmi/chains";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -43,7 +42,6 @@ interface PoolInfo {
 // CONSTANTS
 // ══════════════════════════════════════════════════════════════════════════════
 
-const UNISWAP_V2_FACTORY = "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f" as Address;
 const FACTORY_ABI = [
   {
     constant: true,
