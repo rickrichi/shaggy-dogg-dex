@@ -100,9 +100,48 @@ In this landmark milestone session, the complete **Shaggy-Dogg-DEX** smart contr
 
 ---
 
-## 4. Next Phase: Mainnet Liquidity Seeding
+## 4. Uniswap V2 Pair Deployment (Base Mainnet)
 
-With all 5 core contracts operational and 1,000,000 SD tokens verified in the user's wallet:
-1. **Uniswap V2 Pair Creation:** Deploy the canonical SD/WETH pair on Base Mainnet Uniswap V2 (`0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6`).
-2. **Initial Liquidity Seeding:** Deposit SD + WETH reserves (e.g., 800,000 SD + 0.001 WETH) to establish public DEX spot price discovery.
-3. **LP Token Custody:** 100% of circulating LP tokens transferred to user root wallet.
+The canonical **SD / WETH** Uniswap V2 Pair was successfully initialized on Base Mainnet:
+- **Factory Address:** `0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6`
+- **Router Address:** `0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24`
+- **Canonical WETH9:** `0x4200000000000000000000000000000000000006`
+- **GovernanceToken (SD):** `0x051c758521971f5c5a84edaf18eea12854375469`
+- **Deployed UniswapV2Pair:** `0xC3D1e0b1CD05081bD7Af4cf87f681512E3E90917`
+- **Transaction Hash:** `0xf1f00774a3341ce10fb3fef4ad6dcdd523f391780eddb5e3b1a9cd0fcfaab185`
+- **Block:** `51981653`
+- **BaseScan Link:** [View Pair Contract](https://basescan.org/address/0xC3D1e0b1CD05081bD7Af4cf87f681512E3E90917)
+
+---
+
+## 5. Wallet Verification on Base Mainnet
+
+As documented in `docs/onbase.jpg`, the user's primary MetaMask wallet `ShaggyDogg` (`0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98`) is **100% active on Base Mainnet**:
+- **Network Indicator:** Base (Chain ID `8453`)
+- **Native ETH Balance:** `0.00199 ETH` (~$5.38 USD)
+- **Token Balance:** `1.00M SD` (`1,000,000 SD` - 100% of initial genesis supply)
+- **Security Label ("Risky"):**
+  - Triggered automatically by MetaMask's security partner (Blockaid) for any brand-new contract (< 24 hours old) with no historical DEX trading volume and unverified source code on BaseScan.
+  - Will be normalized upon (1) verifying contract source code on BaseScan and (2) seeding the initial liquidity pool so trading activity commences.
+
+---
+
+## 6. Frontend & Amm Architecture Upgrades
+
+- **Chain-Aware Token Registry (`src/config/tokens.ts`):** Added `BASE_MAINNET_TOKENS` and dynamic `getTokensForChain(chainId)` to cleanly separate L1 Mainnet, Base Sepolia, and Base Mainnet.
+- **Dynamic Routing & Factory Resolution (`src/config/contracts.ts`):** Configured canonical Base Uniswap V2 Router (`0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24`) and Factory (`0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6`).
+- **Liquidity UI (`src/pages/Liquidity.tsx`):** Upgraded to use chain-aware token selections, dynamic router/factory addresses, and direct support for Base Mainnet.
+- **Strict TypeScript Compliance:** Resolved unused imports and optional property types; `tsc -b tsconfig.app.json` compiles with zero errors, and all 76 unit/integration tests pass.
+
+---
+
+## 7. Next Step: Initial Liquidity Seeding
+
+To establish public pricing and AMM swap functionality:
+1. Navigate to `http://localhost:5173/liquidity` with MetaMask connected on Base.
+2. Select **ETH** and **SD**.
+3. Deposit initial reserves (e.g. `0.0005 ETH` and `500,000 SD`).
+4. Click **Approve SD** -> Sign in MetaMask (ERC-20 approval for Router `0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24`).
+5. Click **Add Liquidity** -> Sign atomic `addLiquidityETH` transaction in MetaMask.
+6. The user receives 100% of minted Uniswap V2 LP tokens in `0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98`.
+
