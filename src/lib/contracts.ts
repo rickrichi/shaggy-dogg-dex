@@ -1,5 +1,5 @@
 // Auto-generated from deployments/ - DO NOT EDIT MANUALLY
-// Last updated: 2026-09-29T09:19:46.599Z
+// Last updated: 2026-09-30T06:35:13.320Z
 
 import type { Address } from 'viem';
 
@@ -9,12 +9,20 @@ export interface DeployedContracts {
   AaveFlashBorrower?: Address;
   YieldStakingVault?: Address;
   CompoundYieldVault?: Address;
-  UniswapV2Pair_SD_WETH?: Address;
   deployedAt: number;
   deployer: Address;
 }
 
 export const CONTRACTS: Record<number, DeployedContracts> = {
+  "8453": {
+    "GovernanceToken": "0x051c758521971f5c5a84edaf18eea12854375469",
+    "FeeDiscountStaking": "0x42134ccc6c41149cf71c7b4994e33ee66758af20",
+    "AaveFlashBorrower": "0xa5b50037a8d2fda22805f750252268adaeb36480",
+    "YieldStakingVault": "0x8531807ef36560cd7db230c95db85791aa586dda",
+    "CompoundYieldVault": "0x38cccafb4ae96a8ef187f07fb17d18eb63e43782",
+    "deployedAt": 1790750068832,
+    "deployer": "0xc1c3d6552231DB22A22Bdf513C0833024FF3f42B"
+  },
   "31337": {
     "GovernanceToken": "0x0000000000000000000000000000000000000000",
     "FeeDiscountStaking": "0x0000000000000000000000000000000000000000",
@@ -27,7 +35,6 @@ export const CONTRACTS: Record<number, DeployedContracts> = {
     "AaveFlashBorrower": "0xa5b50037a8d2fda22805f750252268adaeb36480",
     "YieldStakingVault": "0x8531807ef36560cd7db230c95db85791aa586dda",
     "CompoundYieldVault": "0x38cccafb4ae96a8ef187f07fb17d18eb63e43782",
-    "UniswapV2Pair_SD_WETH": "0x63D504336d01BcCa615B23AD393E5812Dc646BF8",
     "deployedAt": 1790673576071,
     "deployer": "0xc1c3d6552231DB22A22Bdf513C0833024FF3f42B"
   },
