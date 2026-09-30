@@ -4,7 +4,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircle, Droplet, Loader2, Minus, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { type Address, formatUnits, type Hash, parseUnits } from "viem";
-import { useAccount, useBalance, usePublicClient, useReadContract, useWriteContract } from "wagmi";
+import {
+  useAccount,
+  useBalance,
+  usePublicClient,
+  useReadContract,
+  useSwitchChain,
+  useWriteContract,
+} from "wagmi";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -101,7 +108,8 @@ function resolveAddress(token: Token): Address {
 // ══════════════════════════════════════════════════════════════════════════════
 
 export default function Liquidity() {
-  const { address: userAddress, chainId, isConnected } = useAccount();
+  const { address: userAddress, chainId, isConnected, chain } = useAccount();
+  const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
   const publicClient = usePublicClient();
   const isSupportedChain = chainId === 1 || chainId === 8453;
   const isMainnet = isSupportedChain;
@@ -736,10 +744,23 @@ export default function Liquidity() {
                   </AlertDescription>
                 </Alert>
               )}
-              {isConnected && !isMainnet && (
-                <Alert>
-                  <AlertDescription>
-                    Liquidity management in this build is available only on Ethereum mainnet.
+              {isConnected && chainId !== 8453 && (
+                <Alert className="border-blue-300 bg-blue-50 text-blue-900">
+                  <AlertDescription className="flex items-center justify-between">
+                    <div>
+                      <p className="font-semibold text-blue-950">Switch to Base Mainnet</p>
+                      <p className="text-xs text-blue-800">
+                        You are currently on {chain?.name || `Chain ${chainId}`}. Switch to Base to seed Shaggy Dogg (SD) liquidity.
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => switchChain({ chainId: 8453 })}
+                      disabled={isSwitchingChain}
+                      className="ml-4 bg-blue-600 text-white hover:bg-blue-700 text-xs font-semibold"
+                    >
+                      {isSwitchingChain ? "Switching..." : "Switch to Base"}
+                    </Button>
                   </AlertDescription>
                 </Alert>
               )}

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { AlertCircle, LogOut, Wallet } from "lucide-react";
-import { useAccount, useBalance, useConnect, useDisconnect } from "wagmi";
+import { useAccount, useBalance, useConnect, useDisconnect, useSwitchChain } from "wagmi";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ export const WalletConnect = () => {
   const { address, isConnected, chain } = useAccount();
   const { connect, connectors, error, isPending } = useConnect();
   const { disconnect } = useDisconnect();
+  const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
   const { data: balance } = useBalance({ address });
   const [connectError, setConnectError] = useState<string | null>(null);
 
@@ -86,8 +87,15 @@ export const WalletConnect = () => {
                   {address.slice(0, 6)}...{address.slice(-4)}
                 </p>
                 <div className="flex items-center space-x-2">
-                  <Badge variant="secondary" className="text-xs">
-                    {chain?.name || "Unknown Chain"}
+                  <Badge
+                    variant={chain?.id === 8453 ? "default" : "secondary"}
+                    className={
+                      chain?.id === 8453
+                        ? "bg-blue-600 text-white text-xs font-semibold"
+                        : "text-xs"
+                    }
+                  >
+                    {chain?.id === 8453 ? "Base" : chain?.name || "Unknown Chain"}
                   </Badge>
                   <span className="text-xs text-gray-600">
                     {balance ? parseFloat(balance.formatted).toFixed(4) : "0.0000"}{" "}
@@ -97,6 +105,18 @@ export const WalletConnect = () => {
               </div>
             </div>
             <div className="flex items-center space-x-2">
+              {chain?.id !== 8453 && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => switchChain({ chainId: 8453 })}
+                  disabled={isSwitchingChain}
+                  className="h-8 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-2 shadow-sm"
+                  title="Switch to Base Mainnet"
+                >
+                  {isSwitchingChain ? "Switching..." : "Switch to Base"}
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"

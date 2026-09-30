@@ -1,7 +1,7 @@
 import { type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 
-import { Activity, ArrowLeftRight, PieChart, Settings } from "lucide-react";
+import { Activity, ArrowLeftRight, Droplets, PieChart, Settings } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { WalletConnect } from "@/components/WalletConnect";
@@ -15,6 +15,7 @@ export const Layout = ({ children }: LayoutProps) => {
 
   const navigation = [
     { name: "Swap", href: "/swap", icon: ArrowLeftRight },
+    { name: "Liquidity", href: "/liquidity", icon: Droplets },
     { name: "Portfolio", href: "/portfolio", icon: PieChart },
     { name: "Activity", href: "/activity", icon: Activity },
     { name: "Admin", href: "/admin", icon: Settings },
@@ -57,7 +58,7 @@ export const Layout = ({ children }: LayoutProps) => {
               })}
             </nav>
 
-            <div className="w-80">
+            <div className="min-w-[340px]">
               <WalletConnect />
             </div>
           </div>
