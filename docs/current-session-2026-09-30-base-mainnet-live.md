@@ -135,13 +135,40 @@ As documented in `docs/onbase.jpg`, the user's primary MetaMask wallet `ShaggyDo
 
 ---
 
-## 7. Next Step: Initial Liquidity Seeding
+## 7. Initial Liquidity Seeding Milestone (100% COMPLETE & LIVE)
 
-To establish public pricing and AMM swap functionality:
-1. Navigate to `http://localhost:5173/liquidity` with MetaMask connected on Base.
-2. Select **ETH** and **SD**.
-3. Deposit initial reserves (e.g. `0.0005 ETH` and `500,000 SD`).
-4. Click **Approve SD** -> Sign in MetaMask (ERC-20 approval for Router `0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24`).
-5. Click **Add Liquidity** -> Sign atomic `addLiquidityETH` transaction in MetaMask.
-6. The user receives 100% of minted Uniswap V2 LP tokens in `0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98`.
+The initial SD/WETH liquidity pool was successfully created and seeded on Base Mainnet:
+
+1. **Step 1: Router Approval**:
+   - **Transaction Hash:** [`0x27385d2974a391755d3f4934b164a59ed03ac5e91294c8173f54dd43d0516598`](https://basescan.org/tx/0x27385d2974a391755d3f4934b164a59ed03ac5e91294c8173f54dd43d0516598)
+   - **Block:** `51987493`
+   - **Gas Fee:** `0.00000048 ETH` (< $0.001 USD)
+   - **Action:** Approved Uniswap V2 Router (`0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24`) for `500,000 SD`.
+
+2. **Step 2: Atomic Liquidity Seeding (`addLiquidityETH`)**:
+   - **Transaction Hash:** [`0x5c725fdedce0229b594f223b949a1579517bb9157ffe040a9943a163ca0df1fe`](https://base.blockscout.com/tx/0x5c725fdedce0229b594f223b949a1579517bb9157ffe040a9943a163ca0df1fe)
+   - **Block:** `51987730`
+   - **Value Deposited:** `0.0005 ETH` + `500,000 SD`
+   - **Pair Contract:** [`0xC3D1e0b1CD05081bD7Af4cf87f681512E3E90917`](https://basescan.org/address/0xC3D1e0b1CD05081bD7Af4cf87f681512E3E90917)
+
+3. **On-Chain Pool State Verification**:
+   - **Reserve0 (SD):** `497,028.76 SD`
+   - **Reserve1 (WETH):** `0.000503 WETH`
+   - **Total LP Tokens:** `15.811388 LP`
+   - **User LP Balance:** `15.811388 LP` (**100.000000% Ownership**)
+   - **Initial Spot Price:** `~0.000000001035 ETH / SD` (~`$0.0000028 USD` per SD token)
+   - **Verified Live Quote:** `0.00001 ETH` swaps for `9,660.20 SD`
+
+---
+
+## 8. Summary of Completed Deliverables
+
+- [x] 5 smart contracts deployed to Base Mainnet.
+- [x] 1,000,000 SD minted 100% into user self-custodial wallet (`0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98`).
+- [x] Uniswap V2 Pair (`SD/WETH`) created on Base Mainnet (`0xC3D1e0b1CD05081bD7Af4cf87f681512E3E90917`).
+- [x] Initial liquidity seeded with `0.0005 ETH` + `500,000 SD`.
+- [x] 100% of circulating LP tokens deposited in user wallet.
+- [x] Frontend upgraded with Base Mainnet support, chain switcher, and nav links.
+- [x] All 76 unit/integration tests passing.
+
 

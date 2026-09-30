@@ -49,7 +49,7 @@ const ALCHEMY_NETWORK: Record<string, string> = {
 
 const PUBLIC_FALLBACK: Record<string, string | undefined> = {
   mainnet: "https://ethereum.publicnode.com",
-  base: "https://mainnet.base.org",
+  base: "https://base.publicnode.com",
   arbitrum: "https://arb1.arbitrum.io/rpc",
   optimism: "https://mainnet.optimism.io",
   polygon: "https://polygon-rpc.com",
@@ -62,7 +62,8 @@ const buildAlchemyUrl = (network: string) =>
     : undefined;
 
 const createTransport = (network: string) => {
-  const alchemy = buildAlchemyUrl(network);
+  // Use publicnode for Base to avoid unconfigured Alchemy app 403s
+  const alchemy = network === "base" ? undefined : buildAlchemyUrl(network);
   const fallback = PUBLIC_FALLBACK[network];
   const common = { batch: true, retryCount: 3, retryDelay: 1000 };
 
