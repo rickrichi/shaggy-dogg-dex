@@ -45,6 +45,7 @@ In this landmark milestone session, the complete **Shaggy-Dogg-DEX** smart contr
 | **AaveFlashBorrower** | `0xa5b50037a8d2fda22805f750252268adaeb36480` | [View on Blockscout](https://base.blockscout.com/address/0xa5b50037a8d2fda22805f750252268adaeb36480) | [View on BaseScan](https://basescan.org/address/0xa5b50037a8d2fda22805f750252268adaeb36480) |
 | **YieldStakingVault** | `0x8531807ef36560cd7db230c95db85791aa586dda` | [View on Blockscout](https://base.blockscout.com/address/0x8531807ef36560cd7db230c95db85791aa586dda) | [View on BaseScan](https://basescan.org/address/0x8531807ef36560cd7db230c95db85791aa586dda) |
 | **CompoundYieldVault** | `0x38cccafb4ae96a8ef187f07fb17d18eb63e43782` | [View on Blockscout](https://base.blockscout.com/address/0x38cccafb4ae96a8ef187f07fb17d18eb63e43782) | [View on BaseScan](https://basescan.org/address/0x38cccafb4ae96a8ef187f07fb17d18eb63e43782) |
+| **UniswapV2Pair (`SD/WETH`)** | `0xC3D1e0b1CD05081bD7Af4cf87f681512E3E90917` | [View on Blockscout](https://base.blockscout.com/address/0xC3D1e0b1CD05081bD7Af4cf87f681512E3E90917) | [View on BaseScan](https://basescan.org/address/0xC3D1e0b1CD05081bD7Af4cf87f681512E3E90917) |
 
 ### Key Wallets & Infrastructure
 
