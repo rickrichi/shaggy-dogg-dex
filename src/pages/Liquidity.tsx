@@ -317,24 +317,40 @@ export default function Liquidity() {
       const deadline = BigInt(Math.floor(Date.now() / 1000) + 900); // 15 min
 
       // Wait for every required approval before requesting the liquidity transaction.
-      if (!isNative(tokenA.address)) {
-        const approvalHash = await approveA({
+      if (!isNative(tokenA.address) && publicClient) {
+        const currentAllowanceA = await publicClient.readContract({
           address: tokenA.address,
           abi: ERC20_ABI,
-          functionName: "approve",
-          args: [routerAddress, amountADesired],
+          functionName: "allowance",
+          args: [userAddress, routerAddress],
         });
-        await waitForConfirmation(approvalHash);
+        if (currentAllowanceA < amountADesired) {
+          const approvalHash = await approveA({
+            address: tokenA.address,
+            abi: ERC20_ABI,
+            functionName: "approve",
+            args: [routerAddress, amountADesired],
+          });
+          await waitForConfirmation(approvalHash);
+        }
       }
 
-      if (!isNative(tokenB.address)) {
-        const approvalHash = await approveB({
+      if (!isNative(tokenB.address) && publicClient) {
+        const currentAllowanceB = await publicClient.readContract({
           address: tokenB.address,
           abi: ERC20_ABI,
-          functionName: "approve",
-          args: [routerAddress, amountBDesired],
+          functionName: "allowance",
+          args: [userAddress, routerAddress],
         });
-        await waitForConfirmation(approvalHash);
+        if (currentAllowanceB < amountBDesired) {
+          const approvalHash = await approveB({
+            address: tokenB.address,
+            abi: ERC20_ABI,
+            functionName: "approve",
+            args: [routerAddress, amountBDesired],
+          });
+          await waitForConfirmation(approvalHash);
+        }
       }
 
       let liquidityHash: Hash;
