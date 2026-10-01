@@ -1,0 +1,51 @@
+6-stage execution firewall
+### 🛡️ How Your Bot-Exploit & Execution-Loss Protections Work
+  The mechanisms you referenced are located in quant-evidence-admission.ts and swap-protection.ts.
+
+  They form an institutional 6-stage execution firewall designed to protect your capital and contracts:
+  ──────
+  ### 1. 📜 DurableDexReplayLedger (Anti-Replay Exploit Guard)
+  • The Attack It Prevents:
+  In decentralized finance, if an arbitrage bot or malicious third party intercepts an authorization signature, they can repeatedly rebroadcast that signature ("replay attack")
+  to drain funds or manipulate pool prices.
+  • How It Protects You:
+      • Every authorization requires a unique (providerId, nonce) pair and an expiresAt timestamp.
+      • The ledger records used nonces directly to disk:
+        fs.appendFileSync(this._filePath, `${JSON.stringify(entry)}\n`, "utf-8");
+
+      • Survives Restarts: Even if your server reboots or restarts, the ledger re-reads previous nonces on startup and permanently rejects any replayed transaction.
+
+  ──────
+  ### 2. 🔐 Anti-Tamper Signature Gate (DexQuantEvidenceAdmissionGate)
+
+  • The Attack It Prevents:
+  A rogue script or bot modifying the arbitrage route, slippage tolerance, or profit threshold in transit.
+  • How It Protects You:
+      1. Canonical SHA-256 Digest: The engine sorts all JSON keys and computes a strict deterministic hash of the trading evidence (computeCanonicalDigest). If a single digit
+      is altered, the digest changes and the transaction is aborted.
+      2. EIP-712 Cryptographic Signature: Uses recoverTypedDataAddress on Base Mainnet (8453) to verify that the trading signal was authorized by your verified signing address.
+
+  ──────
+  ### 3. 🧪 Dry-Run & Paper Simulation Engine
+
+  • The Risk It Prevents:
+  Executing an untested algorithmic arbitrage strategy on live mainnet that loses gas fees or suffers execution failure due to sudden liquidity shifts.
+  • How It Protects You:
+      1. Structurally Disabled Live Mode:
+        if (authorization.accountMode === "live") {
+          throw new Error("Live DEX mutation is structurally blocked: mainnet execution is disabled.");
+        }
+      Any live mainnet execution attempt fails-closed automatically.
+      2. Two-Step Human Confirmation:
+          • Requires the exact confirmation phrase "ADMIT PAPER" to arm the plan.
+          • Requires the explicit phrase "SUBMIT PAPER SWAP" to simulate against current pool reserves.
+      3. Single-Use Admission: Once simulated, the admission handle is destroyed (this._admittedPlans.delete(admissionId)) so it cannot be executed twice.
+
+  ──────
+  ### 4. 🥪 MEV Sandwich & Slippage Protection (swap-protection.ts)
+
+  • The Attack It Prevents:
+  MEV (Maximal Extractable Value) searcher bots frontrunning your swap in the mempool and selling it back to you at a worse price ("sandwich attack").
+  • How It Protects You:
+      • The calculateMinimumAmountOut() function strictly derives and enforces amountOutMin on-chain.
+      • Limits maximum slippage to a hard ceiling of MAX_SWAP_SLIPPAGE_BPS (10%) and rejects any swap that would result in a zero or manipulated return.

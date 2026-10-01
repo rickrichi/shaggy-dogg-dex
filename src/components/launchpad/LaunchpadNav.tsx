@@ -1,7 +1,7 @@
 // src/components/launchpad/LaunchpadNav.tsx
 import { Link, useLocation } from "react-router-dom";
 
-import { Coins, Compass, Rocket, ShieldCheck, Sparkles } from "lucide-react";
+import { Coins, Compass, Rocket, ShieldCheck, Sparkles, Zap } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
@@ -38,6 +38,12 @@ export const LaunchpadNav = () => {
       href: "/stake",
       icon: ShieldCheck,
       description: "Fee discounts & single-sided staking",
+    },
+    {
+      name: "Arbitrage Studio",
+      href: "/arbitrage",
+      icon: Zap,
+      description: "Triangular & Flash Loan Arbitrage",
     },
   ];
 

@@ -28,6 +28,7 @@ const Launchpad = lazy(() => import("./pages/Launchpad"));
 const LaunchpadExplore = lazy(() => import("./pages/LaunchpadExplore"));
 const ProtocolOps = lazy(() => import("./pages/ProtocolOps"));
 const Stake = lazy(() => import("./pages/Stake"));
+const Arbitrage = lazy(() => import("./pages/Arbitrage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Optional (dev only): React Query Devtools
@@ -220,6 +221,8 @@ export const AppRoutes = (): JSX.Element => (
         <Route path="/launchpad/my-tokens" element={<LaunchpadExplore defaultTab="my-tokens" />} />
         <Route path="/protocol" element={<ProtocolOps />} />
         <Route path="/launchpad/manage" element={<ProtocolOps />} />
+        <Route path="/arbitrage" element={<Arbitrage />} />
+        <Route path="/launchpad/arbitrage" element={<Arbitrage />} />
         <Route path="/portfolio" element={<Portfolio />} />
         <Route path="/activity" element={<Activity />} />
         <Route path="/admin" element={<Admin />} />
