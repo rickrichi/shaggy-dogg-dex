@@ -8,6 +8,7 @@ import {
   PieChart,
   Rocket,
   Settings,
+  ShieldCheck,
   Sparkles,
 } from "lucide-react";
 
@@ -24,6 +25,7 @@ export const Layout = ({ children }: LayoutProps) => {
   const navigation = [
     { name: "Swap", href: "/swap", icon: ArrowLeftRight },
     { name: "Liquidity", href: "/liquidity", icon: Droplets },
+    { name: "Stake", href: "/stake", icon: ShieldCheck },
     { name: "Launchpad", href: "/launchpad", icon: Rocket },
     { name: "Protocol Hub", href: "/protocol", icon: Sparkles },
     { name: "Portfolio", href: "/portfolio", icon: PieChart },

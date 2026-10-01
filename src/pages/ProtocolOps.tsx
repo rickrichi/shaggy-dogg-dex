@@ -4,11 +4,15 @@ import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 
 import { ActiveProtocolManager } from "@/components/launchpad/ActiveProtocolManager";
+import { LaunchpadNav } from "@/components/launchpad/LaunchpadNav";
 import { Button } from "@/components/ui/button";
 
 export default function ProtocolOps() {
   return (
     <div className="min-h-[calc(100vh-80px)] space-y-6 p-4 duration-500 animate-in fade-in md:p-8">
+      {/* Sub-Navigation Bar */}
+      <LaunchpadNav />
+
       {/* Top Header */}
       <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
         <div>

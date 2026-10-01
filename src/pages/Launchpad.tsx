@@ -17,6 +17,7 @@ import {
 import { toast } from "sonner";
 import { useAccount, usePublicClient, useSwitchChain, useWalletClient } from "wagmi";
 
+import { LaunchpadNav } from "@/components/launchpad/LaunchpadNav";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { DEX_VENUES, LAUNCHPAD_ARCHETYPES } from "@/lib/launchpad/constants";
 import { executeLaunchpadDeployment } from "@/lib/launchpad/deployEngine";
+import { saveLaunchedToken } from "@/lib/launchpad/storage";
 
 import type { DeployedEcosystemResult, LaunchpadFormState } from "@/lib/launchpad/types";
 
@@ -113,6 +115,22 @@ export default function Launchpad() {
       if (form.enableDexSeeding) addLog(`Liquidity seeded on ${selectedDexDef.name}!`);
 
       setDeployedResult(result);
+      saveLaunchedToken({
+        tokenAddress: result.tokenAddress,
+        tokenName: form.tokenName,
+        tokenSymbol: form.tokenSymbol,
+        decimals: form.decimals || 18,
+        initialSupply: form.initialSupply,
+        description: form.description,
+        archetype: form.selectedArchetype,
+        stakingAddress: result.stakingAddress,
+        vaultAddress: result.vaultAddress,
+        pairAddress: result.pairAddress,
+        creatorAddress: address,
+        chainId: chainId || 8453,
+        deployedAt: Date.now(),
+        txHash: result.txHash,
+      });
       toast.success("Ecosystem deployed successfully on Base Mainnet!");
     } catch (err: unknown) {
       console.error(err);
@@ -125,7 +143,10 @@ export default function Launchpad() {
   };
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-6 pb-12">
+      {/* Sub-Navigation Bar */}
+      <LaunchpadNav />
+
       {/* Hero Header */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-purple-900 via-indigo-900 to-blue-900 p-8 text-white shadow-xl">
         <div className="relative z-10 max-w-3xl space-y-4">
@@ -184,11 +205,25 @@ export default function Launchpad() {
             </p>
           </div>
         </div>
-        <Link to="/protocol">
-          <Button size="sm" className="bg-indigo-600 font-semibold text-white hover:bg-indigo-700">
-            Open Protocol Hub <ArrowRight className="ml-1.5 size-3.5" />
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link to="/stake">
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+            >
+              Stake & VIP Tiers
+            </Button>
+          </Link>
+          <Link to="/protocol">
+            <Button
+              size="sm"
+              className="bg-indigo-600 font-semibold text-white hover:bg-indigo-700"
+            >
+              Open Protocol Hub <ArrowRight className="ml-1.5 size-3.5" />
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Main Studio Pipeline */}

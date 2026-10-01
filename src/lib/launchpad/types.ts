@@ -73,3 +73,20 @@ export interface DeployedEcosystemResult {
   deploymentMode: DeploymentExecutionMode;
   archetype: ArchetypeId;
 }
+
+export interface LaunchedTokenRecord {
+  tokenAddress: Address;
+  tokenName: string;
+  tokenSymbol: string;
+  decimals: number;
+  initialSupply: string;
+  description: string;
+  archetype: ArchetypeId;
+  stakingAddress?: Address | undefined;
+  vaultAddress?: Address | undefined;
+  pairAddress?: Address | undefined;
+  creatorAddress: Address;
+  chainId: number;
+  deployedAt: number;
+  txHash: string;
+}
