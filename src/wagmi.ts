@@ -1,5 +1,5 @@
 // src/wagmi.ts
-import { createConfig, http } from "wagmi";
+import { createConfig, fallback, http } from "wagmi";
 import { arbitrum, base, mainnet, optimism, polygon, sepolia } from "wagmi/chains";
 import { coinbaseWallet, injected, metaMask, walletConnect } from "wagmi/connectors";
 
@@ -49,7 +49,7 @@ const ALCHEMY_NETWORK: Record<string, string> = {
 
 const PUBLIC_FALLBACK: Record<string, string | undefined> = {
   mainnet: "https://ethereum.publicnode.com",
-  base: "https://base.publicnode.com",
+  base: "https://mainnet.base.org",
   arbitrum: "https://arb1.arbitrum.io/rpc",
   optimism: "https://mainnet.optimism.io",
   polygon: "https://polygon-rpc.com",
@@ -62,14 +62,23 @@ const buildAlchemyUrl = (network: string) =>
     : undefined;
 
 const createTransport = (network: string) => {
-  // Use publicnode for Base to avoid unconfigured Alchemy app 403s
-  const alchemy = network === "base" ? undefined : buildAlchemyUrl(network);
-  const fallback = PUBLIC_FALLBACK[network];
   const common = { batch: true, retryCount: 3, retryDelay: 1000 };
+
+  // Use official Base RPC with failover to avoid publicnode archive paywalls
+  if (network === "base") {
+    return fallback([
+      http("https://mainnet.base.org", common),
+      http("https://1rpc.io/base", common),
+      http("https://base.meowrpc.com", common),
+    ]);
+  }
+
+  const alchemy = buildAlchemyUrl(network);
+  const fallbackUrl = PUBLIC_FALLBACK[network];
 
   // Prefer Alchemy if available, else explicit public RPC, else default
   if (alchemy) return http(alchemy, common);
-  if (fallback) return http(fallback, common);
+  if (fallbackUrl) return http(fallbackUrl, common);
   return http(undefined, common);
 };
 
