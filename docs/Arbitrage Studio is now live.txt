@@ -1,0 +1,33 @@
+ Arbitrage Studio is now live and integrated into the DEX and Launchpad ecosystem.
+  ──────
+  ### What Was Built & Connected
+
+  1. Dedicated Arbitrage Page (Arbitrage.tsx)
+      • Located at /arbitrage and /launchpad/arbitrage.
+      • Accessible directly from the Launchpad sub-navigation bar via the Arbitrage Studio tab in LaunchpadNav.tsx.
+      • Lazy-loaded in App.tsx:224-225 for zero impact on initial bundle load time.
+  2. Quant Solvers Exposed & Interactive
+      • Triangular Arbitrage Solver (ShaggyDoggQuantAiEngine.calculateCrossDexTriangularArbitrage):
+          • Evaluates 3-hop cyclic routing (e.g., WETH → USDC → DAI → WETH).
+          • Deducts 30 bps (0.3%) AMM swap friction across each pool and accounts for Base L2 gas friction.
+      • Dual-Pool Cross-DEX Spread Optimizer (ShaggyDoggQuantAiEngine.calculateDualPoolArbitrage):
+          • Evaluates pricing spreads across Uniswap V2 and Aerodrome Base.
+          • Determines optimal directional routing (BUY_POOL_A_SELL_POOL_B vs BUY_POOL_B_SELL_POOL_A) and computes net profit margins.
+      • Aave v3 Flash Loan Arbitrage (ShaggyDoggQuantAiEngine.calculateAaveFlashArbitrage):
+          • Computes uncollateralized loan economics with Aave v3's 0.05% (5 bps) flash loan fee on Base.
+          • Live simulation adjusts profits according to your VIP Staking discount tier (from Tier 0 up to Diamond Tier 4 in FeeDiscountStaking.sol).
+      • Paper Simulation Gate:
+          • Requires explicit "ADMIT PAPER" two-step confirmation.
+          • Computes canonical SHA-256 tamper-evident plan digests with computeCanonicalDigest.
+          • Structurally blocked from executing live capital transactions without multi-signature governance approval.
+
+
+  ──────
+  ### Verification & Git Commit
+
+  • Unit Tests: 78 / 78 passing (npm test -- --run)
+  • TypeScript: 0 errors (npm run type-check)
+  • Lint & Format: Clean, 0 warnings (npm run lint, npm run format)
+  • Production Build: Successfully compiled (dist/js/Arbitrage-_sTRFitd.js, 25.68 kB)
+  • Local Dev Server: Responding 200 OK on http://localhost:5173/arbitrage and http://localhost:5173/launchpad/arbitrage.
+  • Git Commit: 37845db ("feat(arbitrage): add quant arbitrage studio with triangular, dual-pool, and flash loan solvers").
