@@ -30,6 +30,7 @@ out/
 .env
 .env.local
 .env.deployer
+.env.bot
 .env.*.local
 .env.development.local
 .env.test.local

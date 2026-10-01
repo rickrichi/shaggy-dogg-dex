@@ -14,6 +14,8 @@
  *  - Atomic EVM Revert Guard (zero loss of principal if prices shift)
  */
 
+import fs from "node:fs";
+import path from "node:path";
 import process from "node:process";
 
 import {
@@ -39,14 +41,38 @@ import {
 import { LAUNCHPAD_ARTIFACTS } from "../src/lib/launchpad/artifacts.js";
 
 // ────────────────────────────────────────────────────────────────────────────
-// CONFIGURATION & ENVIRONMENT
+// CONFIGURATION & ENVIRONMENT LOADER
 // ────────────────────────────────────────────────────────────────────────────
+function loadEnvFile(filePath: string) {
+  if (fs.existsSync(filePath)) {
+    try {
+      const lines = fs.readFileSync(filePath, "utf-8").split("\n");
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("#")) continue;
+        const eqIdx = trimmed.indexOf("=");
+        if (eqIdx > 0) {
+          const key = trimmed.substring(0, eqIdx).trim();
+          const val = trimmed.substring(eqIdx + 1).trim().replace(/^["']|["']$/g, "");
+          if (!process.env[key]) {
+            process.env[key] = val;
+          }
+        }
+      }
+    } catch {}
+  }
+}
+
+loadEnvFile(path.resolve(process.cwd(), ".env.bot"));
+loadEnvFile(path.resolve(process.cwd(), ".env.deployer"));
+loadEnvFile(path.resolve(process.cwd(), ".env"));
+
 const args = process.argv.slice(2);
 const isDryRunFlag = args.includes("--dry-run");
 
 const RPC_HTTP = process.env.BASE_RPC_HTTP || "https://mainnet.base.org";
 const RPC_WS = process.env.BASE_RPC_WS || "wss://base-rpc.publicnode.com";
-const OPERATOR_KEY = process.env.OPERATOR_PRIVATE_KEY as `0x${string}` | undefined;
+const OPERATOR_KEY = (process.env.OPERATOR_PRIVATE_KEY || process.env.PRIVATE_KEY) as `0x${string}` | undefined;
 
 const MIN_NET_PROFIT_USD = parseFloat(process.env.MIN_NET_PROFIT_USD || "500.0");
 const MAX_SLIPPAGE_BPS = parseInt(process.env.MAX_SLIPPAGE_BPS || "20", 10); // 0.20%
