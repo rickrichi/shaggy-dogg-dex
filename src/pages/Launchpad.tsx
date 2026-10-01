@@ -26,6 +26,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 
+import { ActiveProtocolManager } from "@/components/launchpad/ActiveProtocolManager";
 import { DEX_VENUES, LAUNCHPAD_ARCHETYPES } from "@/lib/launchpad/constants";
 import { executeLaunchpadDeployment } from "@/lib/launchpad/deployEngine";
 import type {
@@ -165,6 +166,9 @@ export default function Launchpad() {
           </AlertDescription>
         </Alert>
       )}
+
+      {/* Live Deployed Protocol Management Console */}
+      <ActiveProtocolManager />
 
       {/* Main Studio Pipeline */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
