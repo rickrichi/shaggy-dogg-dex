@@ -119,6 +119,25 @@ export async function executeLaunchpadDeployment(
     const vaultReceipt = await publicClient.waitForTransactionReceipt({ hash: vaultHash });
     vaultAddress = vaultReceipt.contractAddress ?? undefined;
   } else if (form.selectedArchetype === "full_defi_suite") {
+    console.log(`[Launchpad] Deploying YieldStakingVault (Aave v3) suite component...`);
+    const vaultHash = await walletClient.deployContract({
+      abi: LAUNCHPAD_ARTIFACTS.YieldStakingVault.abi,
+      bytecode: LAUNCHPAD_ARTIFACTS.YieldStakingVault.bytecode,
+      args: [
+        CANONICAL_BASE_CONTRACTS.USDC,
+        CANONICAL_BASE_CONTRACTS.AaveV3Pool,
+        "0x4e65fE4DbA92Fc70D9ef79B2bA64722fa0633C14" as Address, // aUSDC Base
+        stakingAddress ?? "0x0000000000000000000000000000000000000000",
+        recipient,
+        recipient,
+      ],
+      account: userAddress,
+      chain: null,
+    });
+    const vaultReceipt = await publicClient.waitForTransactionReceipt({ hash: vaultHash });
+    vaultAddress = vaultReceipt.contractAddress ?? undefined;
+    console.log(`[Launchpad] Yield Staking Vault deployed at: ${vaultAddress}`);
+
     console.log(`[Launchpad] Deploying AaveFlashBorrower suite component...`);
     const borrowerHash = await walletClient.deployContract({
       abi: LAUNCHPAD_ARTIFACTS.AaveFlashBorrower.abi,
@@ -129,6 +148,7 @@ export async function executeLaunchpadDeployment(
     });
     const borrowerReceipt = await publicClient.waitForTransactionReceipt({ hash: borrowerHash });
     borrowerAddress = borrowerReceipt.contractAddress ?? undefined;
+    console.log(`[Launchpad] Flash Loan Borrower deployed at: ${borrowerAddress}`);
   }
 
   // ────────────────────────────────────────────────────────────────────────────
