@@ -23,6 +23,7 @@ const files = [
   "AaveFlashBorrower.sol",
   "YieldStakingVault.sol",
   "CompoundYieldVault.sol",
+  "IsolatedLendingVault.sol",
   "DeployEcosystem.sol",
 ];
 const sources = {};
