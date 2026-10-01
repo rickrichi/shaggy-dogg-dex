@@ -6,15 +6,16 @@ export const CANONICAL_BASE_CONTRACTS = {
   WETH: "0x4200000000000000000000000000000000000006" as Address,
   USDC: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as Address,
   AaveV3Pool: "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5" as Address,
-  MoonwellComptroller: "0xfbb21d0380beE3312B33c4353c7936a0F13EF26C" as Address,
+  aUSDC: "0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB" as Address,
+  MoonwellComptroller: "0xFbb21d0380bee3312b33C4353c7936a0F13ef26C" as Address,
   MoonwellWethMarket: "0x628ff693426583D9a7FB391E54366292F509D457" as Address,
-  MoonwellUsdcMarket: "0xEdc817A28E8B93Ca120334C48696d70d740E7D2B" as Address,
+  MoonwellUsdcMarket: "0xeDC817a28e8B93Ca120334C48696d70d740E7D2B" as Address,
   MorphoBlue: "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb" as Address,
   UniswapV2Router: "0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24" as Address,
   UniswapV2Factory: "0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6" as Address,
   PancakeSwapV2Router: "0x8cFe327CEc66d1C090Dd72bd0FF11d690C33a2Eb" as Address,
   PancakeSwapV2Factory: "0x02a84c1b3BBD7401a5f7fa98a384EBC70bB5749E" as Address,
-  AerodromeRouter: "0xcF77a3Ba9A5CA399B7c97c749545344273801A9B" as Address,
+  AerodromeRouter: "0xCf77a3bA9A5ca399b7c97c749545344273801A9B" as Address,
 };
 
 export const LAUNCHPAD_ARCHETYPES: ArchetypeDefinition[] = [

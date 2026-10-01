@@ -108,7 +108,7 @@ export async function executeLaunchpadDeployment(
       args: [
         CANONICAL_BASE_CONTRACTS.USDC,
         CANONICAL_BASE_CONTRACTS.AaveV3Pool,
-        "0x4e65fE4DbA92Fc70D9ef79B2bA64722fa0633C14" as Address, // aUSDC Base
+        CANONICAL_BASE_CONTRACTS.aUSDC,
         stakingAddress ?? "0x0000000000000000000000000000000000000000",
         recipient,
         recipient,
@@ -126,7 +126,7 @@ export async function executeLaunchpadDeployment(
       args: [
         CANONICAL_BASE_CONTRACTS.USDC,
         CANONICAL_BASE_CONTRACTS.AaveV3Pool,
-        "0x4e65fE4DbA92Fc70D9ef79B2bA64722fa0633C14" as Address, // aUSDC Base
+        CANONICAL_BASE_CONTRACTS.aUSDC,
         stakingAddress ?? "0x0000000000000000000000000000000000000000",
         recipient,
         recipient,
