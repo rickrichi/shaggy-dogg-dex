@@ -24,6 +24,8 @@
     "api:dev": "npm --prefix server run dev",
     "api:start": "npm --prefix server run start",
     "script:block": "tsx scripts/getBlock.ts",
+    "bot:arbitrage": "tsx scripts/arbitrage-bot-daemon.ts",
+    "bot:arbitrage:dry-run": "tsx scripts/arbitrage-bot-daemon.ts --dry-run",
     "test": "vitest",
     "amm:plan:test": "vitest run src/lib/amm/plans.test.ts --reporter=dot",
     "amm:mainnet-readiness:test": "vitest run src/lib/amm/mainnet-readiness.test.ts --reporter=dot",
