@@ -10,6 +10,7 @@ import {
   Loader2,
   ShieldCheck,
   Sparkles,
+  TrendingUp,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -52,6 +53,11 @@ export function ActiveProtocolManager() {
   // Staking Tiers State
   const [isSettingTiers, setIsSettingTiers] = useState<boolean>(false);
   const [tiersTxHash, setTiersTxHash] = useState<string | null>(null);
+
+  // Initial Market Swap State
+  const [swapEthAmount, setSwapEthAmount] = useState<string>("0.00005");
+  const [isSwapping, setIsSwapping] = useState<boolean>(false);
+  const [swapTxHash, setSwapTxHash] = useState<string | null>(null);
 
   // ────────────────────────────────────────────────────────────────────────────
   // Action 1: Add Liquidity ETH to Uniswap V2
@@ -162,7 +168,94 @@ export function ActiveProtocolManager() {
       console.error(err);
       toast.error(err instanceof Error ? err.message : "Failed to set tiers.");
     } finally {
-      setIsSettingTiers(false);
+  // ────────────────────────────────────────────────────────────────────────────
+  // Action 3: One-Click Import Token into MetaMask (EIP-747)
+  // ────────────────────────────────────────────────────────────────────────────
+  const handleWatchToken = async () => {
+    try {
+      if (walletClient) {
+        await walletClient.watchAsset({
+          type: "ERC20",
+          options: {
+            address: AMUTT_DEPLOYMENT.tokenAddress,
+            symbol: "AMUTT",
+            decimals: 18,
+          },
+        });
+        toast.success("Astro Mutt (AMUTT) added to MetaMask!");
+        return;
+      }
+
+      const ethereum = (window as unknown as { ethereum?: { request: (args: unknown) => Promise<unknown> } }).ethereum;
+      if (!ethereum) {
+        toast.error("MetaMask provider not found.");
+        return;
+      }
+      await ethereum.request({
+        method: "wallet_watchAsset",
+        params: {
+          type: "ERC20",
+          options: {
+            address: AMUTT_DEPLOYMENT.tokenAddress,
+            symbol: "AMUTT",
+            decimals: 18,
+          },
+        },
+      });
+      toast.success("Astro Mutt (AMUTT) added to MetaMask!");
+    } catch (err: unknown) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Failed to add token to MetaMask.");
+    }
+  };
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // Action 4: Execute Initial Market Trade (First Buy on Base Mainnet)
+  // ────────────────────────────────────────────────────────────────────────────
+  const handleExecuteInitialSwap = async () => {
+    if (!isConnected || !address || !walletClient || !publicClient) {
+      toast.error("Please connect your wallet first.");
+      return;
+    }
+    if (chainId !== 8453) {
+      toast.error("Please switch to Base Mainnet.");
+      return;
+    }
+
+    try {
+      setIsSwapping(true);
+      setSwapTxHash(null);
+
+      const parsedEth = parseEther(swapEthAmount);
+      const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200);
+      const path = [CANONICAL_BASE_CONTRACTS.WETH, AMUTT_DEPLOYMENT.tokenAddress];
+
+      toast.info("Sending swapExactETHForTokens to MetaMask...");
+
+      const hash = await walletClient.writeContract({
+        address: AMUTT_DEPLOYMENT.uniswapRouterAddress,
+        abi: UNISWAP_V2_ROUTER_ABI,
+        functionName: "swapExactETHForTokens",
+        args: [0n, path, address, deadline],
+        value: parsedEth,
+        account: address,
+        chain: null,
+      });
+
+      toast.info("Swap submitted! Awaiting Base confirmation...");
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+
+      if (receipt.status === "success") {
+        setSwapTxHash(hash);
+        toast.success("Initial swap successful! Trading data is now live on GeckoTerminal & DexScreener!");
+      } else {
+        throw new Error("Swap transaction reverted.");
+      }
+    } catch (err: unknown) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Swap failed.");
+    } finally {
+      setIsSwapping(false);
     }
   };
 
@@ -188,6 +281,24 @@ export function ActiveProtocolManager() {
         <CardDescription>
           Complete the live ecosystem setup for your deployed Astro Mutt contracts on Base Mainnet.
         </CardDescription>
+
+        {/* 1-Click MetaMask Token Importer */}
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 bg-purple-100/70 border border-purple-200 p-3 rounded-xl">
+          <div className="flex items-center gap-2.5">
+            <span className="text-2xl">🦊</span>
+            <div>
+              <p className="text-xs font-bold text-purple-950">1-Click MetaMask Token Importer</p>
+              <p className="text-[11px] text-purple-800">Can't find the import button in MetaMask? Click below to prompt MetaMask directly.</p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            onClick={handleWatchToken}
+            className="bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs shadow-sm"
+          >
+            Add AMUTT to MetaMask
+          </Button>
+        </div>
       </CardHeader>
 
       <CardContent className="space-y-6">
@@ -388,6 +499,89 @@ export function ActiveProtocolManager() {
                 >
                   {tiersTxHash}
                 </a>
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
+
+        {/* ── OPERATION: INITIAL MARKET TRADE ── */}
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="size-5 text-emerald-600" />
+              <h3 className="font-bold text-gray-900 text-base">Step 4: Execute Initial Market Trade (First Buy)</h3>
+            </div>
+            <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200">Live DEX Market Starter</Badge>
+          </div>
+          <p className="text-xs text-gray-600 leading-relaxed">
+            Execute the very first trade on your Uniswap V2 AMUTT/WETH pool. Swapping a tiny fraction of ETH (e.g. 0.00005 ETH ≈ $0.13)
+            creates the first on-chain buy, establishes the initial USD price, draws the first candlestick on DexScreener, and activates 24h volume and price on GeckoTerminal!
+          </p>
+
+          <div className="max-w-xs space-y-1.5">
+            <Label htmlFor="swapEthAmount" className="text-xs font-semibold text-gray-700">ETH Amount to Swap for AMUTT</Label>
+            <Input
+              id="swapEthAmount"
+              value={swapEthAmount}
+              onChange={(e) => setSwapEthAmount(e.target.value)}
+              placeholder="0.00005"
+              className="bg-white"
+            />
+          </div>
+
+          <Button
+            onClick={handleExecuteInitialSwap}
+            disabled={isSwapping || !isConnected || chainId !== 8453}
+            className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+          >
+            {isSwapping ? (
+              <>
+                <Loader2 className="mr-2 size-4 animate-spin" />
+                Executing Swap on Base...
+              </>
+            ) : (
+              <>
+                <TrendingUp className="mr-2 size-4" />
+                Execute First Buy via MetaMask ({swapEthAmount} ETH)
+              </>
+            )}
+          </Button>
+
+          {swapTxHash && (
+            <Alert className="border-emerald-300 bg-white text-emerald-950">
+              <CheckCircle2 className="size-4 text-emerald-600" />
+              <AlertTitle className="text-sm font-bold">First Market Swap Confirmed!</AlertTitle>
+              <AlertDescription className="text-xs space-y-2 mt-1">
+                <div>
+                  Transaction hash:{" "}
+                  <a
+                    href={`https://basescan.org/tx/${swapTxHash}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-mono underline text-emerald-700"
+                  >
+                    {swapTxHash}
+                  </a>
+                </div>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <a
+                    href="https://dexscreener.com/base/0x581B294FeC1A4332f17cf18B49D68087c09b6784"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center text-xs font-semibold text-purple-700 hover:underline"
+                  >
+                    View on DexScreener <ExternalLink className="ml-1 size-3" />
+                  </a>
+                  <span className="text-gray-300">•</span>
+                  <a
+                    href="https://www.geckoterminal.com/base/pools/0x581B294FeC1A4332f17cf18B49D68087c09b6784"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center text-xs font-semibold text-emerald-700 hover:underline"
+                  >
+                    View on GeckoTerminal <ExternalLink className="ml-1 size-3" />
+                  </a>
+                </div>
               </AlertDescription>
             </Alert>
           )}

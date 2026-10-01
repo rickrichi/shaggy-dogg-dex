@@ -12,8 +12,8 @@ import {
 } from "wagmi";
 
 import { ERC20_ABI, UNISWAP_V2_ROUTER_ABI } from "@/config/abis";
-import { CONTRACTS, DEFAULT_SLIPPAGE, SWAP_DEADLINE_BUFFER } from "@/config/contracts";
-import { WRAPPED_NATIVE_ADDRESS } from "@/config/tokens";
+import { DEFAULT_SLIPPAGE, SWAP_DEADLINE_BUFFER, getUniswapV2Router } from "@/config/contracts";
+import { WRAPPED_NATIVE_ADDRESS, getWrappedNativeAddress } from "@/config/tokens";
 import {
   trackProtectionAndGas,
   trackQuoteSourceSelection,
@@ -120,7 +120,11 @@ export interface UseSwapReturn {
 }
 
 export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwapReturn {
-  const { address, isConnected } = useAccount();
+  const { chain, address, isConnected } = useAccount();
+  const currentChainId = chain?.id ?? 1;
+  const currentRouter = getUniswapV2Router(currentChainId);
+  const currentWrapped = getWrappedNativeAddress(currentChainId);
+
   const lastSwapContextRef = useRef<SwapTelemetryContext | null>(null);
   const lastRouteRef = useRef<{ path: readonly Address[]; source: string } | null>(null);
   const [activeRoutePath, setActiveRoutePath] = useState<readonly Address[] | null>(null);
@@ -195,7 +199,7 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
     functionName: "allowance",
     args:
       isConnected && !!address && !isNative(state.sellToken.address)
-        ? [address, CONTRACTS.UNISWAP_V2_ROUTER as Address]
+        ? [address, currentRouter]
         : undefined,
     query: {
       enabled: isConnected && !!address && !isNative(state.sellToken.address),
@@ -205,8 +209,8 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
   // ---------- Quote (Uniswap V2 getAmountsOut) ----------
   const routePath: readonly Address[] | undefined = useMemo(() => {
     if (!state.sellAmount) return undefined;
-    return buildRoutePath(state.sellToken, state.buyToken);
-  }, [state.sellAmount, state.sellToken, state.buyToken]);
+    return buildRoutePath(state.sellToken, state.buyToken, currentWrapped);
+  }, [state.sellAmount, state.sellToken, state.buyToken, currentWrapped]);
 
   const amountInForQuote =
     state.sellAmount && parseFloat(state.sellAmount) > 0
@@ -218,7 +222,7 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
     isError: isQuoteError,
     isLoading: isQuoteLoading,
   } = useReadContract({
-    address: CONTRACTS.UNISWAP_V2_ROUTER as Address,
+    address: currentRouter,
     abi: UNISWAP_V2_ROUTER_ABI,
     functionName: "getAmountsOut",
     args:
@@ -354,7 +358,7 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
         abi: ERC20_ABI,
         functionName: "approve",
         args: [
-          CONTRACTS.UNISWAP_V2_ROUTER as Address,
+          currentRouter,
           parseUnits(state.sellAmount, state.sellToken.decimals),
         ],
         chain: undefined,
@@ -368,7 +372,7 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
       toast.error("Approval failed. Please try again.");
       console.error("Approve error:", error);
     }
-  }, [state.sellAmount, state.sellToken.address, state.sellToken.decimals, approveToken]);
+  }, [state.sellAmount, state.sellToken.address, state.sellToken.decimals, approveToken, currentRouter]);
 
   const handleSwap = useCallback(async () => {
     if (!canSwap || !quoteData) return;
@@ -426,7 +430,7 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
       if (isNative(state.sellToken.address)) {
         // native -> token
         hash = await executeSwap({
-          address: CONTRACTS.UNISWAP_V2_ROUTER as Address,
+          address: currentRouter,
           abi: UNISWAP_V2_ROUTER_ABI,
           functionName: "swapExactETHForTokens",
           args: [amountOutMin, uniswapPath, address as Address, deadline],
@@ -437,7 +441,7 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
       } else if (isNative(state.buyToken.address)) {
         // token -> native; the V2 router unwraps WETH before sending ETH to the recipient.
         hash = await executeSwap({
-          address: CONTRACTS.UNISWAP_V2_ROUTER as Address,
+          address: currentRouter,
           abi: UNISWAP_V2_ROUTER_ABI,
           functionName: "swapExactTokensForETH",
           args: [amountIn, amountOutMin, uniswapPath, address as Address, deadline],
@@ -447,7 +451,7 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
       } else {
         // token -> token
         hash = await executeSwap({
-          address: CONTRACTS.UNISWAP_V2_ROUTER as Address,
+          address: currentRouter,
           abi: UNISWAP_V2_ROUTER_ABI,
           functionName: "swapExactTokensForTokens",
           args: [amountIn, amountOutMin, uniswapPath, address as Address, deadline],
@@ -486,6 +490,7 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
     activeRoutePath,
     executeSwap,
     address,
+    currentRouter,
   ]);
 
   const reverseTokens = useCallback(() => {

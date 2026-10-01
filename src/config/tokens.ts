@@ -226,3 +226,10 @@ if (!wrappedNative || wrappedNative.kind !== "erc20") {
 }
 
 export const WRAPPED_NATIVE_ADDRESS: Address = wrappedNative.address;
+
+export function getWrappedNativeAddress(chainId?: number): Address {
+  if (chainId === 8453) {
+    return "0x4200000000000000000000000000000000000006" as Address;
+  }
+  return WRAPPED_NATIVE_ADDRESS;
+}
