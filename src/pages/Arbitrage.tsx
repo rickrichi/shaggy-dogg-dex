@@ -442,7 +442,7 @@ export default function Arbitrage() {
   // OPTION A: IN-BROWSER AI AUTO-PILOT STATE & ENGINE
   // ──────────────────────────────────────────────────────────────────────────
   const [isBotRunning, setIsBotRunning] = useState<boolean>(false);
-  const [minNetProfitTarget, setMinNetProfitTarget] = useState<number>(500.0);
+  const [minNetProfitTarget, setMinNetProfitTarget] = useState<number>(5.0);
   const [maxSlippageCap, setMaxSlippageCap] = useState<number>(0.2); // 0.2%
   const [maxGasCeiling, setMaxGasCeiling] = useState<number>(0.01); // 0.01 Gwei
   const [autoSubmitTrades, setAutoSubmitTrades] = useState<boolean>(false);
@@ -932,10 +932,10 @@ export default function Arbitrage() {
                     <Input
                       id="profitTarget"
                       type="number"
-                      step="50"
+                      step="1"
                       value={minNetProfitTarget}
                       onChange={(e) => setMinNetProfitTarget(parseFloat(e.target.value) || 0)}
-                      placeholder="e.g. 500.00"
+                      placeholder="e.g. 5.00"
                       className="bg-white font-mono text-sm"
                     />
                     <p className="text-[11px] text-slate-500">

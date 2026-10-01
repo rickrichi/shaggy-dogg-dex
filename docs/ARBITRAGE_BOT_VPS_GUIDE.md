@@ -15,7 +15,7 @@ This guide explains how to deploy and operate the **Shaggy Mutt DEX Autonomous A
 ┌────────────────────────────────┐
 │   Arbitrage Bot Daemon (Node)  │ (scripts/arbitrage-bot-daemon.ts)
 ├────────────────────────────────┤
-│ 1. AI Profit Delta Guard       │ -> Net Profit > Min Hurdle ($500.00 default)
+│ 1. AI Profit Delta Guard       │ -> Net Profit > Min Hurdle ($5.00 default)
 │ 2. Base Gas Ceiling Guard      │ -> Base Gas < Max Cap (0.01 Gwei default)
 │ 3. Slippage Margin Guard       │ -> Slippage < 0.20%
 └───────────────┬────────────────┘
@@ -70,7 +70,7 @@ BASE_RPC_HTTP=https://mainnet.base.org
 BASE_RPC_WS=wss://base-rpc.publicnode.com
 
 # Minimum required net profit in USD per trade
-MIN_NET_PROFIT_USD=500.0
+MIN_NET_PROFIT_USD=5.0
 
 # Maximum price slippage tolerance (20 bps = 0.20%)
 MAX_SLIPPAGE_BPS=20

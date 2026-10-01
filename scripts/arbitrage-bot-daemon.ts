@@ -59,7 +59,9 @@ function loadEnvFile(filePath: string) {
           }
         }
       }
-    } catch {}
+    } catch {
+      // Ignore unreadable or missing env files
+    }
   }
 }
 
@@ -74,7 +76,7 @@ const RPC_HTTP = process.env.BASE_RPC_HTTP || "https://mainnet.base.org";
 const RPC_WS = process.env.BASE_RPC_WS || "wss://base-rpc.publicnode.com";
 const OPERATOR_KEY = (process.env.OPERATOR_PRIVATE_KEY || process.env.PRIVATE_KEY) as `0x${string}` | undefined;
 
-const MIN_NET_PROFIT_USD = parseFloat(process.env.MIN_NET_PROFIT_USD || "500.0");
+const MIN_NET_PROFIT_USD = parseFloat(process.env.MIN_NET_PROFIT_USD || "5.0");
 const MAX_SLIPPAGE_BPS = parseInt(process.env.MAX_SLIPPAGE_BPS || "20", 10); // 0.20%
 const MAX_GAS_GWEI = parseFloat(process.env.MAX_GAS_GWEI || "0.01"); // 0.01 Gwei
 const TRADE_CAPITAL_ETH = parseFloat(process.env.TRADE_CAPITAL_ETH || "2.0");
