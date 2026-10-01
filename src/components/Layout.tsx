@@ -1,7 +1,7 @@
 import { type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 
-import { Activity, ArrowLeftRight, Droplets, PieChart, Rocket, Settings } from "lucide-react";
+import { Activity, ArrowLeftRight, Droplets, PieChart, Rocket, Settings, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { WalletConnect } from "@/components/WalletConnect";
@@ -17,6 +17,7 @@ export const Layout = ({ children }: LayoutProps) => {
     { name: "Swap", href: "/swap", icon: ArrowLeftRight },
     { name: "Liquidity", href: "/liquidity", icon: Droplets },
     { name: "Launchpad", href: "/launchpad", icon: Rocket },
+    { name: "Protocol Hub", href: "/protocol", icon: Sparkles },
     { name: "Portfolio", href: "/portfolio", icon: PieChart },
     { name: "Activity", href: "/activity", icon: Activity },
     { name: "Admin", href: "/admin", icon: Settings },

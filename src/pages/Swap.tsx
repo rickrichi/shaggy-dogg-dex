@@ -13,7 +13,7 @@ import { SwapCard } from "@/components/swap/SwapCard";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { isErc20Token, MAINNET_TOKENS, type Token, type TokenSymbol } from "@/config/tokens";
+import { getTokensForChain, isErc20Token, MAINNET_TOKENS, type Token, type TokenSymbol } from "@/config/tokens";
 import { useSwap } from "@/hooks/useSwap";
 import { fetchPrices } from "@/lib/api/prices";
 
@@ -73,32 +73,42 @@ function parseTradeMode(param: string | null): TradeMode {
 /**
  * Get initial token from URL param or fallback to index
  */
-function getInitialToken(param: string | null, fallbackIndex: number): Token {
-  const fallback = MAINNET_TOKENS[fallbackIndex];
+function getInitialToken(param: string | null, fallbackIndex: number, chainId?: number): Token {
+  const chainTokens = getTokensForChain(chainId);
+  const fallback = chainTokens[fallbackIndex] ?? chainTokens[0];
   if (!fallback) {
-    throw new Error("MAINNET_TOKENS must include at least one token");
+    throw new Error("Tokens list must include at least one token");
   }
 
   if (!param) return fallback;
 
+  if (param.toLowerCase() === "native" || param.toUpperCase() === "ETH") {
+    const nativeToken = chainTokens.find((t) => t.kind === "native");
+    return nativeToken ?? fallback;
+  }
+
   const normalized = param.toLowerCase();
-  const found = MAINNET_TOKENS.find((t) => t.address.toLowerCase() === normalized);
+  const found = chainTokens.find(
+    (t) => t.address.toLowerCase() === normalized || t.symbol.toLowerCase() === normalized
+  );
   return found ?? fallback;
 }
 
 /**
  * Find first stablecoin in token list (type-safe, no `as any`)
  */
-function getFirstStable(fallback: Token): Token {
-  const stable = MAINNET_TOKENS.find((t) => isStableSymbol(t.symbol));
+function getFirstStable(fallback: Token, chainId?: number): Token {
+  const chainTokens = getTokensForChain(chainId);
+  const stable = chainTokens.find((t) => isStableSymbol(t.symbol));
   return stable ?? fallback;
 }
 
 /**
  * Find first non-stablecoin in token list (type-safe, no `as any`)
  */
-function getFirstNonStable(fallback: Token): Token {
-  const nonStable = MAINNET_TOKENS.find((t) => !isStableSymbol(t.symbol));
+function getFirstNonStable(fallback: Token, chainId?: number): Token {
+  const chainTokens = getTokensForChain(chainId);
+  const nonStable = chainTokens.find((t) => !isStableSymbol(t.symbol));
   return nonStable ?? fallback;
 }
 
@@ -154,20 +164,22 @@ export default function Swap() {
   // Token Selection Logic
   // ────────────────────────────────────────────────────────────────────────────
 
+  const chainTokens = useMemo(() => getTokensForChain(chain?.id), [chain?.id]);
+
   const baseTokens = useMemo(
     () => ({
-      initialSell: getInitialToken(urlParams.input, 0),
-      initialBuy: getInitialToken(urlParams.output, 1),
+      initialSell: getInitialToken(urlParams.input, 0, chain?.id),
+      initialBuy: getInitialToken(urlParams.output, 1, chain?.id),
     }),
-    [urlParams.input, urlParams.output]
+    [urlParams.input, urlParams.output, chain?.id]
   );
 
   const specialTokens = useMemo(
     () => ({
-      stable: getFirstStable(baseTokens.initialSell),
-      nonStable: getFirstNonStable(baseTokens.initialBuy),
+      stable: getFirstStable(baseTokens.initialSell, chain?.id),
+      nonStable: getFirstNonStable(baseTokens.initialBuy, chain?.id),
     }),
-    [baseTokens.initialSell, baseTokens.initialBuy]
+    [baseTokens.initialSell, baseTokens.initialBuy, chain?.id]
   );
 
   // ────────────────────────────────────────────────────────────────────────────
@@ -471,17 +483,17 @@ export default function Swap() {
                   {tabMode === "limit" ? (
                     <LimitOrderCard
                       swap={swapInstances[tabMode]}
-                      tokens={MAINNET_TOKENS}
+                      tokens={chainTokens}
                       showSettings={showSettings}
                       onSettingsChange={setShowSettings}
                     />
                   ) : (
                     <SwapCard
                       swap={swapInstances[tabMode]}
-                      tokens={MAINNET_TOKENS}
+                      tokens={chainTokens}
                       isCorrectNetwork={isCorrectNetwork}
                       isSwitchingNetwork={isSwitchingChain}
-                      onSwitchNetwork={() => switchChain({ chainId: mainnet.id })}
+                      onSwitchNetwork={() => switchChain({ chainId: 8453 })}
                       showSettings={showSettings}
                       onSettingsChange={setShowSettings}
                     />

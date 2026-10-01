@@ -26,7 +26,6 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 
-import { ActiveProtocolManager } from "@/components/launchpad/ActiveProtocolManager";
 import { DEX_VENUES, LAUNCHPAD_ARCHETYPES } from "@/lib/launchpad/constants";
 import { executeLaunchpadDeployment } from "@/lib/launchpad/deployEngine";
 import type {
@@ -167,8 +166,23 @@ export default function Launchpad() {
         </Alert>
       )}
 
-      {/* Live Deployed Protocol Management Console */}
-      <ActiveProtocolManager />
+      {/* Managing Deployed Protocol Banner */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-indigo-200 bg-gradient-to-r from-indigo-50/80 via-purple-50/60 to-white p-4 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="flex size-9 items-center justify-center rounded-lg bg-indigo-600 text-white">
+            <Sparkles className="size-5" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-gray-900">Managing a Live Ecosystem?</p>
+            <p className="text-xs text-gray-600">Access contracts, VIP staking tiers, LP pools, and 1-click token import in the dedicated Protocol Hub.</p>
+          </div>
+        </div>
+        <Link to="/protocol">
+          <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">
+            Open Protocol Hub <ArrowRight className="ml-1.5 size-3.5" />
+          </Button>
+        </Link>
+      </div>
 
       {/* Main Studio Pipeline */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">

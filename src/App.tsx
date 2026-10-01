@@ -25,6 +25,7 @@ const Portfolio = lazy(() => import("./pages/Portfolio"));
 const Activity = lazy(() => import("./pages/Activity"));
 const Admin = lazy(() => import("./pages/Admin"));
 const Launchpad = lazy(() => import("./pages/Launchpad"));
+const ProtocolOps = lazy(() => import("./pages/ProtocolOps"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Optional (dev only): React Query Devtools
@@ -216,6 +217,8 @@ export const AppRoutes = (): JSX.Element => (
         <Route path="/liquidity" element={<Liquidity />} />
         <Route path="/launchpad" element={<Launchpad />} />
         <Route path="/create-token" element={<Launchpad />} />
+        <Route path="/protocol" element={<ProtocolOps />} />
+        <Route path="/launchpad/manage" element={<ProtocolOps />} />
         <Route path="/portfolio" element={<Portfolio />} />
         <Route path="/activity" element={<Activity />} />
         <Route path="/admin" element={<Admin />} />

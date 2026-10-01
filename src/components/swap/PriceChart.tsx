@@ -2,25 +2,25 @@ import { useMemo } from "react";
 
 import { ArrowRight, RefreshCw, Route } from "lucide-react";
 import { type Address, formatUnits, parseUnits } from "viem";
-import { useReadContracts } from "wagmi";
+import { useAccount, useReadContracts } from "wagmi";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { UNISWAP_V2_ROUTER_ABI } from "@/config/abis";
-import { DEX_VENUES } from "@/config/dexes";
-import { type Token, WRAPPED_NATIVE_ADDRESS } from "@/config/tokens";
+import { getDexVenuesForChain } from "@/config/dexes";
+import { type Token, getWrappedNativeAddress } from "@/config/tokens";
 
-const resolveAddress = (token: Token): Address =>
-  token.address === "native" ? WRAPPED_NATIVE_ADDRESS : token.address;
+const resolveAddress = (token: Token, wrappedAddress: Address): Address =>
+  token.address === "native" ? wrappedAddress : token.address;
 
-const buildPath = (baseToken: Token, quoteToken: Token): readonly Address[] => {
-  const base = resolveAddress(baseToken);
-  const quote = resolveAddress(quoteToken);
+const buildPath = (baseToken: Token, quoteToken: Token, wrappedAddress: Address): readonly Address[] => {
+  const base = resolveAddress(baseToken, wrappedAddress);
+  const quote = resolveAddress(quoteToken, wrappedAddress);
   if (base === quote) return [base];
-  if (base === WRAPPED_NATIVE_ADDRESS || quote === WRAPPED_NATIVE_ADDRESS) {
+  if (base === wrappedAddress || quote === wrappedAddress) {
     return [base, quote];
   }
-  return [base, WRAPPED_NATIVE_ADDRESS, quote];
+  return [base, wrappedAddress, quote];
 };
 
 interface PriceChartProps {
@@ -37,7 +37,12 @@ interface VenueQuote {
 }
 
 export const PriceChart = ({ baseToken, quoteToken }: PriceChartProps) => {
-  const path = useMemo(() => buildPath(baseToken, quoteToken), [baseToken, quoteToken]);
+  const { chain } = useAccount();
+  const chainId = chain?.id ?? 1;
+  const venues = useMemo(() => getDexVenuesForChain(chainId), [chainId]);
+  const wrappedAddress = useMemo(() => getWrappedNativeAddress(chainId), [chainId]);
+
+  const path = useMemo(() => buildPath(baseToken, quoteToken, wrappedAddress), [baseToken, quoteToken, wrappedAddress]);
   const amountIn = useMemo(() => parseUnits("1", baseToken.decimals), [baseToken.decimals]);
   const canQuote = path.length > 1 && path[0] !== path[path.length - 1];
 
@@ -48,7 +53,7 @@ export const PriceChart = ({ baseToken, quoteToken }: PriceChartProps) => {
     isFetching,
     refetch,
   } = useReadContracts({
-    contracts: DEX_VENUES.map((venue) => ({
+    contracts: venues.map((venue) => ({
       address: venue.router,
       abi: UNISWAP_V2_ROUTER_ABI,
       functionName: "getAmountsOut" as const,
@@ -63,7 +68,7 @@ export const PriceChart = ({ baseToken, quoteToken }: PriceChartProps) => {
 
   const quotes = useMemo<readonly VenueQuote[]>(
     () =>
-      DEX_VENUES.map((venue, index) => {
+      venues.map((venue, index) => {
         const result = data?.[index];
         const amounts = result?.status === "success" ? result.result : undefined;
         const output = Array.isArray(amounts) ? (amounts.at(-1) as bigint | undefined) : undefined;
@@ -78,7 +83,7 @@ export const PriceChart = ({ baseToken, quoteToken }: PriceChartProps) => {
           ...(detail ? { detail } : {}),
         };
       }),
-    [data, isFetching]
+    [data, isFetching, venues]
   );
 
   const bestOutput = quotes.reduce<bigint | null>(
