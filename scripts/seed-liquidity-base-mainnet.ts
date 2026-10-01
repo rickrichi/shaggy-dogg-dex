@@ -1,14 +1,15 @@
 import fs from "node:fs";
 import path from "node:path";
+
 import {
+  type Address,
   createPublicClient,
   createWalletClient,
+  formatEther,
+  type Hex,
   http,
   parseAbi,
   parseEther,
-  formatEther,
-  type Address,
-  type Hex,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";

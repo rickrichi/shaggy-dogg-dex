@@ -1,5 +1,5 @@
-import { createPublicClient, http, formatEther, type Address } from "viem";
-import { base, baseSepolia, sepolia, mainnet, arbitrumSepolia, optimismSepolia } from "viem/chains";
+import { type Address,createPublicClient, formatEther, http } from "viem";
+import { arbitrumSepolia, base, baseSepolia, mainnet, optimismSepolia,sepolia } from "viem/chains";
 
 const userAddress: Address = "0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98";
 const scriptDeployer: Address = "0xc1c3d6552231DB22A22Bdf513C0833024FF3f42B";

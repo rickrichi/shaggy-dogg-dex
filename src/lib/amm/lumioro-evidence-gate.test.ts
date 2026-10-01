@@ -37,8 +37,7 @@ describe("LUMIORO mainnet evidence gate", () => {
       auditor: "Tanaka Minato",
       reviewedAt: "2026-09-19",
       memorandumPath: "docs/INDEPENDENT-REVIEW-MEMORANDUM-LUMIORO-TOKEN.md",
-      memorandumSha256:
-        "0x828b2ddeee5521bd4e4ebf6b2e68b8d642dc4245fc2f883e6fd6442a8f5ba3c7",
+      memorandumSha256: "0x828b2ddeee5521bd4e4ebf6b2e68b8d642dc4245fc2f883e6fd6442a8f5ba3c7",
       authenticationRecord: "deployments/lumioro-token-build-2026-08-30.json",
       scopedSourceCommit: "7f359ab44a8636632ea8d07e36ba3a174271d26c",
       deployedRuntimeBytecodeSha256: LUMIORO_MAINNET_RELEASE.token.runtimeBytecodeSha256,

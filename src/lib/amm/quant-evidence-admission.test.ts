@@ -1,9 +1,10 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+
 import { type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
+import { describe, expect, it } from "vitest";
 
 import {
   BASE_CHAIN_ID,
@@ -18,7 +19,8 @@ import {
   QuantEvidenceVerifier,
 } from "./quant-evidence-admission";
 
-const TEST_PRIVATE_KEY = "***REMOVED***" as Hex;
+const TEST_PRIVATE_KEY =
+  "***REMOVED***" as Hex;
 const TEST_ANCHOR = "0x1111111111111111111111111111111111111111" as const;
 const NOW = 1_800_000_000;
 
@@ -71,24 +73,32 @@ describe("DexQuantEvidenceAdmissionGate & Verifier", () => {
 
     // Tamper with integrity digest
     const wrongDigest = JSON.parse(JSON.stringify(evidence));
-    wrongDigest.integrity.sha256 = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
+    wrongDigest.integrity.sha256 =
+      "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
     expect(() => QuantEvidenceVerifier.verify(wrongDigest)).toThrow(QuantEvidenceRejectedError);
   });
 
   it("DurableDexReplayLedger prevents nonce reuse and survives simulated restart", () => {
-    const tempFile = path.join(os.tmpdir(), `dex-replay-${Date.now()}-${Math.random().toString(36).substring(7)}.jsonl`);
+    const tempFile = path.join(
+      os.tmpdir(),
+      `dex-replay-${Date.now()}-${Math.random().toString(36).substring(7)}.jsonl`
+    );
     try {
       const ledger1 = new DurableDexReplayLedger(tempFile, () => NOW);
       expect(ledger1.hasNonce("lumioro-desk", 101n)).toBe(false);
 
       ledger1.registerNonce("lumioro-desk", 101n, BigInt(NOW + 300));
       expect(ledger1.hasNonce("lumioro-desk", 101n)).toBe(true);
-      expect(() => ledger1.registerNonce("lumioro-desk", 101n, BigInt(NOW + 300))).toThrow(QuantEvidenceRejectedError);
+      expect(() => ledger1.registerNonce("lumioro-desk", 101n, BigInt(NOW + 300))).toThrow(
+        QuantEvidenceRejectedError
+      );
 
       // Simulate process restart: read from disk
       const ledger2 = new DurableDexReplayLedger(tempFile, () => NOW);
       expect(ledger2.hasNonce("lumioro-desk", 101n)).toBe(true);
-      expect(() => ledger2.registerNonce("lumioro-desk", 101n, BigInt(NOW + 300))).toThrow(QuantEvidenceRejectedError);
+      expect(() => ledger2.registerNonce("lumioro-desk", 101n, BigInt(NOW + 300))).toThrow(
+        QuantEvidenceRejectedError
+      );
     } finally {
       if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
     }

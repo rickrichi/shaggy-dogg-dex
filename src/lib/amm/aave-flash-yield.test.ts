@@ -1,9 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
+
 import { describe, expect, it } from "vitest";
+
 import {
-  ShaggyDoggQuantAiEngine,
   type AaveFlashArbitrageInput,
+  ShaggyDoggQuantAiEngine,
   type YieldVaultProjectionInput,
 } from "./quant-ai-engine";
 
@@ -88,7 +90,7 @@ describe("Aave Flash Liquidity & Yield Staking Vault Integrations", () => {
           daiWethRate: 1 / 3000.0,
           basePoolFeeBps: 30,
         },
-        gasCostUsd: 0.50,
+        gasCostUsd: 0.5,
       };
 
       const result = ShaggyDoggQuantAiEngine.calculateAaveFlashArbitrage(input);
@@ -143,8 +145,12 @@ describe("Aave Flash Liquidity & Yield Staking Vault Integrations", () => {
       const artifact = JSON.parse(fs.readFileSync(artifactPath, "utf8"));
       expect(artifact.contractName).toBe("AaveFlashBorrower");
       expect(artifact.bytecode.length).toBeGreaterThan(100);
-      expect(artifact.abi.some((item: { name?: string }) => item.name === "executeOperation")).toBe(true);
-      expect(artifact.abi.some((item: { name?: string }) => item.name === "requestFlashLoan")).toBe(true);
+      expect(artifact.abi.some((item: { name?: string }) => item.name === "executeOperation")).toBe(
+        true
+      );
+      expect(artifact.abi.some((item: { name?: string }) => item.name === "requestFlashLoan")).toBe(
+        true
+      );
     });
 
     it("verifies YieldStakingVault artifact compiled cleanly with bytecode", () => {
@@ -156,7 +162,9 @@ describe("Aave Flash Liquidity & Yield Staking Vault Integrations", () => {
       expect(artifact.bytecode.length).toBeGreaterThan(100);
       expect(artifact.abi.some((item: { name?: string }) => item.name === "deposit")).toBe(true);
       expect(artifact.abi.some((item: { name?: string }) => item.name === "withdraw")).toBe(true);
-      expect(artifact.abi.some((item: { name?: string }) => item.name === "totalAssets")).toBe(true);
+      expect(artifact.abi.some((item: { name?: string }) => item.name === "totalAssets")).toBe(
+        true
+      );
     });
 
     it("verifies CompoundYieldVault artifact compiled cleanly with bytecode", () => {
@@ -168,7 +176,9 @@ describe("Aave Flash Liquidity & Yield Staking Vault Integrations", () => {
       expect(artifact.bytecode.length).toBeGreaterThan(100);
       expect(artifact.abi.some((item: { name?: string }) => item.name === "deposit")).toBe(true);
       expect(artifact.abi.some((item: { name?: string }) => item.name === "withdraw")).toBe(true);
-      expect(artifact.abi.some((item: { name?: string }) => item.name === "totalAssets")).toBe(true);
+      expect(artifact.abi.some((item: { name?: string }) => item.name === "totalAssets")).toBe(
+        true
+      );
     });
 
     it("verifies DeployEcosystem master factory artifact compiled cleanly with bytecode", () => {

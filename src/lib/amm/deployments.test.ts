@@ -1,7 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+
 import { isAddress } from "viem";
+import { describe, expect, it } from "vitest";
+
 import { getContracts, isDeployedOnChain } from "@/lib/contracts";
 
 describe("Base Sepolia Deployment & Artifacts Verification", () => {

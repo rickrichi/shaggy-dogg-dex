@@ -1,10 +1,10 @@
-import { createPublicClient, http, formatEther, parseEther, parseUnits, parseAbi, type Address } from "viem";
+import { type Address, createPublicClient, formatEther, http, parseAbi } from "viem";
 import { base } from "viem/chains";
 
 const AMUTT_TOKEN: Address = "0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7";
 const STAKING_VAULT: Address = "0x055BB4eD8d5464C25D71391E940ce53CA30845fC";
-const YIELD_VAULT: Address = "0x16a1E9c10B913912b7B7df4649D9596D95ce33E6";
-const FLASH_BORROWER: Address = "0x936a3D52c3037848879F3641dfBc9132aAe51bDF";
+const _YIELD_VAULT: Address = "0x16a1E9c10B913912b7B7df4649D9596D95ce33E6";
+const _FLASH_BORROWER: Address = "0x936a3D52c3037848879F3641dfBc9132aAe51bDF";
 const UNISWAP_V2_ROUTER: Address = "0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24";
 const UNISWAP_V2_FACTORY: Address = "0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6";
 const WETH: Address = "0x4200000000000000000000000000000000000006";

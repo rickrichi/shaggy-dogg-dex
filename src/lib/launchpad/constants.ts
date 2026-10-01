@@ -24,8 +24,10 @@ export const LAUNCHPAD_ARCHETYPES: ArchetypeDefinition[] = [
     name: "Standard ERC-20 / Governance Token",
     category: "Standard",
     badge: "Lightweight",
-    description: "Capped-supply standard token with admin & minter roles. Ready for DEX trading, wallet custody, and DAO voting.",
-    architectureDetails: "Direct deployment of GovernanceToken.sol with 100% genesis allocation to creator.",
+    description:
+      "Capped-supply standard token with admin & minter roles. Ready for DEX trading, wallet custody, and DAO voting.",
+    architectureDetails:
+      "Direct deployment of GovernanceToken.sol with 100% genesis allocation to creator.",
     protocolsReferenced: ["ERC-20", "OpenZeppelin Governor Compatible"],
     contractsDeployed: ["GovernanceToken.sol"],
     riskContagionModel: "None",
@@ -35,8 +37,10 @@ export const LAUNCHPAD_ARCHETYPES: ArchetypeDefinition[] = [
     name: "Staking & Loyalty Ecosystem",
     category: "Staking & Loyalty",
     badge: "Community Driven",
-    description: "Bundles your token with a single-sided staking vault featuring 4 VIP fee discount tiers and time-lock dump protection.",
-    architectureDetails: "Deploys GovernanceToken.sol + FeeDiscountStaking.sol linked together with configurable lock duration and early exit fees.",
+    description:
+      "Bundles your token with a single-sided staking vault featuring 4 VIP fee discount tiers and time-lock dump protection.",
+    architectureDetails:
+      "Deploys GovernanceToken.sol + FeeDiscountStaking.sol linked together with configurable lock duration and early exit fees.",
     protocolsReferenced: ["Shaggy Mutt VIP Staking", "Uniswap V2 Fee Tier"],
     contractsDeployed: ["GovernanceToken.sol", "FeeDiscountStaking.sol"],
     riskContagionModel: "Sovereign",
@@ -46,10 +50,16 @@ export const LAUNCHPAD_ARCHETYPES: ArchetypeDefinition[] = [
     name: "Moonwell Base Flagship Money Market",
     category: "Next-Gen Lending",
     badge: "Base Native Flagship",
-    description: "Connects your token to Moonwell—the dominant native lending protocol on Base Layer 2. Enables high-speed, sub-cent lending.",
-    architectureDetails: "Deploys GovernanceToken + IsolatedLendingVault wired to Moonwell mToken markets with creator treasury fee streaming.",
+    description:
+      "Connects your token to Moonwell—the dominant native lending protocol on Base Layer 2. Enables high-speed, sub-cent lending.",
+    architectureDetails:
+      "Deploys GovernanceToken + IsolatedLendingVault wired to Moonwell mToken markets with creator treasury fee streaming.",
     protocolsReferenced: ["Moonwell Finance", "Compound v2/v3 Architecture", "Base L2"],
-    contractsDeployed: ["GovernanceToken.sol", "IsolatedLendingVault.sol", "FeeDiscountStaking.sol"],
+    contractsDeployed: [
+      "GovernanceToken.sol",
+      "IsolatedLendingVault.sol",
+      "FeeDiscountStaking.sol",
+    ],
     riskContagionModel: "Pooled",
   },
   {
@@ -57,8 +67,10 @@ export const LAUNCHPAD_ARCHETYPES: ArchetypeDefinition[] = [
     name: "Morpho Blue Isolated Risk Primitive",
     category: "Isolated Risk",
     badge: "Zero Contagion",
-    description: "Next-generation isolated market architecture. Prevents bad-debt spillover by decoupling collateral into independent 2-asset markets.",
-    architectureDetails: "Deploys GovernanceToken + IsolatedLendingVault with custom LLTV (Liquidation Loan-to-Value) parameters targeting Morpho Blue.",
+    description:
+      "Next-generation isolated market architecture. Prevents bad-debt spillover by decoupling collateral into independent 2-asset markets.",
+    architectureDetails:
+      "Deploys GovernanceToken + IsolatedLendingVault with custom LLTV (Liquidation Loan-to-Value) parameters targeting Morpho Blue.",
     protocolsReferenced: ["Morpho Blue", "ERC-4626 Vault Standard", "Base L2"],
     contractsDeployed: ["GovernanceToken.sol", "IsolatedLendingVault.sol"],
     riskContagionModel: "Isolated",
@@ -68,10 +80,16 @@ export const LAUNCHPAD_ARCHETYPES: ArchetypeDefinition[] = [
     name: "Silo / Sovereign ERC-4626 Vault",
     category: "Isolated Risk",
     badge: "Risk Isolated",
-    description: "Autonomous dual-asset bridge market (Token + USDC or Token + ETH). Localized liquidations guarantee zero systemic contagion.",
-    architectureDetails: "Deploys GovernanceToken + IsolatedLendingVault acting as a sovereign standalone lending pool for your token.",
+    description:
+      "Autonomous dual-asset bridge market (Token + USDC or Token + ETH). Localized liquidations guarantee zero systemic contagion.",
+    architectureDetails:
+      "Deploys GovernanceToken + IsolatedLendingVault acting as a sovereign standalone lending pool for your token.",
     protocolsReferenced: ["Silo Finance Concept", "ERC-4626 Tokenized Vaults"],
-    contractsDeployed: ["GovernanceToken.sol", "IsolatedLendingVault.sol", "FeeDiscountStaking.sol"],
+    contractsDeployed: [
+      "GovernanceToken.sol",
+      "IsolatedLendingVault.sol",
+      "FeeDiscountStaking.sol",
+    ],
     riskContagionModel: "Isolated",
   },
   {
@@ -79,8 +97,10 @@ export const LAUNCHPAD_ARCHETYPES: ArchetypeDefinition[] = [
     name: "Aave v3 CeDeFi Vault",
     category: "Next-Gen Lending",
     badge: "Deepest Liquidity",
-    description: "Supplies stablecoin/ETH reserves to Aave v3 on Base to capture institutional lending APR while streaming performance fees to treasury.",
-    architectureDetails: "Deploys GovernanceToken + YieldStakingVault wired directly to Aave v3 Pool (0xA238Dd...8d1c5).",
+    description:
+      "Supplies stablecoin/ETH reserves to Aave v3 on Base to capture institutional lending APR while streaming performance fees to treasury.",
+    architectureDetails:
+      "Deploys GovernanceToken + YieldStakingVault wired directly to Aave v3 Pool (0xA238Dd...8d1c5).",
     protocolsReferenced: ["Aave v3 Base", "aToken Yield Streaming"],
     contractsDeployed: ["GovernanceToken.sol", "YieldStakingVault.sol", "FeeDiscountStaking.sol"],
     riskContagionModel: "Pooled",
@@ -90,8 +110,10 @@ export const LAUNCHPAD_ARCHETYPES: ArchetypeDefinition[] = [
     name: "Fluid AMM-Lending Hybrid Engine",
     category: "Next-Gen Lending",
     badge: "Capital Efficient",
-    description: "Merges automated market making with lending. LP positions simultaneously capture DEX swap fees while acting as collateral.",
-    architectureDetails: "Deploys GovernanceToken + FeeDiscountStaking + Uniswap V2 LP Yield Vault.",
+    description:
+      "Merges automated market making with lending. LP positions simultaneously capture DEX swap fees while acting as collateral.",
+    architectureDetails:
+      "Deploys GovernanceToken + FeeDiscountStaking + Uniswap V2 LP Yield Vault.",
     protocolsReferenced: ["Fluid Concept", "Uniswap V2 LP", "Dual Yield Engine"],
     contractsDeployed: ["GovernanceToken.sol", "IsolatedLendingVault.sol", "Uniswap V2 Pair"],
     riskContagionModel: "Sovereign",
@@ -101,10 +123,18 @@ export const LAUNCHPAD_ARCHETYPES: ArchetypeDefinition[] = [
     name: "Full Sovereign Protocol Suite",
     category: "Full Suite",
     badge: "Enterprise",
-    description: "The complete 5-contract Shaggy Dogg DeFi suite: Token + Staking + Aave Vault + Compound Vault + Uncollateralized Flash Loan Arbitrageur.",
-    architectureDetails: "All 5 core contracts deployed and cross-linked with 100% root ownership assigned to your wallet.",
+    description:
+      "The complete 5-contract Shaggy Dogg DeFi suite: Token + Staking + Aave Vault + Compound Vault + Uncollateralized Flash Loan Arbitrageur.",
+    architectureDetails:
+      "All 5 core contracts deployed and cross-linked with 100% root ownership assigned to your wallet.",
     protocolsReferenced: ["Aave v3", "Compound v3", "Uniswap V2", "Moonwell"],
-    contractsDeployed: ["GovernanceToken.sol", "FeeDiscountStaking.sol", "YieldStakingVault.sol", "CompoundYieldVault.sol", "AaveFlashBorrower.sol"],
+    contractsDeployed: [
+      "GovernanceToken.sol",
+      "FeeDiscountStaking.sol",
+      "YieldStakingVault.sol",
+      "CompoundYieldVault.sol",
+      "AaveFlashBorrower.sol",
+    ],
     riskContagionModel: "Sovereign",
   },
 ];
@@ -116,7 +146,8 @@ export const DEX_VENUES: DexVenueDefinition[] = [
     routerAddress: CANONICAL_BASE_CONTRACTS.UniswapV2Router,
     factoryAddress: CANONICAL_BASE_CONTRACTS.UniswapV2Factory,
     network: "Base Mainnet",
-    description: "The most trusted, universally recognized constant product AMM with 0.30% compounding LP fee.",
+    description:
+      "The most trusted, universally recognized constant product AMM with 0.30% compounding LP fee.",
   },
   {
     id: "pancakeswap_v2",

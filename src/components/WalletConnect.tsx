@@ -55,7 +55,9 @@ export const WalletConnect = () => {
   };
 
   const handleAddSdToken = async () => {
-    const eth = (window as unknown as { ethereum?: { request: (args: unknown) => Promise<unknown> } })?.ethereum;
+    const eth = (
+      window as unknown as { ethereum?: { request: (args: unknown) => Promise<unknown> } }
+    )?.ethereum;
     if (eth) {
       try {
         await eth.request({
@@ -91,7 +93,7 @@ export const WalletConnect = () => {
                     variant={chain?.id === 8453 ? "default" : "secondary"}
                     className={
                       chain?.id === 8453
-                        ? "bg-blue-600 text-white text-xs font-semibold"
+                        ? "bg-blue-600 text-xs font-semibold text-white"
                         : "text-xs"
                     }
                   >
@@ -111,7 +113,7 @@ export const WalletConnect = () => {
                   size="sm"
                   onClick={() => switchChain({ chainId: 8453 })}
                   disabled={isSwitchingChain}
-                  className="h-8 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-2 shadow-sm"
+                  className="h-8 bg-blue-600 px-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-700"
                   title="Switch to Base Mainnet"
                 >
                   {isSwitchingChain ? "Switching..." : "Switch to Base"}

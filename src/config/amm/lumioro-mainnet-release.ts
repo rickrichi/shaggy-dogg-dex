@@ -246,8 +246,7 @@ export const LUMIORO_MAINNET_RELEASE: LumioroMainnetRelease = {
     auditor: "Tanaka Minato",
     reviewedAt: "2026-09-19",
     memorandumPath: "docs/INDEPENDENT-REVIEW-MEMORANDUM-LUMIORO-TOKEN.md",
-    memorandumSha256:
-      "0x828b2ddeee5521bd4e4ebf6b2e68b8d642dc4245fc2f883e6fd6442a8f5ba3c7" as Hex,
+    memorandumSha256: "0x828b2ddeee5521bd4e4ebf6b2e68b8d642dc4245fc2f883e6fd6442a8f5ba3c7" as Hex,
     authenticationRecord: "deployments/lumioro-token-build-2026-08-30.json",
     scopedSourceCommit: "7f359ab44a8636632ea8d07e36ba3a174271d26c",
     deployedRuntimeBytecodeSha256: LUMIORO_DEPLOYED_RUNTIME_BYTECODE_SHA256,
@@ -286,4 +285,3 @@ export const APPROVED_LUMIORO_LIQUIDITY_PLAN: ApprovedLiquidityPlan = {
     evidencePath: "docs/liquidity/LUMIORO-INITIAL-LIQUIDITY-APPROVAL-2026-09-28.md",
   },
 };
-

@@ -1,0 +1,24 @@
+0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7
+
+============================================================
+ASTRO MUTT (AMUTT) - BASE MAINNET CONTRACT
+============================================================
+Token Name:      Astro Mutt
+Token Symbol:    AMUTT
+Decimals:        18
+Network:         Base Mainnet (Chain ID: 8453)
+
+Contract Address:
+0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7
+
+BaseScan Explorer:
+https://basescan.org/token/0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7
+
+============================================================
+ASSOCIATED PROTOCOL CONTRACTS
+============================================================
+Fee Discount Staking: 0x055BB4eD8d5464C25D71391E940ce53CA30845fC
+Yield Staking Vault:  0x16a1E9c10B913912b7B7df4649D9596D95ce33E6
+Aave Flash Borrower:  0x936a3D52c3037848879F3641dfBc9132aAe51bDF
+Uniswap V2 LP Pair:   0x581B294FeC1A4332f17cf18B49D68087c09b6784
+============================================================

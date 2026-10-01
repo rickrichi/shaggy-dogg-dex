@@ -60,7 +60,7 @@ export interface DualPoolCrossDexInput {
   readonly amountUnits?: number;
   readonly poolAFeeRate?: number; // default 0.0030 (0.30%)
   readonly poolBFeeRate?: number; // default 0.0030 (0.30%)
-  readonly l2GasUsd?: number;     // default 0.08 ($0.08)
+  readonly l2GasUsd?: number; // default 0.08 ($0.08)
 }
 
 export interface DualPoolCrossDexResult {
@@ -191,7 +191,10 @@ export class ShaggyDoggQuantAiEngine {
    * Directive 337: Concentrated Liquidity Capital Efficiency Multiplier
    * Computes virtual reserve multiplier over price interval [lowerPrice, upperPrice].
    */
-  public static calculateConcentratedLiquidityMultiplier(lowerPrice: number, upperPrice: number): number {
+  public static calculateConcentratedLiquidityMultiplier(
+    lowerPrice: number,
+    upperPrice: number
+  ): number {
     if (lowerPrice <= 0 || upperPrice <= lowerPrice) {
       throw new Error("Upper price must be strictly greater than lower price, and both positive.");
     }
@@ -222,7 +225,7 @@ export class ShaggyDoggQuantAiEngine {
       throw new Error("Prices, exchange rates, and initial capital must be strictly positive.");
     }
 
-    const feeFactor = 1.0 - (poolFeeBps / 10000.0);
+    const feeFactor = 1.0 - poolFeeBps / 10000.0;
     const usdc = initialWeth * wethUsdcPrice * feeFactor;
     const dai = usdc * usdcDaiRate * feeFactor;
     const termWeth = dai * daiWethRate * feeFactor;
@@ -242,7 +245,9 @@ export class ShaggyDoggQuantAiEngine {
       netProfit,
       roiBps,
       arbitrageDetected,
-      decision: arbitrageDetected ? "EXECUTE_TRIANGULAR_ARBITRAGE" : "ARBITRAGE_UNPROFITABLE_AFTER_GAS",
+      decision: arbitrageDetected
+        ? "EXECUTE_TRIANGULAR_ARBITRAGE"
+        : "ARBITRAGE_UNPROFITABLE_AFTER_GAS",
     };
   }
 
@@ -251,13 +256,15 @@ export class ShaggyDoggQuantAiEngine {
    * Computes net cross-venue spread between two decentralized on-chain liquidity pools
    * (e.g. Uniswap V2 vs Aerodrome on Base L2) strictly independent of centralized broker APIs.
    */
-  public static calculateDualPoolCrossDexSpread(input: DualPoolCrossDexInput): DualPoolCrossDexResult {
+  public static calculateDualPoolCrossDexSpread(
+    input: DualPoolCrossDexInput
+  ): DualPoolCrossDexResult {
     const {
       poolAPrice,
       poolBPrice,
       amountUnits = 1.0,
-      poolAFeeRate = 0.0030,
-      poolBFeeRate = 0.0030,
+      poolAFeeRate = 0.003,
+      poolBFeeRate = 0.003,
       l2GasUsd = 0.08,
     } = input;
 
@@ -308,13 +315,7 @@ export class ShaggyDoggQuantAiEngine {
    * Calculates Base L2 execution fees and L1 DA commitment fees.
    */
   public static estimateL2ExecutionFee(input: L2GasEstimateInput): L2GasEstimateResult {
-    const {
-      baseFeeGwei,
-      priorityFeeGwei,
-      gasLimit,
-      ethPriceUsd,
-      l1DataFeeGwei = 0.1,
-    } = input;
+    const { baseFeeGwei, priorityFeeGwei, gasLimit, ethPriceUsd, l1DataFeeGwei = 0.1 } = input;
 
     if (baseFeeGwei < 0 || priorityFeeGwei < 0 || gasLimit <= 0 || ethPriceUsd <= 0) {
       throw new Error("Invalid gas or pricing parameters.");
@@ -325,7 +326,7 @@ export class ShaggyDoggQuantAiEngine {
     const l1DataFeeEth = (l1DataFeeGwei * gasLimit) / 1e9;
     const totalFeeEth = l2ExecutionFeeEth + l1DataFeeEth;
     const totalFeeUsd = totalFeeEth * ethPriceUsd;
-    const recommendedMaxFeeGwei = (baseFeeGwei * 1.25) + priorityFeeGwei;
+    const recommendedMaxFeeGwei = baseFeeGwei * 1.25 + priorityFeeGwei;
 
     return {
       totalFeeEth,
@@ -368,7 +369,9 @@ export class ShaggyDoggQuantAiEngine {
    * Directive 340: Uncollateralized Flash Liquidity (Aave v3) & Staking Discount Arb Optimizer
    * Computes multi-hop triangular arbitrage powered by Aave v3 flash loans with SD staking fee discounts.
    */
-  public static calculateAaveFlashArbitrage(input: AaveFlashArbitrageInput): AaveFlashArbitrageResult {
+  public static calculateAaveFlashArbitrage(
+    input: AaveFlashArbitrageInput
+  ): AaveFlashArbitrageResult {
     const {
       borrowAsset,
       borrowAmount,
@@ -438,7 +441,9 @@ export class ShaggyDoggQuantAiEngine {
    * Directive 342: Aave Yield-Staking Vault Share & Protocol Performance Fee Projection
    * Computes yield accumulation and creator equity revenue share based on SD staking tier.
    */
-  public static calculateYieldVaultProjection(input: YieldVaultProjectionInput): YieldVaultProjectionResult {
+  public static calculateYieldVaultProjection(
+    input: YieldVaultProjectionInput
+  ): YieldVaultProjectionResult {
     const {
       depositAmount,
       aaveApyPct,

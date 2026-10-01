@@ -1,16 +1,12 @@
 // src/lib/launchpad/deployEngine.ts
-import {
-  type Address,
-  type PublicClient,
-  type WalletClient,
-  parseEther,
-  parseUnits,
-} from "viem";
+import { type Address, parseEther, parseUnits, type PublicClient, type WalletClient } from "viem";
 
-import { CANONICAL_BASE_CONTRACTS, DEX_VENUES } from "./constants";
-import { LAUNCHPAD_ARTIFACTS } from "./artifacts";
-import type { DeployedEcosystemResult, LaunchpadFormState } from "./types";
 import { ERC20_ABI, UNISWAP_V2_ROUTER_ABI } from "@/config/abis";
+
+import { LAUNCHPAD_ARTIFACTS } from "./artifacts";
+import { CANONICAL_BASE_CONTRACTS, DEX_VENUES } from "./constants";
+
+import type { DeployedEcosystemResult, LaunchpadFormState } from "./types";
 
 export async function executeLaunchpadDeployment(
   walletClient: WalletClient,
@@ -41,7 +37,8 @@ export async function executeLaunchpadDeployment(
 
   const tokenReceipt = await publicClient.waitForTransactionReceipt({ hash: tokenTxHash });
   const tokenAddress = tokenReceipt.contractAddress;
-  if (!tokenAddress) throw new Error("Token deployment transaction completed without a contract address.");
+  if (!tokenAddress)
+    throw new Error("Token deployment transaction completed without a contract address.");
   console.log(`[Launchpad] Token deployed at: ${tokenAddress}`);
 
   let stakingAddress: Address | undefined;
@@ -161,7 +158,9 @@ export async function executeLaunchpadDeployment(
     const tokenPercent = Math.min(Math.max(form.initialTokenLiquidityPercent || 50, 1), 100);
     const tokenAmount = (supplyUnits * BigInt(tokenPercent)) / 100n;
 
-    console.log(`[Launchpad] Approving ${venue.name} router for ${tokenAmount.toString()} tokens...`);
+    console.log(
+      `[Launchpad] Approving ${venue.name} router for ${tokenAmount.toString()} tokens...`
+    );
     const approveHash = await walletClient.writeContract({
       address: tokenAddress,
       abi: ERC20_ABI,

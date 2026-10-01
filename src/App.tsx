@@ -111,15 +111,11 @@ const ApiDiagnostic = (): JSX.Element | null => {
       <button
         onClick={() => setIsMinimized(false)}
         title="Click to expand API Diagnostics"
-        className="fixed bottom-3 right-3 z-50 flex items-center gap-1.5 rounded-full border border-gray-200 bg-white/95 px-3 py-1.5 text-xs font-medium shadow-md backdrop-blur transition-all hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800/95 dark:hover:bg-gray-750"
+        className="dark:hover:bg-gray-750 fixed bottom-3 right-3 z-50 flex items-center gap-1.5 rounded-full border border-gray-200 bg-white/95 px-3 py-1.5 text-xs font-medium shadow-md backdrop-blur transition-all hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800/95"
       >
         <span
           className={`size-2 rounded-full ${
-            error
-              ? "bg-red-500 animate-pulse"
-              : result
-                ? "bg-green-500"
-                : "bg-amber-500"
+            error ? "animate-pulse bg-red-500" : result ? "bg-green-500" : "bg-amber-500"
           }`}
         />
         <span className="text-gray-700 dark:text-gray-300">
@@ -151,14 +147,14 @@ const ApiDiagnostic = (): JSX.Element | null => {
         <div className="flex items-center gap-1">
           <button
             onClick={() => setIsMinimized(true)}
-            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200 text-xs leading-none"
+            className="rounded p-1 text-xs leading-none text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
             title="Minimize"
           >
             —
           </button>
           <button
             onClick={() => setIsDismissed(true)}
-            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200 text-xs leading-none"
+            className="rounded p-1 text-xs leading-none text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
             title="Dismiss diagnostic"
           >
             ✕

@@ -1,0 +1,116 @@
+================================================================================
+ASTRO MUTT (AMUTT) PROTOCOL SUITE
+Comprehensive Live Monitoring, DEX Tracking & Operations Guide
+================================================================================
+Network:                 Base Mainnet (Chain ID: 8453)
+Deployer/Admin Wallet:   0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98
+Generated:               September 30, 2026
+
+================================================================================
+1. OFFICIAL DEPLOYED CONTRACT REGISTRY
+================================================================================
+
+1. Astro Mutt (AMUTT) Token:
+   Address:   0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7
+   Explorer:  https://basescan.org/token/0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7
+   Supply:    100,000,000 AMUTT (18 Decimals)
+
+2. Uniswap V2 AMUTT/WETH Liquidity Pair:
+   Address:   0x581B294FeC1A4332f17cf18B49D68087c09b6784
+   Explorer:  https://basescan.org/address/0x581B294FeC1A4332f17cf18B49D68087c09b6784
+   Pool:      50,000,000 AMUTT + 0.0005 WETH (158.11 LP tokens created)
+
+3. Fee Discount Staking Vault:
+   Address:   0x055BB4eD8d5464C25D71391E940ce53CA30845fC
+   Explorer:  https://basescan.org/address/0x055BB4eD8d5464C25D71391E940ce53CA30845fC
+   Tiers:     Bronze (10k), Silver (50k), Gold (200k), Diamond (1M)
+
+4. Yield Staking Vault (Aave v3 USDC):
+   Address:   0x16a1E9c10B913912b7B7df4649D9596D95ce33E6
+   Explorer:  https://basescan.org/address/0x16a1E9c10B913912b7B7df4649D9596D95ce33E6
+   Aave Asset:aBasUSDC (0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB)
+
+5. Aave Flash Borrower:
+   Address:   0x936a3D52c3037848879F3641dfBc9132aAe51bDF
+   Explorer:  https://basescan.org/address/0x936a3D52c3037848879F3641dfBc9132aAe51bDF
+
+6. Uniswap V2 Canonical Router (Base):
+   Address:   0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24
+
+================================================================================
+2. DEX TRADING, LIVE CHARTS & LIQUIDITY DEPTH
+================================================================================
+
+- DexScreener (Real-Time Live Candlestick Charts & Buy/Sell Trades):
+  https://dexscreener.com/base/0x581B294FeC1A4332f17cf18B49D68087c09b6784
+
+- GeckoTerminal (CoinGecko Live Metrics & Liquidity Tracker):
+  https://www.geckoterminal.com/base/pools/0x581B294FeC1A4332f17cf18B49D68087c09b6784
+
+- Uniswap V2 Base Pools Interface (View Your LP Position):
+  https://app.uniswap.org/positions/v2/base
+
+================================================================================
+3. AAVE V3 & YIELD STAKING VAULT MONITORING
+================================================================================
+
+- Aave Base Market Protocol Dashboard:
+  https://app.aave.com/?marketName=proto_base_v3
+  (View current USDC supply APY, borrowing rates, and total liquidity)
+
+- On-Chain Yield Vault Holdings:
+  https://basescan.org/address/0x16a1E9c10B913912b7B7df4649D9596D95ce33E6
+  Under "Token Holdings", you can observe the growing balance of interest-bearing
+  aBasUSDC as Aave accrues compound yield.
+
+- Flash Loan Monitor:
+  https://basescan.org/address/0x936a3D52c3037848879F3641dfBc9132aAe51bDF
+
+================================================================================
+4. BASESCAN WATCHLIST & REAL-TIME ALERTS (EMAIL / TELEGRAM)
+================================================================================
+
+Set up free real-time alerts whenever anyone swaps, stakes, or sends tokens:
+1. Go to https://basescan.org/register and sign in.
+2. Navigate to Account -> Watch List.
+3. Click "Add New Address" and paste:
+   - AMUTT Token:   0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7
+   - Uniswap Pair:  0x581B294FeC1A4332f17cf18B49D68087c09b6784
+   - Fee Staking:   0x055BB4eD8d5464C25D71391E940ce53CA30845fC
+   - Your Wallet:   0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98
+4. Select "Notify on Incoming & Outgoing Txns" via Email or Telegram.
+
+================================================================================
+5. LOCAL DEX DIAGNOSTICS & CONSOLE
+================================================================================
+
+- Terminal Command:
+  Run in PowerShell from your repository root (C:\Users\fbada\source\repos\shaggy-dogg-dex):
+  npx tsx scripts/manage-amutt-ecosystem.ts
+
+- Browser Launchpad:
+  Open: http://localhost:5173/launchpad
+
+================================================================================
+6. HOW TO ADD AMUTT TO METAMASK
+================================================================================
+
+Option A (1-Click):
+1. Open http://localhost:5173/launchpad in your browser.
+2. In the purple box, click "Add AMUTT to MetaMask".
+3. Click "Add Token" in the MetaMask pop-up.
+
+Option B (Manual):
+1. In MetaMask on Base network, click the 3 vertical dots (:) on the right
+   across from "Network: Base" (next to the sort icon).
+2. Click "Import tokens" -> "Custom token".
+3. Paste: 0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7
+4. Click Next -> Import.
+
+================================================================================
+7. PROTOCOL IMMUTABILITY
+================================================================================
+Smart contracts deployed on Base Mainnet are permanently hosted across the
+decentralized network. They do not run as local processes, require no server
+restarts, and remain operational 24/7/365 permanently.
+================================================================================

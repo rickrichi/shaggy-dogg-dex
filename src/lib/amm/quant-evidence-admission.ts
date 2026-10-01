@@ -14,6 +14,7 @@
 
 import crypto from "node:crypto";
 import fs from "node:fs";
+
 import { type Address, getAddress, type Hex, recoverTypedDataAddress } from "viem";
 
 export const LUMIORO_EIP712_DOMAIN_NAME = "LUMIORO";
@@ -89,12 +90,12 @@ export function canonicalJson(obj: unknown): string {
     return JSON.stringify(obj);
   }
   if (Array.isArray(obj)) {
-    return "[" + obj.map(canonicalJson).join(",") + "]";
+    return `[${obj.map(canonicalJson).join(",")}]`;
   }
   const record = obj as Record<string, unknown>;
   const keys = Object.keys(record).sort();
-  const pairs = keys.map((k) => JSON.stringify(k) + ":" + canonicalJson(record[k]));
-  return "{" + pairs.join(",") + "}";
+  const pairs = keys.map((k) => `${JSON.stringify(k)}:${canonicalJson(record[k])}`);
+  return `{${pairs.join(",")}}`;
 }
 
 export function computeCanonicalDigest(document: Record<string, unknown>): string {
@@ -104,9 +105,13 @@ export function computeCanonicalDigest(document: Record<string, unknown>): strin
       body[key] = document[key];
     }
   }
-  const canonical = canonicalJson(body) + "\n";
-  const digest = crypto.createHash("sha256").update(Buffer.from(canonical, "utf-8")).digest("hex").toLowerCase();
-  return "0x" + digest;
+  const canonical = `${canonicalJson(body)}\n`;
+  const digest = crypto
+    .createHash("sha256")
+    .update(Buffer.from(canonical, "utf-8"))
+    .digest("hex")
+    .toLowerCase();
+  return `0x${digest}`;
 }
 
 export class QuantEvidenceVerifier {
@@ -125,11 +130,15 @@ export class QuantEvidenceVerifier {
 
     const mode = String(execution.mode || "");
     if (!mode.startsWith("READ_ONLY")) {
-      throw new QuantEvidenceRejectedError(`Quant evidence execution mode must be read-only, got: ${mode}`);
+      throw new QuantEvidenceRejectedError(
+        `Quant evidence execution mode must be read-only, got: ${mode}`
+      );
     }
 
     if (execution.orders_submitted !== false || execution.orders_cancelled !== false) {
-      throw new QuantEvidenceRejectedError("Quant evidence claims broker order execution authority.");
+      throw new QuantEvidenceRejectedError(
+        "Quant evidence claims broker order execution authority."
+      );
     }
 
     const suite = document.suite as Record<string, unknown> | undefined;
@@ -202,12 +211,16 @@ export class DurableDexReplayLedger {
   public registerNonce(providerId: string, nonce: bigint, expiresAt: bigint): void {
     const key = `${providerId}:${nonce.toString()}`;
     if (this._usedNonces.has(key)) {
-      throw new QuantEvidenceRejectedError(`Nonce ${nonce} has already been consumed for provider ${providerId}.`);
+      throw new QuantEvidenceRejectedError(
+        `Nonce ${nonce} has already been consumed for provider ${providerId}.`
+      );
     }
 
     const now = this._clock();
     if (Number(expiresAt) <= now) {
-      throw new QuantEvidenceRejectedError(`Authorization has already expired at ${expiresAt} (now: ${now}).`);
+      throw new QuantEvidenceRejectedError(
+        `Authorization has already expired at ${expiresAt} (now: ${now}).`
+      );
     }
 
     this._usedNonces.add(key);
@@ -219,7 +232,7 @@ export class DurableDexReplayLedger {
         timestamp: now,
         expiresAt: Number(expiresAt),
       };
-      fs.appendFileSync(this._filePath, JSON.stringify(entry) + "\n", "utf-8");
+      fs.appendFileSync(this._filePath, `${JSON.stringify(entry)}\n`, "utf-8");
     }
   }
 }
@@ -259,7 +272,9 @@ export class DexQuantEvidenceAdmissionGate {
     confirmationPhrase: string
   ): Promise<AdmittedDexPlan> {
     if (confirmationPhrase !== "ADMIT PAPER" && confirmationPhrase !== "ADMIT SWAP PLAN") {
-      throw new Error("Admission requires exact confirmation phrase 'ADMIT PAPER' or 'ADMIT SWAP PLAN'.");
+      throw new Error(
+        "Admission requires exact confirmation phrase 'ADMIT PAPER' or 'ADMIT SWAP PLAN'."
+      );
     }
 
     if (authorization.accountMode === "live") {
@@ -290,7 +305,9 @@ export class DexQuantEvidenceAdmissionGate {
     }
 
     if (this._replayLedger.hasNonce(authorization.providerId, authorization.nonce)) {
-      throw new QuantEvidenceRejectedError(`Replay detected: nonce ${authorization.nonce} already consumed.`);
+      throw new QuantEvidenceRejectedError(
+        `Replay detected: nonce ${authorization.nonce} already consumed.`
+      );
     }
 
     // 5. Cryptographic Provenance (EIP-712 Signature Recovery)
@@ -321,7 +338,11 @@ export class DexQuantEvidenceAdmissionGate {
     }
 
     // 6. Record Nonce in Replay Ledger
-    this._replayLedger.registerNonce(authorization.providerId, authorization.nonce, authorization.expiresAt);
+    this._replayLedger.registerNonce(
+      authorization.providerId,
+      authorization.nonce,
+      authorization.expiresAt
+    );
 
     const admissionId = `dex-admit-${crypto.randomUUID()}`;
     const admittedPlan: AdmittedDexPlan = {

@@ -1,0 +1,13 @@
+https://base.blockscout.com/tx/0x733c4741e4d38d49c2f755596a20139d40680feb3d23a721e74a93f7a55ffdc1
+
+This was a small, successful token buy on Uniswap V2 on Base.
+
+- What it was: wallet 0x9dC0…7C98 swapped 0.00005 ETH (roughly 15–20¢) for about 4,533,054 AMUTT ("Astro Mutt", token contract 0x41F4…6Ae7). It went through the official Uniswap V2 Router02 (swapExactETHForTokens).
+- How it ran: the router wrapped the ETH into WETH and sent it to the WETH/AMUTT pool (0x581B…6784). The pool sent the AMUTT straight back to the same wallet.
+- When: block 52,022,804, at 2026-10-01 06:09:15 UTC (Sept 30, 11:09 PM Pacific).
+- Gas: 135,909 gas at about 0.009 gwei, so the fee was about 0.0000012 ETH, a fraction of a cent.
+- Status: succeeded, nothing reverted.
+
+One thing to note: amountOutMin was set to 0, so the swap had no slippage protection. It would have gone through at any price, which leaves it open to sandwich attacks or a pool being drained mid-swap. On a 15¢ trade that hardly matters. But if this came from one of your bots, the same setting at real size could cost money. Also, AMUTT looks like a small meme token, so 4.5 million tokens doesn't tell you much about what they're worth.
+
+Is 0x9dC0…7C98 your wallet or one of your bots? If it is, I can look for where that code sets amountOutMin.

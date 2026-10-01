@@ -8,14 +8,15 @@
 
 import fs from "node:fs";
 import path from "node:path";
+
 import {
   type Address,
   createPublicClient,
   createWalletClient,
-  http,
-  type Hex,
-  parseEther,
   defineChain,
+  type Hex,
+  http,
+  parseEther,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { base, baseSepolia } from "viem/chains";

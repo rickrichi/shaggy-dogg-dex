@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 
 const root = process.cwd();

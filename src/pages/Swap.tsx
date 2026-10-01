@@ -13,7 +13,13 @@ import { SwapCard } from "@/components/swap/SwapCard";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getTokensForChain, isErc20Token, MAINNET_TOKENS, type Token, type TokenSymbol } from "@/config/tokens";
+import {
+  getTokensForChain,
+  isErc20Token,
+  MAINNET_TOKENS,
+  type Token,
+  type TokenSymbol,
+} from "@/config/tokens";
 import { useSwap } from "@/hooks/useSwap";
 import { fetchPrices } from "@/lib/api/prices";
 

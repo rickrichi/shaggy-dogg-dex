@@ -1,7 +1,15 @@
 import { type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 
-import { Activity, ArrowLeftRight, Droplets, PieChart, Rocket, Settings, Sparkles } from "lucide-react";
+import {
+  Activity,
+  ArrowLeftRight,
+  Droplets,
+  PieChart,
+  Rocket,
+  Settings,
+  Sparkles,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { WalletConnect } from "@/components/WalletConnect";

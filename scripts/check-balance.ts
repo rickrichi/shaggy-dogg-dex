@@ -1,4 +1,4 @@
-import { createPublicClient, http, formatEther, type Address } from "viem";
+import { type Address,createPublicClient, formatEther, http } from "viem";
 import { base, baseSepolia } from "viem/chains";
 
 const userAddress: Address = "0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98";

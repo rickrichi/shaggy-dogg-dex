@@ -1,0 +1,76 @@
+================================================================================
+SHAGGY DOGG DEX - BASE MAINNET DEPLOYMENT INSTRUCTIONS
+================================================================================
+
+1. OVERVIEW
+--------------------------------------------------------------------------------
+We are returning to the automated .env.deployer pipeline. This eliminates all
+need for Remix IDE, manual parameter copying, and web bridge interfaces.
+
+With one command from the terminal, the automated script will:
+  - Deploy all 5 smart contracts to Base Mainnet in under 60 seconds:
+      1. GovernanceToken (SD)
+      2. FeeDiscountStaking
+      3. AaveFlashBorrower
+      4. YieldStakingVault
+      5. CompoundYieldVault
+  - Assign your personal wallet (0x9dC0a...47C98) as the 100% Admin & Owner.
+  - Mint the 1,000,000 SD tokens directly to your personal wallet.
+  - Automatically update the frontend DEX configuration and deployment records.
+
+
+2. KEY ADDRESSES
+--------------------------------------------------------------------------------
+Your Personal Admin / Owner Wallet:
+  0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98
+
+Automated Deployer Worker Address:
+  0xc1c3d6552231DB22A22Bdf513C0833024FF3f42B
+
+Target Network:
+  Base Mainnet (Chain ID: 8453)
+
+
+3. PREREQUISITE: FUND THE DEPLOYER WALLET
+--------------------------------------------------------------------------------
+The deployer worker wallet needs a tiny amount of ETH on Base Mainnet to pay
+the network gas fees (approx 0.001 ETH, about $2.70).
+
+Choose whichever funding method is easiest for you:
+
+--------------------------------------------------------------------------------
+METHOD A: From Coinbase, Robinhood, Kraken, or any Crypto App (Fastest)
+--------------------------------------------------------------------------------
+1. In your exchange app, go to Withdraw / Send ETH.
+2. Recipient Address:
+   0xc1c3d6552231DB22A22Bdf513C0833024FF3f42B
+3. Network: Select "Base" (NOT Ethereum).
+4. Amount: $3 to $5 worth of ETH.
+5. Click Send. It will arrive in seconds!
+
+--------------------------------------------------------------------------------
+METHOD B: From MetaMask via Official Base Portal (No Websites Needed)
+--------------------------------------------------------------------------------
+You can bridge your existing 0.004 ETH directly inside MetaMask without using
+any third-party bridge websites:
+1. Open MetaMask and make sure your network is set to "Ethereum Mainnet".
+2. Click "Send".
+3. In the recipient box, paste the official Base Bridge Portal contract address:
+   0x49048044D57e1C92A77f79988d21Fa8fAF74E97e
+4. Amount: 0.003 ETH.
+5. Click Next -> Confirm.
+   (The official Base Portal contract automatically deposits that ETH directly
+   into your wallet on Base within ~2 minutes).
+6. Once it arrives, switch MetaMask to the "Base" network, click "Send", and
+   transfer $2 of that ETH to the deployer wallet:
+   0xc1c3d6552231DB22A22Bdf513C0833024FF3f42B
+
+
+4. WHAT HAPPENS NEXT
+--------------------------------------------------------------------------------
+As soon as the deployer worker (0xc1c3d...f42B) has ~$2 of ETH on Base:
+1. Just tell me: "It's funded!"
+2. I will execute the live deployment command from the terminal:
+   npx tsx scripts/deploy-sd-contracts.ts --network=base-mainnet
+3. All 5 contracts will go live, and your DEX will be fully operational!
+================================================================================

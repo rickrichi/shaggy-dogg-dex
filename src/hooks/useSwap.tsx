@@ -12,8 +12,8 @@ import {
 } from "wagmi";
 
 import { ERC20_ABI, UNISWAP_V2_ROUTER_ABI } from "@/config/abis";
-import { DEFAULT_SLIPPAGE, SWAP_DEADLINE_BUFFER, getUniswapV2Router } from "@/config/contracts";
-import { WRAPPED_NATIVE_ADDRESS, getWrappedNativeAddress } from "@/config/tokens";
+import { DEFAULT_SLIPPAGE, getUniswapV2Router, SWAP_DEADLINE_BUFFER } from "@/config/contracts";
+import { getWrappedNativeAddress, WRAPPED_NATIVE_ADDRESS } from "@/config/tokens";
 import {
   trackProtectionAndGas,
   trackQuoteSourceSelection,
@@ -357,10 +357,7 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
         address: state.sellToken.address as Address,
         abi: ERC20_ABI,
         functionName: "approve",
-        args: [
-          currentRouter,
-          parseUnits(state.sellAmount, state.sellToken.decimals),
-        ],
+        args: [currentRouter, parseUnits(state.sellAmount, state.sellToken.decimals)],
         chain: undefined,
         account: undefined,
       });
@@ -372,7 +369,13 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
       toast.error("Approval failed. Please try again.");
       console.error("Approve error:", error);
     }
-  }, [state.sellAmount, state.sellToken.address, state.sellToken.decimals, approveToken, currentRouter]);
+  }, [
+    state.sellAmount,
+    state.sellToken.address,
+    state.sellToken.decimals,
+    approveToken,
+    currentRouter,
+  ]);
 
   const handleSwap = useCallback(async () => {
     if (!canSwap || !quoteData) return;

@@ -301,7 +301,9 @@ export default function Liquidity() {
   const handleAddLiquidity = useCallback(async () => {
     if (!amountA || !amountB || !userAddress) return;
     if (!isMainnet) {
-      toast.error("Switch to Base or Ethereum mainnet before managing this Uniswap V2 liquidity position.");
+      toast.error(
+        "Switch to Base or Ethereum mainnet before managing this Uniswap V2 liquidity position."
+      );
       return;
     }
     if (resolveAddress(tokenA) === resolveAddress(tokenB)) {
@@ -766,14 +768,15 @@ export default function Liquidity() {
                     <div>
                       <p className="font-semibold text-blue-950">Switch to Base Mainnet</p>
                       <p className="text-xs text-blue-800">
-                        You are currently on {chain?.name || `Chain ${chainId}`}. Switch to Base to seed Shaggy Dogg (SD) liquidity.
+                        You are currently on {chain?.name || `Chain ${chainId}`}. Switch to Base to
+                        seed Shaggy Dogg (SD) liquidity.
                       </p>
                     </div>
                     <Button
                       size="sm"
                       onClick={() => switchChain({ chainId: 8453 })}
                       disabled={isSwitchingChain}
-                      className="ml-4 bg-blue-600 text-white hover:bg-blue-700 text-xs font-semibold"
+                      className="ml-4 bg-blue-600 text-xs font-semibold text-white hover:bg-blue-700"
                     >
                       {isSwitchingChain ? "Switching..." : "Switch to Base"}
                     </Button>

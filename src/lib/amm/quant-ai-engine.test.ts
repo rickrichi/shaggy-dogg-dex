@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { ShaggyDoggQuantAiEngine } from "./quant-ai-engine";
 
 describe("ShaggyDoggQuantAiEngine (Quant Manual Directives 336-341)", () => {
@@ -51,7 +52,7 @@ describe("ShaggyDoggQuantAiEngine (Quant Manual Directives 336-341)", () => {
     // Negative case: low exchange rate leads to unprofitable path
     const unprofitable = ShaggyDoggQuantAiEngine.calculateCrossDexTriangularArbitrage({
       wethUsdcPrice: 2500.0,
-      usdcDaiRate: 1.000,
+      usdcDaiRate: 1.0,
       daiWethRate: 0.000398,
       initialWeth: 10.0,
       poolFeeBps: 30.0,
@@ -68,8 +69,8 @@ describe("ShaggyDoggQuantAiEngine (Quant Manual Directives 336-341)", () => {
       poolAPrice: 3450.0,
       poolBPrice: 3465.0,
       amountUnits: 1.0,
-      poolAFeeRate: 0.0030,
-      poolBFeeRate: 0.0030,
+      poolAFeeRate: 0.003,
+      poolBFeeRate: 0.003,
       l2GasUsd: 0.08,
     });
 
@@ -85,8 +86,8 @@ describe("ShaggyDoggQuantAiEngine (Quant Manual Directives 336-341)", () => {
       poolAPrice: 3450.0,
       poolBPrice: 3485.0,
       amountUnits: 1.0,
-      poolAFeeRate: 0.0030,
-      poolBFeeRate: 0.0030,
+      poolAFeeRate: 0.003,
+      poolBFeeRate: 0.003,
       l2GasUsd: 0.08,
     });
 
@@ -105,7 +106,7 @@ describe("ShaggyDoggQuantAiEngine (Quant Manual Directives 336-341)", () => {
     });
 
     expect(gas.totalFeeEth).toBeGreaterThan(0);
-    expect(gas.totalFeeUsd).toBeLessThan(0.50); // Base L2 fees are typically cents
+    expect(gas.totalFeeUsd).toBeLessThan(0.5); // Base L2 fees are typically cents
     expect(gas.recommendedMaxFeeGwei).toBeCloseTo(0.0825, 3);
   });
 

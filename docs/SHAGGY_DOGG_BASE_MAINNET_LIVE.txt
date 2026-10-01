@@ -1,0 +1,67 @@
+================================================================================
+SHAGGY DOGG DEX - BASE MAINNET DEPLOYMENT REPORT (100% COMPLETE & LIVE)
+================================================================================
+
+DATE DEPLOYED: September 29, 2026
+NETWORK: Base Mainnet
+CHAIN ID: 8453
+BLOCK CONFIRMED: 51980362 - 51980364
+EXPLORER: https://basescan.org
+
+--------------------------------------------------------------------------------
+1. OWNERSHIP & TOKEN DISTRIBUTION
+--------------------------------------------------------------------------------
+Owner / Admin Wallet (Your Personal Wallet):
+  0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98
+
+Token Balance in Your Wallet:
+  1,000,000 SD (100% of Total Circulating Supply)
+  Decimals: 18
+
+Admin & Minter Rights:
+  Assigned 100% exclusively to 0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98
+
+
+--------------------------------------------------------------------------------
+2. LIVE DEPLOYED CONTRACT ADDRESSES ON BASE MAINNET
+--------------------------------------------------------------------------------
+1. GovernanceToken (SD)
+   Address: 0x051c758521971f5c5a84edaf18eea12854375469
+   Tx Hash: 0x62e802324d1c2602c386282c03339bdaaaa098de8b129554a0d066425d0ee4a5
+   Explorer: https://basescan.org/address/0x051c758521971f5c5a84edaf18eea12854375469
+
+2. FeeDiscountStaking
+   Address: 0x42134ccc6c41149cf71c7b4994e33ee66758af20
+   Tx Hash: 0xc496656373e2babba14330755f0e6f70b088986f8fbcbcb0cbe330e3da034cee
+   Explorer: https://basescan.org/address/0x42134ccc6c41149cf71c7b4994e33ee66758af20
+
+3. AaveFlashBorrower
+   Address: 0xa5b50037a8d2fda22805f750252268adaeb36480
+   Tx Hash: 0x478d05e6a72e005526e102141316fd2380827190115496ffc773f231a5d7de72
+   Explorer: https://basescan.org/address/0xa5b50037a8d2fda22805f750252268adaeb36480
+
+4. YieldStakingVault
+   Address: 0x8531807ef36560cd7db230c95db85791aa586dda
+   Tx Hash: 0xe406cac54b84f7e52cdb0b023e3b92b17c05b6306e1f26ba31d61ba358608d5f
+   Explorer: https://basescan.org/address/0x8531807ef36560cd7db230c95db85791aa586dda
+
+5. CompoundYieldVault
+   Address: 0x38cccafb4ae96a8ef187f07fb17d18eb63e43782
+   Tx Hash: 0xebc12e9904d41e8fa554467d189a6d2d1bc89a012979913ad2e164bb94f77d6e
+   Explorer: https://basescan.org/address/0x38cccafb4ae96a8ef187f07fb17d18eb63e43782
+
+6. UniswapV2Pair (SD / WETH Official Liquidity Pool)
+   Address: 0xC3D1e0b1CD05081bD7Af4cf87f681512E3E90917
+   Tx Hash: 0xf1f00774a3341ce10fb3fef4ad6dcdd523f391780eddb5e3b1a9cd0fcfaab185
+   Explorer: https://basescan.org/address/0xC3D1e0b1CD05081bD7Af4cf87f681512E3E90917
+   Blockscout: https://base.blockscout.com/address/0xC3D1e0b1CD05081bD7Af4cf87f681512E3E90917
+
+
+--------------------------------------------------------------------------------
+3. FRONTEND & GITHUB STATUS
+--------------------------------------------------------------------------------
+- Frontend config updated: src/lib/contracts.ts (Base Mainnet 8453 live)
+- Deployment record: deployments/base-mainnet.json
+- Test Suite: 76/76 unit & integration tests passing (100% green)
+- Git Repository: Committed and pushed to origin/fix/strict-ts
+================================================================================

@@ -12,18 +12,19 @@ lerna-debug.log*
 node_modules/
 dist/
 dist-ssr/
-.out/            # some tools write here
+.out/
 build/
 coverage/
 contracts/cache/
 contracts/out/
-*.tsbuildinfo    # TypeScript incremental build info
+# TypeScript incremental build info
+*.tsbuildinfo
 
 # ── Next.js ──────────────────────────────────────────────────────────────────
 .next/
 .next/cache/
 out/
-.vercel/         # you already had this; keep it
+.vercel/
 
 # ── Env files (keep example checked in) ──────────────────────────────────────
 .env

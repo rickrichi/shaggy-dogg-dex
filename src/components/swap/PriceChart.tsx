@@ -8,12 +8,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { UNISWAP_V2_ROUTER_ABI } from "@/config/abis";
 import { getDexVenuesForChain } from "@/config/dexes";
-import { type Token, getWrappedNativeAddress } from "@/config/tokens";
+import { getWrappedNativeAddress, type Token } from "@/config/tokens";
 
 const resolveAddress = (token: Token, wrappedAddress: Address): Address =>
   token.address === "native" ? wrappedAddress : token.address;
 
-const buildPath = (baseToken: Token, quoteToken: Token, wrappedAddress: Address): readonly Address[] => {
+const buildPath = (
+  baseToken: Token,
+  quoteToken: Token,
+  wrappedAddress: Address
+): readonly Address[] => {
   const base = resolveAddress(baseToken, wrappedAddress);
   const quote = resolveAddress(quoteToken, wrappedAddress);
   if (base === quote) return [base];
@@ -42,7 +46,10 @@ export const PriceChart = ({ baseToken, quoteToken }: PriceChartProps) => {
   const venues = useMemo(() => getDexVenuesForChain(chainId), [chainId]);
   const wrappedAddress = useMemo(() => getWrappedNativeAddress(chainId), [chainId]);
 
-  const path = useMemo(() => buildPath(baseToken, quoteToken, wrappedAddress), [baseToken, quoteToken, wrappedAddress]);
+  const path = useMemo(
+    () => buildPath(baseToken, quoteToken, wrappedAddress),
+    [baseToken, quoteToken, wrappedAddress]
+  );
   const amountIn = useMemo(() => parseUnits("1", baseToken.decimals), [baseToken.decimals]);
   const canQuote = path.length > 1 && path[0] !== path[path.length - 1];
 
