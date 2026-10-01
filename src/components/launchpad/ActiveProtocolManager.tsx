@@ -168,6 +168,10 @@ export function ActiveProtocolManager() {
       console.error(err);
       toast.error(err instanceof Error ? err.message : "Failed to set tiers.");
     } finally {
+      setIsSettingTiers(false);
+    }
+  };
+
   // ────────────────────────────────────────────────────────────────────────────
   // Action 3: One-Click Import Token into MetaMask (EIP-747)
   // ────────────────────────────────────────────────────────────────────────────
