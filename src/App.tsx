@@ -55,6 +55,8 @@ const ApiDiagnostic = (): JSX.Element | null => {
   const [result, setResult] = useState<unknown>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [isDismissed, setIsDismissed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -99,41 +101,84 @@ const ApiDiagnostic = (): JSX.Element | null => {
     };
   }, []);
 
-  if (!import.meta.env.DEV) {
-    return null; // Only show in development
+  if (!import.meta.env.DEV || isDismissed) {
+    return null; // Only show in development unless dismissed
+  }
+
+  if (isMinimized) {
+    return (
+      <button
+        onClick={() => setIsMinimized(false)}
+        title="Click to expand API Diagnostics"
+        className="fixed bottom-3 right-3 z-50 flex items-center gap-1.5 rounded-full border border-gray-200 bg-white/95 px-3 py-1.5 text-xs font-medium shadow-md backdrop-blur transition-all hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800/95 dark:hover:bg-gray-750"
+      >
+        <span
+          className={`size-2 rounded-full ${
+            error
+              ? "bg-red-500 animate-pulse"
+              : result
+                ? "bg-green-500"
+                : "bg-amber-500"
+          }`}
+        />
+        <span className="text-gray-700 dark:text-gray-300">
+          API: {error ? "Err" : result ? "Online" : "Connecting..."}
+        </span>
+      </button>
+    );
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 max-w-md rounded-lg border border-gray-200 bg-white p-4 shadow-lg dark:border-gray-700 dark:bg-gray-800">
-      <div className="mb-2 flex items-center gap-2">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">API Diagnostic</h3>
-        <span
-          className={`rounded px-2 py-0.5 text-[10px] ${
-            error
-              ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
-              : result
-                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
-                : "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-300"
-          }`}
-        >
-          {error ? "ERR" : result ? "OK" : "…"}
-        </span>
+    <div className="fixed bottom-4 right-4 z-50 max-w-sm rounded-xl border border-gray-200 bg-white/95 p-3.5 shadow-xl backdrop-blur transition-all dark:border-gray-700 dark:bg-gray-800/95">
+      <div className="mb-2 flex items-center justify-between gap-2 border-b border-gray-100 pb-2 dark:border-gray-700/60">
+        <div className="flex items-center gap-2">
+          <h3 className="text-xs font-semibold text-gray-900 dark:text-gray-100">
+            API Health Diagnostic
+          </h3>
+          <span
+            className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+              error
+                ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"
+                : result
+                  ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
+                  : "bg-gray-100 text-gray-700 dark:bg-gray-900/40 dark:text-gray-300"
+            }`}
+          >
+            {error ? "ERR" : result ? "OK" : "…"}
+          </span>
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setIsMinimized(true)}
+            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200 text-xs leading-none"
+            title="Minimize"
+          >
+            —
+          </button>
+          <button
+            onClick={() => setIsDismissed(true)}
+            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200 text-xs leading-none"
+            title="Dismiss diagnostic"
+          >
+            ✕
+          </button>
+        </div>
       </div>
 
       {isLoading && (
-        <div className="text-xs text-gray-500 dark:text-gray-400">
-          Connecting to localhost:8788...
+        <div className="text-[11px] text-gray-500 dark:text-gray-400">
+          Checking backend health (port 8788)...
         </div>
       )}
 
       {result !== null && (
-        <pre className="max-h-32 overflow-auto rounded bg-gray-50 p-2 text-xs text-gray-700 dark:bg-gray-900 dark:text-gray-300">
+        <pre className="mt-1.5 max-h-28 overflow-auto rounded bg-gray-50 p-2 text-[11px] text-gray-700 dark:bg-gray-900/70 dark:text-gray-300">
           {JSON.stringify(result, null, 2)}
         </pre>
       )}
 
       {error && (
-        <pre className="rounded bg-red-50 p-2 text-xs text-red-600 dark:bg-red-900/20 dark:text-red-400">
+        <pre className="mt-1.5 rounded bg-red-50 p-2 text-[11px] text-red-600 dark:bg-red-900/20 dark:text-red-400">
           Error: {error}
         </pre>
       )}

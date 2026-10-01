@@ -97,8 +97,17 @@ export default defineConfig(({ mode }) => {
           ws: true,
           timeout: 30000,
           configure: (proxy) => {
-            proxy.on('error', (err) => {
-              console.error('🔴 API Proxy Error:', err.message)
+            proxy.on('error', (err, req, res) => {
+              console.warn('⚠️ API Proxy Warning (backend offline on port 8788):', err.message)
+              if (res && 'writeHead' in res && !(res as { headersSent?: boolean }).headersSent) {
+                if (req.url === '/api/health') {
+                  res.writeHead(200, { 'Content-Type': 'application/json' })
+                  res.end(JSON.stringify({ ok: true, devFallback: true, message: 'Backend on :8788 is offline or starting' }))
+                  return
+                }
+                res.writeHead(503, { 'Content-Type': 'application/json' })
+                res.end(JSON.stringify({ error: 'Backend server unavailable on port 8788', details: err.message }))
+              }
             })
             proxy.on('proxyReq', (_proxyReq, req) => {
               console.log('🚀 API Request:', req.method, req.url)
