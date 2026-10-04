@@ -47,6 +47,11 @@ export function mountSsr(app: Hono) {
     if (url.pathname.startsWith('/api')) {
       return c.text('Not Found', 404)
     }
+    // Development: the app is served by Vite (ORIGIN). Server-side rendering of the source tree only works
+    // in a production build, where the '@/…' import aliases have been resolved.
+    if (env.NODE_ENV !== 'production') {
+      return c.redirect(`${env.ORIGIN}${url.pathname}${url.search}`, 302)
+    }
 
     try {
       const html = await renderApp(url.pathname + url.search)

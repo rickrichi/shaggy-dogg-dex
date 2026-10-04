@@ -8,6 +8,8 @@ import { preflight } from './cors/preflight.js'
 import { logRequests } from './middleware/log.js'
 import { rateLimit } from './middleware/rateLimit.js'
 import { withSecurityHeaders } from './middleware/security.js'
+import { AdminStore } from './admin/store.js'
+import { mountAdminRoutes } from './routes/admin.js'
 import { mountCeDeFiRoutes } from './routes/cedefi.js'
 // routes
 import { mountHealth } from './routes/health.js'
@@ -68,6 +70,18 @@ mountQuoteRoutes(app) // POST /api/quote
 
 // ----- CeDeFi Bridge Routes -----
 mountCeDeFiRoutes(app) // GET /api/cedefi/status, GET /api/cedefi/quote
+
+// ----- Admin panel (wallet sign-in, local SQLite) -----
+mountAdminRoutes(app, {
+  store: new AdminStore(env.ADMIN_DB_PATH),
+  admins: env.ADMIN_WALLETS,
+  origin: env.ORIGIN,
+  sessionHours: env.ADMIN_SESSION_HOURS,
+  secureCookie: env.NODE_ENV === 'production',
+})
+if (env.ADMIN_WALLETS.length === 0) {
+  console.warn('Admin sign-in disabled: set ADMIN_WALLETS in server/.env')
+}
 
 // ----- Webhooks -----
 mountSupabaseDbWebhook(app)

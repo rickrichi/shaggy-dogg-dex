@@ -1,226 +1,105 @@
 // server/src/routes/prices.ts
-import { env } from '../env.js'
+// All prices come from Shaggy Dogg Crypto Market-Data (../shaggy-dogg-market-data): exchange order-book
+// medians for native coins, Base on-chain pools for ERC-20s. No third-party price API.
 import { makeTtlCache } from '../utils/cache.js'
+import { marketDataNative, marketDataTokens } from '../utils/marketData.js'
 
 import type { Hono as HonoApp } from 'hono'
-import type { AddressHex,PriceRow } from '../schemas/prices.js'
+import type { PriceRow } from '../schemas/prices.js'
 
-const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as AddressHex
-
-interface PlatformMeta { platform: string; nativeId: string; nativeSymbol: string }
-const PLATFORM = {
-  1:     { platform: 'ethereum',            nativeId: 'ethereum',      nativeSymbol: 'ETH' },
-  10:    { platform: 'optimistic-ethereum', nativeId: 'ethereum',      nativeSymbol: 'ETH' },
-  137:   { platform: 'polygon-pos',         nativeId: 'matic-network', nativeSymbol: 'MATIC' },
-  42161: { platform: 'arbitrum-one',        nativeId: 'ethereum',      nativeSymbol: 'ETH' },
-  8453:  { platform: 'base',                nativeId: 'ethereum',      nativeSymbol: 'ETH' },
-} as const satisfies Record<number, PlatformMeta>
-
-const getPlatform = (chainId: number): PlatformMeta | null =>
-  (PLATFORM as Record<number, PlatformMeta>)[chainId] ?? null
-
-const findChainIdByNativeSymbol = (symbol: string): number | null => {
-  const s = symbol.toUpperCase()
-  for (const [id, meta] of Object.entries(PLATFORM) as Array<[string, PlatformMeta]>) {
-    if (meta.nativeSymbol.toUpperCase() === s) return Number(id)
-  }
-  return null
+const NATIVE_SYMBOL: Record<number, string> = {
+  1: 'ETH',
+  10: 'ETH',
+  137: 'POL',
+  42161: 'ETH',
+  8453: 'ETH',
 }
 
-async function fetchNative(chainId: number): Promise<PriceRow | undefined> {
-  const meta = getPlatform(chainId)
-  if (!meta) return undefined
-
-  const url = new URL(`${env.PRICE_API_FALLBACK}/simple/price`)
-  url.searchParams.set('ids', meta.nativeId)
-  url.searchParams.set('vs_currencies', 'usd')
-  url.searchParams.set('include_24hr_change', 'true')
-
-  const headers: Record<string, string> = {}
-  if (env.COINGECKO_API_KEY) headers['x-cg-pro-api-key'] = env.COINGECKO_API_KEY
-
-  const r = await fetch(url, { headers })
-  if (!r.ok) return undefined
-
-  const j = (await r.json()) as Record<string, { usd?: number; usd_24h_change?: number }>
-  const row = j[meta.nativeId]
-  if (!row) return undefined
-
-  return {
-    address: ZERO_ADDRESS,
-    priceUsd: Number(row.usd ?? 0),
-    change24hPercent: Number(row.usd_24h_change ?? 0),
-    symbol: meta.nativeSymbol,
-  }
-}
+const ADDRESS = /^0x[0-9a-fA-F]{40}$/
 
 const nativeCache = makeTtlCache<PriceRow | undefined>({ ttlMs: 15_000 })
-async function fetchNativeCached(chainId: number) {
-  const k = String(chainId)
-  const hit = nativeCache.get(k)
+async function nativeCached(symbol: string): Promise<PriceRow | undefined> {
+  const hit = nativeCache.get(symbol)
   if (hit !== undefined) return hit
-  const row = await fetchNative(chainId)
-  nativeCache.set(k, row)
+  const row = await marketDataNative(symbol)
+  if (row) nativeCache.set(symbol, row)
   return row
 }
 
+/** Native + ERC-20 rows for one chain; tokens Market-Data cannot price are simply absent. */
+async function chainPrices(chainId: number, addresses: string[]): Promise<{ native?: PriceRow; tokens: PriceRow[] }> {
+  const symbol = NATIVE_SYMBOL[chainId]
+  const [native, tokens] = await Promise.all([
+    symbol ? nativeCached(symbol) : Promise.resolve(undefined),
+    addresses.length > 0 ? marketDataTokens(chainId, addresses) : Promise.resolve([]),
+  ])
+  return { ...(native ? { native } : {}), tokens }
+}
+
 export function mountPriceRoutes(app: HonoApp): void {
-  // GET /api/prices?symbol=ETH
+  // GET /api/prices?symbol=ETH                        -> { symbol, priceUsd, change24hPercent }
+  // GET /api/prices?chainId=8453&contracts=0x..,0x..  -> { native: {...}, tokens: { addr: {...} } } (portfolio)
   app.get('/api/prices', async (c) => {
     const symbol = (c.req.query('symbol') || '').trim().toUpperCase()
-    if (!symbol) return c.json({ error: 'symbol is required' }, 400)
+    if (symbol) {
+      if (!/^[A-Z0-9]{1,15}$/.test(symbol)) return c.json({ error: 'invalid symbol' }, 400)
+      const row = await nativeCached(symbol)
+      if (!row) return c.json({ error: 'no_price', detail: `No fresh exchange price for ${symbol}` }, 404)
+      return c.json({ symbol, priceUsd: row.priceUsd, change24hPercent: row.change24hPercent })
+    }
 
-    const chainId = symbol === 'ETH' ? 1 : findChainIdByNativeSymbol(symbol)
-    if (!chainId || !getPlatform(chainId)) return c.json({ error: 'unsupported symbol' }, 400)
-
-    const row = await fetchNativeCached(chainId)
-    if (!row) return c.json({ error: 'upstream_error' }, 502)
-
-    return c.json({ symbol, priceUsd: row.priceUsd, change24hPercent: row.change24hPercent })
+    const chainId = Number(c.req.query('chainId'))
+    if (!Number.isInteger(chainId) || !NATIVE_SYMBOL[chainId]) {
+      return c.json({ error: 'symbol or a supported chainId is required' }, 400)
+    }
+    const contracts = (c.req.query('contracts') || '').split(',').map((a) => a.trim()).filter(Boolean)
+    if (contracts.length > 100 || contracts.some((a) => !ADDRESS.test(a))) {
+      return c.json({ error: 'contracts must be up to 100 comma-separated addresses' }, 400)
+    }
+    const { native, tokens } = await chainPrices(chainId, contracts)
+    if (!native) return c.json({ error: 'no_price', detail: 'Native price unavailable' }, 502)
+    return c.json({
+      native: { symbol: native.symbol ?? NATIVE_SYMBOL[chainId], usd: native.priceUsd, usd_24h_change: native.change24hPercent },
+      tokens: Object.fromEntries(
+        tokens.map((t) => [t.address.toLowerCase(), { usd: t.priceUsd, usd_24h_change: t.change24hPercent }]),
+      ),
+    })
   })
 
-  // POST /api/prices - Portfolio page endpoint
+  // POST /api/prices { chainId, addresses } -> { success, data: { prices: PriceRow[] } }
   app.post('/api/prices', async (c) => {
-    let body: { chainId?: number; addresses?: string[] }
-
+    let body: { chainId?: unknown; addresses?: unknown }
     try {
       body = await c.req.json()
     } catch {
       return c.json({ success: false, error: 'invalid_json' }, 400)
     }
-
     const { chainId, addresses } = body
-
-    if (typeof chainId !== 'number' || !Array.isArray(addresses)) {
+    if (typeof chainId !== 'number' || !Array.isArray(addresses) || addresses.some((a) => typeof a !== 'string' || !ADDRESS.test(a))) {
       return c.json({ success: false, error: 'invalid_body' }, 400)
     }
+    if (!NATIVE_SYMBOL[chainId]) return c.json({ success: false, error: 'unsupported_chain', chainId }, 400)
+    if (addresses.length > 100) return c.json({ success: false, error: 'too_many_addresses' }, 400)
 
-    const platform = getPlatform(chainId)
-    if (!platform) {
-      return c.json({ success: false, error: 'unsupported_chain', chainId }, 400)
-    }
-
-    try {
-      const prices: PriceRow[] = []
-
-      // 1. Fetch native token price (always included)
-      const nativeRow = await fetchNativeCached(chainId)
-      if (nativeRow) {
-        prices.push(nativeRow)
-      }
-
-      // 2. Fetch ERC20 token prices via CoinGecko contract API
-      if (addresses.length > 0) {
-        const erc20Prices = await fetchErc20Prices(platform.platform, addresses)
-        prices.push(...erc20Prices)
-      }
-
-      return c.json({
-        success: true,
-        data: { prices },
-      })
-    } catch (error) {
-      console.error('[POST /api/prices] Error:', error)
-      return c.json({ success: false, error: 'upstream_error' }, 502)
-    }
+    const { native, tokens } = await chainPrices(chainId, addresses as string[])
+    return c.json({ success: true, data: { prices: [...(native ? [native] : []), ...tokens] } })
   })
-}
 
-/**
- * Fetch ERC20 token prices from CoinGecko's contract price API
- *
- * @param platform - CoinGecko platform ID (e.g., 'base', 'ethereum', 'polygon-pos')
- * @param addresses - Array of contract addresses
- * @returns Array of price rows
- *
- * @example
- * // Fetch WETH price on Base
- * const prices = await fetchErc20Prices('base', ['0x4200000000000000000000000000000000000006'])
- */
-async function fetchErc20Prices(
-  platform: string,
-  addresses: string[]
-): Promise<PriceRow[]> {
-  if (addresses.length === 0) return []
-
-  // CoinGecko allows up to 100 addresses per request, but we'll batch by 50 for safety
-  const BATCH_SIZE = 50
-  const batches: string[][] = []
-
-  for (let i = 0; i < addresses.length; i += BATCH_SIZE) {
-    batches.push(addresses.slice(i, i + BATCH_SIZE))
-  }
-
-  const allPrices: PriceRow[] = []
-
-  for (const batch of batches) {
-    const batchPrices = await fetchErc20PriceBatch(platform, batch)
-    allPrices.push(...batchPrices)
-  }
-
-  return allPrices
-}
-
-/**
- * Fetch a single batch of ERC20 prices from CoinGecko
- */
-async function fetchErc20PriceBatch(
-  platform: string,
-  addresses: string[]
-): Promise<PriceRow[]> {
-  // Normalize addresses to lowercase for CoinGecko API
-  const normalizedAddresses = addresses.map(a => a.toLowerCase())
-
-  // Build CoinGecko API URL
-  // Endpoint: /simple/token_price/{platform}
-  const baseUrl = env.PRICE_API_FALLBACK || 'https://api.coingecko.com/api/v3'
-  const url = new URL(`${baseUrl}/simple/token_price/${platform}`)
-
-  url.searchParams.set('contract_addresses', normalizedAddresses.join(','))
-  url.searchParams.set('vs_currencies', 'usd')
-  url.searchParams.set('include_24hr_change', 'true')
-
-  // Add API key header if available (Pro API)
-  const headers: Record<string, string> = {
-    'Accept': 'application/json',
-  }
-  if (env.COINGECKO_API_KEY) {
-    headers['x-cg-pro-api-key'] = env.COINGECKO_API_KEY
-  }
-
-  try {
-    const response = await fetch(url.toString(), {
-      headers,
-      signal: AbortSignal.timeout(5000), // 5s timeout
+  // GET /api/price/:symbol?currency=usd -> { symbol, price, currency, timestamp, change24h, source }
+  app.get('/api/price/:symbol', async (c) => {
+    const symbol = c.req.param('symbol').trim().toUpperCase()
+    const currency = (c.req.query('currency') || 'usd').toLowerCase()
+    if (!/^[A-Z0-9]{1,15}$/.test(symbol)) return c.json({ error: 'invalid symbol' }, 400)
+    if (currency !== 'usd') return c.json({ error: 'Only USD prices are available' }, 400)
+    const row = await nativeCached(symbol)
+    if (!row) return c.json({ error: 'no_price', detail: `No fresh exchange price for ${symbol}` }, 404)
+    return c.json({
+      symbol,
+      price: row.priceUsd,
+      currency,
+      timestamp: Date.now(),
+      change24h: row.change24hPercent,
+      source: 'market-data',
     })
-
-    if (!response.ok) {
-      console.error(`CoinGecko API error: ${response.status} ${response.statusText}`)
-      return []
-    }
-
-    const data = await response.json() as Record<string, {
-      usd?: number
-      usd_24h_change?: number
-    }>
-
-    // Parse response into PriceRow format
-    const prices: PriceRow[] = []
-
-    for (const [address, priceData] of Object.entries(data)) {
-      if (!priceData || typeof priceData.usd !== 'number') continue
-
-      prices.push({
-        address: address as AddressHex,
-        priceUsd: priceData.usd,
-        change24hPercent: priceData.usd_24h_change ?? 0,
-        symbol: undefined, // CoinGecko contract API doesn't return symbol
-      })
-    }
-
-    return prices
-  } catch (error) {
-    console.error('[fetchErc20PriceBatch] Error:', error)
-    return [] // Return empty array on error (graceful degradation)
-  }
+  })
 }

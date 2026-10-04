@@ -97,7 +97,7 @@ export const withSecurityHeaders: MiddlewareHandler = async (c, next) => {
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https:",
       "font-src 'self' data: https://fonts.gstatic.com",
-      "connect-src 'self' https://api.coingecko.com https://*.alchemy.com https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in https://mainnet.base.org https://*.coinbase.com https://*.walletconnect.com",
+      "connect-src 'self' https://*.alchemy.com https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in https://mainnet.base.org https://*.coinbase.com https://*.walletconnect.com",
       "worker-src 'self'",
       "child-src 'self'",
       "object-src 'none'",
