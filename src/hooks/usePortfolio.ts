@@ -230,7 +230,7 @@ export function usePortfolio(): UsePortfolioReturn {
         })(),
       ]);
 
-      // 3) Prices via serverless API (CoinGecko Demo)
+      // 3) Prices via the API server (Shaggy Dogg Crypto Market-Data)
       const contracts = list.map((t) => t.address).join(",");
       const qs = new URLSearchParams({ chainId: String(chainId) });
       if (contracts) qs.set("contracts", contracts);

@@ -1,0 +1,402 @@
+{
+  "BTC/USDT": {
+    "minNetEdgePct": "0.10%",
+    "tier": "Tier 1 Mega Cap"
+  },
+  "ETH/USDT": {
+    "minNetEdgePct": "0.10%",
+    "tier": "Tier 1 Mega Cap"
+  },
+  "SOL/USDT": {
+    "minNetEdgePct": "0.12%",
+    "tier": "Tier 1 Major"
+  },
+  "XRP/USDT": {
+    "minNetEdgePct": "0.12%",
+    "tier": "Tier 1 Major"
+  },
+  "USDC/USDT": {
+    "minNetEdgePct": "0.08%",
+    "tier": "Stablecoin Basis"
+  },
+  "BNB/USDT": {
+    "minNetEdgePct": "0.15%",
+    "tier": "Major"
+  },
+  "DOGE/USDT": {
+    "minNetEdgePct": "0.15%",
+    "tier": "Major"
+  },
+  "ADA/USDT": {
+    "minNetEdgePct": "0.15%",
+    "tier": "Major"
+  },
+  "LINK/USDT": {
+    "minNetEdgePct": "0.15%",
+    "tier": "Major"
+  },
+  "AVAX/USDT": {
+    "minNetEdgePct": "0.15%",
+    "tier": "Major"
+  },
+  "SUI/USDT": {
+    "minNetEdgePct": "0.18%",
+    "tier": "Liquid Alt"
+  },
+  "LTC/USDT": {
+    "minNetEdgePct": "0.15%",
+    "tier": "Major"
+  },
+  "BCH/USDT": {
+    "minNetEdgePct": "0.15%",
+    "tier": "Major"
+  },
+  "TRX/USDT": {
+    "minNetEdgePct": "0.18%",
+    "tier": "Liquid Alt"
+  },
+  "DOT/USDT": {
+    "minNetEdgePct": "0.18%",
+    "tier": "Major"
+  },
+  "NEAR/USDT": {
+    "minNetEdgePct": "0.18%",
+    "tier": "Liquid Alt"
+  },
+  "AAVE/USDT": {
+    "minNetEdgePct": "0.18%",
+    "tier": "Liquid DeFi"
+  },
+  "UNI/USDT": {
+    "minNetEdgePct": "0.18%",
+    "tier": "Liquid DeFi"
+  },
+  "XLM/USDT": {
+    "minNetEdgePct": "0.18%",
+    "tier": "Major"
+  },
+  "ATOM/USDT": {
+    "minNetEdgePct": "0.18%",
+    "tier": "Major"
+  },
+  "ETC/USDT": {
+    "minNetEdgePct": "0.20%",
+    "tier": "Large Alt"
+  },
+  "FIL/USDT": {
+    "minNetEdgePct": "0.20%",
+    "tier": "Large Alt"
+  },
+  "ICP/USDT": {
+    "minNetEdgePct": "0.20%",
+    "tier": "Large Alt"
+  },
+  "HBAR/USDT": {
+    "minNetEdgePct": "0.20%",
+    "tier": "Large Alt"
+  },
+  "ALGO/USDT": {
+    "minNetEdgePct": "0.20%",
+    "tier": "Large Alt"
+  },
+  "VET/USDT": {
+    "minNetEdgePct": "0.22%",
+    "tier": "Mid Alt"
+  },
+  "APT/USDT": {
+    "minNetEdgePct": "0.20%",
+    "tier": "Large Alt"
+  },
+  "ARB/USDT": {
+    "minNetEdgePct": "0.20%",
+    "tier": "Large L2"
+  },
+  "OP/USDT": {
+    "minNetEdgePct": "0.20%",
+    "tier": "Large L2"
+  },
+  "INJ/USDT": {
+    "minNetEdgePct": "0.22%",
+    "tier": "Mid Alt"
+  },
+  "SEI/USDT": {
+    "minNetEdgePct": "0.22%",
+    "tier": "Mid Alt"
+  },
+  "TIA/USDT": {
+    "minNetEdgePct": "0.22%",
+    "tier": "Mid Alt"
+  },
+  "JUP/USDT": {
+    "minNetEdgePct": "0.22%",
+    "tier": "Mid Alt"
+  },
+  "FET/USDT": {
+    "minNetEdgePct": "0.22%",
+    "tier": "AI Alt"
+  },
+  "RENDER/USDT": {
+    "minNetEdgePct": "0.22%",
+    "tier": "AI/Compute Alt"
+  },
+  "GRT/USDT": {
+    "minNetEdgePct": "0.22%",
+    "tier": "Mid Alt"
+  },
+  "MKR/USDT": {
+    "minNetEdgePct": "0.30%",
+    "tier": "DeFi Core (Sky Migration)"
+  },
+  "LDO/USDT": {
+    "minNetEdgePct": "0.25%",
+    "tier": "Liquid Staking"
+  },
+  "RUNE/USDT": {
+    "minNetEdgePct": "0.25%",
+    "tier": "Mid Alt"
+  },
+  "STX/USDT": {
+    "minNetEdgePct": "0.25%",
+    "tier": "Mid Alt"
+  },
+  "IMX/USDT": {
+    "minNetEdgePct": "0.25%",
+    "tier": "Gaming L2"
+  },
+  "QNT/USDT": {
+    "minNetEdgePct": "0.25%",
+    "tier": "Mid Alt"
+  },
+  "AR/USDT": {
+    "minNetEdgePct": "0.25%",
+    "tier": "Storage Alt"
+  },
+  "FLOW/USDT": {
+    "minNetEdgePct": "0.25%",
+    "tier": "Mid Alt"
+  },
+  "TON/USDT": {
+    "minNetEdgePct": "0.20%",
+    "tier": "Large Ecosystem"
+  },
+  "MNT/USDT": {
+    "minNetEdgePct": "0.25%",
+    "tier": "Bybit Native L2"
+  },
+  "HYPE/USDT": {
+    "minNetEdgePct": "0.20%",
+    "tier": "High Vol DEX Alt"
+  },
+  "ADA/USDC": {
+    "minNetEdgePct": "0.15%",
+    "tier": "USDC Cross Pair"
+  },
+  "BTC/USDC": {
+    "minNetEdgePct": "0.10%",
+    "tier": "Institutional Major"
+  },
+  "ETH/USDC": {
+    "minNetEdgePct": "0.10%",
+    "tier": "Institutional Major"
+  },
+  "ENA/USDT": {
+    "minNetEdgePct": "0.22%",
+    "tier": "Yield Alt"
+  },
+  "ONDO/USDT": {
+    "minNetEdgePct": "0.20%",
+    "tier": "RWA Major"
+  },
+  "WLD/USDT": {
+    "minNetEdgePct": "0.22%",
+    "tier": "High Vol Alt"
+  },
+  "ZRO/USDT": {
+    "minNetEdgePct": "0.25%",
+    "tier": "Interop Alt"
+  },
+  "PENDLE/USDT": {
+    "minNetEdgePct": "0.25%",
+    "tier": "Yield Tokenization"
+  },
+  "PYTH/USDT": {
+    "minNetEdgePct": "0.25%",
+    "tier": "Oracle Alt"
+  },
+  "STRK/USDT": {
+    "minNetEdgePct": "0.25%",
+    "tier": "ZK L2"
+  },
+  "JTO/USDT": {
+    "minNetEdgePct": "0.25%",
+    "tier": "Solana Staking"
+  },
+  "ETHFI/USDT": {
+    "minNetEdgePct": "0.30%",
+    "tier": "Restaking Alt"
+  },
+  "EIGEN/USDT": {
+    "minNetEdgePct": "0.25%",
+    "tier": "Restaking Protocol"
+  },
+  "RAY/USDT": {
+    "minNetEdgePct": "0.25%",
+    "tier": "Solana DEX"
+  },
+  "ORDI/USDT": {
+    "minNetEdgePct": "0.30%",
+    "tier": "Inscriptions Alt"
+  },
+  "SATS/USDT": {
+    "minNetEdgePct": "0.40%",
+    "tier": "Micro Token"
+  },
+  "FLOKI/USDT": {
+    "minNetEdgePct": "0.30%",
+    "tier": "Memecoin High Vol"
+  },
+  "WIF/USDT": {
+    "minNetEdgePct": "0.25%",
+    "tier": "Memecoin High Vol"
+  },
+  "BONK/USDT": {
+    "minNetEdgePct": "0.25%",
+    "tier": "Memecoin High Vol"
+  },
+  "PEPE/USDT": {
+    "minNetEdgePct": "0.25%",
+    "tier": "Memecoin High Vol"
+  },
+  "SHIB/USDT": {
+    "minNetEdgePct": "0.25%",
+    "tier": "Liquid Meme Major"
+  },
+  "NOT/USDT": {
+    "minNetEdgePct": "0.30%",
+    "tier": "Telegram Gaming"
+  },
+  "TURBO/USDT": {
+    "minNetEdgePct": "0.35%",
+    "tier": "AI Meme Alt"
+  },
+  "TWT/USDT": {
+    "minNetEdgePct": "0.30%",
+    "tier": "Wallet Token"
+  },
+  "CRV/USDT": {
+    "minNetEdgePct": "0.25%",
+    "tier": "DeFi Core"
+  },
+  "COMP/USDT": {
+    "minNetEdgePct": "0.25%",
+    "tier": "Lending DeFi"
+  },
+  "SNX/USDT": {
+    "minNetEdgePct": "0.30%",
+    "tier": "Synthetics DeFi"
+  },
+  "DYDX/USDT": {
+    "minNetEdgePct": "0.25%",
+    "tier": "Perp DEX Alt"
+  },
+  "ZEC/USDT": {
+    "minNetEdgePct": "0.20%",
+    "tier": "Privacy Major"
+  },
+  "DASH/USDT": {
+    "minNetEdgePct": "0.30%",
+    "tier": "Legacy PoW"
+  },
+  "KAVA/USDT": {
+    "minNetEdgePct": "0.30%",
+    "tier": "Cosmos EVM"
+  },
+  "EGLD/USDT": {
+    "minNetEdgePct": "0.30%",
+    "tier": "Sharded L1"
+  },
+  "ROSE/USDT": {
+    "minNetEdgePct": "0.30%",
+    "tier": "Privacy Smart Contract"
+  },
+  "CHZ/USDT": {
+    "minNetEdgePct": "0.25%",
+    "tier": "Fan Token Chain"
+  },
+  "GALA/USDT": {
+    "minNetEdgePct": "0.30%",
+    "tier": "Gaming Alt"
+  },
+  "AXS/USDT": {
+    "minNetEdgePct": "0.30%",
+    "tier": "GameFi Major"
+  },
+  "SAND/USDT": {
+    "minNetEdgePct": "0.30%",
+    "tier": "Metaverse Alt"
+  },
+  "MANA/USDT": {
+    "minNetEdgePct": "0.30%",
+    "tier": "Metaverse Alt"
+  },
+  "APE/USDT": {
+    "minNetEdgePct": "0.30%",
+    "tier": "NFT Ecosystem"
+  },
+  "GMT/USDT": {
+    "minNetEdgePct": "0.35%",
+    "tier": "Move-to-Earn Alt"
+  },
+  "BLUR/USDT": {
+    "minNetEdgePct": "0.30%",
+    "tier": "NFT Marketplace"
+  },
+  "MINA/USDT": {
+    "minNetEdgePct": "0.30%",
+    "tier": "Succinct L1"
+  },
+  "CELO/USDT": {
+    "minNetEdgePct": "0.30%",
+    "tier": "Mobile EVM L2"
+  },
+  "IOTA/USDT": {
+    "minNetEdgePct": "0.30%",
+    "tier": "Tangle DAG"
+  },
+  "THETA/USDT": {
+    "minNetEdgePct": "0.30%",
+    "tier": "Decentralized Video"
+  },
+  "NEO/USDT": {
+    "minNetEdgePct": "0.30%",
+    "tier": "Legacy L1"
+  },
+  "QTUM/USDT": {
+    "minNetEdgePct": "0.35%",
+    "tier": "UTXO Smart Contract"
+  },
+  "1INCH/USDT": {
+    "minNetEdgePct": "0.30%",
+    "tier": "DEX Aggregator"
+  },
+  "BAT/USDT": {
+    "minNetEdgePct": "0.30%",
+    "tier": "Attention Token"
+  },
+  "ZIL/USDT": {
+    "minNetEdgePct": "0.35%",
+    "tier": "Sharding L1"
+  },
+  "ENS/USDT": {
+    "minNetEdgePct": "0.25%",
+    "tier": "Ethereum Naming"
+  },
+  "MASK/USDT": {
+    "minNetEdgePct": "0.35%",
+    "tier": "Social Web3 Alt"
+  },
+  "LRC/USDT": {
+    "minNetEdgePct": "0.40%",
+    "tier": "Legacy ZK Rollup"
+  }
+}

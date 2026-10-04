@@ -22,7 +22,7 @@ export interface TokenPriceData {
   currency: string;
   timestamp: number;
   change24h?: number;
-  source: "coingecko" | "fallback" | "cache";
+  source: "market-data" | "fallback" | "cache";
 }
 
 export interface UseTokenPriceOptions {

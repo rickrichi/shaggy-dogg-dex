@@ -13,13 +13,7 @@ import { SwapCard } from "@/components/swap/SwapCard";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  getTokensForChain,
-  isErc20Token,
-  MAINNET_TOKENS,
-  type Token,
-  type TokenSymbol,
-} from "@/config/tokens";
+import { getTokensForChain, isErc20Token, type Token, type TokenSymbol } from "@/config/tokens";
 import { useSwap } from "@/hooks/useSwap";
 import { fetchPrices } from "@/lib/api/prices";
 
@@ -128,8 +122,8 @@ export default function Swap() {
   // ────────────────────────────────────────────────────────────────────────────
 
   const { chain, isConnected } = useAccount();
-  const { data: blockNumber } = useBlockNumber({ watch: true });
-  const { data: gasPrice } = useGasPrice();
+  const { data: blockNumber } = useBlockNumber({ chainId: chain?.id ?? 8453, watch: true });
+  const { data: gasPrice } = useGasPrice({ chainId: chain?.id ?? 8453 });
   const { isPending: isSwitchingChain, switchChain } = useSwitchChain();
   const [searchParams, setSearchParams] = useSearchParams();
   const isCorrectNetwork = !isConnected || chain?.id === mainnet.id || chain?.id === 8453;
@@ -170,20 +164,20 @@ export default function Swap() {
   // Token Selection Logic
   // ────────────────────────────────────────────────────────────────────────────
 
-  const chainTokens = useMemo(() => getTokensForChain(chain?.id), [chain?.id]);
+  const chainTokens = useMemo(() => getTokensForChain(chain?.id ?? 8453), [chain?.id]);
 
   const baseTokens = useMemo(
     () => ({
-      initialSell: getInitialToken(urlParams.input, 0, chain?.id),
-      initialBuy: getInitialToken(urlParams.output, 1, chain?.id),
+      initialSell: getInitialToken(urlParams.input, 0, chain?.id ?? 8453),
+      initialBuy: getInitialToken(urlParams.output, 1, chain?.id ?? 8453),
     }),
     [urlParams.input, urlParams.output, chain?.id]
   );
 
   const specialTokens = useMemo(
     () => ({
-      stable: getFirstStable(baseTokens.initialSell, chain?.id),
-      nonStable: getFirstNonStable(baseTokens.initialBuy, chain?.id),
+      stable: getFirstStable(baseTokens.initialSell, chain?.id ?? 8453),
+      nonStable: getFirstNonStable(baseTokens.initialBuy, chain?.id ?? 8453),
     }),
     [baseTokens.initialSell, baseTokens.initialBuy, chain?.id]
   );
@@ -295,7 +289,7 @@ export default function Swap() {
   }, []);
 
   const runScanner = useCallback(async () => {
-    const tokens = MAINNET_TOKENS.filter(isErc20Token);
+    const tokens = chainTokens.filter(isErc20Token);
     const symbolsByAddress = new Map(
       tokens.map((token) => [
         token.address.toLowerCase(),
@@ -308,7 +302,7 @@ export default function Swap() {
 
     try {
       const result = await fetchPrices({
-        chainId: mainnet.id,
+        chainId: chain?.id ?? 8453,
         addresses: tokens.map((token) => token.address as AddressHex),
       });
 
@@ -335,7 +329,7 @@ export default function Swap() {
     } finally {
       setIsScannerLoading(false);
     }
-  }, []);
+  }, [chainTokens, chain?.id]);
 
   useEffect(() => {
     if (!scannerEnabled) return;
@@ -386,12 +380,8 @@ export default function Swap() {
         {/* Left Column: Chart & Info */}
         <div className="h-full min-h-[400px] lg:col-span-2">
           <PriceChart
-            baseToken={
-              MAINNET_TOKENS.find((token) => token.symbol === chartBaseSymbol) ?? sellToken
-            }
-            quoteToken={
-              MAINNET_TOKENS.find((token) => token.symbol === chartQuoteSymbol) ?? buyToken
-            }
+            baseToken={chainTokens.find((token) => token.symbol === chartBaseSymbol) ?? sellToken}
+            quoteToken={chainTokens.find((token) => token.symbol === chartQuoteSymbol) ?? buyToken}
           />
 
           <Card className="mt-6 border-slate-200/70 bg-white/70 p-4 shadow-sm backdrop-blur-sm">

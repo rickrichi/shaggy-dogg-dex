@@ -1,5 +1,6 @@
 // src/wagmi.ts
-import { createConfig, fallback, http } from "wagmi";
+import { createConfig, http } from "wagmi";
+import { createBaseReadTransport } from "@/lib/base-rpc";
 import { arbitrum, base, mainnet, optimism, polygon, sepolia } from "wagmi/chains";
 import { coinbaseWallet, injected, metaMask, walletConnect } from "wagmi/connectors";
 
@@ -66,11 +67,7 @@ const createTransport = (network: string) => {
 
   // Use official Base RPC with failover to avoid publicnode archive paywalls
   if (network === "base") {
-    return fallback([
-      http("https://mainnet.base.org", common),
-      http("https://1rpc.io/base", common),
-      http("https://base.meowrpc.com", common),
-    ]);
+    return createBaseReadTransport();
   }
 
   const alchemy = buildAlchemyUrl(network);

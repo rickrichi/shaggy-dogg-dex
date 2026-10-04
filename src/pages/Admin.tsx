@@ -1,9 +1,10 @@
 // src/pages/Admin.tsx
 import { useEffect, useMemo, useState } from "react";
 
-import { type Session } from "@supabase/supabase-js";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Copy, Loader2, Settings, Shield } from "lucide-react";
+import { AlertTriangle, Copy, Loader2, Settings, Shield, Wallet } from "lucide-react";
+import { createSiweMessage } from "viem/siwe";
+import { useAccount, useSignMessage } from "wagmi";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,10 +12,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { useDexSettings, useFeaturedTokens, useTokenLists } from "@/hooks/useAdminData";
+import { ADMIN_SESSION_KEY, useAdminSession, useDexSettings, useFeaturedTokens, useTokenLists } from "@/hooks/useAdminData";
+import { AdminApiError, fetchAdminNonce, signInAdmin, signOutAdmin } from "@/lib/adminApi";
 import { SUPPORTED_CHAINS } from "@/lib/config";
 import { DEPLOYMENTS, deploymentsLastUpdated } from "@/lib/deployments";
-import { supabase } from "@/lib/supabase/client";
 
 import type { FeaturedTokenInput, TokenListInput } from "@/lib/adminSchemas";
 
@@ -51,97 +52,75 @@ function validateFeaturedToken(input: FeaturedTokenInput): string | null {
 }
 
 export default function Admin() {
-  // ────────────────────────────── Auth gate ────────────────────────────────
-  const [authStatus, setAuthStatus] = useState<AuthStatus>("loading");
-  const [session, setSession] = useState<Session | null>(null);
-  const [supabaseConfigured, setSupabaseConfigured] = useState<boolean>(true);
+  // ─────────────────────── Auth gate (wallet sign-in, SIWE) ───────────────────
+  // The API server verifies the signature against ADMIN_WALLETS and sets an HttpOnly session cookie.
   const queryClient = useQueryClient();
+  const sessionQuery = useAdminSession();
+  const session = sessionQuery.data ?? null;
+  const authStatus: AuthStatus = sessionQuery.isLoading
+    ? "loading"
+    : session
+      ? "authenticated"
+      : "unauthenticated";
+  const { address, chainId } = useAccount();
+  const { signMessageAsync } = useSignMessage();
+  const [signingIn, setSigningIn] = useState(false);
+  const [loginMessage, setLoginMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    let mounted = true;
+  const refreshAuth = (): void => {
+    void queryClient.invalidateQueries({ queryKey: ADMIN_SESSION_KEY });
+    for (const key of ["dexSettings", "featuredTokens", "tokenLists"]) {
+      void queryClient.invalidateQueries({ queryKey: [key] });
+    }
+  };
 
-    const init = async (): Promise<void> => {
-      // Check if Supabase is configured
-      const hasSupabaseEnv = !!(
-        import.meta.env.VITE_SUPABASE_URL &&
-        (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY)
-      );
-      if (!hasSupabaseEnv) {
-        setSupabaseConfigured(false);
-        setAuthStatus("unauthenticated");
-        return;
-      }
-
-      // Exchange OAuth code if present (reliable social login landing)
-      if (window.location.href.includes("code=")) {
-        try {
-          await supabase.auth.exchangeCodeForSession(window.location.href);
-          const url = new URL(window.location.href);
-          url.searchParams.delete("code");
-          url.searchParams.delete("state");
-          window.history.replaceState({}, "", url.toString());
-        } catch (err) {
-          console.error("[exchangeCodeForSession]", err);
-        }
-      }
-
-      try {
-        await supabase.auth.refreshSession().catch(() => {});
-        const { data, error } = await supabase.auth.getSession();
-        if (!mounted) return;
-        if (error) {
-          setSession(null);
-          setAuthStatus("unauthenticated");
-          return;
-        }
-        setSession(data.session ?? null);
-        setAuthStatus(data.session ? "authenticated" : "unauthenticated");
-      } catch (err) {
-        if (!mounted) return;
-        console.error("[getSession]", err);
-        setSession(null);
-        setAuthStatus("unauthenticated");
-      }
-    };
-
-    void init();
-
-    const { data } = supabase.auth.onAuthStateChange((_evt, s) => {
-      if (!mounted) return;
-      setSession(s);
-      setAuthStatus(s ? "authenticated" : "unauthenticated");
-      // Invalidate admin data on auth boundary changes
-      void queryClient.invalidateQueries({ queryKey: ["adminSettings"] });
-      void queryClient.invalidateQueries({ queryKey: ["featuredTokens"] });
-      void queryClient.invalidateQueries({ queryKey: ["tokenLists"] });
-    });
-
-    return () => {
-      mounted = false;
-      data.subscription.unsubscribe();
-    };
-  }, []);
-
-  const onOAuth = async (provider: "github" | "google"): Promise<void> => {
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        redirectTo: `${window.location.origin}/admin`,
-        queryParams: { prompt: "select_account" },
-        scopes: provider === "google" ? "openid email profile" : "read:user user:email",
-      },
-    });
-    if (error) {
-      console.error("[signInWithOAuth]", error.message);
+  const signInWithWallet = async (): Promise<void> => {
+    if (!address) {
+      setLoginMessage("Connect your admin wallet first (top right).");
       return;
     }
-    if (data?.url) window.location.assign(data.url);
+    setSigningIn(true);
+    setLoginMessage(null);
+    try {
+      const { nonce, enabled } = await fetchAdminNonce();
+      if (!enabled) {
+        throw new Error("Admin sign-in is disabled: set ADMIN_WALLETS in server/.env and restart the API server.");
+      }
+      const message = createSiweMessage({
+        domain: window.location.host,
+        address,
+        statement: "Sign in to the Shaggy Dogg DEX admin panel. This is a signature only: no transaction, no gas.",
+        uri: window.location.origin,
+        version: "1",
+        chainId: chainId ?? 1,
+        nonce,
+        issuedAt: new Date(),
+        expirationTime: new Date(Date.now() + 5 * 60_000),
+      });
+      const signature = await signMessageAsync({ message });
+      await signInAdmin(message, signature);
+      refreshAuth();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Sign-in failed";
+      setLoginMessage(/rejected|denied/i.test(msg) ? "The signature request was rejected in your wallet." : msg);
+    } finally {
+      setSigningIn(false);
+    }
   };
 
   // ───────────────────────────── Data hooks wiring ───────────────────────────
-  const { settings, save } = useDexSettings();
-  const { tokens, add, remove } = useFeaturedTokens();
-  const { lists, add: addList, remove: removeList } = useTokenLists();
+  const signedIn = authStatus === "authenticated";
+  const { settings, save } = useDexSettings(signedIn);
+  const { tokens, add, remove } = useFeaturedTokens(signedIn);
+  const { lists, add: addList, remove: removeList } = useTokenLists(signedIn);
+
+  // A 401 from any admin call means the session expired or the wallet was removed from ADMIN_WALLETS.
+  const sessionLost = [settings.error, tokens.error, lists.error].some(
+    (e) => e instanceof AdminApiError && e.status === 401
+  );
+  useEffect(() => {
+    if (sessionLost) void queryClient.invalidateQueries({ queryKey: ADMIN_SESSION_KEY });
+  }, [sessionLost, queryClient]);
 
   // ───────────────────────────── Local controlled state ──────────────────────
   // Defaults from server (memoized to avoid controlled/uncontrolled flips)
@@ -217,57 +196,40 @@ export default function Admin() {
           <p className="text-gray-600">Manage DEX settings and configuration</p>
         </div>
 
-        {!supabaseConfigured ? (
-          <Card className="border-2 border-red-200 bg-red-50">
-            <CardContent className="p-4">
-              <div className="flex items-start space-x-3">
-                <AlertTriangle className="mt-0.5 size-5 text-red-600" />
-                <div className="text-sm">
-                  <p className="font-medium text-red-800">Supabase Not Configured</p>
-                  <p className="mt-2 text-red-700">
-                    The Admin panel requires Supabase configuration. Add these to your{" "}
-                    <code className="rounded bg-red-100 px-1 py-0.5">.env</code> file:
-                  </p>
-                  <pre className="mt-3 overflow-x-auto rounded bg-red-100 p-3 text-xs">
-                    {`VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_PUBLISHABLE_KEY=your_publishable_key_here`}
-                  </pre>
-                  <p className="mt-2 text-red-700">
-                    Get your credentials from{" "}
-                    <a
-                      href="https://supabase.com/dashboard"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-medium underline"
-                    >
-                      Supabase Dashboard
-                    </a>
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="border-2 border-amber-200 bg-amber-50">
-            <CardContent className="p-4">
-              <div className="flex items-start space-x-3">
-                <AlertTriangle className="mt-0.5 size-5 text-amber-600" />
-                <div className="text-sm">
+        <Card className="border-2 border-amber-200 bg-amber-50">
+          <CardContent className="p-4">
+            <div className="flex items-start space-x-3">
+              <Wallet className="mt-0.5 size-5 text-amber-600" />
+              <div className="space-y-3 text-sm">
+                <div>
                   <p className="font-medium text-amber-800">Admin Access Required</p>
                   <p className="text-amber-700">
-                    This section requires admin authentication via Supabase Auth + RLS policies.
+                    Sign a one-time message with an admin wallet. It is not a transaction and costs no gas.
                   </p>
-                  <div className="mt-3 flex gap-2">
-                    <Button onClick={() => void onOAuth("github")}>Sign in with GitHub</Button>
-                    <Button variant="outline" onClick={() => void onOAuth("google")}>
-                      Sign in with Google
-                    </Button>
-                  </div>
                 </div>
+                <p className="font-mono text-xs text-amber-800">
+                  {address ? `Connected: ${address}` : "No wallet connected — use Connect Wallet in the header."}
+                </p>
+                <Button onClick={() => void signInWithWallet()} disabled={signingIn || !address}>
+                  {signingIn ? (
+                    <span className="inline-flex items-center">
+                      <Loader2 className="mr-2 size-4 animate-spin" />
+                      Waiting for signature…
+                    </span>
+                  ) : (
+                    "Sign in with wallet"
+                  )}
+                </Button>
+                {loginMessage && (
+                  <p className="flex items-start gap-1 text-xs text-red-700">
+                    <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+                    {loginMessage}
+                  </p>
+                )}
               </div>
-            </CardContent>
-          </Card>
-        )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -287,7 +249,8 @@ VITE_SUPABASE_PUBLISHABLE_KEY=your_publishable_key_here`}
           <Button
             variant="outline"
             onClick={async () => {
-              await supabase.auth.signOut();
+              await signOutAdmin().catch(() => undefined);
+              refreshAuth();
             }}
           >
             Sign out

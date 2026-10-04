@@ -402,19 +402,36 @@ export class ShaggyDoggQuantAiEngine {
     const effectivePoolFeeBps = basePoolFeeBps * (1 - feeDiscountBps / 1000);
     const poolFeeFactor = 1 - effectivePoolFeeBps / 10_000;
 
-    // Triangular route: WETH -> USDC -> DAI -> WETH
-    const usdc = borrowAmount * wethUsdcPrice * poolFeeFactor;
-    const dai = usdc * usdcDaiRate * poolFeeFactor;
-    const grossArbitrageReturn = dai * daiWethRate * poolFeeFactor;
-
     // Aave Flash loan premium
     const flashLoanPremium = borrowAmount * (flashPremiumBps / 10_000);
     const repaymentRequired = borrowAmount + flashLoanPremium;
 
-    const grossProfit = grossArbitrageReturn - repaymentRequired;
-    const gasInAsset = gasCostUsd / wethUsdcPrice;
-    const netProfit = grossProfit - gasInAsset;
-    const netProfitUsd = netProfit * wethUsdcPrice;
+    let grossArbitrageReturn = 0;
+    let grossProfit = 0;
+    let netProfit = 0;
+    let netProfitUsd = 0;
+
+    if (borrowAsset === "USDC") {
+      // Cyclic Route starting with USDC: USDC -> DAI -> WETH -> USDC
+      const dai = borrowAmount * usdcDaiRate * poolFeeFactor;
+      const weth = dai * daiWethRate * poolFeeFactor;
+      grossArbitrageReturn = weth * wethUsdcPrice * poolFeeFactor;
+
+      grossProfit = grossArbitrageReturn - repaymentRequired;
+      netProfit = grossProfit - gasCostUsd;
+      netProfitUsd = netProfit;
+    } else {
+      // Cyclic Route starting with WETH: WETH -> USDC -> DAI -> WETH
+      const usdc = borrowAmount * wethUsdcPrice * poolFeeFactor;
+      const dai = usdc * usdcDaiRate * poolFeeFactor;
+      grossArbitrageReturn = dai * daiWethRate * poolFeeFactor;
+
+      grossProfit = grossArbitrageReturn - repaymentRequired;
+      const gasInAsset = gasCostUsd / wethUsdcPrice;
+      netProfit = grossProfit - gasInAsset;
+      netProfitUsd = netProfit * wethUsdcPrice;
+    }
+
     const roiBps = (netProfit / borrowAmount) * 10_000;
     const isProfitable = netProfit > 0;
 

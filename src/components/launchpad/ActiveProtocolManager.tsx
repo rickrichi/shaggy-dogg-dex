@@ -255,7 +255,7 @@ export function ActiveProtocolManager() {
       if (receipt.status === "success") {
         setSwapTxHash(hash);
         toast.success(
-          "Initial swap successful! Trading data is now live on GeckoTerminal & DexScreener!"
+          "Initial swap successful! Trading data is now live on DexScreener!"
         );
       } else {
         throw new Error("Swap transaction reverted.");
@@ -547,7 +547,7 @@ export function ActiveProtocolManager() {
             Execute the very first trade on your Uniswap V2 AMUTT/WETH pool. Swapping a tiny
             fraction of ETH (e.g. 0.00005 ETH ≈ $0.13) creates the first on-chain buy, establishes
             the initial USD price, draws the first candlestick on DexScreener, and activates 24h
-            volume and price on GeckoTerminal! The swap uses a fresh router quote, a 0.5%
+            volume and price on DexScreener! The swap uses a fresh router quote, a 0.5%
             minimum-output floor, and a two-minute expiry so it cannot execute at an arbitrary
             price.
           </p>
@@ -610,12 +610,12 @@ export function ActiveProtocolManager() {
                   </a>
                   <span className="text-gray-300">•</span>
                   <a
-                    href="https://www.geckoterminal.com/base/pools/0x581B294FeC1A4332f17cf18B49D68087c09b6784"
+                    href="https://dexscreener.com/base/0x581B294FeC1A4332f17cf18B49D68087c09b6784"
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center text-xs font-semibold text-emerald-700 hover:underline"
                   >
-                    View on GeckoTerminal <ExternalLink className="ml-1 size-3" />
+                    View on DexScreener <ExternalLink className="ml-1 size-3" />
                   </a>
                 </div>
               </AlertDescription>

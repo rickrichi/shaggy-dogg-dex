@@ -15,7 +15,10 @@ export const CANONICAL_BASE_CONTRACTS = {
   UniswapV2Factory: "0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6" as Address,
   PancakeSwapV2Router: "0x8cFe327CEc66d1C090Dd72bd0FF11d690C33a2Eb" as Address,
   PancakeSwapV2Factory: "0x02a84c1b3BBD7401a5f7fa98a384EBC70bB5749E" as Address,
-  AerodromeRouter: "0xCf77a3bA9A5ca399b7c97c749545344273801A9B" as Address,
+  AerodromeRouter: "0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43" as Address,
+  AerodromeFactory: "0x420DD381b31aEf6683db6B902084cB0FFECe40Da" as Address,
+  AtomicFlashArbitrageRouter: "0x70315019d12a11556c837970675cdc8fa54d186b" as Address,
+  DeployerAdminWallet: "0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98" as Address,
 };
 
 export const LAUNCHPAD_ARCHETYPES: ArchetypeDefinition[] = [

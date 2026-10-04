@@ -4,12 +4,16 @@ import { Link, useLocation } from "react-router-dom";
 import {
   Activity,
   ArrowLeftRight,
+  CandlestickChart,
   Droplets,
+  LineChart,
   PieChart,
+  Radio,
   Rocket,
   Settings,
   ShieldCheck,
   Sparkles,
+  Zap,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -26,6 +30,10 @@ export const Layout = ({ children }: LayoutProps) => {
     { name: "Swap", href: "/swap", icon: ArrowLeftRight },
     { name: "Liquidity", href: "/liquidity", icon: Droplets },
     { name: "Stake", href: "/stake", icon: ShieldCheck },
+    { name: "Arbitrage", href: "/arbitrage/matrix", icon: Zap },
+    { name: "Live Desk", href: "/arbitrage/live-desk", icon: Radio },
+    { name: "Markets", href: "/markets", icon: CandlestickChart },
+    { name: "Market Data", href: "/market-data", icon: LineChart },
     { name: "Launchpad", href: "/launchpad", icon: Rocket },
     { name: "Protocol Hub", href: "/protocol", icon: Sparkles },
     { name: "Portfolio", href: "/portfolio", icon: PieChart },
@@ -50,7 +58,11 @@ export const Layout = ({ children }: LayoutProps) => {
             <nav className="hidden space-x-1 md:flex">
               {navigation.map((item) => {
                 const Icon = item.icon;
-                const isActive = location.pathname === item.href;
+                const onLiveDesk = location.pathname.startsWith("/arbitrage/live");
+                const isActive =
+                  location.pathname === item.href ||
+                  (item.name === "Live Desk" && onLiveDesk) ||
+                  (item.name === "Arbitrage" && location.pathname.startsWith("/arbitrage") && !onLiveDesk);
                 return (
                   <Link key={item.name} to={item.href}>
                     <Button

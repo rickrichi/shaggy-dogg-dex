@@ -1,10 +1,12 @@
 // src/lib/adminApi.ts
-import { supabase } from "./supabase/client";
+// Admin data lives on the Hono API server (server/src/routes/admin.ts), proxied by Vite at /api.
+// Access is a wallet-signed (SIWE) session held in an HttpOnly cookie; no Supabase involvement.
 import {
   type AdminChain,
   type AdminChainInput,
   AdminChainSchema,
-  type AdminStatus,
+  type AdminSession,
+  AdminSessionSchema,
   type DexSettings,
   type DexSettingsInput,
   DexSettingsSchema,
@@ -12,198 +14,138 @@ import {
   type FeaturedTokenInput,
   FeaturedTokenInputSchema,
   FeaturedTokenSchema,
-  type Profile,
-  type ProfileInput,
-  ProfileSchema,
   type TokenList,
   type TokenListInput,
   TokenListInputSchema,
   TokenListSchema,
 } from "./adminSchemas";
 
-// ============================================================================
-// Admin Status Check
-// ============================================================================
-
-/**
- * Check if current user is an admin
- * Uses the is_admin() RLS function from your database
- */
-export async function checkAdminStatus(): Promise<AdminStatus> {
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) {
-    return { isAdmin: false, userId: null, email: null };
+export class AdminApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number
+  ) {
+    super(message);
   }
+}
 
-  // Check profile for admin role
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  const isAdmin = profile?.role === "admin";
-
-  return {
-    isAdmin,
-    userId: user.id,
-    email: user.email ?? null,
-  };
+async function adminFetch<T>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
+  const method = init.method ?? "GET";
+  const response = await fetch(`/api/admin${path}`, {
+    method,
+    credentials: "same-origin",
+    cache: "no-store",
+    ...(method === "GET"
+      ? {}
+      : { headers: { "Content-Type": "application/json", "X-Admin-Request": "1" } }),
+    ...(init.body === undefined ? {} : { body: JSON.stringify(init.body) }),
+  });
+  const data: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    const message =
+      typeof (data as { error?: unknown } | null)?.error === "string"
+        ? (data as { error: string }).error
+        : `Admin request failed (HTTP ${response.status})`;
+    throw new AdminApiError(message, response.status);
+  }
+  return data as T;
 }
 
 // ============================================================================
-// Profile Management
+// Wallet sign-in (Sign-In with Ethereum)
 // ============================================================================
 
-export async function fetchProfile(userId: string): Promise<Profile> {
-  const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).single();
-
-  if (error) throw error;
-  return ProfileSchema.parse(data);
+/** Current admin session, or null when signed out. */
+export async function fetchAdminSession(): Promise<AdminSession | null> {
+  try {
+    return AdminSessionSchema.parse(await adminFetch("/session"));
+  } catch (error) {
+    if (error instanceof AdminApiError && error.status === 401) return null;
+    throw error;
+  }
 }
 
-export async function updateProfile(userId: string, input: ProfileInput): Promise<Profile> {
-  const { data, error } = await supabase
-    .from("profiles")
-    .update(input)
-    .eq("id", userId)
-    .select()
-    .single();
+export async function fetchAdminNonce(): Promise<{ nonce: string; enabled: boolean }> {
+  return adminFetch("/nonce");
+}
 
-  if (error) throw error;
-  return ProfileSchema.parse(data);
+export async function signInAdmin(message: string, signature: string): Promise<AdminSession> {
+  return AdminSessionSchema.parse(
+    await adminFetch("/login", { method: "POST", body: { message, signature } })
+  );
+}
+
+export async function signOutAdmin(): Promise<void> {
+  await adminFetch("/logout", { method: "POST", body: {} });
 }
 
 // ============================================================================
-// DEX Settings (table: dex_settings)
+// DEX Settings
 // ============================================================================
 
 export async function fetchDexSettings(): Promise<DexSettings> {
-  const { data, error } = await supabase
-    .from("dex_settings")
-    .select("*")
-    .eq("id", "default")
-    .single();
-
-  if (error) throw error;
-  return DexSettingsSchema.parse(data);
+  return DexSettingsSchema.parse(await adminFetch("/settings"));
 }
 
 export async function updateDexSettings(input: DexSettingsInput): Promise<DexSettings> {
-  const { data, error } = await supabase
-    .from("dex_settings")
-    .update({ ...input, updated_at: new Date().toISOString() })
-    .eq("id", "default")
-    .select()
-    .single();
-
-  if (error) throw error;
-  return DexSettingsSchema.parse(data);
+  return DexSettingsSchema.parse(await adminFetch("/settings", { method: "PUT", body: input }));
 }
 
 // ============================================================================
-// Admin Chains (table: admin_chains)
+// Admin Chains
 // ============================================================================
 
 export async function listAdminChains(): Promise<AdminChain[]> {
-  const { data, error } = await supabase
-    .from("admin_chains")
-    .select("*")
-    .order("chain", { ascending: true });
-
-  if (error) throw error;
-  return data.map((row) => AdminChainSchema.parse(row));
+  const rows = await adminFetch<unknown[]>("/chains");
+  return rows.map((row) => AdminChainSchema.parse(row));
 }
 
 export async function upsertAdminChain(input: AdminChainInput): Promise<void> {
-  const { error } = await supabase.from("admin_chains").upsert({
-    chain: input.chain,
-    enabled: input.enabled,
-    updated_at: new Date().toISOString(),
-  });
-
-  if (error) throw error;
+  await adminFetch("/chains", { method: "PUT", body: input });
 }
 
 export async function deleteAdminChain(chain: string): Promise<void> {
-  const { error } = await supabase.from("admin_chains").delete().eq("chain", chain);
-
-  if (error) throw error;
+  await adminFetch(`/chains/${encodeURIComponent(chain)}`, { method: "DELETE" });
 }
 
 // ============================================================================
-// Featured Tokens (table: admin_featured_tokens)
+// Featured Tokens
 // ============================================================================
 
 export async function listFeaturedTokens(): Promise<FeaturedToken[]> {
-  const { data, error } = await supabase
-    .from("admin_featured_tokens")
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  if (error) throw error;
-  return data.map((row) => FeaturedTokenSchema.parse(row));
+  const rows = await adminFetch<unknown[]>("/featured-tokens");
+  return rows.map((row) => FeaturedTokenSchema.parse(row));
 }
 
 export async function addFeaturedToken(input: FeaturedTokenInput): Promise<void> {
-  // Validate input
-  FeaturedTokenInputSchema.parse(input);
-
-  const { error } = await supabase.from("admin_featured_tokens").insert({
-    chain: input.chain,
-    address: input.address.toLowerCase(), // Normalize address
-    symbol: input.symbol ?? null,
-    name: input.name ?? null,
+  const body = FeaturedTokenInputSchema.parse(input);
+  await adminFetch("/featured-tokens", {
+    method: "POST",
+    body: { ...body, symbol: body.symbol || null, name: body.name || null },
   });
-
-  if (error) throw error;
 }
 
 export async function removeFeaturedToken(id: string): Promise<void> {
-  const { error } = await supabase.from("admin_featured_tokens").delete().eq("id", id);
-
-  if (error) throw error;
+  await adminFetch(`/featured-tokens/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
 // ============================================================================
-// Token Lists (table: admin_token_lists)
+// Token Lists
 // ============================================================================
 
 export async function listTokenLists(): Promise<TokenList[]> {
-  const { data, error } = await supabase
-    .from("admin_token_lists")
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  if (error) throw error;
-  return data.map((row) => TokenListSchema.parse(row));
+  const rows = await adminFetch<unknown[]>("/token-lists");
+  return rows.map((row) => TokenListSchema.parse(row));
 }
 
 export async function addTokenList(input: TokenListInput): Promise<void> {
-  // Validate input
-  TokenListInputSchema.parse(input);
-
-  const { error } = await supabase.from("admin_token_lists").insert({
-    url: input.url,
-    name: input.name,
-    enabled: input.enabled ?? true,
-  });
-
-  if (error) throw error;
+  await adminFetch("/token-lists", { method: "POST", body: TokenListInputSchema.parse(input) });
 }
 
 export async function updateTokenList(id: string, enabled: boolean): Promise<void> {
-  const { error } = await supabase.from("admin_token_lists").update({ enabled }).eq("id", id);
-
-  if (error) throw error;
+  await adminFetch(`/token-lists/${encodeURIComponent(id)}`, { method: "PATCH", body: { enabled } });
 }
 
 export async function removeTokenList(id: string): Promise<void> {
-  const { error } = await supabase.from("admin_token_lists").delete().eq("id", id);
-
-  if (error) throw error;
+  await adminFetch(`/token-lists/${encodeURIComponent(id)}`, { method: "DELETE" });
 }

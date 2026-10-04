@@ -17,6 +17,8 @@ vi.mock("wagmi", async () => {
       data: { value: toWei(10), decimals: 18, formatted: "10.0", symbol: "ETH" },
       isLoading: false,
     })),
+    usePublicClient: vi.fn(() => undefined),
+    useWalletClient: vi.fn(() => ({ data: undefined })),
     useReadContract: vi.fn(() => ({ data: undefined, isLoading: false })),
     useWriteContract: vi.fn(() => ({
       writeContractAsync: vi.fn(),
@@ -47,7 +49,7 @@ describe("useSwap", () => {
     expect(result.current.swap.canSwap).toBe(false);
   });
 
-  it("updates tokens and amounts", () => {
+  it("updates input and derives output only from router quotes", () => {
     const { result } = renderHook(() => useSwap(MOCK_ETH, MOCK_USDC), { wrapper: AllProviders });
     const dai: Token = {
       kind: "erc20",
@@ -66,7 +68,7 @@ describe("useSwap", () => {
 
     expect(result.current.state.sellToken).toEqual(dai);
     expect(result.current.state.sellAmount).toBe("1.5");
-    expect(result.current.state.buyAmount).toBe("2500");
+    expect(result.current.state.buyAmount).toBe("");
   });
 
   it("updates slippage and exposes approval state", () => {
@@ -79,7 +81,7 @@ describe("useSwap", () => {
     expect(result.current.approval.approve).toEqual(expect.any(Function));
   });
 
-  it("reverses tokens and entered amounts", () => {
+  it("clears amounts when reversing without a valid quote", () => {
     const { result } = renderHook(() => useSwap(MOCK_ETH, MOCK_USDC), { wrapper: AllProviders });
 
     act(() => {
@@ -90,7 +92,7 @@ describe("useSwap", () => {
 
     expect(result.current.state.sellToken).toEqual(MOCK_USDC);
     expect(result.current.state.buyToken).toEqual(MOCK_ETH);
-    expect(result.current.state.sellAmount).toBe("2500");
-    expect(result.current.state.buyAmount).toBe("1");
+    expect(result.current.state.sellAmount).toBe("");
+    expect(result.current.state.buyAmount).toBe("");
   });
 });

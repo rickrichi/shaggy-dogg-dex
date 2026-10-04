@@ -4,62 +4,33 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   addFeaturedToken,
   addTokenList,
-  checkAdminStatus,
   deleteAdminChain,
+  fetchAdminSession,
   fetchDexSettings,
-  fetchProfile,
   listAdminChains,
   listFeaturedTokens,
   listTokenLists,
   removeFeaturedToken,
   removeTokenList,
   updateDexSettings,
-  updateProfile,
   updateTokenList,
   upsertAdminChain,
 } from "@/lib/adminApi";
 
-import type {
-  AdminChainInput,
-  FeaturedTokenInput,
-  ProfileInput,
-  TokenListInput,
-} from "@/lib/adminSchemas";
+import type { AdminChainInput, FeaturedTokenInput, TokenListInput } from "@/lib/adminSchemas";
 
 // ============================================================================
-// Admin Status
+// Admin Session (wallet sign-in)
 // ============================================================================
 
-export function useAdminStatus() {
+export const ADMIN_SESSION_KEY = ["adminSession"] as const;
+
+export function useAdminSession() {
   return useQuery({
-    queryKey: ["adminStatus"],
-    queryFn: checkAdminStatus,
-    staleTime: 60_000, // 1 minute
-  });
-}
-
-// ============================================================================
-// Profile
-// ============================================================================
-
-export function useProfile(userId: string | null) {
-  return useQuery({
-    queryKey: ["profile", userId],
-    queryFn: () => fetchProfile(userId!),
-    enabled: !!userId,
-    staleTime: 30_000,
-  });
-}
-
-export function useUpdateProfile() {
-  const qc = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ userId, input }: { userId: string; input: ProfileInput }) =>
-      updateProfile(userId, input),
-    onSuccess: (_, { userId }) => {
-      qc.invalidateQueries({ queryKey: ["profile", userId] });
-    },
+    queryKey: ADMIN_SESSION_KEY,
+    queryFn: fetchAdminSession,
+    staleTime: 60_000,
+    retry: false,
   });
 }
 
@@ -67,12 +38,13 @@ export function useUpdateProfile() {
 // DEX Settings
 // ============================================================================
 
-export function useDexSettings() {
+export function useDexSettings(enabled = true) {
   const qc = useQueryClient();
   const settings = useQuery({
     queryKey: ["dexSettings"],
     queryFn: fetchDexSettings,
     staleTime: 30_000,
+    enabled,
   });
 
   const save = useMutation({
@@ -87,12 +59,13 @@ export function useDexSettings() {
 // Admin Chains
 // ============================================================================
 
-export function useAdminChains() {
+export function useAdminChains(enabled = true) {
   const qc = useQueryClient();
   const chains = useQuery({
     queryKey: ["adminChains"],
     queryFn: listAdminChains,
     staleTime: 30_000,
+    enabled,
   });
 
   const upsert = useMutation({
@@ -112,12 +85,13 @@ export function useAdminChains() {
 // Featured Tokens
 // ============================================================================
 
-export function useFeaturedTokens() {
+export function useFeaturedTokens(enabled = true) {
   const qc = useQueryClient();
   const tokens = useQuery({
     queryKey: ["featuredTokens"],
     queryFn: listFeaturedTokens,
     staleTime: 15_000,
+    enabled,
   });
 
   const add = useMutation({
@@ -137,12 +111,13 @@ export function useFeaturedTokens() {
 // Token Lists
 // ============================================================================
 
-export function useTokenLists() {
+export function useTokenLists(enabled = true) {
   const qc = useQueryClient();
   const lists = useQuery({
     queryKey: ["tokenLists"],
     queryFn: listTokenLists,
     staleTime: 30_000,
+    enabled,
   });
 
   const add = useMutation({
@@ -151,7 +126,7 @@ export function useTokenLists() {
   });
 
   const toggle = useMutation({
-    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) => updateTokenList(id, enabled),
+    mutationFn: ({ id, enabled: on }: { id: string; enabled: boolean }) => updateTokenList(id, on),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tokenLists"] }),
   });
 

@@ -35,6 +35,15 @@ export interface MarketSnapshot {
   readonly timestamp: number;
 }
 
+export interface OpportunityBreakdown {
+  readonly grossProfitUsd: number;
+  readonly flashLoanFeeUsd: number;
+  readonly estimatedGasUsd: number;
+  readonly netProfitUsd: number;
+  readonly minProfitFloorUsd: number;
+  readonly returnOnCapitalBps: number;
+}
+
 export interface OpportunityEvaluation {
   readonly id: string;
   readonly timestamp: string;
@@ -46,6 +55,9 @@ export interface OpportunityEvaluation {
   readonly confidenceScore: number;
   readonly summary: string;
   readonly disqualificationReason?: string;
+  readonly breakdown?: OpportunityBreakdown;
+  readonly simulationStatus?: "PENDING" | "PASSED" | "REVERTED_ANTI_LOSS" | "REVERTED_ERROR";
+  readonly simulationError?: string;
   readonly executionPlan?: {
     readonly targetRouter: string;
     readonly action: string;
@@ -89,6 +101,7 @@ export class AiArbitrageBotEngine {
       gasUsd: number;
       confidence: number;
       summary: string;
+      breakdown: OpportunityBreakdown;
       plan?: OpportunityEvaluation["executionPlan"];
     }> = [];
 
@@ -113,6 +126,14 @@ export class AiArbitrageBotEngine {
           gasUsd: triResult.gasCostUsd,
           confidence: triResult.arbitrageDetected ? 97.5 : 45.0,
           summary: `Triangular WETH ➔ USDC ➔ DAI ➔ WETH (${config.tradeCapitalEth} WETH)`,
+          breakdown: {
+            grossProfitUsd: triResult.grossProfit * market.wethUsdcPrice,
+            flashLoanFeeUsd: 0,
+            estimatedGasUsd: triResult.gasCostUsd,
+            netProfitUsd: netUsd,
+            minProfitFloorUsd: config.minNetProfitUsd,
+            returnOnCapitalBps: triResult.roiBps,
+          },
           plan: {
             targetRouter: "0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24",
             action: "swapExactETHForTokens",
@@ -145,11 +166,19 @@ export class AiArbitrageBotEngine {
           gasUsd: dualResult.l2GasUsd,
           confidence: dualResult.isProfitable ? 98.2 : 30.0,
           summary: `Cross-DEX ${dualResult.optimalRoute} (${config.tradeCapitalEth} ETH)`,
+          breakdown: {
+            grossProfitUsd: dualResult.grossSpread,
+            flashLoanFeeUsd: 0,
+            estimatedGasUsd: dualResult.l2GasUsd,
+            netProfitUsd: dualResult.netProfitUsd,
+            minProfitFloorUsd: config.minNetProfitUsd,
+            returnOnCapitalBps: dualResult.netSpreadPct * 100,
+          },
           plan: {
             targetRouter:
               dualResult.optimalRoute === "BUY_POOL_A_SELL_POOL_B"
                 ? "0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24"
-                : "0xcF664087a5bB0237a0BAd6742852ec6c8d58504e",
+                : "0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43",
             action: "swapExactETHForTokens",
             inputAsset: "ETH",
             inputAmount: `${config.tradeCapitalEth} ETH`,
@@ -178,6 +207,8 @@ export class AiArbitrageBotEngine {
           gasCostUsd: 0.15,
         });
 
+        const flashLoanFeeUsd = config.flashBorrowUsdc * 0.0005; // Exact 0.05% Aave v3 pool premium
+
         candidates.push({
           strategy: "FLASH_LOAN",
           netProfitUsd: flashResult.netProfitUsd,
@@ -185,8 +216,16 @@ export class AiArbitrageBotEngine {
           gasUsd: 0.15,
           confidence: flashResult.isProfitable ? 99.1 : 20.0,
           summary: `Aave Flash Loan ${config.flashBorrowUsdc.toLocaleString()} USDC uncollateralized`,
+          breakdown: {
+            grossProfitUsd: flashResult.grossProfit,
+            flashLoanFeeUsd,
+            estimatedGasUsd: 0.15,
+            netProfitUsd: flashResult.netProfitUsd,
+            minProfitFloorUsd: config.minNetProfitUsd,
+            returnOnCapitalBps: (flashResult.netProfitUsd / config.flashBorrowUsdc) * 10000,
+          },
           plan: {
-            targetRouter: "0x936a3D52c3037848879F3641dfBc9132aAe51bDF",
+            targetRouter: "0x70315019d12a11556c837970675cdc8fa54d186b",
             action: "requestFlashLoan",
             inputAsset: "USDC",
             inputAmount: `${config.flashBorrowUsdc.toLocaleString()} USDC`,
@@ -198,7 +237,9 @@ export class AiArbitrageBotEngine {
       }
     }
 
-    if (candidates.length === 0) {
+    candidates.sort((a, b) => b.netProfitUsd - a.netProfitUsd);
+    const best = candidates[0];
+    if (!best) {
       return {
         id: evalId,
         timestamp: timestampStr,
@@ -213,9 +254,6 @@ export class AiArbitrageBotEngine {
       };
     }
 
-    // Pick candidate with highest net profit
-    candidates.sort((a, b) => b.netProfitUsd - a.netProfitUsd);
-    const best = candidates[0];
 
     // 5. Strict Anti-Loss Guard: Positive Delta & Minimum Profit Threshold Check
     if (best.netProfitUsd <= 0) {
@@ -230,6 +268,8 @@ export class AiArbitrageBotEngine {
         confidenceScore: best.confidence,
         summary: `${best.summary} | Net Profit: $${best.netProfitUsd.toFixed(2)}`,
         disqualificationReason: `Negative or zero return ($${best.netProfitUsd.toFixed(2)}). Anti-Loss Guard prevented transaction execution.`,
+        breakdown: best.breakdown,
+        simulationStatus: "REVERTED_ANTI_LOSS",
       };
     }
 
@@ -245,10 +285,12 @@ export class AiArbitrageBotEngine {
         confidenceScore: best.confidence,
         summary: `${best.summary} | Net Profit: +$${best.netProfitUsd.toFixed(2)}`,
         disqualificationReason: `Projected profit +$${best.netProfitUsd.toFixed(2)} is below your minimum target of $${config.minNetProfitUsd.toFixed(2)}.`,
+        breakdown: best.breakdown,
+        simulationStatus: "REVERTED_ANTI_LOSS",
       };
     }
 
-    // Opportunity Qualified for Auto-Execution!
+    // Opportunity Qualified for Pre-Flight Simulation / Execution!
     return {
       id: evalId,
       timestamp: timestampStr,
@@ -259,7 +301,9 @@ export class AiArbitrageBotEngine {
       estimatedGasCostUsd: best.gasUsd,
       confidenceScore: best.confidence,
       summary: `🚀 OPPORTUNITY CONFIRMED: ${best.summary} clears all anti-loss gates!`,
-      executionPlan: best.plan,
+      breakdown: best.breakdown,
+      simulationStatus: "PENDING",
+      ...(best.plan ? { executionPlan: best.plan } : {}),
     };
   }
 }

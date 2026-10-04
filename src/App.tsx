@@ -21,6 +21,8 @@ import type { JSX, ReactNode } from "react";
 const Home = lazy(() => import("./pages/Home"));
 const Swap = lazy(() => import("./pages/Swap"));
 const Liquidity = lazy(() => import("./pages/Liquidity"));
+const BaseDex = lazy(() => import("./pages/BaseDex"));
+const DexSetup = lazy(() => import("./pages/DexSetup"));
 const Portfolio = lazy(() => import("./pages/Portfolio"));
 const Activity = lazy(() => import("./pages/Activity"));
 const Admin = lazy(() => import("./pages/Admin"));
@@ -29,6 +31,8 @@ const LaunchpadExplore = lazy(() => import("./pages/LaunchpadExplore"));
 const ProtocolOps = lazy(() => import("./pages/ProtocolOps"));
 const Stake = lazy(() => import("./pages/Stake"));
 const Arbitrage = lazy(() => import("./pages/Arbitrage"));
+const MarketData = lazy(() => import("./pages/MarketData"));
+const Markets = lazy(() => import("./pages/Markets"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Optional (dev only): React Query Devtools
@@ -212,8 +216,11 @@ export const AppRoutes = (): JSX.Element => (
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/classic" element={<Swap />} />
-        <Route path="/swap" element={<Swap />} />
-        <Route path="/liquidity" element={<Liquidity />} />
+        <Route path="/swap/compare" element={<Swap />} />
+        <Route path="/swap" element={<BaseDex key="swap" />} />
+        <Route path="/liquidity" element={<BaseDex key="liquidity" initialMode="add" />} />
+        <Route path="/dex/setup" element={<DexSetup />} />
+        <Route path="/legacy/liquidity" element={<Liquidity />} />
         <Route path="/stake" element={<Stake />} />
         <Route path="/launchpad" element={<Launchpad />} />
         <Route path="/create-token" element={<Launchpad />} />
@@ -222,7 +229,13 @@ export const AppRoutes = (): JSX.Element => (
         <Route path="/protocol" element={<ProtocolOps />} />
         <Route path="/launchpad/manage" element={<ProtocolOps />} />
         <Route path="/arbitrage" element={<Arbitrage />} />
+        <Route path="/arbitrage/:tab" element={<Arbitrage />} />
+        <Route path="/arbitrage/:tab/:symbol" element={<Arbitrage />} />
         <Route path="/launchpad/arbitrage" element={<Arbitrage />} />
+        <Route path="/launchpad/arbitrage/:tab" element={<Arbitrage />} />
+        <Route path="/launchpad/arbitrage/:tab/:symbol" element={<Arbitrage />} />
+        <Route path="/markets" element={<Markets />} />
+        <Route path="/market-data" element={<MarketData />} />
         <Route path="/portfolio" element={<Portfolio />} />
         <Route path="/activity" element={<Activity />} />
         <Route path="/admin" element={<Admin />} />
@@ -279,7 +292,7 @@ const App = (): JSX.Element => {
 
   return (
     <Providers>
-      <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
+      <BrowserRouter>
         <AppRoutes />
 
         {/* API Diagnostic Panel - Development Only */}

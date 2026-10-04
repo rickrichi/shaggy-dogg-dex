@@ -8,7 +8,6 @@ export interface NativeCurrencyConfig {
   name: string;
   symbol: string;
   decimals: number;
-  coinGeckoId: string;
 }
 
 export interface TokenConfig {
@@ -16,7 +15,6 @@ export interface TokenConfig {
   name: string;
   symbol: string;
   decimals: number;
-  coinGeckoId: string; // <-- Add this property
 }
 
 export interface ChainConfig {
@@ -33,7 +31,6 @@ const tokenWatchlist: Record<number, ChainConfig> = {
       name: mainnet.nativeCurrency.name,
       symbol: mainnet.nativeCurrency.symbol,
       decimals: mainnet.nativeCurrency.decimals,
-      coinGeckoId: "ethereum",
     },
     tokens: [
       {
@@ -41,21 +38,18 @@ const tokenWatchlist: Record<number, ChainConfig> = {
         name: "Tether USD",
         symbol: "USDT",
         decimals: 6,
-        coinGeckoId: "tether",
       },
       {
         address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
         name: "USD Coin",
         symbol: "USDC",
         decimals: 6,
-        coinGeckoId: "usd-coin",
       },
       {
         address: "0x6B175474E89094C44Da98b954EedeAC495271d0F",
         name: "Dai Stablecoin",
         symbol: "DAI",
         decimals: 18,
-        coinGeckoId: "dai",
       },
     ],
   },
@@ -65,7 +59,6 @@ const tokenWatchlist: Record<number, ChainConfig> = {
       name: arbitrum.nativeCurrency.name,
       symbol: arbitrum.nativeCurrency.symbol,
       decimals: arbitrum.nativeCurrency.decimals,
-      coinGeckoId: "ethereum",
     },
     tokens: [
       {
@@ -73,7 +66,6 @@ const tokenWatchlist: Record<number, ChainConfig> = {
         name: "Tether USD",
         symbol: "USDT",
         decimals: 6,
-        coinGeckoId: "tether",
       },
     ],
   },
@@ -83,7 +75,6 @@ const tokenWatchlist: Record<number, ChainConfig> = {
       name: polygon.nativeCurrency.name,
       symbol: polygon.nativeCurrency.symbol,
       decimals: polygon.nativeCurrency.decimals,
-      coinGeckoId: "matic-network",
     },
     tokens: [
       {
@@ -91,7 +82,6 @@ const tokenWatchlist: Record<number, ChainConfig> = {
         name: "Tether USD",
         symbol: "USDT",
         decimals: 6,
-        coinGeckoId: "tether",
       },
     ],
   },
@@ -101,7 +91,6 @@ const tokenWatchlist: Record<number, ChainConfig> = {
       name: optimism.nativeCurrency.name,
       symbol: optimism.nativeCurrency.symbol,
       decimals: optimism.nativeCurrency.decimals,
-      coinGeckoId: "ethereum",
     },
     tokens: [],
   },
@@ -111,7 +100,6 @@ const tokenWatchlist: Record<number, ChainConfig> = {
       name: sepolia.nativeCurrency.name,
       symbol: sepolia.nativeCurrency.symbol,
       decimals: sepolia.nativeCurrency.decimals,
-      coinGeckoId: "ethereum",
     },
     tokens: [],
   },
@@ -121,7 +109,6 @@ const tokenWatchlist: Record<number, ChainConfig> = {
       name: "Ether",
       symbol: "ETH",
       decimals: 18,
-      coinGeckoId: "ethereum",
     },
     tokens: [
       {
@@ -129,21 +116,18 @@ const tokenWatchlist: Record<number, ChainConfig> = {
         name: "Shaggy Dogg",
         symbol: "SD",
         decimals: 18,
-        coinGeckoId: "shaggy-dogg",
       },
       {
         address: "0x4200000000000000000000000000000000000006",
         name: "Wrapped Ether",
         symbol: "WETH",
         decimals: 18,
-        coinGeckoId: "weth",
       },
       {
         address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
         name: "USD Coin",
         symbol: "USDC",
         decimals: 6,
-        coinGeckoId: "usd-coin",
       },
     ],
   },
@@ -153,7 +137,6 @@ const tokenWatchlist: Record<number, ChainConfig> = {
       name: "Sepolia Ether",
       symbol: "ETH",
       decimals: 18,
-      coinGeckoId: "ethereum",
     },
     tokens: [
       {
@@ -161,21 +144,18 @@ const tokenWatchlist: Record<number, ChainConfig> = {
         name: "Shaggy Dogg",
         symbol: "SD",
         decimals: 18,
-        coinGeckoId: "shaggy-dogg",
       },
       {
         address: "0x4200000000000000000000000000000000000006",
         name: "Wrapped Ether",
         symbol: "WETH",
         decimals: 18,
-        coinGeckoId: "weth",
       },
       {
         address: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
         name: "USD Coin",
         symbol: "USDC",
         decimals: 6,
-        coinGeckoId: "usd-coin",
       },
     ],
   },
@@ -189,7 +169,6 @@ export function tokenWatchlistForChain(chainId: number): ChainConfig {
         name: "Unknown",
         symbol: "UNK",
         decimals: 18,
-        coinGeckoId: "unknown",
       },
       tokens: [],
     }

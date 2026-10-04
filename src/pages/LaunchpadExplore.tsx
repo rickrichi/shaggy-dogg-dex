@@ -65,7 +65,7 @@ export default function LaunchpadExplore({ defaultTab }: LaunchpadExploreProps) 
     try {
       await walletClient.watchAsset({
         type: "ERC20",
-        params: {
+        options: {
           address: token.tokenAddress,
           symbol: token.tokenSymbol,
           decimals: token.decimals,

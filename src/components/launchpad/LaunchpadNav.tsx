@@ -41,7 +41,7 @@ export const LaunchpadNav = () => {
     },
     {
       name: "Arbitrage Studio",
-      href: "/arbitrage",
+      href: "/arbitrage/matrix",
       icon: Zap,
       description: "Triangular & Flash Loan Arbitrage",
     },
@@ -53,7 +53,8 @@ export const LaunchpadNav = () => {
         const Icon = item.icon;
         const isActive =
           location.pathname === item.href ||
-          (item.href === "/launchpad" && location.pathname === "/create-token");
+          (item.href === "/launchpad" && location.pathname === "/create-token") ||
+          (item.href.startsWith("/arbitrage") && location.pathname.startsWith("/arbitrage"));
 
         return (
           <Link key={item.name} to={item.href}>

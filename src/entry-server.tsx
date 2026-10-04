@@ -1,6 +1,6 @@
 // src/entry-server.tsx
 import { renderToString } from "react-dom/server";
-import { StaticRouter } from "react-router-dom/server";
+import { StaticRouter } from "react-router-dom";
 
 import { flushAnalyticsForRequest } from "./lib/analytics-ssr";
 import App, { AppRoutes, Providers } from "./App";
@@ -13,7 +13,7 @@ interface RenderContext {
 
 const SsrApp = ({ url }: { url: string }): JSX.Element => (
   <Providers>
-    <StaticRouter location={url} future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
+    <StaticRouter location={url}>
       <AppRoutes />
     </StaticRouter>
   </Providers>

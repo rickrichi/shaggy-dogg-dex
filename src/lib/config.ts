@@ -33,10 +33,6 @@ export const CHAIN_CONFIG = {
 
 export const checkEnvironment = () => {
   const missing = [];
-  if (!env.VITE_SUPABASE_URL) missing.push("VITE_SUPABASE_URL");
-  if (!env.VITE_SUPABASE_ANON_KEY && !env.VITE_SUPABASE_PUBLISHABLE_KEY) {
-    missing.push("VITE_SUPABASE_PUBLISHABLE_KEY");
-  }
   if (!env.VITE_ZEROX_API_KEY) missing.push("VITE_ZEROX_API_KEY");
   return { isValid: missing.length === 0, missing };
 };

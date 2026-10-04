@@ -1,5 +1,5 @@
 // src/pages/Stake.tsx
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import {
@@ -19,7 +19,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
-import { type Address, formatUnits, parseUnits } from "viem";
+import { formatUnits, parseUnits, erc20Abi, zeroAddress } from "viem";
 import { useAccount, usePublicClient, useSwitchChain, useWalletClient } from "wagmi";
 
 import { LaunchpadNav } from "@/components/launchpad/LaunchpadNav";
@@ -30,356 +30,260 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ERC20_ABI } from "@/config/abis";
-import { LAUNCHPAD_ARTIFACTS } from "@/lib/launchpad/artifacts";
-import { signAndDepositWithPermit } from "@/lib/permit";
-
-interface NetworkStakingConfig {
-  name: string;
-  tokenName: string;
-  tokenSymbol: string;
-  tokenAddress: Address;
-  stakingAddress: Address;
-  explorerUrl: string;
-}
-
-const NETWORK_CONFIGS: Record<number, NetworkStakingConfig> = {
-  // Base Mainnet
-  8453: {
-    name: "Base Mainnet",
-    tokenName: "Astro Mutt",
-    tokenSymbol: "AMUTT",
-    tokenAddress: "0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7",
-    stakingAddress: "0x055BB4eD8d5464C25D71391E940ce53CA30845fC",
-    explorerUrl: "https://basescan.org",
-  },
-  // Base Sepolia
-  84532: {
-    name: "Base Sepolia",
-    tokenName: "Shaggy Dogg Token",
-    tokenSymbol: "SDT",
-    tokenAddress: "0x051c758521971f5c5a84edaf18eea12854375469",
-    stakingAddress: "0x42134ccc6c41149cf71c7b4994e33ee66758af20",
-    explorerUrl: "https://sepolia.basescan.org",
-  },
-};
-
-const DEFAULT_CONFIG: NetworkStakingConfig = NETWORK_CONFIGS[8453]!;
+import { base } from "viem/chains";
+import { BASE_STAKING, STAKING_ABI } from "@/lib/staking";
+import { positiveAmount } from "@/lib/amm/own-dex";
+import { YieldVaultPanel } from "@/components/YieldVaultPanel";
 
 interface TierInfo {
   name: string;
   required: number;
   discountBps: number;
   icon: string;
-  color: string;
 }
 
-const VIP_TIERS: TierInfo[] = [
-  {
-    name: "Bronze VIP",
-    required: 10_000,
-    discountBps: 500,
-    icon: "🥉",
-    color: "from-amber-700 to-amber-900 text-amber-900 border-amber-300",
-  },
-  {
-    name: "Silver VIP",
-    required: 50_000,
-    discountBps: 1000,
-    icon: "🥈",
-    color: "from-slate-400 to-slate-600 text-slate-800 border-slate-300",
-  },
-  {
-    name: "Gold VIP",
-    required: 200_000,
-    discountBps: 2000,
-    icon: "🥇",
-    color: "from-yellow-400 to-amber-500 text-yellow-900 border-yellow-300",
-  },
-  {
-    name: "Diamond VIP",
-    required: 1_000_000,
-    discountBps: 3000,
-    icon: "💎",
-    color: "from-cyan-400 to-blue-600 text-blue-950 border-cyan-300",
-  },
-];
+const activeConfig = BASE_STAKING;
 
 export default function Stake() {
   const { address, isConnected, chainId, chain } = useAccount();
   const { data: walletClient } = useWalletClient();
-  const publicClient = usePublicClient();
+  const publicClient = usePublicClient({ chainId: base.id });
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
-
-  const activeConfig = useMemo<NetworkStakingConfig>(() => {
-    if (chainId && NETWORK_CONFIGS[chainId]) {
-      return NETWORK_CONFIGS[chainId]!;
-    }
-    return DEFAULT_CONFIG;
-  }, [chainId]);
-
-  // Form states
-  const [stakeAmount, setStakeAmount] = useState<string>("");
-  const [unstakeAmount, setUnstakeAmount] = useState<string>("");
-  const deadlineMins = 20;
-  const [usePermit, setUsePermit] = useState<boolean>(true);
-
-  // Loading states
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [stakeAmount, setStakeAmount] = useState("");
+  const [unstakeAmount, setUnstakeAmount] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [progress, setProgress] = useState("");
+  const [progressSeconds, setProgressSeconds] = useState(0);
+  const [submittedTxHash, setSubmittedTxHash] = useState<string | null>(null);
   const [recentTxHash, setRecentTxHash] = useState<string | null>(null);
-
-  // On-chain values
-  const [tokenBalance, setTokenBalance] = useState<bigint>(0n);
-  const [allowance, setAllowance] = useState<bigint>(0n);
-  const [stakedBalance, setStakedBalance] = useState<bigint>(0n);
-  const [discountBps, setDiscountBps] = useState<number>(0);
-  const [totalProtocolStaked, setTotalProtocolStaked] = useState<bigint>(0n);
-
-  // Refresh balances
-  const refreshOnChainData = useCallback(async () => {
-    if (!publicClient) return;
-
-    try {
-      setIsRefreshing(true);
-
-      // Total protocol staked
-      try {
-        const total = await publicClient.readContract({
-          address: activeConfig.stakingAddress,
-          abi: LAUNCHPAD_ARTIFACTS.FeeDiscountStaking.abi,
-          functionName: "totalStaked",
-        });
-        setTotalProtocolStaked(total as bigint);
-      } catch {
-        // contract might be uninitialized on testnets
-      }
-
-      if (!address) {
-        setTokenBalance(0n);
-        setAllowance(0n);
-        setStakedBalance(0n);
-        setDiscountBps(0);
-        return;
-      }
-
-      // User token balance
-      const [bal, userAllowance, staked, disc] = await Promise.all([
-        publicClient
-          .readContract({
-            address: activeConfig.tokenAddress,
-            abi: ERC20_ABI,
-            functionName: "balanceOf",
-            args: [address],
-          })
-          .catch(() => 0n),
-        publicClient
-          .readContract({
-            address: activeConfig.tokenAddress,
-            abi: ERC20_ABI,
-            functionName: "allowance",
-            args: [address, activeConfig.stakingAddress],
-          })
-          .catch(() => 0n),
-        publicClient
-          .readContract({
-            address: activeConfig.stakingAddress,
-            abi: LAUNCHPAD_ARTIFACTS.FeeDiscountStaking.abi,
-            functionName: "stakedOf",
-            args: [address],
-          })
-          .catch(() => 0n),
-        publicClient
-          .readContract({
-            address: activeConfig.stakingAddress,
-            abi: LAUNCHPAD_ARTIFACTS.FeeDiscountStaking.abi,
-            functionName: "discountBpsOf",
-            args: [address],
-          })
-          .catch(() => 0),
-      ]);
-
-      setTokenBalance(bal as bigint);
-      setAllowance(userAllowance as bigint);
-      setStakedBalance(staked as bigint);
-      setDiscountBps(Number(disc));
-    } catch (err) {
-      console.error("Failed to load staking balances:", err);
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [publicClient, address, activeConfig]);
+  const [tokenBalance, setTokenBalance] = useState(0n);
+  const [stakedBalance, setStakedBalance] = useState(0n);
+  const [discountBps, setDiscountBps] = useState(0);
+  const [totalProtocolStaked, setTotalProtocolStaked] = useState(0n);
+  const [tiers, setTiers] = useState<TierInfo[]>([]);
+  const [lockSeconds, setLockSeconds] = useState(0n);
+  const [unlockAt, setUnlockAt] = useState(0n);
+  const [withdrawalFeeBps, setWithdrawalFeeBps] = useState(0);
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  const [dataError, setDataError] = useState<string | null>(null);
+  const generation = useRef(0);
+  const walletScope = useRef({ address, chainId });
+  walletScope.current = { address, chainId };
+  const dataReady = loadedFor === (address ?? "disconnected") && !dataError;
 
   useEffect(() => {
+    setProgressSeconds(0);
+    if (!isSubmitting) return;
+    const started = Date.now();
+    const timer = setInterval(
+      () => setProgressSeconds(Math.floor((Date.now() - started) / 1000)),
+      1000
+    );
+    return () => clearInterval(timer);
+  }, [isSubmitting, progress]);
+
+  const refreshOnChainData = useCallback(async () => {
+    if (!publicClient) {
+      setDataError("Base connection is unavailable. Refresh the page to reconnect.");
+      return;
+    }
+    const request = ++generation.current;
+    setIsRefreshing(true);
+    const timeout = setTimeout(() => {
+      if (request !== generation.current) return;
+      generation.current++;
+      setLoadedFor(null);
+      setDataError("Base staking data took more than 30 seconds to load. Click Refresh to retry.");
+      setIsRefreshing(false);
+    }, 30_000);
+    try {
+      const staking = { address: activeConfig.stakingAddress, abi: STAKING_ABI } as const;
+      const [token, decimals, held, balance, staked, discount, period, fee, timestamp, count] =
+        await publicClient.multicall({
+          allowFailure: false,
+          contracts: [
+            { ...staking, functionName: "token" },
+            { address: activeConfig.tokenAddress, abi: erc20Abi, functionName: "decimals" },
+            {
+              address: activeConfig.tokenAddress,
+              abi: erc20Abi,
+              functionName: "balanceOf",
+              args: [activeConfig.stakingAddress],
+            },
+            {
+              address: activeConfig.tokenAddress,
+              abi: erc20Abi,
+              functionName: "balanceOf",
+              args: [address ?? zeroAddress],
+            },
+            { ...staking, functionName: "stakedBalance", args: [address ?? zeroAddress] },
+            { ...staking, functionName: "getTier", args: [address ?? zeroAddress] },
+            { ...staking, functionName: "minimumStakePeriod" },
+            { ...staking, functionName: "withdrawalFeeBps" },
+            { ...staking, functionName: "stakeTimestamp", args: [address ?? zeroAddress] },
+            { ...staking, functionName: "tiersLength" },
+          ],
+        });
+      if (request !== generation.current) return;
+      if (token.toLowerCase() !== activeConfig.tokenAddress.toLowerCase() || decimals !== 18) {
+        throw new Error("Staking token configuration does not match the deployed contract.");
+      }
+      if (count > 100n) throw new Error("Staking tier count exceeds the supported limit.");
+      const tierValues =
+        count === 0n
+          ? []
+          : await publicClient.multicall({
+              allowFailure: false,
+              contracts: Array.from({ length: Number(count) }, (_, index) => ({
+                ...staking,
+                functionName: "tiers" as const,
+                args: [BigInt(index)] as const,
+              })),
+            });
+      if (request !== generation.current) return;
+      setTokenBalance(balance);
+      setStakedBalance(staked);
+      setDiscountBps(discount);
+      setTotalProtocolStaked(held);
+      setLockSeconds(period);
+      setUnlockAt(timestamp + period);
+      setWithdrawalFeeBps(fee);
+      setTiers(
+        tierValues.map(([required, bps], index) => ({
+          name: `Tier ${index + 1}`,
+          required: Number(formatUnits(required, 18)),
+          discountBps: bps,
+          icon: ["🥉", "🥈", "🥇", "💎"][index] ?? "★",
+        }))
+      );
+      setDataError(null);
+      setLoadedFor(address ?? "disconnected");
+    } catch (err) {
+      if (request !== generation.current) return;
+      setLoadedFor(null);
+      setDataError(err instanceof Error ? err.message : "Could not load Base staking data.");
+    } finally {
+      clearTimeout(timeout);
+      if (request === generation.current) setIsRefreshing(false);
+    }
+  }, [publicClient, address]);
+
+  useEffect(() => {
+    setLoadedFor(null);
+    setRecentTxHash(null);
+    setSubmittedTxHash(null);
     void refreshOnChainData();
+    return () => {
+      generation.current++;
+    };
   }, [refreshOnChainData]);
 
-  // Derived metrics
   const humanStaked = Number(formatUnits(stakedBalance, 18));
   const humanTokenBalance = Number(formatUnits(tokenBalance, 18));
   const currentDiscountPercent = (discountBps / 100).toFixed(1);
+  const currentTier = useMemo(
+    () => tiers.filter((t) => humanStaked >= t.required).at(-1),
+    [tiers, humanStaked]
+  );
+  const nextTier = useMemo(
+    () => [...tiers].sort((a, b) => a.required - b.required).find((t) => t.required > humanStaked),
+    [tiers, humanStaked]
+  );
 
-  const currentTier = useMemo(() => {
-    if (humanStaked >= 1_000_000) return VIP_TIERS[3]!;
-    if (humanStaked >= 200_000) return VIP_TIERS[2]!;
-    if (humanStaked >= 50_000) return VIP_TIERS[1]!;
-    if (humanStaked >= 10_000) return VIP_TIERS[0]!;
-    return null;
-  }, [humanStaked]);
-
-  const nextTier = useMemo(() => {
-    if (humanStaked >= 1_000_000) return null;
-    if (humanStaked >= 200_000) return VIP_TIERS[3]!;
-    if (humanStaked >= 50_000) return VIP_TIERS[2]!;
-    if (humanStaked >= 10_000) return VIP_TIERS[1]!;
-    return VIP_TIERS[0]!;
-  }, [humanStaked]);
-
-  // Handle Stake
-  const handleStake = async () => {
-    if (!isConnected || !address || !walletClient || !publicClient) {
-      toast.error("Please connect your wallet first.");
+  const transact = async (action: "stake" | "unstake") => {
+    if (!address || !walletClient || !publicClient || !dataReady) {
+      toast.error("Connect your wallet and refresh staking data first.");
       return;
     }
-
-    const trimmed = stakeAmount.trim();
-    if (!trimmed || Number(trimmed) <= 0) {
-      toast.error("Please enter a valid positive staking amount.");
-      return;
-    }
-
+    const account = address;
+    const assertWallet = async () => {
+      if (
+        walletScope.current.address !== account ||
+        walletScope.current.chainId !== base.id ||
+        (await walletClient.getChainId()) !== base.id ||
+        (await walletClient.getAddresses())[0]?.toLowerCase() !== account.toLowerCase()
+      ) {
+        throw new Error("Connect the same wallet on Base Mainnet before continuing.");
+      }
+    };
     try {
       setIsSubmitting(true);
+      setProgress("Checking your wallet and Base network");
       setRecentTxHash(null);
-      const parsedAmount = parseUnits(trimmed, 18);
-
-      if (parsedAmount > tokenBalance) {
-        toast.error(`Insufficient ${activeConfig.tokenSymbol} balance.`);
-        return;
-      }
-
-      if (usePermit) {
-        toast.info("Requesting EIP-2612 Permit signature in your wallet...");
-        const deadline = BigInt(Math.floor(Date.now() / 1000) + deadlineMins * 60);
-
-        const txHash = await signAndDepositWithPermit({
-          publicClient,
-          walletClient,
-          token: activeConfig.tokenAddress,
-          staking: activeConfig.stakingAddress,
-          owner: address,
-          value: parsedAmount,
-          deadline,
-          tokenName: activeConfig.tokenName,
+      await assertWallet();
+      const trimmed = (action === "stake" ? stakeAmount : unstakeAmount).trim();
+      if (!positiveAmount(trimmed, 18))
+        throw new Error("Enter a positive token amount with at most 18 decimals.");
+      const amount = parseUnits(trimmed, 18);
+      if (action === "stake" && amount > tokenBalance)
+        throw new Error("Amount exceeds your token balance.");
+      if (action === "unstake" && amount > stakedBalance)
+        throw new Error("Amount exceeds your staked balance.");
+      if (action === "stake") {
+        setProgress("Reading your token allowance from Base");
+        // Read allowance again: approvals can change outside this page.
+        const allowance = await publicClient.readContract({
+          address: activeConfig.tokenAddress,
+          abi: erc20Abi,
+          functionName: "allowance",
+          args: [account, activeConfig.stakingAddress],
         });
-
-        toast.info("Transaction broadcast! Awaiting on-chain confirmation...");
-        const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
-
-        if (receipt.status === "success") {
-          setRecentTxHash(txHash);
-          toast.success(`Successfully staked ${trimmed} ${activeConfig.tokenSymbol}!`);
-          setStakeAmount("");
-          await refreshOnChainData();
-        } else {
-          throw new Error("Staking transaction reverted.");
-        }
-      } else {
-        // Standard ERC20 Approve + Deposit
-        if (allowance < parsedAmount) {
-          toast.info(`Approving ${trimmed} ${activeConfig.tokenSymbol}...`);
-          const approveHash = await walletClient.writeContract({
+        if (allowance < amount) {
+          setProgress("Simulating token approval on Base");
+          toast.info("Approve the staking amount in your wallet.");
+          const { request } = await publicClient.simulateContract({
             address: activeConfig.tokenAddress,
-            abi: ERC20_ABI,
+            abi: erc20Abi,
             functionName: "approve",
-            args: [activeConfig.stakingAddress, parsedAmount],
-            account: address,
-            chain: null,
+            args: [activeConfig.stakingAddress, amount],
+            account,
           });
-
-          await publicClient.waitForTransactionReceipt({ hash: approveHash });
-          toast.success("Approval confirmed!");
-        }
-
-        toast.info("Depositing to FeeDiscountStaking...");
-        const depositHash = await walletClient.writeContract({
-          address: activeConfig.stakingAddress,
-          abi: LAUNCHPAD_ARTIFACTS.FeeDiscountStaking.abi,
-          functionName: "deposit",
-          args: [parsedAmount],
-          account: address,
-          chain: null,
-        });
-
-        const receipt = await publicClient.waitForTransactionReceipt({ hash: depositHash });
-        if (receipt.status === "success") {
-          setRecentTxHash(depositHash);
-          toast.success(`Successfully staked ${trimmed} ${activeConfig.tokenSymbol}!`);
-          setStakeAmount("");
-          await refreshOnChainData();
-        } else {
-          throw new Error("Deposit transaction reverted.");
+          await assertWallet();
+          setProgress("Waiting for you to confirm token approval in your wallet");
+          const hash = await walletClient.writeContract({ ...request, chain: base });
+          setSubmittedTxHash(hash);
+          setProgress("Token approval submitted — waiting for Base confirmation");
+          const receipt = await publicClient.waitForTransactionReceipt({ hash });
+          if (receipt.status !== "success") throw new Error("Approval transaction reverted.");
+          setSubmittedTxHash(null);
         }
       }
-    } catch (err) {
-      console.error("Stake failed:", err);
-      toast.error(err instanceof Error ? err.message : "Failed to stake tokens.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Handle Unstake
-  const handleUnstake = async () => {
-    if (!isConnected || !address || !walletClient || !publicClient) {
-      toast.error("Please connect your wallet first.");
-      return;
-    }
-
-    const trimmed = unstakeAmount.trim();
-    if (!trimmed || Number(trimmed) <= 0) {
-      toast.error("Please enter a valid positive unstake amount.");
-      return;
-    }
-
-    try {
-      setIsSubmitting(true);
-      setRecentTxHash(null);
-      const parsedAmount = parseUnits(trimmed, 18);
-
-      if (parsedAmount > stakedBalance) {
-        toast.error("Amount exceeds your currently staked balance.");
-        return;
-      }
-
-      toast.info("Submitting unstake withdrawal via wallet...");
-      const withdrawHash = await walletClient.writeContract({
+      setProgress(`Simulating ${action === "stake" ? "stake" : "withdrawal"} on Base`);
+      const { request } = await publicClient.simulateContract({
         address: activeConfig.stakingAddress,
-        abi: LAUNCHPAD_ARTIFACTS.FeeDiscountStaking.abi,
-        functionName: "withdraw",
-        args: [parsedAmount],
-        account: address,
-        chain: null,
+        abi: STAKING_ABI,
+        functionName: action,
+        args: [amount],
+        account,
       });
-
-      toast.info("Transaction submitted! Waiting for confirmation...");
-      const receipt = await publicClient.waitForTransactionReceipt({ hash: withdrawHash });
-
-      if (receipt.status === "success") {
-        setRecentTxHash(withdrawHash);
-        toast.success(`Successfully withdrawn ${trimmed} ${activeConfig.tokenSymbol}!`);
-        setUnstakeAmount("");
+      await assertWallet();
+      setProgress(
+        `Waiting for you to confirm ${action === "stake" ? "staking" : "withdrawal"} in your wallet`
+      );
+      const hash = await walletClient.writeContract({ ...request, chain: base });
+      setSubmittedTxHash(hash);
+      setProgress("Transaction submitted — waiting for Base confirmation");
+      toast.info("Waiting for Base confirmation...");
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      if (receipt.status !== "success") throw new Error("Staking transaction reverted.");
+      if (walletScope.current.address === account) {
+        setSubmittedTxHash(null);
+        setRecentTxHash(hash);
+        if (action === "stake") setStakeAmount("");
+        else setUnstakeAmount("");
+        setProgress("Transaction confirmed — refreshing your balance");
         await refreshOnChainData();
-      } else {
-        throw new Error("Withdraw transaction reverted.");
       }
+      toast.success(action === "stake" ? "Stake confirmed." : "Withdrawal confirmed.");
     } catch (err) {
-      console.error("Unstake failed:", err);
-      toast.error(err instanceof Error ? err.message : "Failed to unstake tokens.");
+      toast.error(err instanceof Error ? err.message : "Staking transaction failed.");
     } finally {
       setIsSubmitting(false);
     }
   };
+  const handleStake = () => transact("stake");
+  const handleUnstake = () => transact("unstake");
 
   return (
     <div className="min-h-[calc(100vh-80px)] space-y-6 p-4 duration-500 animate-in fade-in md:p-8">
@@ -398,8 +302,8 @@ export default function Stake() {
             </Badge>
           </div>
           <p className="mt-1 text-sm text-slate-500">
-            Stake {activeConfig.tokenSymbol} in single-sided vaults to unlock 5% to 30% trading fee
-            discounts across the Shaggy Mutt DEX.
+            Stake {activeConfig.tokenSymbol} to qualify for the fee tiers configured on Base
+            Mainnet.
           </p>
         </div>
 
@@ -449,6 +353,40 @@ export default function Stake() {
         </Alert>
       )}
 
+      {dataError && (
+        <Alert variant="destructive">
+          <AlertTitle>Staking data unavailable</AlertTitle>
+          <AlertDescription>{dataError}</AlertDescription>
+        </Alert>
+      )}
+      {!dataReady && !dataError && <p role="status">Loading Base staking data…</p>}
+
+      {(isSubmitting || submittedTxHash) && (
+        <Alert>
+          <AlertTitle>Staking progress</AlertTitle>
+          <AlertDescription>
+            <p role="status">
+              {isSubmitting
+                ? `${progress} · ${progressSeconds}s`
+                : "A transaction was submitted. Check its status before retrying."}
+            </p>
+            {isSubmitting && progress.includes("in your wallet") && (
+              <p>Open your wallet extension to review or reject the pending request.</p>
+            )}
+            {submittedTxHash && (
+              <a
+                className="underline"
+                href={`${activeConfig.explorerUrl}/tx/${submittedTxHash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                View submitted transaction on BaseScan
+              </a>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Cross-Link Banner */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-indigo-200 bg-gradient-to-r from-indigo-50/80 via-purple-50/60 to-white p-4 shadow-sm">
         <div className="flex items-center gap-3">
@@ -480,7 +418,10 @@ export default function Stake() {
       </div>
 
       {/* Stats Overview Grid */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div
+        style={{ display: dataReady ? undefined : "none" }}
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
+      >
         {/* Your Staked Position */}
         <Card className="border-purple-100 bg-white shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -513,7 +454,9 @@ export default function Stake() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-pink-600">{currentDiscountPercent}%</div>
-            <p className="mt-1 text-xs text-slate-500">Applied automatically to all DEX swaps</p>
+            <p className="mt-1 text-xs text-slate-500">
+              Applies only to contracts that integrate these tiers
+            </p>
           </CardContent>
         </Card>
 
@@ -533,7 +476,9 @@ export default function Stake() {
             <p className="mt-1 text-xs text-slate-500">
               {nextTier
                 ? `Stake ${(nextTier.required - humanStaked).toLocaleString()} more for ${nextTier.name}`
-                : "Maximum VIP tier achieved! 🎉"}
+                : tiers.length
+                  ? "Highest configured tier reached"
+                  : "No tiers configured"}
             </p>
           </CardContent>
         </Card>
@@ -542,7 +487,7 @@ export default function Stake() {
         <Card className="border-purple-100 bg-white shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-slate-500">
-              Total Staked (Ecosystem)
+              Tokens Held by Staking
             </CardTitle>
             <Layers className="size-4 text-indigo-600" />
           </CardHeader>
@@ -555,11 +500,14 @@ export default function Stake() {
                 {activeConfig.tokenSymbol}
               </span>
             </div>
-            <p className="mt-1 text-xs text-slate-500">Locked across all VIP participants</p>
+            <p className="mt-1 text-xs text-slate-500">
+              Contract balance, including any direct transfers
+            </p>
           </CardContent>
         </Card>
       </div>
 
+      <YieldVaultPanel />
       {/* Main Interactive Interface & Tiers */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         {/* Staking / Unstaking Form */}
@@ -571,8 +519,8 @@ export default function Stake() {
                 Manage Staked Position
               </CardTitle>
               <CardDescription>
-                Deposit {activeConfig.tokenSymbol} using gas-optimized EIP-2612 permits with zero
-                prior allowance transactions, or withdraw whenever needed.
+                Approve {activeConfig.tokenSymbol}, then confirm your stake. Withdrawals follow the
+                current contract settings.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -638,28 +586,20 @@ export default function Stake() {
                     </div>
                   </div>
 
-                  {/* Permit Options */}
-                  <div className="flex items-center justify-between rounded-lg border border-purple-100 bg-purple-50/40 p-3 text-xs text-purple-900">
-                    <div className="space-y-0.5">
-                      <p className="font-semibold">EIP-2612 Gasless Permit</p>
-                      <p className="text-purple-700">
-                        Sign with wallet to approve and deposit in 1 step
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={usePermit ? "default" : "outline"}
-                      onClick={() => setUsePermit(!usePermit)}
-                      className={usePermit ? "bg-purple-600 text-white" : "border-purple-200"}
-                    >
-                      {usePermit ? "Permit Active" : "Standard Approve"}
-                    </Button>
-                  </div>
+                  <p className="text-xs text-slate-600">
+                    Approval is needed when your token allowance is insufficient. Staking again
+                    resets the lock for your entire position.
+                  </p>
 
                   <Button
                     onClick={() => void handleStake()}
-                    disabled={isSubmitting || !isConnected}
+                    disabled={
+                      isSubmitting ||
+                      !isConnected ||
+                      chainId !== base.id ||
+                      !dataReady ||
+                      isRefreshing
+                    }
                     className="w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 py-6 text-base font-bold text-white shadow-md hover:from-purple-700 hover:to-pink-700"
                   >
                     {isSubmitting ? (
@@ -732,13 +672,26 @@ export default function Stake() {
                   <Alert className="border-amber-200 bg-amber-50 text-amber-900">
                     <AlertTriangle className="size-4 text-amber-600" />
                     <AlertDescription className="text-xs">
-                      Withdrawing tokens immediately recalculates your VIP tier and fee discount.
+                      Withdrawing tokens recalculates your tier. Current withdrawal fee:{" "}
+                      {dataReady ? `${withdrawalFeeBps / 100}%` : "unavailable"}. Minimum stake
+                      period: {dataReady ? `${Number(lockSeconds)} seconds` : "unavailable"}.
+                      {dataReady &&
+                        stakedBalance > 0n &&
+                        lockSeconds > 0n &&
+                        ` Unlocks ${new Date(Number(unlockAt) * 1000).toLocaleString()}.`}
                     </AlertDescription>
                   </Alert>
 
                   <Button
                     onClick={() => void handleUnstake()}
-                    disabled={isSubmitting || !isConnected || stakedBalance === 0n}
+                    disabled={
+                      isSubmitting ||
+                      !isConnected ||
+                      chainId !== base.id ||
+                      !dataReady ||
+                      isRefreshing ||
+                      stakedBalance === 0n
+                    }
                     variant="outline"
                     className="w-full border-purple-300 py-6 text-base font-bold text-purple-700 hover:bg-purple-50"
                   >
@@ -784,11 +737,11 @@ export default function Stake() {
                 VIP Staking Tiers
               </CardTitle>
               <CardDescription>
-                Tier discounts apply in real-time to every token swap on the Shaggy Mutt AMM router.
+                Live contract tiers. Standard Uniswap V2 pools do not apply these discounts.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {VIP_TIERS.map((tier) => {
+              {(dataReady ? tiers : []).map((tier) => {
                 const isCurrent = currentTier?.name === tier.name;
                 const isUnlocked = humanStaked >= tier.required;
 
@@ -831,9 +784,9 @@ export default function Stake() {
               })}
 
               <div className="mt-4 rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
-                💡 <span className="font-semibold text-slate-700">Non-Custodial Guarantee:</span>{" "}
-                Your staked tokens remain fully owned by your wallet. You can withdraw your position
-                anytime without penalty.
+                💡 <span className="font-semibold text-slate-700">Contract terms:</span> Staked
+                tokens are held by the staking contract. Its administrators can change tiers, lock
+                periods, and withdrawal fees.
               </div>
             </CardContent>
           </Card>

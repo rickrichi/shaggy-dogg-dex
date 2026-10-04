@@ -43,62 +43,36 @@ export default function Portfolio(): JSX.Element {
     setError(null);
 
     try {
-      // Native (ETH on Base) via CoinGecko simple price (free tier, no key)
-      const nativeUrl =
-        "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd&include_24hr_change=true";
+      // ETH and Base ERC-20s via the API server (Shaggy Dogg Crypto Market-Data:
+      // exchange order-book medians for ETH, on-chain pool prices for tokens).
+      const res = await fetch("/api/prices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chainId: 8453, addresses: ERC20_ADDRESSES.map((a) => a.toLowerCase()) }),
+      });
+      if (!res.ok) throw new Error(`Price API HTTP ${res.status}`);
 
-      // ERC20s on Base via contract addresses
-      const tokenUrl = (() => {
-        const url = new URL("https://api.coingecko.com/api/v3/simple/token_price/base");
-        url.searchParams.set(
-          "contract_addresses",
-          ERC20_ADDRESSES.map((a) => a.toLowerCase()).join(",")
-        );
-        url.searchParams.set("vs_currencies", "usd");
-        url.searchParams.set("include_24hr_change", "true");
-        return url.toString();
-      })();
+      const body = (await res.json()) as {
+        success: boolean;
+        data?: { prices: Array<{ address: string; priceUsd: number; change24hPercent: number; symbol?: string }> };
+        error?: string;
+      };
+      if (!body.success || !body.data) throw new Error(body.error ?? "Price API returned no data");
 
-      const [nativeRes, tokenRes] = await Promise.all([fetch(nativeUrl), fetch(tokenUrl)]);
-
-      if (!nativeRes.ok) throw new Error(`Native price HTTP ${nativeRes.status}`);
-      if (!tokenRes.ok) throw new Error(`Token price HTTP ${tokenRes.status}`);
-
-      const nativeJson = (await nativeRes.json()) as Record<
-        string,
-        { usd?: number; usd_24h_change?: number }
-      >;
-      const tokenJson = (await tokenRes.json()) as Record<
-        string,
-        { usd?: number; usd_24h_change?: number; symbol?: string }
-      >;
-
-      const nextPrices: PriceRow[] = [];
-
-      const ethRow = nativeJson["ethereum"];
-      if (ethRow?.usd !== undefined) {
-        nextPrices.push({
-          address: ZERO_ADDRESS,
-          priceUsd: Number(ethRow.usd),
-          change24hPercent: Number(ethRow.usd_24h_change ?? 0),
-          symbol: "ETH",
-        });
-      }
-
-      for (const [addr, row] of Object.entries(tokenJson)) {
-        if (row?.usd === undefined) continue;
-        nextPrices.push({
-          address: addr as AddressHex,
-          priceUsd: Number(row.usd),
-          change24hPercent: Number(row.usd_24h_change ?? 0),
+      const nextPrices: PriceRow[] = body.data.prices.map((row) => {
+        const address = (
+          normalizeAddress(row.address as AddressHex) === ZERO_NORMALIZED ? ZERO_ADDRESS : row.address
+        ) as AddressHex;
+        return {
+          address,
+          priceUsd: Number(row.priceUsd),
+          change24hPercent: Number(row.change24hPercent ?? 0),
           symbol:
             row.symbol ??
-            WATCHLIST.find(
-              (w) => normalizeAddress(w.address) === normalizeAddress(addr as AddressHex)
-            )?.symbol ??
+            WATCHLIST.find((w) => normalizeAddress(w.address) === normalizeAddress(address))?.symbol ??
             "UNKNOWN",
-        });
-      }
+        };
+      });
 
       setPrices(nextPrices);
     } catch (err) {

@@ -511,10 +511,101 @@ export const WETH_ABI = [
   },
 ] as const satisfies Abi;
 
+/**
+ * Aerodrome Router ABI (Base Mainnet canonical DEX)
+ */
+export const AERODROME_ROUTER_ABI = [
+  {
+    type: "function",
+    name: "swapExactETHForTokens",
+    stateMutability: "payable",
+    inputs: [
+      { name: "amountOutMin", type: "uint256" },
+      {
+        name: "routes",
+        type: "tuple[]",
+        components: [
+          { name: "from", type: "address" },
+          { name: "to", type: "address" },
+          { name: "stable", type: "bool" },
+          { name: "factory", type: "address" },
+        ],
+      },
+      { name: "to", type: "address" },
+      { name: "deadline", type: "uint256" },
+    ],
+    outputs: [{ name: "amounts", type: "uint256[]" }],
+  },
+  {
+    type: "function",
+    name: "swapExactTokensForETH",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "amountIn", type: "uint256" },
+      { name: "amountOutMin", type: "uint256" },
+      {
+        name: "routes",
+        type: "tuple[]",
+        components: [
+          { name: "from", type: "address" },
+          { name: "to", type: "address" },
+          { name: "stable", type: "bool" },
+          { name: "factory", type: "address" },
+        ],
+      },
+      { name: "to", type: "address" },
+      { name: "deadline", type: "uint256" },
+    ],
+    outputs: [{ name: "amounts", type: "uint256[]" }],
+  },
+  {
+    type: "function",
+    name: "swapExactTokensForTokens",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "amountIn", type: "uint256" },
+      { name: "amountOutMin", type: "uint256" },
+      {
+        name: "routes",
+        type: "tuple[]",
+        components: [
+          { name: "from", type: "address" },
+          { name: "to", type: "address" },
+          { name: "stable", type: "bool" },
+          { name: "factory", type: "address" },
+        ],
+      },
+      { name: "to", type: "address" },
+      { name: "deadline", type: "uint256" },
+    ],
+    outputs: [{ name: "amounts", type: "uint256[]" }],
+  },
+  {
+    type: "function",
+    name: "getAmountsOut",
+    stateMutability: "view",
+    inputs: [
+      { name: "amountIn", type: "uint256" },
+      {
+        name: "routes",
+        type: "tuple[]",
+        components: [
+          { name: "from", type: "address" },
+          { name: "to", type: "address" },
+          { name: "stable", type: "bool" },
+          { name: "factory", type: "address" },
+        ],
+      },
+    ],
+    outputs: [{ name: "amounts", type: "uint256[]" }],
+  },
+] as const satisfies Abi;
+
 /** ——— Type aliases (strict, no `any`) ——— */
 export type ERC20ABI = typeof ERC20_ABI;
 export type UniswapV2RouterABI = typeof UNISWAP_V2_ROUTER_ABI;
 export type UniswapV2PairABI = typeof UNISWAP_V2_PAIR_ABI;
+export type AerodromeRouterABI = typeof AERODROME_ROUTER_ABI;
 export type WETHABI = typeof WETH_ABI;
 
 /** ——— Name unions for safer wrappers/guards ——— */
@@ -523,6 +614,8 @@ export type ERC20EventName = AbiEventNames<ERC20ABI>;
 
 export type UniswapV2RouterFunctionName = AbiFunctionNames<UniswapV2RouterABI>;
 export type UniswapV2RouterEventName = AbiEventNames<UniswapV2RouterABI>;
+
+export type AerodromeRouterFunctionName = AbiFunctionNames<AerodromeRouterABI>;
 
 export type UniswapV2PairFunctionName = AbiFunctionNames<UniswapV2PairABI>;
 export type UniswapV2PairEventName = AbiEventNames<UniswapV2PairABI>;

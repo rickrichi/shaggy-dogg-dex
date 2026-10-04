@@ -2,8 +2,7 @@
 import { z } from "zod";
 
 /**
- * Schema definitions matching your Supabase database
- * Based on: DeFi Platform User and Token Management Schema
+ * Admin data schemas (rows served by the API server's local SQLite store)
  */
 
 // Modern Zod v4 date coercion helper
@@ -118,11 +117,9 @@ export type TokenListInput = z.infer<typeof TokenListInputSchema>;
 // Helper Types
 // ============================================================================
 
-/**
- * Admin role check result
- */
-export interface AdminStatus {
-  isAdmin: boolean;
-  userId: string | null;
-  email: string | null;
-}
+/** Wallet-signed admin session (server/src/routes/admin.ts). */
+export const AdminSessionSchema = z.object({
+  address: z.string().regex(/^0x[a-f0-9]{40}$/),
+  expiresAt: z.number().nullable(),
+});
+export type AdminSession = z.infer<typeof AdminSessionSchema>;

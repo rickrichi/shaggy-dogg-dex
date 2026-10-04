@@ -10,7 +10,8 @@ export const BASE_PUBLIC_RPC_URLS = [
 
 // Optional Shaggy-Dogg gateway (docs/shaggy-rpc.md). Its key is visible to browser users,
 // so use a dedicated low-quota key. Public endpoints remain as fallback if it fails or is throttled.
-const GATEWAY_URL = import.meta.env.VITE_SHAGGY_RPC_URL as string | undefined;
+const GATEWAY_URL = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env
+  ?.VITE_SHAGGY_RPC_URL;
 
 export function createBaseReadTransport() {
   const transports = [
