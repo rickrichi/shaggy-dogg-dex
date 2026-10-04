@@ -1,6 +1,6 @@
 {
   "chainId": 8453,
-  "generatedAt": "2026-10-04T07:37:13.521Z",
+  "generatedAt": "2026-10-04T08:00:49.064Z",
   "source": "on-chain reads + Blockscout API",
   "contracts": [
     {
@@ -51,7 +51,7 @@
       "creationTx": "0xf039cb517f286df9fea11f84966806c0a932fc6058ec279ca0eb29b3a4e83c05",
       "label": {
         "ecosystem": "AMUTT",
-        "role": "YieldStakingVault (legacy discount scale; deposits disabled in app)",
+        "role": "YieldStakingVault v1 (legacy discount scale; superseded by 0xC29c…4981; zero assets)",
         "usedBy": [
           "src/components/YieldVaultPanel.tsx"
         ]
@@ -189,6 +189,18 @@
           "src/lib/contracts.ts"
         ]
       }
+    },
+    {
+      "address": "0xc29c4b5aF82f6c1469bc47CfA167386F93514981",
+      "hasCode": true,
+      "admin": "0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98",
+      "treasury": "0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98",
+      "discountDenominator": "10000",
+      "blockscoutVerified": true,
+      "contractName": "YieldStakingVault",
+      "creator": "0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98",
+      "creationTx": "0x342b72fc23fe2505d9e07ef28d350cac009d160291dd093a1db8e7c2d2d71ab5",
+      "label": null
     }
   ],
   "adminAddresses": [
