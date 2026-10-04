@@ -1,8 +1,11 @@
-import { describe, expect, it } from "vitest";
 import { decodeFunctionData, encodeFunctionData } from "viem";
-import { BASE_MAINNET_TOKENS } from "@/config/tokens";
+import { describe, expect, it } from "vitest";
+
 import { AERODROME_ROUTER_ABI, UNISWAP_V2_ROUTER_ABI } from "@/config/abis";
+import { BASE_MAINNET_TOKENS } from "@/config/tokens";
+
 import { AERODROME_ROUTER, routeCandidates, routeSwapCall } from "./smart-routing";
+
 const weth = BASE_MAINNET_TOKENS.find((t) => t.symbol === "WETH")!;
 const usdc = BASE_MAINNET_TOKENS.find((t) => t.symbol === "USDC")!;
 describe("Executable router plans", () => {

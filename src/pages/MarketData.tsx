@@ -91,15 +91,29 @@ const usd = (v: number) => {
   return `$${v.toLocaleString("en-US", { minimumFractionDigits: Math.min(digits, 2), maximumFractionDigits: digits })}`;
 };
 const compactUsd = (v: number | null | undefined) =>
-  v == null ? "—" : `$${new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 }).format(v)}`;
+  v == null
+    ? "—"
+    : `$${new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 }).format(v)}`;
 const pct = (v: number | null) => (v == null ? "—" : `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`);
-const pctTone = (v: number | null) => (v == null ? "text-slate-400" : v > 0 ? "text-emerald-600" : v < 0 ? "text-rose-600" : "text-slate-600");
-const age = (ms: number | null) => (ms == null ? "—" : ms < 1_000 ? `${ms}ms` : `${(ms / 1_000).toFixed(1)}s`);
+const pctTone = (v: number | null) =>
+  v == null
+    ? "text-slate-400"
+    : v > 0
+      ? "text-emerald-600"
+      : v < 0
+        ? "text-rose-600"
+        : "text-slate-600";
+const age = (ms: number | null) =>
+  ms == null ? "—" : ms < 1_000 ? `${ms}ms` : `${(ms / 1_000).toFixed(1)}s`;
 
 // ───────────────────────────── page ─────────────────────────────
 
 export default function MarketData() {
-  const status = useQuery({ queryKey: ["md-status"], queryFn: () => getJson<Status>("/api/market-data"), refetchInterval: 10_000 });
+  const status = useQuery({
+    queryKey: ["md-status"],
+    queryFn: () => getJson<Status>("/api/market-data"),
+    refetchInterval: 10_000,
+  });
   const prices = useQuery({
     queryKey: ["md-prices"],
     queryFn: () => getJson<{ prices: AssetPrice[]; updatedAt: number }>("/api/market-data/prices"),
@@ -108,12 +122,17 @@ export default function MarketData() {
   const [selected, setSelected] = useState("ETH");
   const [search, setSearch] = useState("");
   const allRows = useMemo(
-    () => [...(prices.data?.prices ?? [])].sort((a, b) => (b.volume24hUsd ?? 0) - (a.volume24hUsd ?? 0)),
+    () =>
+      [...(prices.data?.prices ?? [])].sort(
+        (a, b) => (b.volume24hUsd ?? 0) - (a.volume24hUsd ?? 0)
+      ),
     [prices.data]
   );
   const rows = useMemo(() => {
     const q = search.trim().toUpperCase();
-    return q ? allRows.filter((r) => r.symbol.includes(q) || r.sources.some((src) => src.pair.includes(q))) : allRows;
+    return q
+      ? allRows.filter((r) => r.symbol.includes(q) || r.sources.some((src) => src.pair.includes(q)))
+      : allRows;
   }, [allRows, search]);
   const selectedRow = allRows.find((r) => r.symbol === selected);
   const coverage = status.data?.coverage ?? null;
@@ -125,7 +144,8 @@ export default function MarketData() {
           Shaggy Dogg Crypto Market-Data
         </h1>
         <p className="text-gray-600">
-          Self-hosted prices from live exchange order books and Base on-chain pools — no third-party price API.
+          Self-hosted prices from live exchange order books and Base on-chain pools — no third-party
+          price API.
         </p>
         <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-xs">
           {status.data ? (
@@ -138,8 +158,12 @@ export default function MarketData() {
                     ` · ${coverage.exchangesLoaded}/${coverage.exchangesTotal} exchanges connected`}
                 </Badge>
               )}
-              <Badge variant="secondary">{status.data.venues.length} exchanges: {status.data.venues.join(", ")}</Badge>
-              <Badge variant="secondary">Base pools ≥ {compactUsd(status.data.onchain.minPoolLiquidityUsd)} liquidity</Badge>
+              <Badge variant="secondary">
+                {status.data.venues.length} exchanges: {status.data.venues.join(", ")}
+              </Badge>
+              <Badge variant="secondary">
+                Base pools ≥ {compactUsd(status.data.onchain.minPoolLiquidityUsd)} liquidity
+              </Badge>
             </>
           ) : status.error ? (
             <Badge variant="destructive">{(status.error as Error).message}</Badge>
@@ -157,7 +181,9 @@ export default function MarketData() {
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1 text-xs text-gray-500">
               {prices.isFetching && <Loader2 className="size-3 animate-spin" />}
-              {prices.data ? `updated ${new Date(prices.data.updatedAt).toLocaleTimeString()} · every 5 s` : ""}
+              {prices.data
+                ? `updated ${new Date(prices.data.updatedAt).toLocaleTimeString()} · every 5 s`
+                : ""}
             </span>
             <Input
               value={search}
@@ -203,14 +229,25 @@ export default function MarketData() {
                       >
                         {pct(r.change24hPercent)}
                       </td>
-                      <td className="py-2 pr-3 text-right font-mono">{compactUsd(r.volume24hUsd)}</td>
-                      <td className="py-2 pr-3" title={r.sources.map((s) => `${s.exchange} ${s.pair} ${usd(s.midUsd)}`).join("\n")}>
+                      <td className="py-2 pr-3 text-right font-mono">
+                        {compactUsd(r.volume24hUsd)}
+                      </td>
+                      <td
+                        className="py-2 pr-3"
+                        title={r.sources
+                          .map((s) => `${s.exchange} ${s.pair} ${usd(s.midUsd)}`)
+                          .join("\n")}
+                      >
                         {r.sourceCount} venue{r.sourceCount === 1 ? "" : "s"}
                         {r.rejected.length > 0 && (
-                          <span className="ml-1 text-amber-600">({r.rejected.length} rejected)</span>
+                          <span className="ml-1 text-amber-600">
+                            ({r.rejected.length} rejected)
+                          </span>
                         )}
                       </td>
-                      <td className="py-2 text-right font-mono text-xs text-gray-500">{age(r.maxAgeMs)}</td>
+                      <td className="py-2 text-right font-mono text-xs text-gray-500">
+                        {age(r.maxAgeMs)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -228,9 +265,10 @@ export default function MarketData() {
       {coverage && <PairCoverage coverage={coverage} rows={allRows} onSelect={setSelected} />}
 
       <p className="text-center text-xs text-gray-500">
-        Price = median of fresh venue mid prices (books &lt; 10 s old, spread &lt; 2%), outliers beyond 1.5% rejected,
-        USDT/USDC quotes converted at the live stablecoin rate. 24h change uses Market-Data&apos;s own history once it
-        covers 24 hours, otherwise exchange 24h tickers. Service: {MARKET_DATA_URL}
+        Price = median of fresh venue mid prices (books &lt; 10 s old, spread &lt; 2%), outliers
+        beyond 1.5% rejected, USDT/USDC quotes converted at the live stablecoin rate. 24h change
+        uses Market-Data&apos;s own history once it covers 24 hours, otherwise exchange 24h tickers.
+        Service: {MARKET_DATA_URL}
       </p>
     </div>
   );
@@ -246,15 +284,17 @@ function PairCoverage({
   onSelect: (asset: string) => void;
 }) {
   const byAsset = new Map(rows.map((r) => [r.symbol, r]));
-  const livePairs = new Set(rows.flatMap((r) => r.sources.map((src) => `${src.exchange}|${src.pair}`)));
+  const livePairs = new Set(
+    rows.flatMap((r) => r.sources.map((src) => `${src.exchange}|${src.pair}`))
+  );
   return (
     <Card className="bg-white/80 backdrop-blur-sm">
       <CardHeader>
         <CardTitle className="flex flex-wrap items-baseline gap-2">
           Your pairs
           <span className="text-sm font-normal text-gray-500">
-            {coverage.streamingPairs} streaming · {coverage.listedPairs} listed on at least one exchange ·{" "}
-            {coverage.requestedPairs} requested
+            {coverage.streamingPairs} streaming · {coverage.listedPairs} listed on at least one
+            exchange · {coverage.requestedPairs} requested
           </span>
         </CardTitle>
       </CardHeader>
@@ -281,15 +321,23 @@ function PairCoverage({
                     className={`border-t border-gray-100 ${asset ? "cursor-pointer hover:bg-purple-50" : ""}`}
                   >
                     <td className="py-1.5 pr-3 font-semibold">{pair}</td>
-                    <td className="py-1.5 pr-3 text-right font-mono">{asset ? usd(asset.priceUsd) : "—"}</td>
+                    <td className="py-1.5 pr-3 text-right font-mono">
+                      {asset ? usd(asset.priceUsd) : "—"}
+                    </td>
                     <td className="py-1.5 pr-3 text-xs text-gray-600">
-                      {exchanges.length ? exchanges.join(", ") : <span className="text-amber-600">none</span>}
+                      {exchanges.length ? (
+                        exchanges.join(", ")
+                      ) : (
+                        <span className="text-amber-600">none</span>
+                      )}
                     </td>
                     <td className="py-1.5 text-xs">
                       {liveOn.length ? (
                         <span className="text-emerald-600">{liveOn.join(", ")}</span>
                       ) : (
-                        <span className="text-gray-400">{exchanges.length ? "connecting / no fresh book" : "not available"}</span>
+                        <span className="text-gray-400">
+                          {exchanges.length ? "connecting / no fresh book" : "not available"}
+                        </span>
                       )}
                     </td>
                   </tr>
@@ -300,7 +348,8 @@ function PairCoverage({
         </div>
         {coverage.unlisted && coverage.unlisted.length > 0 && (
           <p className="text-xs text-gray-500">
-            Not listed on any connected exchange (no price shown, nothing estimated): {coverage.unlisted.join(", ")}
+            Not listed on any connected exchange (no price shown, nothing estimated):{" "}
+            {coverage.unlisted.join(", ")}
           </p>
         )}
       </CardContent>
@@ -315,7 +364,8 @@ function ServiceDown({ message }: { message: string }) {
       <div>
         <p className="font-medium">{message}</p>
         <p className="mt-1 font-mono text-xs">
-          cd C:\Users\fbada\source\repos\shaggy-dogg-market-data; uv run uvicorn app.main:app --port 8010
+          cd C:\Users\fbada\source\repos\shaggy-dogg-market-data; uv run uvicorn app.main:app --port
+          8010
         </p>
       </div>
     </div>
@@ -327,7 +377,8 @@ function ServiceDown({ message }: { message: string }) {
 function HistoryCard({ asset, row }: { asset: string; row: AssetPrice | undefined }) {
   const history = useQuery({
     queryKey: ["md-history", asset],
-    queryFn: () => getJson<History>(`/api/market-data/history/${encodeURIComponent(asset)}?hours=24`),
+    queryFn: () =>
+      getJson<History>(`/api/market-data/history/${encodeURIComponent(asset)}?hours=24`),
     refetchInterval: 60_000,
   });
   const points = history.data?.points ?? [];
@@ -343,13 +394,15 @@ function HistoryCard({ asset, row }: { asset: string; row: AssetPrice | undefine
         {row && (
           <div className="flex items-baseline gap-3">
             <span className="font-mono text-2xl font-bold">{usd(row.priceUsd)}</span>
-            <span className={`font-mono ${pctTone(row.change24hPercent)}`}>{pct(row.change24hPercent)}</span>
+            <span className={`font-mono ${pctTone(row.change24hPercent)}`}>
+              {pct(row.change24hPercent)}
+            </span>
           </div>
         )}
         {points.length < 2 ? (
           <p className="rounded bg-gray-50 p-6 text-center text-sm text-gray-500">
-            Collecting history — {points.length} minute sample{points.length === 1 ? "" : "s"} so far. The chart fills in
-            as the service runs.
+            Collecting history — {points.length} minute sample{points.length === 1 ? "" : "s"} so
+            far. The chart fills in as the service runs.
           </p>
         ) : (
           <Sparkline points={points} />
@@ -367,7 +420,10 @@ function HistoryCard({ asset, row }: { asset: string; row: AssetPrice | undefine
               </li>
             ))}
             {row.rejected.map((s) => (
-              <li key={`rej-${s.exchange}-${s.pair}`} className="flex justify-between font-mono text-amber-600">
+              <li
+                key={`rej-${s.exchange}-${s.pair}`}
+                className="flex justify-between font-mono text-amber-600"
+              >
                 <span>
                   {s.exchange} · {s.pair} (rejected outlier)
                 </span>
@@ -392,12 +448,26 @@ function Sparkline({ points }: { points: Array<{ ts: number; priceUsd: number }>
   const t1 = points.at(-1)?.ts ?? 1;
   const x = (ts: number) => ((ts - t0) / (t1 - t0 || 1)) * W;
   const y = (v: number) => H - ((v - lo) / span) * (H - 8) - 4;
-  const d = points.map((p, i) => `${i ? "L" : "M"}${x(p.ts).toFixed(1)},${y(p.priceUsd).toFixed(1)}`).join("");
+  const d = points
+    .map((p, i) => `${i ? "L" : "M"}${x(p.ts).toFixed(1)},${y(p.priceUsd).toFixed(1)}`)
+    .join("");
   const up = (points.at(-1)?.priceUsd ?? 0) >= (points[0]?.priceUsd ?? 0);
   return (
     <div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="h-36 w-full" preserveAspectRatio="none" role="img" aria-label="Price history">
-        <path d={d} fill="none" strokeWidth={2} vectorEffect="non-scaling-stroke" className={up ? "stroke-emerald-500" : "stroke-rose-500"} />
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="h-36 w-full"
+        preserveAspectRatio="none"
+        role="img"
+        aria-label="Price history"
+      >
+        <path
+          d={d}
+          fill="none"
+          strokeWidth={2}
+          vectorEffect="non-scaling-stroke"
+          className={up ? "stroke-emerald-500" : "stroke-rose-500"}
+        />
       </svg>
       <div className="flex justify-between text-[11px] text-gray-500">
         <span>{new Date(t0).toLocaleTimeString()}</span>
@@ -450,7 +520,9 @@ function TokenLookup() {
             {token.isFetching ? <Loader2 className="size-4 animate-spin" /> : "Price"}
           </Button>
         </form>
-        <p className="text-xs text-gray-500">Example prefilled: AERO. Priced from the deepest Uniswap V2 / Aerodrome pool.</p>
+        <p className="text-xs text-gray-500">
+          Example prefilled: AERO. Priced from the deepest Uniswap V2 / Aerodrome pool.
+        </p>
         {token.error && <p className="text-sm text-rose-600">{(token.error as Error).message}</p>}
         {token.data && (
           <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
@@ -460,7 +532,9 @@ function TokenLookup() {
             <dd className="font-mono">{usd(token.data.priceUsd)}</dd>
             <dt className="text-gray-500">24h</dt>
             <dd className={`font-mono ${pctTone(token.data.change24hPercent)}`}>
-              {token.data.change24hPercent == null ? "collecting history" : pct(token.data.change24hPercent)}
+              {token.data.change24hPercent == null
+                ? "collecting history"
+                : pct(token.data.change24hPercent)}
             </dd>
             {token.data.pool && (
               <>

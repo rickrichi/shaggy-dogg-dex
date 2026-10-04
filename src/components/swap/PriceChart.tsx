@@ -1,10 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { formatUnits } from "viem";
 import { usePublicClient } from "wagmi";
+
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { type Token } from "@/config/tokens";
 import { quoteSmartRoutes } from "@/lib/amm/smart-routing";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 
 export function PriceChart({ baseToken, quoteToken }: { baseToken: Token; quoteToken: Token }) {
   const client = usePublicClient({ chainId: baseToken.chainId });

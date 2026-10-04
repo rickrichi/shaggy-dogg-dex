@@ -1,7 +1,8 @@
+import { decodeFunctionData, encodeFunctionData } from "viem";
 import { describe, expect, it } from "vitest";
-import { encodeFunctionData, decodeFunctionData } from "viem";
+
 import { LAUNCHPAD_ARTIFACTS } from "./launchpad/artifacts";
-import { STAKING_ABI, BASE_STAKING } from "./staking";
+import { BASE_STAKING, STAKING_ABI } from "./staking";
 
 describe("Staking interface compatibility", () => {
   it("encodes both wallet actions against the compiled contract ABI", () => {

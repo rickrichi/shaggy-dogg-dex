@@ -1,8 +1,9 @@
 import { createPublicClient, formatUnits } from "viem";
 import { base } from "viem/chains";
+
 import { BASE_MAINNET_TOKENS } from "../src/config/tokens";
-import { createBaseReadTransport } from "../src/lib/base-rpc";
 import { quoteSmartRoutes } from "../src/lib/amm/smart-routing";
+import { createBaseReadTransport } from "../src/lib/base-rpc";
 
 const client = createPublicClient({ chain: base, transport: createBaseReadTransport() });
 const sell = BASE_MAINNET_TOKENS.find(t => t.symbol === "USDC")!;

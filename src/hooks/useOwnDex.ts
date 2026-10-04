@@ -1,6 +1,8 @@
 import { useState } from "react";
+
 import { useQuery } from "@tanstack/react-query";
 import { usePublicClient } from "wagmi";
+
 import { DEX_CHAIN_ID, loadDexDeployment } from "@/config/dex/deployment";
 import { verifyDexDeployment } from "@/lib/amm/own-dex";
 
@@ -14,7 +16,14 @@ export function useOwnDex() {
       if (!client || !deployment) throw new Error("DEX deployment is not configured.");
       return verifyDexDeployment(client, deployment);
     },
-    staleTime: 30_000, refetchInterval: 60_000, retry: 1,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    retry: 1,
   });
-  return { deployment, client, verification, ready: Boolean(verification.data && !verification.isError) };
+  return {
+    deployment,
+    client,
+    verification,
+    ready: Boolean(verification.data && !verification.isError),
+  };
 }

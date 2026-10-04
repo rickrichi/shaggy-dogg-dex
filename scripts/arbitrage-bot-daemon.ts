@@ -14,7 +14,6 @@
  *  - Atomic EVM Revert Guard (zero loss of principal if prices shift)
  */
 
-import { verifyPrivateSubmission } from "./lib/private-submission";
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -42,6 +41,8 @@ import {
   type MarketSnapshot,
 } from "../src/lib/amm/ai-arbitrage-bot.js";
 import { LAUNCHPAD_ARTIFACTS } from "../src/lib/launchpad/artifacts.js";
+
+import { verifyPrivateSubmission } from "./lib/private-submission";
 
 // ────────────────────────────────────────────────────────────────────────────
 // CONFIGURATION & ENVIRONMENT LOADER

@@ -1,6 +1,8 @@
-import { loadEnvFile } from "node:process";
 import { existsSync } from "node:fs";
+import { loadEnvFile } from "node:process";
+
 import { verifyPrivateSubmission } from "./lib/private-submission";
+
 if (existsSync(".env.private-routing")) loadEnvFile(".env.private-routing");
 try {
   const config = await verifyPrivateSubmission(process.env);

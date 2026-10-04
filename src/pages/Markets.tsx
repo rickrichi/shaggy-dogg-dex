@@ -69,11 +69,16 @@ const price = (v: string | null | undefined) => {
   const n = num(v);
   if (n == null || !Number.isFinite(n)) return "—";
   const digits = n >= 1_000 ? 2 : n >= 1 ? 4 : n >= 0.01 ? 5 : 8;
-  return n.toLocaleString("en-US", { minimumFractionDigits: Math.min(2, digits), maximumFractionDigits: digits });
+  return n.toLocaleString("en-US", {
+    minimumFractionDigits: Math.min(2, digits),
+    maximumFractionDigits: digits,
+  });
 };
 const usdCompact = (v: string | null | undefined) => {
   const n = num(v);
-  return n == null ? "—" : `$${new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 }).format(n)}`;
+  return n == null
+    ? "—"
+    : `$${new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 }).format(n)}`;
 };
 const pct = (v: string | null | undefined) => {
   const n = num(v);
@@ -81,7 +86,13 @@ const pct = (v: string | null | undefined) => {
 };
 const tone = (v: string | null | undefined) => {
   const n = num(v);
-  return n == null ? "text-gray-400" : n > 0 ? "text-emerald-600" : n < 0 ? "text-rose-600" : "text-gray-600";
+  return n == null
+    ? "text-gray-400"
+    : n > 0
+      ? "text-emerald-600"
+      : n < 0
+        ? "text-rose-600"
+        : "text-gray-600";
 };
 
 // ───────────────────────────── live price ticks over WebSocket ─────────────────────────────
@@ -119,7 +130,13 @@ function useLiveTicks(): { ticks: LiveTicks; connected: boolean } {
           for (const f of frames as Array<{ kind?: string; symbol?: string; price?: string }>) {
             if (f.kind !== "live" || !f.symbol || !f.price) continue;
             const old = prev[f.symbol];
-            const dir = old ? (Number(f.price) > Number(old.price) ? 1 : Number(f.price) < Number(old.price) ? -1 : old.dir) : 0;
+            const dir = old
+              ? Number(f.price) > Number(old.price)
+                ? 1
+                : Number(f.price) < Number(old.price)
+                  ? -1
+                  : old.dir
+              : 0;
             next[f.symbol] = { price: f.price, at: Date.now(), dir };
           }
           return next;
@@ -167,7 +184,9 @@ export default function Markets() {
     return { gainers: sorted.slice(0, 5), losers: sorted.slice(-5).reverse() };
   }, [markets.data]);
 
-  const selectedRow = rows.find((r) => r.streamed_as === selected) ?? markets.data?.data.find((r) => r.streamed_as === selected);
+  const selectedRow =
+    rows.find((r) => r.streamed_as === selected) ??
+    markets.data?.data.find((r) => r.streamed_as === selected);
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -175,10 +194,13 @@ export default function Markets() {
         <h1 className="mb-2 bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-3xl font-bold text-transparent">
           Markets
         </h1>
-        <p className="text-gray-600">Live crypto prices and 24h statistics streamed directly from Coinbase.</p>
+        <p className="text-gray-600">
+          Live crypto prices and 24h statistics streamed directly from Coinbase.
+        </p>
         <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-xs">
           <Badge variant={connected ? "secondary" : "destructive"} className="gap-1">
-            <Radio className="size-3" /> {connected ? "live ticks streaming" : "live ticks reconnecting"}
+            <Radio className="size-3" />{" "}
+            {connected ? "live ticks streaming" : "live ticks reconnecting"}
           </Badge>
           {markets.data && (
             <Badge variant="secondary">
@@ -194,15 +216,27 @@ export default function Markets() {
             <AlertTriangle className="mt-0.5 size-4 shrink-0" />
             <div>
               <p className="font-medium">{(markets.error as Error).message}</p>
-              <p className="mt-1 font-mono text-xs">cd C:\Users\fbada\source\repos\cryptostream; uv run cryptostream serve</p>
+              <p className="mt-1 font-mono text-xs">
+                cd C:\Users\fbada\source\repos\cryptostream; uv run cryptostream serve
+              </p>
             </div>
           </CardContent>
         </Card>
       ) : null}
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        <MoversCard title="Top gainers (24h)" icon={<ArrowUpRight className="size-5 text-emerald-600" />} rows={movers.gainers} onPick={setSelected} />
-        <MoversCard title="Top losers (24h)" icon={<ArrowDownRight className="size-5 text-rose-600" />} rows={movers.losers} onPick={setSelected} />
+        <MoversCard
+          title="Top gainers (24h)"
+          icon={<ArrowUpRight className="size-5 text-emerald-600" />}
+          rows={movers.gainers}
+          onPick={setSelected}
+        />
+        <MoversCard
+          title="Top losers (24h)"
+          icon={<ArrowDownRight className="size-5 text-rose-600" />}
+          rows={movers.losers}
+          onPick={setSelected}
+        />
       </div>
 
       <Card className="bg-white/80 backdrop-blur-sm">
@@ -222,7 +256,8 @@ export default function Markets() {
         <CardContent>
           {!markets.data ? (
             <p className="flex items-center justify-center gap-2 py-10 text-sm text-gray-500">
-              {markets.isLoading && <Loader2 className="size-4 animate-spin" />} Loading live markets…
+              {markets.isLoading && <Loader2 className="size-4 animate-spin" />} Loading live
+              markets…
             </p>
           ) : (
             <div className="overflow-x-auto">
@@ -243,7 +278,14 @@ export default function Markets() {
                   {rows.map((r, i) => {
                     const tick = ticks[r.streamed_as];
                     const live = tick && Date.now() - tick.at < 10_000 ? tick.price : r.price; // fresh tick, else polled price
-                    const flash = tick && Date.now() - tick.at < 1_200 ? (tick.dir > 0 ? "bg-emerald-50" : tick.dir < 0 ? "bg-rose-50" : "") : "";
+                    const flash =
+                      tick && Date.now() - tick.at < 1_200
+                        ? tick.dir > 0
+                          ? "bg-emerald-50"
+                          : tick.dir < 0
+                            ? "bg-rose-50"
+                            : ""
+                        : "";
                     return (
                       <tr
                         key={r.streamed_as}
@@ -254,18 +296,31 @@ export default function Markets() {
                         <td className="py-2 pr-3">
                           <span className="font-semibold">{r.streamed_as}</span>
                           {r.symbol !== r.streamed_as && (
-                            <span className="ml-1 text-[11px] text-gray-400" title={`${r.symbol} is not listed on Coinbase; showing ${r.streamed_as}`}>
+                            <span
+                              className="ml-1 text-[11px] text-gray-400"
+                              title={`${r.symbol} is not listed on Coinbase; showing ${r.streamed_as}`}
+                            >
                               for {r.symbol}
                             </span>
                           )}
-                          {r.stale && <Badge variant="outline" className="ml-2 text-[10px]">no recent trade</Badge>}
+                          {r.stale && (
+                            <Badge variant="outline" className="ml-2 text-[10px]">
+                              no recent trade
+                            </Badge>
+                          )}
                         </td>
-                        <td className={`py-2 pr-3 text-right font-mono transition-colors ${flash}`}>{price(live)}</td>
-                        <td className={`py-2 pr-3 text-right font-mono ${tone(r.change_24h_pct)}`}>{pct(r.change_24h_pct)}</td>
+                        <td className={`py-2 pr-3 text-right font-mono transition-colors ${flash}`}>
+                          {price(live)}
+                        </td>
+                        <td className={`py-2 pr-3 text-right font-mono ${tone(r.change_24h_pct)}`}>
+                          {pct(r.change_24h_pct)}
+                        </td>
                         <td className="py-2 pr-3 text-right font-mono text-xs text-gray-600">
                           {price(r.high_24h)} / {price(r.low_24h)}
                         </td>
-                        <td className="py-2 pr-3 text-right font-mono">{usdCompact(r.volume_24h_usd)}</td>
+                        <td className="py-2 pr-3 text-right font-mono">
+                          {usdCompact(r.volume_24h_usd)}
+                        </td>
                         <td className="py-2 pr-3 text-right font-mono text-xs">
                           {r.spread_bps == null ? "—" : `${Number(r.spread_bps).toFixed(1)} bps`}
                         </td>
@@ -287,12 +342,27 @@ export default function Markets() {
         </CardContent>
       </Card>
 
-      {selectedRow && <PairDetail row={selectedRow} livePrice={ticks[selectedRow.streamed_as]?.price ?? selectedRow.price} />}
+      {selectedRow && (
+        <PairDetail
+          row={selectedRow}
+          livePrice={ticks[selectedRow.streamed_as]?.price ?? selectedRow.price}
+        />
+      )}
     </div>
   );
 }
 
-function MoversCard({ title, icon, rows, onPick }: { title: string; icon: React.ReactNode; rows: MarketRow[]; onPick: (s: string) => void }) {
+function MoversCard({
+  title,
+  icon,
+  rows,
+  onPick,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  rows: MarketRow[];
+  onPick: (s: string) => void;
+}) {
   return (
     <Card className="bg-white/80 backdrop-blur-sm">
       <CardHeader className="pb-2">
@@ -307,10 +377,15 @@ function MoversCard({ title, icon, rows, onPick }: { title: string; icon: React.
           <ul className="space-y-1 text-sm">
             {rows.map((r) => (
               <li key={r.streamed_as}>
-                <button type="button" onClick={() => onPick(r.streamed_as)} className="flex w-full justify-between rounded px-1 hover:bg-purple-50">
+                <button
+                  type="button"
+                  onClick={() => onPick(r.streamed_as)}
+                  className="flex w-full justify-between rounded px-1 hover:bg-purple-50"
+                >
                   <span className="font-semibold">{r.streamed_as}</span>
                   <span className="font-mono">
-                    {price(r.price)} <span className={tone(r.change_24h_pct)}>{pct(r.change_24h_pct)}</span>
+                    {price(r.price)}{" "}
+                    <span className={tone(r.change_24h_pct)}>{pct(r.change_24h_pct)}</span>
                   </span>
                 </button>
               </li>
@@ -330,11 +405,22 @@ function Spark({ values }: { values: string[] }) {
   const lo = Math.min(...nums);
   const hi = Math.max(...nums);
   const span = hi - lo || hi * 0.001 || 1;
-  const d = nums.map((v, i) => `${i ? "L" : "M"}${((i / (nums.length - 1)) * W).toFixed(1)},${(H - ((v - lo) / span) * (H - 2) - 1).toFixed(1)}`).join("");
+  const d = nums
+    .map(
+      (v, i) =>
+        `${i ? "L" : "M"}${((i / (nums.length - 1)) * W).toFixed(1)},${(H - ((v - lo) / span) * (H - 2) - 1).toFixed(1)}`
+    )
+    .join("");
   const up = (nums.at(-1) ?? 0) >= (nums[0] ?? 0);
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="h-6 w-24" preserveAspectRatio="none" aria-hidden>
-      <path d={d} fill="none" strokeWidth={1.5} vectorEffect="non-scaling-stroke" className={up ? "stroke-emerald-500" : "stroke-rose-500"} />
+      <path
+        d={d}
+        fill="none"
+        strokeWidth={1.5}
+        vectorEffect="non-scaling-stroke"
+        className={up ? "stroke-emerald-500" : "stroke-rose-500"}
+      />
     </svg>
   );
 }
@@ -351,7 +437,9 @@ function PairDetail({ row, livePrice }: { row: MarketRow; livePrice: string | nu
         <CardTitle className="flex flex-wrap items-baseline gap-3">
           {row.streamed_as}
           <span className="font-mono text-2xl">{price(livePrice)}</span>
-          <span className={`font-mono text-base ${tone(row.change_24h_pct)}`}>{pct(row.change_24h_pct)}</span>
+          <span className={`font-mono text-base ${tone(row.change_24h_pct)}`}>
+            {pct(row.change_24h_pct)}
+          </span>
         </CardTitle>
       </CardHeader>
       <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -361,15 +449,19 @@ function PairDetail({ row, livePrice }: { row: MarketRow; livePrice: string | nu
             {price(row.bid)} / {price(row.ask)}
           </dd>
           <dt className="text-gray-500">Spread</dt>
-          <dd className="font-mono">{row.spread_bps == null ? "—" : `${Number(row.spread_bps).toFixed(2)} bps`}</dd>
+          <dd className="font-mono">
+            {row.spread_bps == null ? "—" : `${Number(row.spread_bps).toFixed(2)} bps`}
+          </dd>
           <dt className="text-gray-500">24h high / low</dt>
           <dd className="font-mono">
             {price(row.high_24h)} / {price(row.low_24h)}
           </dd>
           <dt className="text-gray-500">24h volume</dt>
           <dd className="font-mono">
-            {row.volume_24h == null ? "—" : `${Number(row.volume_24h).toLocaleString("en-US", { maximumFractionDigits: 2 })} ${row.base}`} ·{" "}
-            {usdCompact(row.volume_24h_usd)}
+            {row.volume_24h == null
+              ? "—"
+              : `${Number(row.volume_24h).toLocaleString("en-US", { maximumFractionDigits: 2 })} ${row.base}`}{" "}
+            · {usdCompact(row.volume_24h_usd)}
           </dd>
           <dt className="text-gray-500">52-week high / low</dt>
           <dd className="font-mono">
@@ -377,11 +469,16 @@ function PairDetail({ row, livePrice }: { row: MarketRow; livePrice: string | nu
           </dd>
           <dt className="text-gray-500">Source</dt>
           <dd>
-            {row.venue ?? "—"} · {row.age_ms == null ? "no recent update" : `updated ${(row.age_ms / 1000).toFixed(1)}s ago`}
+            {row.venue ?? "—"} ·{" "}
+            {row.age_ms == null
+              ? "no recent update"
+              : `updated ${(row.age_ms / 1000).toFixed(1)}s ago`}
           </dd>
         </dl>
         <div>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Latest trades</h3>
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
+            Latest trades
+          </h3>
           {!trades.data?.data.length ? (
             <p className="text-sm text-gray-500">No trades since the stream started.</p>
           ) : (
@@ -399,8 +496,12 @@ function PairDetail({ row, livePrice }: { row: MarketRow; livePrice: string | nu
                   <tr key={t.trade_id}>
                     <td>{new Date(t.ts_ms).toLocaleTimeString()}</td>
                     <td className="text-right">{price(t.price)}</td>
-                    <td className="text-right">{Number(t.size).toLocaleString("en-US", { maximumFractionDigits: 6 })}</td>
-                    <td className={`text-right ${t.side === "buy" ? "text-emerald-600" : t.side === "sell" ? "text-rose-600" : "text-gray-400"}`}>
+                    <td className="text-right">
+                      {Number(t.size).toLocaleString("en-US", { maximumFractionDigits: 6 })}
+                    </td>
+                    <td
+                      className={`text-right ${t.side === "buy" ? "text-emerald-600" : t.side === "sell" ? "text-rose-600" : "text-gray-400"}`}
+                    >
                       {t.side ?? "—"}
                     </td>
                   </tr>

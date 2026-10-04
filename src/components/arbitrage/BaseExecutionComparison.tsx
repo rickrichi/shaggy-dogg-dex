@@ -1,10 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
-import { usePublicClient } from "wagmi";
-import { formatUnits, parseUnits } from "viem";
 import { Link } from "react-router-dom";
+
+import { useQuery } from "@tanstack/react-query";
+import { formatUnits, parseUnits } from "viem";
+import { usePublicClient } from "wagmi";
+
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BASE_MAINNET_TOKENS } from "@/config/tokens";
 import { quoteSmartRoutes } from "@/lib/amm/smart-routing";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const usdc = BASE_MAINNET_TOKENS.find((t) => t.symbol === "USDC")!;
 const weth = BASE_MAINNET_TOKENS.find((t) => t.symbol === "WETH")!;
@@ -57,7 +59,7 @@ export function BaseExecutionComparison({ notional }: { notional: number }) {
           Pool fees are included; gas is separate. Cross-venue legs settle independently. A failed
           or partial leg leaves exposure.
         </p>
-        <Link className="text-purple-700 underline" to={`/swap/compare?input=USDC&output=WETH`}>
+        <Link className="text-purple-700 underline" to="/swap/compare?input=USDC&output=WETH">
           Review and sign the Base leg
         </Link>
         <p className="text-xs text-slate-500">

@@ -1,30 +1,37 @@
 import { createPublicClient, formatUnits } from "viem";
-import { createBaseReadTransport } from "@/lib/base-rpc";
 import { base } from "viem/chains";
 
 import { UNISWAP_V2_ROUTER_ABI } from "@/config/abis";
 import { getUniswapV2Router } from "@/config/contracts";
-import { BASE_MAINNET_TOKENS } from "@/config/tokens";
 import { loadDexDeployment } from "@/config/dex/deployment";
+import { BASE_MAINNET_TOKENS } from "@/config/tokens";
 import { verifyDexDeployment } from "@/lib/amm/own-dex";
+import { createBaseReadTransport } from "@/lib/base-rpc";
 
 import type { Address } from "viem";
 
 export const MATRIX_QUOTE_MAX_AGE_MS = 30_000;
-const wrapped = BASE_MAINNET_TOKENS.find(t => t.symbol === "WETH")!;
+const wrapped = BASE_MAINNET_TOKENS.find((t) => t.symbol === "WETH")!;
 
 /** Only exact, chain-specific token mappings. Fiat and BTC are not wrapped-token aliases. */
 export function matrixRoute(symbol: string) {
   const [from, to] = symbol.split("/");
-  const resolve = (s: string | undefined) => BASE_MAINNET_TOKENS.find(t => t.symbol === (s === "ETH" ? "WETH" : s));
+  const resolve = (s: string | undefined) =>
+    BASE_MAINNET_TOKENS.find((t) => t.symbol === (s === "ETH" ? "WETH" : s));
   const sell = resolve(from);
   const buy = resolve(to);
   if (!sell || !buy || sell.address === buy.address) return null;
   const path: Address[] = [sell.address as Address];
-  if (sell.address !== wrapped.address && buy.address !== wrapped.address) path.push(wrapped.address as Address);
+  if (sell.address !== wrapped.address && buy.address !== wrapped.address)
+    path.push(wrapped.address as Address);
   path.push(buy.address as Address);
-  return { path, amountIn: 10n ** BigInt(sell.decimals), decimalsOut: buy.decimals,
-    inputSymbol: sell.symbol, outputSymbol: buy.symbol };
+  return {
+    path,
+    amountIn: 10n ** BigInt(sell.decimals),
+    decimalsOut: buy.decimals,
+    inputSymbol: sell.symbol,
+    outputSymbol: buy.symbol,
+  };
 }
 
 export interface MatrixDexQuote {
@@ -36,8 +43,10 @@ export interface MatrixDexQuote {
   venueLabel?: string;
 }
 
-export async function fetchMatrixDexQuotes(symbols: readonly string[]): Promise<Record<string, MatrixDexQuote>> {
-  const routes = symbols.flatMap(symbol => {
+export async function fetchMatrixDexQuotes(
+  symbols: readonly string[]
+): Promise<Record<string, MatrixDexQuote>> {
+  const routes = symbols.flatMap((symbol) => {
     const route = matrixRoute(symbol);
     return route ? [{ symbol, ...route }] : [];
   });
@@ -49,19 +58,45 @@ export async function fetchMatrixDexQuotes(symbols: readonly string[]): Promise<
   const venueLabel = deployment ? "Shaggy-Dogg-Dex pools · Base" : "Via Uniswap V2 · Base";
   try {
     if (deployment) await verifyDexDeployment(client, deployment);
-    const results = await client.multicall({ allowFailure: true, contracts: routes.map(route => ({
-      address: deployment?.router ?? getUniswapV2Router(base.id), abi: UNISWAP_V2_ROUTER_ABI,
-      functionName: "getAmountsOut" as const, args: [route.amountIn, route.path] as const,
-    })) });
-    return Object.fromEntries(routes.map((route, i) => {
-      const result = results[i];
-      const output = result?.status === "success" ? result.result.at(-1) : undefined;
-      return [route.symbol, { checkedAt, venueLabel, inputSymbol: route.inputSymbol, outputSymbol: route.outputSymbol,
-        ...(output && output > 0n ? { status: "quoted", output: formatUnits(output, route.decimalsOut) } : { status: "unavailable" }) }];
-    }));
+    const results = await client.multicall({
+      allowFailure: true,
+      contracts: routes.map((route) => ({
+        address: deployment?.router ?? getUniswapV2Router(base.id),
+        abi: UNISWAP_V2_ROUTER_ABI,
+        functionName: "getAmountsOut" as const,
+        args: [route.amountIn, route.path] as const,
+      })),
+    });
+    return Object.fromEntries(
+      routes.map((route, i) => {
+        const result = results[i];
+        const output = result?.status === "success" ? result.result.at(-1) : undefined;
+        return [
+          route.symbol,
+          {
+            checkedAt,
+            venueLabel,
+            inputSymbol: route.inputSymbol,
+            outputSymbol: route.outputSymbol,
+            ...(output && output > 0n
+              ? { status: "quoted", output: formatUnits(output, route.decimalsOut) }
+              : { status: "unavailable" }),
+          },
+        ];
+      })
+    );
   } catch {
-    return Object.fromEntries(routes.map(route => [route.symbol, {
-      status: "rpc-error", inputSymbol: route.inputSymbol, outputSymbol: route.outputSymbol, checkedAt, venueLabel,
-    }]));
+    return Object.fromEntries(
+      routes.map((route) => [
+        route.symbol,
+        {
+          status: "rpc-error",
+          inputSymbol: route.inputSymbol,
+          outputSymbol: route.outputSymbol,
+          checkedAt,
+          venueLabel,
+        },
+      ])
+    );
   }
 }

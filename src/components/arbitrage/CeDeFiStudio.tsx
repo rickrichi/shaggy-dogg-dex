@@ -1,4 +1,3 @@
-import { ARB_API_URL } from "@/config/crypto-arb";
 // src/components/arbitrage/CeDeFiStudio.tsx
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -26,9 +25,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { UNISWAP_V2_ROUTER_ABI } from "@/config/abis";
-import { useLiveAccounts } from "@/hooks/useLiveAccounts";
-import { LiveVenueComparison } from "./LiveVenueComparison";
+import { ARB_API_URL } from "@/config/crypto-arb";
 import { useCeFiArbStream } from "@/hooks/useCeFiArbStream";
+import { useLiveAccounts } from "@/hooks/useLiveAccounts";
+
+import { LiveVenueComparison } from "./LiveVenueComparison";
 
 import type { Subscription, VenueState } from "@/types/crypto-arb";
 
@@ -80,7 +81,12 @@ interface CeDeFiStudioProps {
   }) => void;
 }
 
-export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToMatrix, onSelectSymbol }: CeDeFiStudioProps) {
+export function CeDeFiStudio({
+  onRecordTx: _onRecordTx,
+  initialSymbol,
+  onBackToMatrix,
+  onSelectSymbol,
+}: CeDeFiStudioProps) {
   const { data: gasPriceData } = useGasPrice({ query: { refetchInterval: 10000 } });
 
   const [notional, setNotional] = useState<number>(1000);
@@ -100,7 +106,12 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
     }
   }, [initialSymbol, selectedSymbol]);
 
-  const { krakenAccount, alpacaAccount, connected: accountsConnected, refresh: refreshAccounts } = useLiveAccounts();
+  const {
+    krakenAccount,
+    alpacaAccount,
+    connected: accountsConnected,
+    refresh: refreshAccounts,
+  } = useLiveAccounts();
   const fetchKrakenAccount = refreshAccounts;
 
   interface KrakenTriangularRoute {
@@ -144,7 +155,9 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
   const scanKrakenTriangular = useCallback(async () => {
     setIsScanningTriangular(true);
     try {
-      const res = await fetch(`${ARB_API_URL}/api/kraken/triangular/scan?capital_usdc=${snipeCapitalUsdc}`);
+      const res = await fetch(
+        `${ARB_API_URL}/api/kraken/triangular/scan?capital_usdc=${snipeCapitalUsdc}`
+      );
       if (res.ok) {
         const json = await res.json();
         setKrakenTriangularOpps(json.opportunities || []);
@@ -156,37 +169,44 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
     }
   }, [snipeCapitalUsdc]);
 
-  const handleExecuteKrakenTrade = useCallback(async (route: KrakenTriangularRoute) => {
-    if (!krakenTradingPerm?.trading_enabled) {
-      toast.error(krakenTradingPerm?.reason || "Trading permission not enabled on Kraken API key.");
-      return;
-    }
-    if (!route.isProfitable) {
-      toast.warning(`Anti-Loss Guard: Trade held because net return is negative (${route.netProfitPct}).`);
-      return;
-    }
-    setIsExecutingKrakenTrade(true);
-    try {
-      const res = await fetch(`${ARB_API_URL}/api/kraken/triangular/execute`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Trade-Intent": "live" },
-        body: JSON.stringify(route),
-      });
-      const data = await res.json();
-      if (data.success) {
-        toast.success(`🎉 Real trade executed on Kraken! ${data.summary}`);
-        setLastSnipeLog(`✅ Executed ${route.asset} triangle on Kraken (+${route.netProfitPct})`);
-        fetchKrakenAccount();
-        scanKrakenTriangular();
-      } else {
-        toast.error(`Kraken trade failed: ${data.error}`);
+  const handleExecuteKrakenTrade = useCallback(
+    async (route: KrakenTriangularRoute) => {
+      if (!krakenTradingPerm?.trading_enabled) {
+        toast.error(
+          krakenTradingPerm?.reason || "Trading permission not enabled on Kraken API key."
+        );
+        return;
       }
-    } catch (err) {
-      toast.error(`Execution error: ${String(err)}`);
-    } finally {
-      setIsExecutingKrakenTrade(false);
-    }
-  }, [krakenTradingPerm, fetchKrakenAccount, scanKrakenTriangular]);
+      if (!route.isProfitable) {
+        toast.warning(
+          `Anti-Loss Guard: Trade held because net return is negative (${route.netProfitPct}).`
+        );
+        return;
+      }
+      setIsExecutingKrakenTrade(true);
+      try {
+        const res = await fetch(`${ARB_API_URL}/api/kraken/triangular/execute`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Trade-Intent": "live" },
+          body: JSON.stringify(route),
+        });
+        const data = await res.json();
+        if (data.success) {
+          toast.success(`🎉 Real trade executed on Kraken! ${data.summary}`);
+          setLastSnipeLog(`✅ Executed ${route.asset} triangle on Kraken (+${route.netProfitPct})`);
+          fetchKrakenAccount();
+          scanKrakenTriangular();
+        } else {
+          toast.error(`Kraken trade failed: ${data.error}`);
+        }
+      } catch (err) {
+        toast.error(`Execution error: ${String(err)}`);
+      } finally {
+        setIsExecutingKrakenTrade(false);
+      }
+    },
+    [krakenTradingPerm, fetchKrakenAccount, scanKrakenTriangular]
+  );
 
   // Periodic high-frequency order book sweep when Auto-Snipe is active (3,500ms)
   useEffect(() => {
@@ -204,7 +224,13 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
     if (profitable) {
       handleExecuteKrakenTrade(profitable);
     }
-  }, [krakenTriangularOpps, isAutoSnipeKraken, isExecutingKrakenTrade, krakenTradingPerm, handleExecuteKrakenTrade]);
+  }, [
+    krakenTriangularOpps,
+    isAutoSnipeKraken,
+    isExecutingKrakenTrade,
+    krakenTradingPerm,
+    handleExecuteKrakenTrade,
+  ]);
 
   useEffect(() => {
     fetchTradingPermissions();
@@ -221,8 +247,7 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
     [notional, selectedSymbol]
   );
 
-  const { lagMs, venues, opportunities, isLive, refetchSnapshot } =
-    useCeFiArbStream(sub);
+  const { lagMs, venues, opportunities, isLive, refetchSnapshot } = useCeFiArbStream(sub);
 
   // Filter venues by selected asset
   const filteredVenues = useMemo(
@@ -275,8 +300,7 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
 
   const cexRefAsk = krakenVenue?.ask ?? bestAskVenue?.ask ?? 0;
   const cexRefBid = krakenVenue?.bid ?? bestBidVenue?.bid ?? 0;
-  const cexSpreadUsd =
-    cexRefAsk > 0 && cexRefBid > 0 ? (cexRefAsk - cexRefBid).toFixed(2) : "0.00";
+  const cexSpreadUsd = cexRefAsk > 0 && cexRefBid > 0 ? (cexRefAsk - cexRefBid).toFixed(2) : "0.00";
 
   // Dynamic DEX reference price: uses live Base Uniswap quote for ETH pairs, or cross-market depth
   const dexRefPrice = useMemo(() => {
@@ -301,9 +325,7 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
   const cexFee = notional * 0.0026;
   const dexFee = grossProceeds * 0.003;
   const estNetProfitCeDeFi =
-    grossProceeds > 0
-      ? Number((grossProceeds - notional - cexFee - dexFee - 0.005).toFixed(2))
-      : 0;
+    grossProceeds > 0 ? Number((grossProceeds - notional - cexFee - dexFee - 0.005).toFixed(2)) : 0;
 
   // Real 0.50% (50 bps) dynamic slippage floor (NOT 1 wei)
   const slippageBps = 50; // 0.50%
@@ -325,18 +347,20 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
                   <CardTitle className="text-lg font-black text-white">
                     Kraken Intra-Exchange Arbitrage (Real Spot Execution)
                   </CardTitle>
-                  <Badge className="border-emerald-500/30 bg-emerald-500/20 text-emerald-300 font-mono text-[10px]">
+                  <Badge className="border-emerald-500/30 bg-emerald-500/20 font-mono text-[10px] text-emerald-300">
                     100% On-Exchange • Zero Bridge Risk
                   </Badge>
                 </div>
                 <CardDescription className="text-xs text-slate-300">
-                  Executes real cyclical trades inside Kraken using your <strong>$29.20 USDC</strong> (e.g. USDC ➔ ETH ➔ USD ➔ USDC). All profits stay directly in your Kraken account.
+                  Executes real cyclical trades inside Kraken using your{" "}
+                  <strong>$29.20 USDC</strong> (e.g. USDC ➔ ETH ➔ USD ➔ USDC). All profits stay
+                  directly in your Kraken account.
                 </CardDescription>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800/90 px-3 py-1.5 shadow-xs">
+              <div className="shadow-xs flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800/90 px-3 py-1.5">
                 <Switch
                   checked={isAutoSnipeKraken}
                   onCheckedChange={setIsAutoSnipeKraken}
@@ -344,7 +368,7 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
                 />
                 <label
                   htmlFor="auto-snipe-kraken"
-                  className="text-xs font-bold text-white cursor-pointer select-none"
+                  className="cursor-pointer select-none text-xs font-bold text-white"
                 >
                   {isAutoSnipeKraken ? "🟢 Autonomous Auto-Snipe ON" : "⚪ Auto-Snipe OFF"}
                 </label>
@@ -355,7 +379,7 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
                 size="sm"
                 onClick={scanKrakenTriangular}
                 disabled={isScanningTriangular}
-                className="border-emerald-400/50 bg-emerald-950/60 text-emerald-300 hover:bg-emerald-900/80 text-xs font-bold"
+                className="border-emerald-400/50 bg-emerald-950/60 text-xs font-bold text-emerald-300 hover:bg-emerald-900/80"
               >
                 {isScanningTriangular ? (
                   <Loader2 className="mr-1.5 size-3.5 animate-spin" />
@@ -373,28 +397,33 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
           {krakenTradingPerm && !krakenTradingPerm.trading_enabled ? (
             <div className="rounded-xl border border-amber-500/40 bg-amber-950/40 p-3.5 text-xs text-amber-200">
               <div className="flex items-start gap-2.5">
-                <AlertTriangle className="size-5 shrink-0 text-amber-400 mt-0.5" />
+                <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-400" />
                 <div className="space-y-1">
                   <div className="font-bold text-amber-100">
                     Kraken API Key Permission Required for Real Trades
                   </div>
-                  <p className="text-amber-200/90 text-[11px]">
-                    {krakenTradingPerm.reason}
-                  </p>
+                  <p className="text-[11px] text-amber-200/90">{krakenTradingPerm.reason}</p>
                   <div className="mt-2 rounded bg-black/40 p-2 font-mono text-[11px] text-amber-300">
-                    <strong>To enable live trading on Kraken in 30 seconds:</strong><br />
-                    1. Log into <strong>Kraken.com</strong> ➔ Settings ➔ API.<br />
-                    2. Edit your API key and check <strong>[x] Create and modify orders</strong> and <strong>[x] Cancel/close orders</strong>.<br />
+                    <strong>To enable live trading on Kraken in 30 seconds:</strong>
+                    <br />
+                    1. Log into <strong>Kraken.com</strong> ➔ Settings ➔ API.
+                    <br />
+                    2. Edit your API key and check <strong>
+                      [x] Create and modify orders
+                    </strong> and <strong>[x] Cancel/close orders</strong>.<br />
                     3. Save changes.
                   </div>
                 </div>
               </div>
             </div>
           ) : krakenTradingPerm?.trading_enabled ? (
-            <div className="flex items-center justify-between rounded-lg border border-emerald-500/40 bg-emerald-950/40 px-3 py-2 text-xs text-emerald-200 font-semibold">
+            <div className="flex items-center justify-between rounded-lg border border-emerald-500/40 bg-emerald-950/40 px-3 py-2 text-xs font-semibold text-emerald-200">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="size-4 text-emerald-400" />
-                <span>Kraken Trading Permissions Active: Ready to place real orders with your $29.20 USDC!</span>
+                <span>
+                  Kraken Trading Permissions Active: Ready to place real orders with your $29.20
+                  USDC!
+                </span>
               </div>
               {lastSnipeLog && (
                 <span className="font-mono text-[11px] text-emerald-300">{lastSnipeLog}</span>
@@ -404,9 +433,12 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
 
           {/* Scanned Live Triangular Routes Table */}
           <div className="space-y-2">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-bold text-slate-300">
+            <div className="flex flex-col justify-between gap-2 text-xs font-bold text-slate-300 sm:flex-row sm:items-center">
               <div className="flex items-center gap-2">
-                <span>Live Scanned Kraken Triangular Loops ({krakenTriangularOpps.length} Routes • 24 Volatile Assets)</span>
+                <span>
+                  Live Scanned Kraken Triangular Loops ({krakenTriangularOpps.length} Routes • 24
+                  Volatile Assets)
+                </span>
                 <Badge className="border-emerald-500/40 bg-emerald-950/60 font-mono text-[10px] text-emerald-300">
                   {isAutoSnipeKraken ? "⚡ 3.5s Sweep Active" : "100% Autonomous Ready"}
                 </Badge>
@@ -417,7 +449,7 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
                   size="sm"
                   variant={snipeCapitalUsdc === 25 ? "default" : "outline"}
                   onClick={() => setSnipeCapitalUsdc(25.0)}
-                  className={`h-6 px-2 text-[10px] font-mono ${
+                  className={`h-6 px-2 font-mono text-[10px] ${
                     snipeCapitalUsdc === 25
                       ? "bg-emerald-600 text-white hover:bg-emerald-500"
                       : "border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700"
@@ -429,7 +461,7 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
                   size="sm"
                   variant={snipeCapitalUsdc === 29.2 ? "default" : "outline"}
                   onClick={() => setSnipeCapitalUsdc(29.2)}
-                  className={`h-6 px-2 text-[10px] font-mono ${
+                  className={`h-6 px-2 font-mono text-[10px] ${
                     snipeCapitalUsdc === 29.2
                       ? "bg-emerald-600 text-white hover:bg-emerald-500"
                       : "border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700"
@@ -444,7 +476,7 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
               {krakenTriangularOpps.slice(0, 6).map((opp) => (
                 <div
                   key={opp.id}
-                  className="flex flex-col justify-between rounded-lg border border-slate-700/80 bg-slate-800/60 p-3 hover:border-emerald-500/50 transition-colors"
+                  className="flex flex-col justify-between rounded-lg border border-slate-700/80 bg-slate-800/60 p-3 transition-colors hover:border-emerald-500/50"
                 >
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
@@ -461,31 +493,42 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
                         Net: {opp.netProfitPct}
                       </Badge>
                     </div>
-                    <p className="font-mono text-[11px] text-slate-300">
-                      {opp.route}
-                    </p>
-                    <div className="flex items-center gap-3 text-[10px] text-slate-400 pt-1">
-                      <span>Capital: <strong>${opp.capitalUsdc} USDC</strong></span>
-                      <span>Est Return: <strong className={opp.isProfitable ? "text-emerald-400" : "text-slate-300"}>${opp.expectedUsdcOut} USDC</strong></span>
+                    <p className="font-mono text-[11px] text-slate-300">{opp.route}</p>
+                    <div className="flex items-center gap-3 pt-1 text-[10px] text-slate-400">
+                      <span>
+                        Capital: <strong>${opp.capitalUsdc} USDC</strong>
+                      </span>
+                      <span>
+                        Est Return:{" "}
+                        <strong
+                          className={opp.isProfitable ? "text-emerald-400" : "text-slate-300"}
+                        >
+                          ${opp.expectedUsdcOut} USDC
+                        </strong>
+                      </span>
                     </div>
                   </div>
 
-                  <div className="mt-2.5 pt-2 border-t border-slate-700/60 flex items-center justify-between">
-                    <span className="text-[10px] text-slate-400 font-mono">
+                  <div className="mt-2.5 flex items-center justify-between border-t border-slate-700/60 pt-2">
+                    <span className="font-mono text-[10px] text-slate-400">
                       Legs: {opp.legs.map((l) => `${l.action} ${l.pair}`).join(" ➔ ")}
                     </span>
                     <Button
                       size="sm"
                       onClick={() => handleExecuteKrakenTrade(opp)}
-                      disabled={isExecutingKrakenTrade || !krakenTradingPerm?.trading_enabled || !opp.isProfitable}
+                      disabled={
+                        isExecutingKrakenTrade ||
+                        !krakenTradingPerm?.trading_enabled ||
+                        !opp.isProfitable
+                      }
                       className={`h-7 px-2.5 text-[11px] font-bold ${
                         opp.isProfitable && krakenTradingPerm?.trading_enabled
-                          ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs animate-pulse cursor-pointer"
-                          : "bg-slate-700/60 text-slate-400 cursor-not-allowed"
+                          ? "shadow-xs animate-pulse cursor-pointer bg-emerald-600 text-white hover:bg-emerald-500"
+                          : "cursor-not-allowed bg-slate-700/60 text-slate-400"
                       }`}
                     >
                       {isExecutingKrakenTrade ? (
-                        <Loader2 className="size-3 animate-spin mr-1" />
+                        <Loader2 className="mr-1 size-3 animate-spin" />
                       ) : null}
                       {!krakenTradingPerm?.trading_enabled
                         ? "Permission Required"
@@ -527,17 +570,18 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 rounded-lg border border-purple-200 bg-white px-3 py-1.5 shadow-xs">
+            <div className="shadow-xs flex items-center gap-2 rounded-lg border border-purple-200 bg-white px-3 py-1.5">
               <span className="text-xs font-semibold text-slate-500">Latency:</span>
               <span className="font-mono text-xs font-bold text-slate-900">
                 {lagMs !== null ? `${lagMs}ms` : "--"}
               </span>
             </div>
 
-            <div className="flex items-center gap-2 rounded-lg border border-purple-200 bg-white px-3 py-1.5 shadow-xs">
+            <div className="shadow-xs flex items-center gap-2 rounded-lg border border-purple-200 bg-white px-3 py-1.5">
               <span className="text-xs font-semibold text-slate-500">Live Venues:</span>
               <span className="font-mono text-xs font-bold text-emerald-600">
-                {venues.filter((v: VenueState) => v.status === "live").length} / {venues.length || 12}
+                {venues.filter((v: VenueState) => v.status === "live").length} /{" "}
+                {venues.length || 12}
               </span>
             </div>
 
@@ -546,7 +590,7 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
                 variant="outline"
                 size="sm"
                 onClick={onBackToMatrix}
-                className="border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 font-black shadow-xs"
+                className="shadow-xs border-emerald-300 bg-emerald-50 font-black text-emerald-800 hover:bg-emerald-100"
               >
                 <ArrowLeft className="mr-1.5 size-4 text-emerald-600" />
                 📊 Return to Pair Matrix
@@ -570,12 +614,16 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
         <Card className="border-slate-200 shadow-sm md:col-span-1">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+              <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-500">
                 1. Select Asset Pair
               </CardTitle>
               {PAIR_THRESHOLDS[selectedSymbol] && (
-                <Badge variant="outline" className="border-purple-200 font-mono text-[10px] text-purple-700">
-                  Min Edge: {PAIR_THRESHOLDS[selectedSymbol].pct} ({PAIR_THRESHOLDS[selectedSymbol].bps} bps)
+                <Badge
+                  variant="outline"
+                  className="border-purple-200 font-mono text-[10px] text-purple-700"
+                >
+                  Min Edge: {PAIR_THRESHOLDS[selectedSymbol].pct} (
+                  {PAIR_THRESHOLDS[selectedSymbol].bps} bps)
                 </Badge>
               )}
             </div>
@@ -583,7 +631,7 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
           <CardContent className="space-y-2">
             {/* Dedicated row for pairs where the user has live capital */}
             <div className="rounded-md border border-emerald-200 bg-emerald-50/60 p-1.5">
-              <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block mb-1">
+              <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-emerald-800">
                 🟢 Your Funded Kraken Pairs (Ready to Execute)
               </span>
               <div className="flex flex-wrap gap-1">
@@ -646,10 +694,10 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
                 variant="outline"
                 size="sm"
                 onClick={onBackToMatrix}
-                className="mt-1 w-full border-emerald-200 bg-emerald-50/70 text-emerald-800 hover:bg-emerald-100 text-xs font-bold"
+                className="mt-1 w-full border-emerald-200 bg-emerald-50/70 text-xs font-bold text-emerald-800 hover:bg-emerald-100"
               >
-                <ArrowLeft className="mr-1.5 size-3.5 text-emerald-600" />
-                ← Browse Other Pairs in Pair Matrix
+                <ArrowLeft className="mr-1.5 size-3.5 text-emerald-600" />← Browse Other Pairs in
+                Pair Matrix
               </Button>
             )}
           </CardContent>
@@ -657,7 +705,7 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
 
         <Card className="border-slate-200 shadow-sm">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+            <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-500">
               2. Trade Notional (Depth Walking Budget)
             </CardTitle>
           </CardHeader>
@@ -665,7 +713,9 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
             <Input
               type="number"
               value={notional}
-              onChange={(e) => setNotional(Math.max(0.000001, parseFloat(e.target.value) || 0.000001))}
+              onChange={(e) =>
+                setNotional(Math.max(0.000001, parseFloat(e.target.value) || 0.000001))
+              }
               className="font-mono font-bold"
             />
             <span className="text-xs font-bold text-slate-500">{quoteAsset}</span>
@@ -675,7 +725,7 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
         <Card className="border-slate-200 shadow-sm">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+              <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-500">
                 3. Kraken Live Account
               </CardTitle>
               {krakenAccount?.configured ? (
@@ -683,7 +733,10 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
                   <Coins className="mr-1 size-3" /> CONNECTED
                 </Badge>
               ) : (
-                <Badge variant="outline" className="border-amber-200 bg-amber-50 font-bold text-amber-800">
+                <Badge
+                  variant="outline"
+                  className="border-amber-200 bg-amber-50 font-bold text-amber-800"
+                >
                   <Key className="mr-1 size-3" /> NOT CONNECTED
                 </Badge>
               )}
@@ -720,7 +773,8 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
                       title={`Click to wire ${b.asset} to active trading pair`}
                       className="cursor-pointer rounded border border-purple-200 bg-purple-50/80 px-1.5 py-0.5 font-mono text-[10px] font-bold text-purple-900 transition-colors hover:border-purple-400 hover:bg-purple-100"
                     >
-                      {b.asset}: {b.free < 0.1 ? b.free.toFixed(4) : b.free.toFixed(2)} ({b.usdValue == null ? "Unpriced" : `$${b.usdValue.toFixed(2)}`})
+                      {b.asset}: {b.free < 0.1 ? b.free.toFixed(4) : b.free.toFixed(2)} (
+                      {b.usdValue == null ? "Unpriced" : `$${b.usdValue.toFixed(2)}`})
                     </button>
                   ))}
                 </div>
@@ -735,7 +789,15 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
                   <span className="text-[11px] text-slate-400">Withdrawals OFF</span>
                 </div>
                 <p className="text-[11px] text-slate-500">
-                  Add <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[10px]">KRAKEN_API_KEY</code> to <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[10px]">crypto-arb/backend/.env</code> for live execution
+                  Add{" "}
+                  <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[10px]">
+                    KRAKEN_API_KEY
+                  </code>{" "}
+                  to{" "}
+                  <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[10px]">
+                    crypto-arb/backend/.env
+                  </code>{" "}
+                  for live execution
                 </p>
               </div>
             )}
@@ -746,7 +808,7 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
         <Card className="border-slate-200 shadow-sm">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+              <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-500">
                 4. Alpaca Live Account
               </CardTitle>
               {alpacaAccount?.configured && alpacaAccount.endpointVerified ? (
@@ -754,7 +816,10 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
                   LIVE VERIFIED
                 </Badge>
               ) : (
-                <Badge variant="outline" className="border-slate-300 font-mono text-[10px] text-slate-500">
+                <Badge
+                  variant="outline"
+                  className="border-slate-300 font-mono text-[10px] text-slate-500"
+                >
                   NOT CONNECTED
                 </Badge>
               )}
@@ -765,23 +830,40 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
               <div className="space-y-1.5">
                 <div className="flex items-baseline justify-between">
                   <span className="font-mono text-base font-black text-slate-900">
-                    ${alpacaAccount.totalUsdEst.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                    $
+                    {alpacaAccount.totalUsdEst.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}{" "}
+                    USD
                   </span>
-                  <span className="text-[11px] font-bold text-emerald-600">
-                    ● Account equity
-                  </span>
+                  <span className="text-[11px] font-bold text-emerald-600">● Account equity</span>
                 </div>
                 <div className="flex items-center justify-between text-xs text-slate-600">
-                  <span>Buying Power: <strong className="font-mono text-slate-900">${alpacaAccount.buyingPower.toLocaleString()}</strong></span>
-                  <span>Cash: <strong className="font-mono text-slate-900">${alpacaAccount.cash.toLocaleString()}</strong></span>
+                  <span>
+                    Buying Power:{" "}
+                    <strong className="font-mono text-slate-900">
+                      ${alpacaAccount.buyingPower.toLocaleString()}
+                    </strong>
+                  </span>
+                  <span>
+                    Cash:{" "}
+                    <strong className="font-mono text-slate-900">
+                      ${alpacaAccount.cash.toLocaleString()}
+                    </strong>
+                  </span>
                 </div>
                 <p className="text-[10px] text-slate-600">
-                  Available USD: ${(alpacaAccount.free.USD ?? 0).toLocaleString()} · Tier {alpacaAccount.cryptoTier ?? "—"}
+                  Available USD: ${(alpacaAccount.free.USD ?? 0).toLocaleString()} · Tier{" "}
+                  {alpacaAccount.cryptoTier ?? "—"}
                 </p>
                 <p className="text-[10px] text-slate-600">
-                  Maker {((alpacaAccount.makerFee ?? 0.0015) * 100).toFixed(3)}% · Taker {((alpacaAccount.takerFee ?? 0.0025) * 100).toFixed(3)}%
+                  Maker {((alpacaAccount.makerFee ?? 0.0015) * 100).toFixed(3)}% · Taker{" "}
+                  {((alpacaAccount.takerFee ?? 0.0025) * 100).toFixed(3)}%
                 </p>
-                <p className="text-[10px] text-slate-500">{alpacaAccount.feeSource} · {accountsConnected ? "Updating live" : "Reconnecting"}</p>
+                <p className="text-[10px] text-slate-500">
+                  {alpacaAccount.feeSource} · {accountsConnected ? "Updating live" : "Reconnecting"}
+                </p>
                 {alpacaAccount.breakdown && alpacaAccount.breakdown.length > 1 ? (
                   <div className="flex flex-wrap gap-1 pt-1">
                     {alpacaAccount.breakdown.map((b) => (
@@ -789,24 +871,37 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
                         key={b.asset}
                         className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-[10px] font-bold text-slate-800"
                       >
-                        {b.asset}: {b.free < 0.1 ? b.free.toFixed(4) : b.free.toFixed(2)} ({b.usdValue == null ? "Unpriced" : `$${b.usdValue.toFixed(2)}`})
+                        {b.asset}: {b.free < 0.1 ? b.free.toFixed(4) : b.free.toFixed(2)} (
+                        {b.usdValue == null ? "Unpriced" : `$${b.usdValue.toFixed(2)}`})
                       </span>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-[10px] text-slate-500">
-                    No additional positions reported
-                  </p>
+                  <p className="text-[10px] text-slate-500">No additional positions reported</p>
                 )}
               </div>
             ) : (
               <div>
                 <div className="flex items-baseline justify-between">
-                  <span className="text-xs font-bold text-slate-800">{alpacaAccount?.error ?? "Connect Alpaca API"}</span>
+                  <span className="text-xs font-bold text-slate-800">
+                    {alpacaAccount?.error ?? "Connect Alpaca API"}
+                  </span>
                   <span className="text-[11px] text-slate-400">Live endpoint required</span>
                 </div>
                 <p className="text-[11px] text-slate-500">
-                  Add <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[10px]">ALPACA_API_KEY</code> and <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[10px]">ALPACA_SECRET_KEY</code> to <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[10px]">crypto-arb/backend/.env</code> for live trading
+                  Add{" "}
+                  <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[10px]">
+                    ALPACA_API_KEY
+                  </code>{" "}
+                  and{" "}
+                  <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[10px]">
+                    ALPACA_SECRET_KEY
+                  </code>{" "}
+                  to{" "}
+                  <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[10px]">
+                    crypto-arb/backend/.env
+                  </code>{" "}
+                  for live trading
                 </p>
               </div>
             )}
@@ -814,7 +909,13 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
         </Card>
       </div>
 
-      {quoteAsset === "USD" && <LiveVenueComparison symbol={selectedSymbol} notional={notional} onExecuted={refreshAccounts} />}
+      {quoteAsset === "USD" && (
+        <LiveVenueComparison
+          symbol={selectedSymbol}
+          notional={notional}
+          onExecuted={refreshAccounts}
+        />
+      )}
 
       {/* Real-Time Live Order Books Grid */}
       <Card className="border-slate-200 shadow-sm">
@@ -859,7 +960,7 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
                 ) : (
                   filteredVenues.map((v: VenueState) => (
                     <tr key={`${v.exchange}-${v.symbol}`} className="hover:bg-slate-50/70">
-                      <td className="px-4 py-2.5 font-bold text-slate-900 capitalize">
+                      <td className="px-4 py-2.5 font-bold capitalize text-slate-900">
                         {v.exchange}
                       </td>
                       <td className="px-4 py-2.5">
@@ -879,13 +980,17 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
                         </span>
                       </td>
                       <td className="px-4 py-2.5 font-bold text-emerald-700">
-                        {v.bid !== null ? `${v.bid.toLocaleString(undefined, { maximumFractionDigits: 10 })} ${quoteAsset}` : "--"}
+                        {v.bid !== null
+                          ? `${v.bid.toLocaleString(undefined, { maximumFractionDigits: 10 })} ${quoteAsset}`
+                          : "--"}
                       </td>
                       <td className="px-4 py-2.5 text-slate-600">
                         {v.bidSize !== null ? v.bidSize.toFixed(4) : "--"}
                       </td>
                       <td className="px-4 py-2.5 font-bold text-rose-700">
-                        {v.ask !== null ? `${v.ask.toLocaleString(undefined, { maximumFractionDigits: 10 })} ${quoteAsset}` : "--"}
+                        {v.ask !== null
+                          ? `${v.ask.toLocaleString(undefined, { maximumFractionDigits: 10 })} ${quoteAsset}`
+                          : "--"}
                       </td>
                       <td className="px-4 py-2.5 text-slate-600">
                         {v.askSize !== null ? v.askSize.toFixed(4) : "--"}
@@ -906,189 +1011,199 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
       </Card>
 
       {/* The on-chain reference is WETH/USDC only; never compare another denomination. */}
-      {selectedSymbol === "ETH/USDC" && dexRefPrice > 0 && <>
-      <Card className="border-2 border-indigo-200 bg-gradient-to-br from-white via-indigo-50/20 to-purple-50/30 shadow-md">
-        <CardHeader className="pb-3">
-          <div className="flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-center">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <Flame className="size-5 text-amber-500" />
-                <CardTitle className="text-base font-bold text-slate-900">
-                  CeDeFi Spatial Arbitrage Engine (CEX ↔ Base Mainnet DEX)
-                </CardTitle>
-                <Badge className="border-indigo-300 bg-indigo-100 font-bold text-indigo-900">
-                  REFERENCE QUOTE
-                </Badge>
+      {selectedSymbol === "ETH/USDC" && dexRefPrice > 0 && (
+        <Card className="border-2 border-indigo-200 bg-gradient-to-br from-white via-indigo-50/20 to-purple-50/30 shadow-md">
+          <CardHeader className="pb-3">
+            <div className="flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-center">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Flame className="size-5 text-amber-500" />
+                  <CardTitle className="text-base font-bold text-slate-900">
+                    CeDeFi Spatial Arbitrage Engine (CEX ↔ Base Mainnet DEX)
+                  </CardTitle>
+                  <Badge className="border-indigo-300 bg-indigo-100 font-bold text-indigo-900">
+                    REFERENCE QUOTE
+                  </Badge>
+                </div>
+                <CardDescription className="text-xs">
+                  Cross-venue dislocation between institutional order book VWAP and on-chain Base
+                  AMM reserves.
+                </CardDescription>
               </div>
-              <CardDescription className="text-xs">
-                Cross-venue dislocation between institutional order book VWAP and on-chain Base AMM
-                reserves.
-              </CardDescription>
+              <div className="text-right">
+                <span className="text-xs font-semibold text-slate-500">Base L2 Gas Estimate:</span>
+                <p className="font-mono text-xs font-bold text-emerald-600">
+                  ${baseGasCostUsd} USD
+                </p>
+              </div>
             </div>
-            <div className="text-right">
-              <span className="text-xs font-semibold text-slate-500">Base L2 Gas Estimate:</span>
-              <p className="font-mono text-xs font-bold text-emerald-600">${baseGasCostUsd} USD</p>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-            <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-xs">
-              <span className="text-[11px] font-semibold text-slate-500 uppercase">
-                Buy Leg (CEX VWAP)
-              </span>
-              <p className="mt-1 font-mono text-lg font-bold text-slate-900">
-                ${cexRefAsk.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-              </p>
-              <span className="text-[11px] text-slate-500 capitalize">
-                {krakenVenue ? "Kraken" : "Best CEX"} L2 Ask (Spread: ${cexSpreadUsd})
-              </span>
-            </div>
-
-            <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-xs">
-              <span className="text-[11px] font-semibold text-slate-500 uppercase">
-                Sell Leg (Base AMM)
-              </span>
-              <p className="mt-1 font-mono text-lg font-bold text-slate-900">
-                ${dexRefPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-              </p>
-              <span className="text-[11px] text-slate-500">
-                {onChainWethPrice ? "Live Uniswap V2 on Base" : "Base AMM Reference"}
-              </span>
-            </div>
-
-            <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-xs">
-              <span className="text-[11px] font-semibold text-slate-500 uppercase">
-                Gross Spread
-              </span>
-              <p
-                className={`mt-1 font-mono text-lg font-bold ${
-                  cexDexSpreadBps > 0 ? "text-emerald-600" : "text-rose-600"
-                }`}
-              >
-                {cexDexSpreadBps > 0 ? `+${cexDexSpreadBps}` : cexDexSpreadBps} bps
-              </p>
-              <span className="text-[11px] text-slate-500">Pre-Fee Market Delta</span>
-            </div>
-
-            <div className="rounded-lg border border-indigo-200 bg-indigo-50/50 p-3 shadow-xs">
-              <span className="text-[11px] font-bold text-indigo-700 uppercase">
-                Net PnL (After All Fees)
-              </span>
-              <p
-                className={`mt-1 font-mono text-lg font-black ${
-                  estNetProfitCeDeFi > 0 ? "text-emerald-600" : "text-slate-600"
-                }`}
-              >
-                {estNetProfitCeDeFi > 0 ? `+$${estNetProfitCeDeFi}` : `$${estNetProfitCeDeFi}`} USD
-              </p>
-              <span className="text-[10px] text-slate-500">Incl. Taker, Swap & Gas</span>
-            </div>
-          </div>
-
-          {/* Capital Safety & Execution Gate Console */}
-          <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-200/80 pb-3">
-              <div className="flex items-center gap-2">
-                <Lock className="size-4 text-amber-700" />
-                <span className="font-bold text-amber-950 text-sm">
-                  CeDeFi Cross-Exchange Execution Gate
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+              <div className="shadow-xs rounded-lg border border-slate-200 bg-white p-3">
+                <span className="text-[11px] font-semibold uppercase text-slate-500">
+                  Buy Leg (CEX VWAP)
                 </span>
-                <Badge className="border-amber-300 bg-amber-100 font-mono text-[10px] font-bold text-amber-900">
-                  READ-ONLY API KEY ENFORCED
-                </Badge>
+                <p className="mt-1 font-mono text-lg font-bold text-slate-900">
+                  ${cexRefAsk.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </p>
+                <span className="text-[11px] capitalize text-slate-500">
+                  {krakenVenue ? "Kraken" : "Best CEX"} L2 Ask (Spread: ${cexSpreadUsd})
+                </span>
               </div>
-              <div className="flex items-center gap-1.5 text-xs text-amber-800">
-                <ShieldCheck className="size-4 text-emerald-600" />
-                <span className="font-semibold">Dual-Leg Protection Active</span>
+
+              <div className="shadow-xs rounded-lg border border-slate-200 bg-white p-3">
+                <span className="text-[11px] font-semibold uppercase text-slate-500">
+                  Sell Leg (Base AMM)
+                </span>
+                <p className="mt-1 font-mono text-lg font-bold text-slate-900">
+                  ${dexRefPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </p>
+                <span className="text-[11px] text-slate-500">
+                  {onChainWethPrice ? "Live Uniswap V2 on Base" : "Base AMM Reference"}
+                </span>
+              </div>
+
+              <div className="shadow-xs rounded-lg border border-slate-200 bg-white p-3">
+                <span className="text-[11px] font-semibold uppercase text-slate-500">
+                  Gross Spread
+                </span>
+                <p
+                  className={`mt-1 font-mono text-lg font-bold ${
+                    cexDexSpreadBps > 0 ? "text-emerald-600" : "text-rose-600"
+                  }`}
+                >
+                  {cexDexSpreadBps > 0 ? `+${cexDexSpreadBps}` : cexDexSpreadBps} bps
+                </p>
+                <span className="text-[11px] text-slate-500">Pre-Fee Market Delta</span>
+              </div>
+
+              <div className="shadow-xs rounded-lg border border-indigo-200 bg-indigo-50/50 p-3">
+                <span className="text-[11px] font-bold uppercase text-indigo-700">
+                  Net PnL (After All Fees)
+                </span>
+                <p
+                  className={`mt-1 font-mono text-lg font-black ${
+                    estNetProfitCeDeFi > 0 ? "text-emerald-600" : "text-slate-600"
+                  }`}
+                >
+                  {estNetProfitCeDeFi > 0 ? `+$${estNetProfitCeDeFi}` : `$${estNetProfitCeDeFi}`}{" "}
+                  USD
+                </p>
+                <span className="text-[10px] text-slate-500">Incl. Taker, Swap & Gas</span>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-              <div className="space-y-1 rounded-lg border border-amber-200/70 bg-white/80 p-2.5">
-                <span className="font-bold text-slate-700 block">1. Kraken Account Gate</span>
-                <p className="text-slate-600 text-[11px]">
-                  {krakenAccount?.configured ? (
-                    <span className="text-emerald-700 font-medium">
-                      ✓ Connected with Read-Only query key. Orders & withdrawals are blocked at the exchange level to protect your capital.
+            {/* Capital Safety & Execution Gate Console */}
+            <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4">
+              <div className="flex flex-col justify-between gap-2 border-b border-amber-200/80 pb-3 sm:flex-row sm:items-center">
+                <div className="flex items-center gap-2">
+                  <Lock className="size-4 text-amber-700" />
+                  <span className="text-sm font-bold text-amber-950">
+                    CeDeFi Cross-Exchange Execution Gate
+                  </span>
+                  <Badge className="border-amber-300 bg-amber-100 font-mono text-[10px] font-bold text-amber-900">
+                    READ-ONLY API KEY ENFORCED
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs text-amber-800">
+                  <ShieldCheck className="size-4 text-emerald-600" />
+                  <span className="font-semibold">Dual-Leg Protection Active</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-3">
+                <div className="space-y-1 rounded-lg border border-amber-200/70 bg-white/80 p-2.5">
+                  <span className="block font-bold text-slate-700">1. Kraken Account Gate</span>
+                  <p className="text-[11px] text-slate-600">
+                    {krakenAccount?.configured ? (
+                      <span className="font-medium text-emerald-700">
+                        ✓ Connected with Read-Only query key. Orders & withdrawals are blocked at
+                        the exchange level to protect your capital.
+                      </span>
+                    ) : (
+                      <span className="text-slate-500">
+                        Query key not configured. Telemetry disabled.
+                      </span>
+                    )}
+                  </p>
+                </div>
+
+                <div className="space-y-1 rounded-lg border border-amber-200/70 bg-white/80 p-2.5">
+                  <span className="block font-bold text-slate-700">2. Dual-Leg Hedging Guard</span>
+                  <p className="text-[11px] text-slate-600">
+                    Unhedged single-leg execution is strictly blocked. An isolated on-chain swap
+                    exposes funds to directional market drift and sandwich attacks.
+                  </p>
+                </div>
+
+                <div className="space-y-1 rounded-lg border border-amber-200/70 bg-white/80 p-2.5">
+                  <span className="block font-bold text-slate-700">3. Bounded Slippage Floor</span>
+                  <p className="text-[11px] text-slate-600">
+                    Calculated slippage floor is clamped at <strong>0.50% (50 bps)</strong> max
+                    depth tolerance ({minAmountOutFloor.toFixed(4)} min out), rejecting zero-floor
+                    swaps.
+                  </p>
+                </div>
+              </div>
+
+              {/* Stage / Verification Action Row */}
+              <div className="flex flex-col items-center justify-between gap-3 pt-1 sm:flex-row">
+                <div className="text-xs text-slate-600">
+                  {estNetProfitCeDeFi > 0 ? (
+                    <span className="font-semibold text-emerald-700">
+                      ● Spread is mathematically viable (+${estNetProfitCeDeFi} USD). Live trade
+                      dispatch is gated until two-sided trade API authorization is provisioned.
                     </span>
                   ) : (
-                    <span className="text-slate-500">
-                      Query key not configured. Telemetry disabled.
-                    </span>
+                    <div className="space-y-0.5">
+                      <span className="block font-semibold text-rose-700">
+                        🛑 Spread is unprofitable (${estNetProfitCeDeFi} USD). Anti-Loss gate blocks
+                        execution to preserve your capital.
+                      </span>
+                      <span className="block text-[11px] text-slate-500">
+                        Market equilibrium fee drag is 0.56% (56 bps). Engine automatically triggers
+                        during cross-venue price swings &gt; 56 bps.
+                      </span>
+                    </div>
                   )}
-                </p>
-              </div>
+                </div>
 
-              <div className="space-y-1 rounded-lg border border-amber-200/70 bg-white/80 p-2.5">
-                <span className="font-bold text-slate-700 block">2. Dual-Leg Hedging Guard</span>
-                <p className="text-slate-600 text-[11px]">
-                  Unhedged single-leg execution is strictly blocked. An isolated on-chain swap exposes funds to directional market drift and sandwich attacks.
-                </p>
-              </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchKrakenAccount}
+                    className="border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                  >
+                    <RefreshCw className="mr-1.5 size-3 text-slate-600" />
+                    Re-Verify Kraken API
+                  </Button>
 
-              <div className="space-y-1 rounded-lg border border-amber-200/70 bg-white/80 p-2.5">
-                <span className="font-bold text-slate-700 block">3. Bounded Slippage Floor</span>
-                <p className="text-slate-600 text-[11px]">
-                  Calculated slippage floor is clamped at <strong>0.50% (50 bps)</strong> max depth tolerance ({minAmountOutFloor.toFixed(4)} min out), rejecting zero-floor swaps.
-                </p>
-              </div>
-            </div>
-
-            {/* Stage / Verification Action Row */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
-              <div className="text-xs text-slate-600">
-                {estNetProfitCeDeFi > 0 ? (
-                  <span className="font-semibold text-emerald-700">
-                    ● Spread is mathematically viable (+${estNetProfitCeDeFi} USD). Live trade dispatch is gated until two-sided trade API authorization is provisioned.
-                  </span>
-                ) : (
-                  <div className="space-y-0.5">
-                    <span className="font-semibold text-rose-700 block">
-                      🛑 Spread is unprofitable (${estNetProfitCeDeFi} USD). Anti-Loss gate blocks execution to preserve your capital.
-                    </span>
-                    <span className="text-[11px] text-slate-500 block">
-                      Market equilibrium fee drag is 0.56% (56 bps). Engine automatically triggers during cross-venue price swings &gt; 56 bps.
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={fetchKrakenAccount}
-                  className="border-slate-300 text-slate-700 hover:bg-slate-100 font-semibold text-xs"
-                >
-                  <RefreshCw className="mr-1.5 size-3 text-slate-600" />
-                  Re-Verify Kraken API
-                </Button>
-
-                <Button
-                  size="sm"
-                  disabled
-                  className="cursor-not-allowed border border-amber-300 bg-amber-100 font-bold text-amber-900 shadow-none hover:bg-amber-100"
-                >
-                  <Lock className="mr-1.5 size-3.5" />
-                  {estNetProfitCeDeFi > 0
-                    ? "Live Execution Gated (Query-Only Mode)"
-                    : "Execution Blocked (Negative Spread)"}
-                </Button>
+                  <Button
+                    size="sm"
+                    disabled
+                    className="cursor-not-allowed border border-amber-300 bg-amber-100 font-bold text-amber-900 shadow-none hover:bg-amber-100"
+                  >
+                    <Lock className="mr-1.5 size-3.5" />
+                    {estNetProfitCeDeFi > 0
+                      ? "Live Execution Gated (Query-Only Mode)"
+                      : "Execution Blocked (Negative Spread)"}
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      </>}
+          </CardContent>
+        </Card>
+      )}
       {/* Pure CEX-to-CEX Spatial Arbitrage Spreads */}
       <Card className="border-slate-200 shadow-sm">
         <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-3">
           <div className="flex items-center justify-between">
             <div className="space-y-1">
               <CardTitle className="text-base font-bold text-slate-900">
-                CEX-to-CEX Spatial Arbitrage Matrix ({notional.toLocaleString()} {quoteAsset} Notional)
+                CEX-to-CEX Spatial Arbitrage Matrix ({notional.toLocaleString()} {quoteAsset}{" "}
+                Notional)
               </CardTitle>
               <CardDescription className="text-xs">
                 Real-time VWAP spread walked through book depth net of taker fees (
@@ -1128,15 +1243,17 @@ export function CeDeFiStudio({ onRecordTx: _onRecordTx, initialSymbol, onBackToM
                       key={`${opp.buyExchange}-${opp.sellExchange}-${idx}`}
                       className="hover:bg-slate-50/70"
                     >
-                      <td className="px-4 py-2.5 font-bold text-slate-900 capitalize">
+                      <td className="px-4 py-2.5 font-bold capitalize text-slate-900">
                         {opp.buyExchange} <ArrowRight className="inline size-3 text-slate-400" />{" "}
                         {opp.sellExchange}
                       </td>
                       <td className="px-4 py-2.5 text-slate-700">
-                        {opp.buyVwap.toLocaleString(undefined, { maximumFractionDigits: 10 })} {quoteAsset}
+                        {opp.buyVwap.toLocaleString(undefined, { maximumFractionDigits: 10 })}{" "}
+                        {quoteAsset}
                       </td>
                       <td className="px-4 py-2.5 text-slate-700">
-                        {opp.sellVwap.toLocaleString(undefined, { maximumFractionDigits: 10 })} {quoteAsset}
+                        {opp.sellVwap.toLocaleString(undefined, { maximumFractionDigits: 10 })}{" "}
+                        {quoteAsset}
                       </td>
                       <td className="px-4 py-2.5 text-slate-600">{opp.qtyBase.toFixed(4)}</td>
                       <td

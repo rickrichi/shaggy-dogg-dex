@@ -29,7 +29,10 @@ export class AdminApiError extends Error {
   }
 }
 
-async function adminFetch<T>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
+async function adminFetch<T>(
+  path: string,
+  init: { method?: string; body?: unknown } = {}
+): Promise<T> {
   const method = init.method ?? "GET";
   const response = await fetch(`/api/admin${path}`, {
     method,
@@ -143,7 +146,10 @@ export async function addTokenList(input: TokenListInput): Promise<void> {
 }
 
 export async function updateTokenList(id: string, enabled: boolean): Promise<void> {
-  await adminFetch(`/token-lists/${encodeURIComponent(id)}`, { method: "PATCH", body: { enabled } });
+  await adminFetch(`/token-lists/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: { enabled },
+  });
 }
 
 export async function removeTokenList(id: string): Promise<void> {

@@ -62,7 +62,9 @@ export const Layout = ({ children }: LayoutProps) => {
                 const isActive =
                   location.pathname === item.href ||
                   (item.name === "Live Desk" && onLiveDesk) ||
-                  (item.name === "Arbitrage" && location.pathname.startsWith("/arbitrage") && !onLiveDesk);
+                  (item.name === "Arbitrage" &&
+                    location.pathname.startsWith("/arbitrage") &&
+                    !onLiveDesk);
                 return (
                   <Link key={item.name} to={item.href}>
                     <Button

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+
 import { privateSubmissionConfig } from "./private-submission";
+
 describe("private submission policy", () => {
   it("rejects public endpoints, missing configuration and wrong-chain provider hosts", () => {
     expect(() => privateSubmissionConfig({})).toThrow();

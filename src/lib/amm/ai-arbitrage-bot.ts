@@ -254,7 +254,6 @@ export class AiArbitrageBotEngine {
       };
     }
 
-
     // 5. Strict Anti-Loss Guard: Positive Delta & Minimum Profit Threshold Check
     if (best.netProfitUsd <= 0) {
       return {

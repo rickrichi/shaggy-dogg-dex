@@ -1,7 +1,8 @@
 // Read-only on-chain inventory of every Shaggy/AMUTT address referenced in the repo.
 // Writes deployments/base-mainnet.manifest.json from chain state + Blockscout, never from docs.
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import { createPublicClient, http, parseAbi, getAddress, type Address } from "viem";
+import { existsSync,readFileSync, writeFileSync } from "node:fs";
+
+import { type Address,createPublicClient, getAddress, http, parseAbi } from "viem";
 import { base } from "viem/chains";
 
 const keyFile = "server/data/shaggy-daemon.key";
@@ -19,7 +20,7 @@ const abi = parseAbi([
   "function discountDenominator() view returns (uint256)",
 ]);
 const fields = ["name", "symbol", "admin", "owner", "minter", "treasury", "token", "totalSupply", "discountDenominator"] as const;
-const out: Record<string, unknown>[] = [];
+const out: Array<Record<string, unknown>> = [];
 const eoas: string[] = [];
 for (const address of candidates) {
   const code = await client.getCode({ address });

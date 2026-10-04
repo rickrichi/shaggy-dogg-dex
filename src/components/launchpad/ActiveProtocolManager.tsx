@@ -254,9 +254,7 @@ export function ActiveProtocolManager() {
 
       if (receipt.status === "success") {
         setSwapTxHash(hash);
-        toast.success(
-          "Initial swap successful! Trading data is now live on DexScreener!"
-        );
+        toast.success("Initial swap successful! Trading data is now live on DexScreener!");
       } else {
         throw new Error("Swap transaction reverted.");
       }

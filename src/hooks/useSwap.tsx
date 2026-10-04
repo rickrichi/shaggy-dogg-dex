@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from "react";
+
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { erc20Abi, formatUnits, parseUnits, type Address } from "viem";
+import { type Address, erc20Abi, formatUnits, parseUnits } from "viem";
 import { useAccount, useBalance, usePublicClient, useWalletClient } from "wagmi";
-import { type Token } from "@/config/tokens";
+
 import { DEFAULT_SLIPPAGE, SWAP_DEADLINE_BUFFER } from "@/config/contracts";
+import { type Token } from "@/config/tokens";
 import { positiveAmount } from "@/lib/amm/own-dex";
-import { calculateMinimumAmountOut } from "@/lib/amm/swap-protection";
 import { quoteSmartRoutes, routeQuoteCall, routeSwapCall } from "@/lib/amm/smart-routing";
+import { calculateMinimumAmountOut } from "@/lib/amm/swap-protection";
 
 type QuoteStatus = "IDLE" | "LOADING" | "SUCCESS" | "NO_ROUTE" | "ERROR";
 export interface BalanceData {

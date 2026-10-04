@@ -58,8 +58,7 @@ export const SwapCard = memo<SwapCardProps>(
     };
 
     const swapButtonLabel = (() => {
-      if (!isCorrectNetwork)
-        return isSwitchingNetwork ? "Switching network..." : "Switch to Base";
+      if (!isCorrectNetwork) return isSwitchingNetwork ? "Switching network..." : "Switch to Base";
       if (swapActions.isSwapping) return "Swapping...";
       if (!state.sellAmount) return "Enter amount";
       if (quote.status === "LOADING") return "Fetching best price...";
@@ -250,11 +249,21 @@ export const SwapCard = memo<SwapCardProps>(
           </div>
 
           {/* Quote Information */}
-          {quote.comparisonText && <p className="text-sm text-purple-800">{quote.comparisonText}</p>}
-          {quote.bestVenue && <div className="text-xs text-slate-600">
-            <p>Uniswap V2: {quote.uniswapAmountOut ?? "No route"} · Aerodrome: {quote.aerodromeAmountOut ?? "No route"} {state.buyToken.symbol}</p>
-            <p>Pool fees are included. Network fees are separate. Submission uses your wallet’s RPC; private routing is unverified.</p>
-          </div>}
+          {quote.comparisonText && (
+            <p className="text-sm text-purple-800">{quote.comparisonText}</p>
+          )}
+          {quote.bestVenue && (
+            <div className="text-xs text-slate-600">
+              <p>
+                Uniswap V2: {quote.uniswapAmountOut ?? "No route"} · Aerodrome:{" "}
+                {quote.aerodromeAmountOut ?? "No route"} {state.buyToken.symbol}
+              </p>
+              <p>
+                Pool fees are included. Network fees are separate. Submission uses your wallet’s
+                RPC; private routing is unverified.
+              </p>
+            </div>
+          )}
           {quote.rate !== null && state.sellAmount && state.buyAmount && (
             <Card className="border-purple-200 bg-gradient-to-r from-purple-50 to-pink-50">
               <CardContent className="space-y-2 p-3">

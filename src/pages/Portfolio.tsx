@@ -48,20 +48,32 @@ export default function Portfolio(): JSX.Element {
       const res = await fetch("/api/prices", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chainId: 8453, addresses: ERC20_ADDRESSES.map((a) => a.toLowerCase()) }),
+        body: JSON.stringify({
+          chainId: 8453,
+          addresses: ERC20_ADDRESSES.map((a) => a.toLowerCase()),
+        }),
       });
       if (!res.ok) throw new Error(`Price API HTTP ${res.status}`);
 
       const body = (await res.json()) as {
         success: boolean;
-        data?: { prices: Array<{ address: string; priceUsd: number; change24hPercent: number; symbol?: string }> };
+        data?: {
+          prices: Array<{
+            address: string;
+            priceUsd: number;
+            change24hPercent: number;
+            symbol?: string;
+          }>;
+        };
         error?: string;
       };
       if (!body.success || !body.data) throw new Error(body.error ?? "Price API returned no data");
 
       const nextPrices: PriceRow[] = body.data.prices.map((row) => {
         const address = (
-          normalizeAddress(row.address as AddressHex) === ZERO_NORMALIZED ? ZERO_ADDRESS : row.address
+          normalizeAddress(row.address as AddressHex) === ZERO_NORMALIZED
+            ? ZERO_ADDRESS
+            : row.address
         ) as AddressHex;
         return {
           address,
@@ -69,7 +81,8 @@ export default function Portfolio(): JSX.Element {
           change24hPercent: Number(row.change24hPercent ?? 0),
           symbol:
             row.symbol ??
-            WATCHLIST.find((w) => normalizeAddress(w.address) === normalizeAddress(address))?.symbol ??
+            WATCHLIST.find((w) => normalizeAddress(w.address) === normalizeAddress(address))
+              ?.symbol ??
             "UNKNOWN",
         };
       });

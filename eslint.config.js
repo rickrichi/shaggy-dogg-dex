@@ -3,6 +3,8 @@
 // COMPREHENSIVE ESLINT SETUP FOR VITE + REACT + TYPESCRIPT + VITEST + TAILWIND
 // ══════════════════════════════════════════════════════════════════════════════
 
+import path from "node:path";
+
 import js from "@eslint/js";
 import vitest from "@vitest/eslint-plugin";
 import prettierConfig from "eslint-config-prettier";
@@ -33,7 +35,12 @@ export default tseslint.config(
       "**/coverage/**",
       "**/.vite/**",
       "**/.turbo/**",
-      "server/dist/**",
+      "server/**",
+      "contracts/**",
+      "shaggy-dogg-sol_files/**",
+      "desktop/**",
+      ".desktop-build/**",
+      "release/**",
       "**/*.d.ts",
       "**/*.config.js",
       "**/*.config.ts",
@@ -226,7 +233,7 @@ export default tseslint.config(
   // Tailwind CSS Configuration
   // ────────────────────────────────────────────────────────────────────────────
   {
-    files: ["**/*.{ts,tsx,js,jsx}"],
+    files: ["src/**/*.{ts,tsx,js,jsx}"],
     plugins: {
       tailwindcss: tailwind,
     },
@@ -242,7 +249,7 @@ export default tseslint.config(
     settings: {
       tailwindcss: {
         callees: ["cn", "cva", "clsx", "twMerge"],
-        config: "tailwind.config.js",
+        config: path.resolve("tailwind.config.ts"),
         classRegex: "^(class(Name)?|tw)$",
       },
     },

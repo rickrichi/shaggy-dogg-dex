@@ -12,7 +12,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { ADMIN_SESSION_KEY, useAdminSession, useDexSettings, useFeaturedTokens, useTokenLists } from "@/hooks/useAdminData";
+import {
+  ADMIN_SESSION_KEY,
+  useAdminSession,
+  useDexSettings,
+  useFeaturedTokens,
+  useTokenLists,
+} from "@/hooks/useAdminData";
 import { AdminApiError, fetchAdminNonce, signInAdmin, signOutAdmin } from "@/lib/adminApi";
 import { SUPPORTED_CHAINS } from "@/lib/config";
 import { DEPLOYMENTS, deploymentsLastUpdated } from "@/lib/deployments";
@@ -84,12 +90,15 @@ export default function Admin() {
     try {
       const { nonce, enabled } = await fetchAdminNonce();
       if (!enabled) {
-        throw new Error("Admin sign-in is disabled: set ADMIN_WALLETS in server/.env and restart the API server.");
+        throw new Error(
+          "Admin sign-in is disabled: set ADMIN_WALLETS in server/.env and restart the API server."
+        );
       }
       const message = createSiweMessage({
         domain: window.location.host,
         address,
-        statement: "Sign in to the Shaggy Dogg DEX admin panel. This is a signature only: no transaction, no gas.",
+        statement:
+          "Sign in to the Shaggy Dogg DEX admin panel. This is a signature only: no transaction, no gas.",
         uri: window.location.origin,
         version: "1",
         chainId: chainId ?? 1,
@@ -102,7 +111,9 @@ export default function Admin() {
       refreshAuth();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Sign-in failed";
-      setLoginMessage(/rejected|denied/i.test(msg) ? "The signature request was rejected in your wallet." : msg);
+      setLoginMessage(
+        /rejected|denied/i.test(msg) ? "The signature request was rejected in your wallet." : msg
+      );
     } finally {
       setSigningIn(false);
     }
@@ -204,11 +215,14 @@ export default function Admin() {
                 <div>
                   <p className="font-medium text-amber-800">Admin Access Required</p>
                   <p className="text-amber-700">
-                    Sign a one-time message with an admin wallet. It is not a transaction and costs no gas.
+                    Sign a one-time message with an admin wallet. It is not a transaction and costs
+                    no gas.
                   </p>
                 </div>
                 <p className="font-mono text-xs text-amber-800">
-                  {address ? `Connected: ${address}` : "No wallet connected — use Connect Wallet in the header."}
+                  {address
+                    ? `Connected: ${address}`
+                    : "No wallet connected — use Connect Wallet in the header."}
                 </p>
                 <Button onClick={() => void signInWithWallet()} disabled={signingIn || !address}>
                   {signingIn ? (

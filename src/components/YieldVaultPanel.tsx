@@ -1,23 +1,25 @@
-import { VaultDeploymentPanel } from "@/components/VaultDeploymentPanel";
 import { useRef, useState } from "react";
+
 import { useQuery } from "@tanstack/react-query";
-import { useAccount, usePublicClient, useWalletClient } from "wagmi";
-import { base } from "viem/chains";
 import {
+  type Address,
   erc20Abi,
   formatUnits,
+  type Hash,
   isAddress,
   parseAbi,
   parseUnits,
   zeroAddress,
-  type Address,
-  type Hash,
 } from "viem";
-import { BASE_STAKING } from "@/lib/staking";
-import { positiveAmount } from "@/lib/amm/own-dex";
+import { base } from "viem/chains";
+import { useAccount, usePublicClient, useWalletClient } from "wagmi";
+
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { VaultDeploymentPanel } from "@/components/VaultDeploymentPanel";
+import { positiveAmount } from "@/lib/amm/own-dex";
+import { BASE_STAKING } from "@/lib/staking";
 
 const abi = parseAbi([
   "function underlyingAsset() view returns (address)",

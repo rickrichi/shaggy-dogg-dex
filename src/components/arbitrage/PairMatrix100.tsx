@@ -1,6 +1,3 @@
-import thresholds from "@/config/market-pair-thresholds.json";
-import MARKET_PAIRS from "@/config/market-pairs.json";
-import { ARB_API_URL } from "@/config/crypto-arb";
 import { useEffect, useMemo, useState } from "react";
 
 import { ArrowUpRight, Coins, Search, Sparkles } from "lucide-react";
@@ -8,8 +5,12 @@ import { ArrowUpRight, Coins, Search, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { ARB_API_URL } from "@/config/crypto-arb";
+import thresholds from "@/config/market-pair-thresholds.json";
+import MARKET_PAIRS from "@/config/market-pairs.json";
 import { useMatrixDexQuotes } from "@/hooks/useMatrixDexQuotes";
 import { MATRIX_QUOTE_MAX_AGE_MS, matrixRoute } from "@/lib/amm/matrix-quotes";
+
 import type { Snapshot } from "@/types/crypto-arb";
 
 export interface MatrixPair {
@@ -28,9 +29,20 @@ export interface MatrixPair {
 
 export const PAIR_MATRIX_DATA: MatrixPair[] = MARKET_PAIRS.map((symbol, index) => {
   const [baseAsset = "", quoteAsset = ""] = symbol.split("/");
-  return { id: index + 1, symbol, baseAsset, quoteAsset,
-    binance: "Unverified", bybit: "Unverified", okx: "Unverified", coinbase: "Unverified", kraken: "Unverified",
-    minNetEdgePct: (thresholds as Record<string, { minNetEdgePct: string }>)[symbol]?.minNetEdgePct ?? "0.40%", tier: (thresholds as Record<string, { tier: string }>)[symbol]?.tier ?? "Requested market" };
+  return {
+    id: index + 1,
+    symbol,
+    baseAsset,
+    quoteAsset,
+    binance: "Unverified",
+    bybit: "Unverified",
+    okx: "Unverified",
+    coinbase: "Unverified",
+    kraken: "Unverified",
+    minNetEdgePct:
+      (thresholds as Record<string, { minNetEdgePct: string }>)[symbol]?.minNetEdgePct ?? "0.40%",
+    tier: (thresholds as Record<string, { tier: string }>)[symbol]?.tier ?? "Requested market",
+  };
 });
 
 interface PairMatrix100Props {
@@ -44,7 +56,10 @@ interface PairMatrix100Props {
 export function PairMatrix100({ onSelectPair, krakenBalances, snapshot }: PairMatrix100Props) {
   const { quotes, now } = useMatrixDexQuotes(MARKET_PAIRS);
   const [dexOnly, setDexOnly] = useState(false);
-  const venueIndex = useMemo(() => new Map(snapshot?.venues.map(v => [`${v.exchange}:${v.symbol}`, v]) ?? []), [snapshot]);
+  const venueIndex = useMemo(
+    () => new Map(snapshot?.venues.map((v) => [`${v.exchange}:${v.symbol}`, v]) ?? []),
+    [snapshot]
+  );
   const [search, setSearch] = useState("");
   const [filterFundedOnly, setFilterFundedOnly] = useState(false);
   const [internalBalances, setInternalBalances] = useState<Record<string, number>>({});
@@ -77,7 +92,7 @@ export function PairMatrix100({ onSelectPair, krakenBalances, snapshot }: PairMa
   }, [krakenBalances]);
 
   const freeAssets: Record<string, number> = useMemo(() => {
-    return (krakenBalances?.free || internalBalances) || {};
+    return krakenBalances?.free || internalBalances || {};
   }, [krakenBalances, internalBalances]);
 
   // Check if user holds the asset in Kraken
@@ -100,9 +115,17 @@ export function PairMatrix100({ onSelectPair, krakenBalances, snapshot }: PairMa
       };
     }
     if (quoteHolding > 0) {
-      return { isFunded: true, summary: `${quoteHolding.toFixed(6)} ${p.quoteAsset} Available`, color: "bg-blue-100 text-blue-900 border-blue-300" };
+      return {
+        isFunded: true,
+        summary: `${quoteHolding.toFixed(6)} ${p.quoteAsset} Available`,
+        color: "bg-blue-100 text-blue-900 border-blue-300",
+      };
     }
-    return { isFunded: false, summary: "No Kraken Balance", color: "bg-slate-100 text-slate-500 border-slate-200" };
+    return {
+      isFunded: false,
+      summary: "No Kraken Balance",
+      color: "bg-slate-100 text-slate-500 border-slate-200",
+    };
   };
 
   const filteredPairs = useMemo(() => {
@@ -143,9 +166,10 @@ export function PairMatrix100({ onSelectPair, krakenBalances, snapshot }: PairMa
               </CardTitle>
             </div>
             <CardDescription className="text-xs">
-              CeDeFi comparison: Shaggy-Dogg-Dex routed sell quotes on Base alongside centralized exchange bid/ask prices.
-              Prices use each pair’s quote asset. DEX quotes sell 1 base token, include pool fees and exclude gas; CEX prices are top-of-book before fees.
-              ETH routes use WETH. Kraken capital is separate from your wallet.
+              CeDeFi comparison: Shaggy-Dogg-Dex routed sell quotes on Base alongside centralized
+              exchange bid/ask prices. Prices use each pair’s quote asset. DEX quotes sell 1 base
+              token, include pool fees and exclude gas; CEX prices are top-of-book before fees. ETH
+              routes use WETH. Kraken capital is separate from your wallet.
             </CardDescription>
           </div>
 
@@ -161,7 +185,9 @@ export function PairMatrix100({ onSelectPair, krakenBalances, snapshot }: PairMa
               }
             >
               <Coins className="mr-1.5 size-3.5" />
-              {filterFundedOnly ? "Showing Funded Only" : `Show All (${PAIR_MATRIX_DATA.length} Pairs)`}
+              {filterFundedOnly
+                ? "Showing Funded Only"
+                : `Show All (${PAIR_MATRIX_DATA.length} Pairs)`}
             </Button>
           </div>
         </div>
@@ -184,10 +210,17 @@ export function PairMatrix100({ onSelectPair, krakenBalances, snapshot }: PairMa
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-            <span className="text-[11px] font-bold text-slate-500 mr-1">Quick Filters:</span>
-            <Button size="sm" variant={dexOnly ? "default" : "outline"}
-              onClick={() => { setDexOnly(!dexOnly); setSearch(""); setFilterFundedOnly(false); }}
-              className="h-6 px-2 text-[10px] font-bold">
+            <span className="mr-1 text-[11px] font-bold text-slate-500">Quick Filters:</span>
+            <Button
+              size="sm"
+              variant={dexOnly ? "default" : "outline"}
+              onClick={() => {
+                setDexOnly(!dexOnly);
+                setSearch("");
+                setFilterFundedOnly(false);
+              }}
+              className="h-6 px-2 text-[10px] font-bold"
+            >
               Shaggy-Dogg-Dex · Base mappings
             </Button>
             {[
@@ -201,7 +234,11 @@ export function PairMatrix100({ onSelectPair, krakenBalances, snapshot }: PairMa
               <Button
                 key={idx}
                 size="sm"
-                variant={!dexOnly && search === pill.query && filterFundedOnly === pill.fundedOnly ? "default" : "outline"}
+                variant={
+                  !dexOnly && search === pill.query && filterFundedOnly === pill.fundedOnly
+                    ? "default"
+                    : "outline"
+                }
                 onClick={() => {
                   setDexOnly(false);
                   setSearch(pill.query);
@@ -244,11 +281,9 @@ export function PairMatrix100({ onSelectPair, krakenBalances, snapshot }: PairMa
                 return (
                   <tr
                     key={pair.id}
-                    className={`hover:bg-slate-50/80 ${
-                      holding.isFunded ? "bg-emerald-50/20" : ""
-                    }`}
+                    className={`hover:bg-slate-50/80 ${holding.isFunded ? "bg-emerald-50/20" : ""}`}
                   >
-                    <td className="px-3 py-2 text-slate-400 font-bold">{pair.id}</td>
+                    <td className="px-3 py-2 font-bold text-slate-400">{pair.id}</td>
                     <td className="px-3 py-2 font-bold text-slate-900">
                       {pair.symbol}
                       <span className="ml-1.5 rounded bg-slate-100 px-1 py-0.5 text-[9px] font-normal text-slate-500">
@@ -256,20 +291,31 @@ export function PairMatrix100({ onSelectPair, krakenBalances, snapshot }: PairMa
                       </span>
                     </td>
                     <td className="min-w-48 px-3 py-2 text-purple-700">
-                      {!matrixRoute(pair.symbol) ? "No Base token mapping" : <>
-                        <div>{(() => {
-                          const quote = quotes[pair.symbol];
-                          if (!quote) return "Checking route…";
-                          if (now - quote.checkedAt > MATRIX_QUOTE_MAX_AGE_MS) return "Stale quote";
-                          if (quote.status === "rpc-error") return "RPC unavailable";
-                          if (quote.status === "unavailable") return "Quote unavailable";
-                          return `1 ${quote.inputSymbol} → ${quote.output} ${quote.outputSymbol}`;
-                        })()}</div>
-                        <span className="text-[10px] text-slate-500">{quotes[pair.symbol]?.venueLabel ?? "Base route"}</span>
-                      </>}
+                      {!matrixRoute(pair.symbol) ? (
+                        "No Base token mapping"
+                      ) : (
+                        <>
+                          <div>
+                            {(() => {
+                              const quote = quotes[pair.symbol];
+                              if (!quote) return "Checking route…";
+                              if (now - quote.checkedAt > MATRIX_QUOTE_MAX_AGE_MS)
+                                return "Stale quote";
+                              if (quote.status === "rpc-error") return "RPC unavailable";
+                              if (quote.status === "unavailable") return "Quote unavailable";
+                              return `1 ${quote.inputSymbol} → ${quote.output} ${quote.outputSymbol}`;
+                            })()}
+                          </div>
+                          <span className="text-[10px] text-slate-500">
+                            {quotes[pair.symbol]?.venueLabel ?? "Base route"}
+                          </span>
+                        </>
+                      )}
                     </td>
-                    {(["binance", "bybit", "okx", "coinbase", "kraken"] as const).map(venue => (
-                      <td key={venue} className="px-3 py-2 text-center text-slate-600">{cexQuote(venue, pair.symbol)}</td>
+                    {(["binance", "bybit", "okx", "coinbase", "kraken"] as const).map((venue) => (
+                      <td key={venue} className="px-3 py-2 text-center text-slate-600">
+                        {cexQuote(venue, pair.symbol)}
+                      </td>
                     ))}
                     <td className="px-3 py-2 font-bold text-emerald-600">{pair.minNetEdgePct}</td>
                     <td className="px-3 py-2">

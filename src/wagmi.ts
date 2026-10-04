@@ -1,8 +1,9 @@
 // src/wagmi.ts
 import { createConfig, http } from "wagmi";
-import { createBaseReadTransport } from "@/lib/base-rpc";
 import { arbitrum, base, mainnet, optimism, polygon, sepolia } from "wagmi/chains";
 import { coinbaseWallet, injected, metaMask, walletConnect } from "wagmi/connectors";
+
+import { createBaseReadTransport } from "@/lib/base-rpc";
 
 import type { Config } from "wagmi";
 

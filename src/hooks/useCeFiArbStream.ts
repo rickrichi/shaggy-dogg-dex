@@ -1,7 +1,7 @@
-import { ARB_API_URL, ARB_WS_URL } from "@/config/crypto-arb";
 // src/hooks/useCeFiArbStream.ts
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { ARB_API_URL, ARB_WS_URL } from "@/config/crypto-arb";
 import {
   type ConnState,
   isSnapshot,

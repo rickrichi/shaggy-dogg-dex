@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+
 import { fetchMatrixDexQuotes } from "@/lib/amm/matrix-quotes";
+
 import type { MatrixDexQuote } from "@/lib/amm/matrix-quotes";
 
 export function useMatrixDexQuotes(symbols: readonly string[]) {
@@ -16,7 +18,11 @@ export function useMatrixDexQuotes(symbols: readonly string[]) {
     };
     void poll();
     const clock = setInterval(() => setNow(Date.now()), 1000);
-    return () => { disposed = true; clearTimeout(timer); clearInterval(clock); };
+    return () => {
+      disposed = true;
+      clearTimeout(timer);
+      clearInterval(clock);
+    };
   }, [symbols]);
   return { quotes, now };
 }
