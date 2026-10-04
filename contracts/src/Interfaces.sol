@@ -109,3 +109,40 @@ interface IMorphoBlue {
     ) external returns (uint256, uint256);
 }
 
+struct Route {
+    address from;
+    address to;
+    bool stable;
+    address factory;
+}
+
+interface IUniswapV2Router02 {
+    function swapExactTokensForTokens(
+        uint256 amountIn,
+        uint256 amountOutMin,
+        address[] calldata path,
+        address to,
+        uint256 deadline
+    ) external returns (uint256[] memory amounts);
+
+    function getAmountsOut(
+        uint256 amountIn,
+        address[] calldata path
+    ) external view returns (uint256[] memory amounts);
+}
+
+interface IAerodromeRouter {
+    function swapExactTokensForTokens(
+        uint256 amountIn,
+        uint256 amountOutMin,
+        Route[] calldata routes,
+        address to,
+        uint256 deadline
+    ) external returns (uint256[] memory amounts);
+
+    function getAmountsOut(
+        uint256 amountIn,
+        Route[] calldata routes
+    ) external view returns (uint256[] memory amounts);
+}
+

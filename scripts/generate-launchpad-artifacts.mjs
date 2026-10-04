@@ -16,12 +16,14 @@ const contracts = [
   "CompoundYieldVault",
   "IsolatedLendingVault",
   "AaveFlashBorrower",
+  "AtomicFlashArbitrageRouter",
 ];
 
 const contractData = {};
 
 for (const name of contracts) {
-  const jsonPath = path.resolve(outDir, `${name}.json`);
+  const forgePath = path.resolve(outDir, `${name}.sol`, `${name}.json`);
+  const jsonPath = fs.existsSync(forgePath) ? forgePath : path.resolve(outDir, `${name}.json`);
   if (!fs.existsSync(jsonPath)) {
     console.error(`Artifact not found: ${jsonPath}`);
     process.exit(1);
@@ -29,7 +31,7 @@ for (const name of contracts) {
   const data = JSON.parse(fs.readFileSync(jsonPath, "utf8"));
   contractData[name] = {
     abi: data.abi,
-    bytecode: data.bytecode,
+    bytecode: typeof data.bytecode === "string" ? data.bytecode : data.bytecode.object,
   };
 }
 
@@ -68,6 +70,10 @@ export const LAUNCHPAD_ARTIFACTS = {
   AaveFlashBorrower: {
     abi: ${JSON.stringify(contractData.AaveFlashBorrower.abi)} as unknown as Abi,
     bytecode: "${contractData.AaveFlashBorrower.bytecode}" as Hex,
+  },
+  AtomicFlashArbitrageRouter: {
+    abi: ${JSON.stringify(contractData.AtomicFlashArbitrageRouter.abi)} as unknown as Abi,
+    bytecode: "${contractData.AtomicFlashArbitrageRouter.bytecode}" as Hex,
   },
 } as const;
 `;

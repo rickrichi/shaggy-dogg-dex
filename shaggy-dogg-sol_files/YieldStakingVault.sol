@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import "./Interfaces.sol";
 import "./GovernanceToken.sol";
 import "./FeeDiscountStaking.sol";
+import "./FeeDiscountMath.sol";
 
 /**
  * @title YieldStakingVault
@@ -25,6 +26,8 @@ contract YieldStakingVault {
 
     // Default performance fee in basis points (1000 = 10%)
     uint16 public performanceFeeBps = 1000;
+
+    function discountDenominator() external pure returns (uint256) { return 10_000; }
 
     uint256 public totalShares;
     mapping(address => uint256) public sharesOf;
@@ -131,6 +134,7 @@ contract YieldStakingVault {
             shares = (amount * totalShares) / assetsBefore;
         }
 
+        require(shares > 0, "Deposit too small");
         totalShares += shares;
         sharesOf[msg.sender] += shares;
         principalDeposited[msg.sender] += amount;
@@ -168,12 +172,7 @@ contract YieldStakingVault {
             // Apply SD staker discount if discountStaking is configured
             if (address(discountStaking) != address(0)) {
                 uint16 discountBps = discountStaking.getTier(msg.sender);
-                // discountBps up to 1000 (100% discount on performance fee)
-                if (discountBps >= 1000) {
-                    effectiveFeeBps = 0;
-                } else {
-                    effectiveFeeBps = uint16((uint256(effectiveFeeBps) * (1000 - discountBps)) / 1000);
-                }
+                effectiveFeeBps = FeeDiscountMath.discountedFee(effectiveFeeBps, discountBps);
             }
 
             fee = (yieldProfit * effectiveFeeBps) / 10_000;

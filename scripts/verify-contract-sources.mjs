@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 
 const root = process.cwd();
 const pairs = [
+  ["contracts/src/FeeDiscountMath.sol", "shaggy-dogg-sol_files/FeeDiscountMath.sol"],
   ["contracts/src/GovernanceToken.sol", "shaggy-dogg-sol_files/GovernanceToken.sol"],
   ["contracts/src/FeeDiscountStaking.sol", "shaggy-dogg-sol_files/FeeDiscountStaking.sol"],
   ["contracts/src/Deploy.sol", "shaggy-dogg-sol_files/Shaggy-Dogg-Dex.sol"],
@@ -11,6 +12,7 @@ const pairs = [
   ["contracts/src/CompoundYieldVault.sol", "shaggy-dogg-sol_files/CompoundYieldVault.sol"],
   ["contracts/src/DeployEcosystem.sol", "shaggy-dogg-sol_files/DeployEcosystem.sol"],
   ["contracts/src/Interfaces.sol", "shaggy-dogg-sol_files/Interfaces.sol"],
+  ["contracts/src/AtomicFlashArbitrageRouter.sol", "shaggy-dogg-sol_files/AtomicFlashArbitrageRouter.sol"],
 ];
 
 const drifted = pairs.filter(([canonical, mirror]) => {
