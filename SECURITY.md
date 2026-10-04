@@ -5,7 +5,7 @@ vulnerability, please report it privately first.
 
 ## How to report
 
-**Contact:** `OWNER TO FILL IN: a monitored email address or a GitHub private-vulnerability-reporting link`
+**Contact:** rickthegenius@outlook.com
 
 Please include:
 - the affected contract address or file and commit,
