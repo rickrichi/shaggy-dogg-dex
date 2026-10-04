@@ -37,7 +37,7 @@ for (const address of candidates) {
         const a = await (await fetch(`https://base.blockscout.com/api/v2/addresses/${address}`, { signal: AbortSignal.timeout(15_000) })).json() as { creator_address_hash?: string; creation_transaction_hash?: string };
         row.creator = a.creator_address_hash ?? null; row.creationTx = a.creation_transaction_hash ?? null;
       } catch { /* optional */ }
-      row.label = labels[address] ?? null;
+      row.label = labels[address] ?? Object.entries(labels).find(([k]) => k.toLowerCase() === address.toLowerCase())?.[1] ?? null;
     } catch { row.blockscoutVerified = "unknown"; }
   }
   if (row.hasCode) out.push(row); else eoas.push(address);

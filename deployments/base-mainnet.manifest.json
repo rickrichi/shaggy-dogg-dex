@@ -1,6 +1,6 @@
 {
   "chainId": 8453,
-  "generatedAt": "2026-10-04T08:00:49.064Z",
+  "generatedAt": "2026-10-04T08:31:19.922Z",
   "source": "on-chain reads + Blockscout API",
   "contracts": [
     {
@@ -200,7 +200,33 @@
       "contractName": "YieldStakingVault",
       "creator": "0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98",
       "creationTx": "0x342b72fc23fe2505d9e07ef28d350cac009d160291dd093a1db8e7c2d2d71ab5",
-      "label": null
+      "label": {
+        "ecosystem": "AMUTT",
+        "role": "YieldStakingVault v2 (10000-bps discount scale, current)",
+        "usedBy": [
+          "src/components/YieldVaultPanel.tsx (VITE_YIELD_VAULT_ADDRESS)"
+        ],
+        "deploymentTx": "0x342b72fc23fe2505d9e07ef28d350cac009d160291dd093a1db8e7c2d2d71ab5",
+        "sourceCommit": "2b20a00"
+      }
+    },
+    {
+      "address": "0x70315019D12A11556C837970675cDC8Fa54d186b",
+      "hasCode": true,
+      "admin": "0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98",
+      "blockscoutVerified": true,
+      "contractName": "AtomicFlashArbitrageRouter",
+      "creator": "0xc1c3d6552231DB22A22Bdf513C0833024FF3f42B",
+      "creationTx": "0x1d0c4addb2b93b7f5fba2b9dbf741656b33a77a5344e0bfd6b7c3969bdaaf4b9",
+      "label": {
+        "ecosystem": "Arbitrage",
+        "role": "AtomicFlashArbitrageRouter (Aave flash loan arbitrage)",
+        "usedBy": [
+          "src/pages/Arbitrage.tsx",
+          "scripts/arbitrage-bot-daemon.ts",
+          "src/lib/launchpad/constants.ts"
+        ]
+      }
     }
   ],
   "adminAddresses": [

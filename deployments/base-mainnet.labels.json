@@ -79,5 +79,14 @@
     ],
     "deploymentTx": "0x342b72fc23fe2505d9e07ef28d350cac009d160291dd093a1db8e7c2d2d71ab5",
     "sourceCommit": "2b20a00"
+  },
+  "0x70315019D12a11556c837970675cdC8fa54d186b": {
+    "ecosystem": "Arbitrage",
+    "role": "AtomicFlashArbitrageRouter (Aave flash loan arbitrage)",
+    "usedBy": [
+      "src/pages/Arbitrage.tsx",
+      "scripts/arbitrage-bot-daemon.ts",
+      "src/lib/launchpad/constants.ts"
+    ]
   }
 }
