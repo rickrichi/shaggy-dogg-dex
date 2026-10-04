@@ -1,0 +1,93 @@
+### Mode A: 🤖 AI Auto-Pilot (Hands-Free Opportunity Hunter)
+Best for scanning Base Mainnet blocks continuously in the background and executing qualifying spreads.
+
+  1. Click the 🤖 AI Auto-Pilot tab (or navigate directly to /arbitrage/autopilot http://localhost:5173/arbitrage/autopilot).
+  2. Configure Your Guardrails:
+      • Min Net Profit Target (USD): Set your threshold (e.g., $1.00 or $5.00). The bot will disqualify anything below this net profit.
+      • Max Slippage Tolerance: Default is 0.50% (50 bps). This prevents sandwich and front-running bots on Base.
+      • Max Base Gas Ceiling: Set to 0.05 Gwei so transactions are only broadcast when network gas is low.
+  3. Select Active Strategies:
+      • ✅ Triangular Arbitrage (Cyclic WETH ↔ USDC ↔ DAI)
+      • ✅ Cross-DEX Spread (Uniswap V2 ↔ Aerodrome)
+      • ✅ Aave v3 Flash Borrow ($0 Collateral)
+  4. Choose Execution Behavior:
+      • Review First: Leave Auto-Submit to Wallet OFF. The live terminal will stream qualified opportunities with a one-click manual execute prompt.
+      • Instant Execution: Toggle Auto-Submit to Wallet ON. When an opportunity meets all your criteria, it immediately prompts your wallet to sign.
+  5. Click ▶ START AI AUTO-PILOT.
+  6. The terminal will begin streaming block-by-block evaluations, showing detected spreads, confidence scores, and
+  net profit projections.
+
+---
+
+Initial setup involves accessing the AI Auto-Pilot interface via the specified URL. Necessary configurations require setting a minimum net profit target, a maximum slippage tolerance (defaulting to 0.50%), and a maximum base gas ceiling. These guardrails aim to control bot behavior, preventing unprofitable trades and mitigating risks on the Bas network.
+
+As the AI Auto-Pilot runs, the terminal streams real-time block evaluations. If Auto-Submit to Wallet is ON and a trade opportunity meets the configured criteria, the browser wallet will automatically prompt for confirmation. Upon wallet confirmation, the terminal displays the submission of the transaction and updates the profit captured display.
+Once step #6 is running and the terminal is streaming evaluations, what you do next depends on whether you have
+
+Auto-Submit to Wallet set to ON or OFF:
+  ──────
+  ### Scenario A: If "Auto-Submit to Wallet" is ON (Automated Trading)
+
+  When an opportunity clears all your Anti-Loss filters (Net Profit Target, Gas Ceiling, and Slippage):
+
+  1. Your Wallet Pops Up:
+      • Your Web3 wallet (MetaMask / Coinbase Wallet) will automatically open a confirmation prompt.
+  2. Review & Confirm:
+      • Check the gas fee (typically less than $0.01 on Base Mainnet).
+      • Click Confirm / Sign in your wallet.
+  3. Watch the Execution Live:
+      • The terminal logs: 🚀 [AUTO-DISPATCH] Submitting atomic transaction on Base Mainnet...
+      • Once mined (~2 seconds on Base), the terminal confirms: ✅ Arbitrage Confirmed on Base! (Gas Used: ...)
+  4. Track Your Net Yield:
+      • Look at the top metric cards:
+          • Profit Captured: Increments by your net earnings (e.g. +$4.20 USD).
+          • Trades Dispatched: Increments by 1.
+          • Anti-Loss Guard: Stays locked at 0.0% Loss.
+      • Click the transaction link to view the receipt and token transfers directly on BaseScan https://basescan.org.
+  ──────
+### Scenario B: If "Auto-Submit to Wallet" is OFF (Manual Review)
+
+The bot will identify opportunities without touching your wallet:
+
+  1. Watch for Green Signals:
+      • You will see a highlighted green log:
+        ⚡ [BLOCK #24918230] OPPORTUNITY QUALIFIED: Aave v3 Flash Borrow | Est. Net: +$5.20 USD (Confidence: 94%)
+        ⚠️ Opportunity held: 'Auto-Submit to Wallet' is OFF.
+
+  2. Take Action:
+      • Choice 1 (Switch to Auto): Toggle the "Auto-Submit to Wallet" switch to ON so the bot immediately executes the next qualified signal.
+      • Choice 2 (Manual Fire): Jump to that strategy's tab to execute it manually:
+          • If it’s Flash Loan: Click 3. Flash Loans (/arbitrage/flash-loans) → Click ⚡ Dispatch Live Aave Flash
+          Loan.
+          • If it’s Triangular: Click 1. Triangular (/arbitrage/triangular) → Click ⚡ Execute Triangular Arbitrage.
+          • If it’s Cross-DEX: Click 2. Cross-DEX (/arbitrage/cross-dex) → Click ⚡ Execute Cross-DEX Spread.
+
+
+  ──────
+### Auditing & Wrapping Up
+
+1. Audit Your Transaction History:
+      • Click the 4. Console & Logs tab (/arbitrage/console) to see the chronological transaction ledger with timestamps, gas consumption, and block hashes.
+  2. Export Your Session Data:
+      • Click the Export button at the top-right of the terminal to download the audit log for your records.
+  3. Pausing the Bot:
+      • When you are done or stepping away, click the red ⏹ PAUSE AI AUTO-PILOT button to stop scanning.
+
+---
+
+Here is what is happening right now and what to expect:
+  ──────
+### What to Watch For Next
+  1. Continuous Sweeping:
+      • The bot is scanning Base Mainnet liquidity pools every 3.5 seconds against your $5.00 USD minimum profit target.
+  2. When an Opportunity Qualifies:
+      • The terminal on the right will log:
+        ⚡ [BLOCK #...] OPPORTUNITY QUALIFIED: Aave v3 Flash Borrow | Est. Net: +$5.80 (Confidence: 96%)
+        🚀 [AUTO-DISPATCH] Submitting atomic transaction on Base Mainnet...
+
+      • Your wallet (0x9dC0...7C98) will immediately pop up with a transaction confirmation prompt.
+  3. Confirming in Your Wallet:
+      • Gas on Base right now is only 0.006 Gwei (less than $0.005), easily covered by your 0.0009 ETH.
+      • Click Confirm / Sign in your wallet.
+      • Once mined (~2 seconds on Base), the profit is routed directly to your wallet.
+      • The Profit Captured card will tick up from +$0.00 to your actual net profit.

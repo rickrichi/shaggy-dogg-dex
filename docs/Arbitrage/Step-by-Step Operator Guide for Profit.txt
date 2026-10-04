@@ -1,0 +1,91 @@
+Step-by-Step Operator Guide for Profit
+
+  #### Step 1: Connect Your Wallet & Switch to Base Mainnet
+
+  1. Open http://localhost:5173/arbitrage/matrix http://localhost:5173/arbitrage/matrix (or click Arbitrage in the
+  top navbar).
+  2. Click Connect Wallet in the top right corner.
+  3. If prompted, ensure your network is set to Base Mainnet (Chain ID 8453).
+  (Base L2 gas is ultra-cheap: typically ~$0.002 to $0.01 per transaction).
+  ──────
+  #### Step 2: Choose Your Execution Mode
+  ──────
+  ### Mode A: 🤖 AI Auto-Pilot (Hands-Free Opportunity Hunter)
+
+  Best for scanning Base Mainnet blocks continuously in the background and executing qualifying spreads.
+
+  1. Click the 🤖 AI Auto-Pilot tab (or navigate directly to /arbitrage/autopilot
+  http://localhost:5173/arbitrage/autopilot).
+  2. Configure Your Guardrails:
+      • Min Net Profit Target (USD): Set your threshold (e.g., $1.00 or $5.00). The bot will disqualify anything
+      below this net profit.
+      • Max Slippage Tolerance: Default is 0.50% (50 bps). This prevents sandwich and front-running bots on Base.
+      • Max Base Gas Ceiling: Set to 0.05 Gwei so transactions are only broadcast when network gas is low.
+  3. Select Active Strategies:
+      • ✅ Triangular Arbitrage (Cyclic WETH ↔ USDC ↔ DAI)
+      • ✅ Cross-DEX Spread (Uniswap V2 ↔ Aerodrome)
+      • ✅ Aave v3 Flash Borrow ($0 Collateral)
+  4. Choose Execution Behavior:
+      • Review First: Leave Auto-Submit to Wallet OFF. The live terminal will stream qualified opportunities with a
+      one-click manual execute prompt.
+      • Instant Execution: Toggle Auto-Submit to Wallet ON. When an opportunity meets all your criteria, it
+      immediately prompts your wallet to sign.
+  5. Click ▶ START AI AUTO-PILOT.
+  6. The terminal will begin streaming block-by-block evaluations, showing detected spreads, confidence scores, and
+  net profit projections.
+  ──────
+  ### Mode B: ⚡ Aave v3 Flash Loans ($0 Collateral Arbitrage)
+
+  Best for leveraging large amounts of capital ($1,000 to $50,000) without risking your own principal.
+
+  1. Click the 3. Flash Loans tab (or go to /arbitrage/flash-loans http://localhost:5173/arbitrage/flash-loans).
+  2. Select Asset: Choose USDC or WETH.
+  3. Set Borrow Amount: Enter a notional amount (e.g. 5,000 USDC).
+  4. Inspect Economics:
+      • The card calculates:
+          • Gross Spread
+          • Aave Flash Loan Fee (0.05% / 5 bps)
+          • Base L2 Gas Cost (~$0.01)
+          • Projected Net Profit
+
+  5. If net profit is positive (green), click ⚡ Execute Live Flash Loan (Aave v3).
+  6. Your wallet will prompt you to call your deployed AaveFlashBorrower contract on Base. The loan is borrowed,
+  cycled through the spread, repaid to Aave, and the net profit is transferred to your wallet in the same transaction.
+  If the profit isn't realized, the transaction reverts.
+  ──────
+  ### Mode C: 📐 Triangular Arbitrage (Cyclic Pool Arbitrage)
+
+  Best for compounding native wallet capital (ETH or USDC) through multi-token liquidity pools.
+
+  1. Click the 1. Triangular tab (or go to /arbitrage/triangular http://localhost:5173/arbitrage/triangular).
+  2. Enter your Initial Capital (e.g. 0.01 or 0.05 ETH).
+  3. The Quant AI Engine evaluates the 3-leg cycle:
+
+    WETH ⟶ USDC ⟶ DAI ⟶ WETH
+
+  4. If the cyclic product exceeds the 30 bps pool fee plus gas, the Est. Net Profit turns green.
+  5. Set your slippage tolerance (recommended: 0.50% / 50 bps).
+  6. Click ⚡ Execute Live Triangular Arbitrage.
+  ──────
+  ### Mode D: 📊 100-Pair Matrix (Market Intelligence)
+
+  Best for identifying which tokens have the highest exchange price discrepancies.
+
+  1. Click 📊 100-Pair Matrix (or go to /arbitrage/matrix http://localhost:5173/arbitrage/matrix).
+  2. Click the quick filter 🟢 My Funded Pairs to immediately see:
+      • #50 ETH/USDC (0.10% min edge)
+      • #2 ETH/USDT (0.10% min edge)
+      • #31 SEI/USDT (0.22% min edge)
+      • #5 USDC/USDT (0.08% min edge)
+  3. Click Load Pair on any row to open the live L2 depth scanner and see real bid/ask spreads across Kraken,
+  Coinbase, OKX, and Uniswap.
+  4. When finished inspecting, click the green [📊 Return to 100-Pair Matrix] button at the top to inspect the next
+  pair.
+  ──────
+  ### Recommended First Move
+
+  1. Connect your wallet to Base Mainnet.
+  2. Go to 🤖 AI Auto-Pilot (http://localhost:5173/arbitrage/autopilot).
+  3. Set Min Net Profit Target to $1.00.
+  4. Leave Auto-Submit to Wallet OFF initially so you can observe the opportunities streaming live in the terminal
+  before signing any transactions.

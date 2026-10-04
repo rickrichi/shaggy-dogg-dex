@@ -1,0 +1,37 @@
+ The scan engine is optimized and loads all 16 live Kraken currency triangles in under 1 second.
+  When you look at http://localhost:5173/arbitrage/cedefi http://localhost:5173/arbitrage/cedefi, here is what you need to click:
+  ──────
+  ### Step 1: Refresh the Page (F5 or Ctrl + Shift + R)
+
+  Refresh your browser tab so it loads the updated batch-scan engine.
+  ──────
+  ### Step 2: The Two Actions Available to You
+
+  In the Kraken Intra-Exchange Arbitrage (Real Spot Execution) panel at the top:
+
+    [ 🟢 Autonomous Auto-Snipe ON ]    [ 🔄 Scan Live Kraken Order Books ]
+  #### 1. Turn ON Autonomous Auto-Snipe (Best for Making Money While You Sleep)
+
+  • Flip the switch to 🟢 Autonomous Auto-Snipe ON.
+  • What happens: The engine scans all 16 currency triangles on Kraken every 12 seconds in the background.
+  • The instant market volatility pushes any triangle positive (e.g. +$0.20, +$0.50 USDC net after all Kraken fees), the bot automatically executes all 3 spot
+  orders on Kraken using your $29.20 USDC capital.
+  • Zero manual clicking is required.
+
+  #### 2. Manual Scanning
+
+  • Click Scan Live Kraken Order Books anytime you want to refresh all live bids and asks.
+  • Look at the button on each triangular card:
+      • When the spread is negative (e.g. -0.77%): The button is locked and says:
+        [ Anti-Loss Lock (Spread Negative) ]
+      (The Anti-Loss Guard prevents you or the bot from executing a trade that would lose money after Kraken's 0.26% taker fees).
+      • When a price jump occurs on Kraken: The card turns green and the button unlocks:
+        [ ⚡ Snatch +$0.25 USD ]
+      Click Snatch to fire the 3 real spot orders on Kraken immediately.
+
+  ──────
+  ### Summary of What Is Happening
+
+  • Capital Used: Your real $29.20 USDC on Kraken.
+  • Where Profit Lands: Directly in your Kraken account balance.
+  • Security Guard: Anti-Loss Lock blocks execution whenever the net spread would be negative.
