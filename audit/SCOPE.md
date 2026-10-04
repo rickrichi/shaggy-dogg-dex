@@ -1,7 +1,12 @@
 # Audit scope — Shaggy-Dogg-Dex (Base mainnet, chain 8453)
 
-Frozen at the git tag `audit-candidate-1`. The source in this tag is byte-for-byte what is deployed
-(runtime bytecode compared with `eth_getCode`; only immutables and the metadata hash may differ).
+Frozen at the git tag `audit-candidate-1`. Source-to-chain correspondence:
+- v2 vault (`0xC29c…`) and the router: current source compiled with 0.8.28 matches the on-chain runtime code
+  (only immutables and the metadata hash may differ).
+- Tokens, staking contracts and flash borrowers: the source files are unchanged since the deployment commit `3402261`;
+  that commit's source (pragma relaxed, solc 0.8.36) matches the on-chain runtime code.
+- Legacy vaults (v1 `0x16a1…`, `0x8531…`, Compound `0x38cc…`): the deployed code is the OLD version from `3402261`
+  (wrong discount scale). The sources in this tag contain the corrected version and are not what those addresses run.
 Every address below is source-verified on Blockscout. Machine-readable facts:
 `deployments/base-mainnet.manifest.json` (regenerate with `scripts/inventory-deployments.ts`).
 
