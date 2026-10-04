@@ -98,9 +98,10 @@ export async function runDeployment(options: DeploymentOptions) {
   console.log(` - YieldStakingVault : ${yieldVaultArtifact.bytecode.length} hex chars`);
   console.log(` - CompoundYieldVault: ${compoundVaultArtifact.bytecode.length} hex chars`);
 
-  const deployerAccount = privateKey
-    ? privateKeyToAccount(privateKey)
-    : privateKeyToAccount("***REMOVED***");
+  if (!privateKey) {
+    throw new Error("Set PRIVATE_KEY in the environment (never hardcode keys in source).");
+  }
+  const deployerAccount = privateKeyToAccount(privateKey);
 
   // User's dedicated ShaggyDogg admin account
   const userShaggyDoggAddress: Address = "0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98";

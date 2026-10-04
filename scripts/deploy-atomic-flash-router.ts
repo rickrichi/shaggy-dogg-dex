@@ -35,8 +35,13 @@ async function main() {
   const artifact = JSON.parse(fs.readFileSync(artifactPath, "utf8"));
 
   // Check private key
-  const privateKey = (process.env.PRIVATE_KEY ||
-    "0x<REDACTED-PRIVATE-KEY-1>") as Hex;
+  const rawKey = process.env.PRIVATE_KEY;
+  if (!rawKey || !/^0x[0-9a-fA-F]{64}$/.test(rawKey)) {
+    throw new Error(
+      "Set PRIVATE_KEY in the environment (for example: node --env-file=.env.deployer ...). Never hardcode keys."
+    );
+  }
+  const privateKey = rawKey as Hex;
   const account = privateKeyToAccount(privateKey);
 
   console.log(`Deployer Account : ${account.address}`);
