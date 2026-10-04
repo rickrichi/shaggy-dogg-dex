@@ -19,12 +19,14 @@ const files = [
   "Interfaces.sol",
   "GovernanceToken.sol",
   "FeeDiscountStaking.sol",
+  "FeeDiscountMath.sol",
   "Deploy.sol",
   "AaveFlashBorrower.sol",
   "YieldStakingVault.sol",
   "CompoundYieldVault.sol",
   "IsolatedLendingVault.sol",
   "DeployEcosystem.sol",
+  "AtomicFlashArbitrageRouter.sol",
 ];
 const sources = {};
 
