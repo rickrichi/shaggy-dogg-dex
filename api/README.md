@@ -91,7 +91,7 @@ GET /api/price/MATIC?currency=gbp
   "currency": "USD",
   "timestamp": 1700000000000,
   "change24h": 3.45,
-  "source": "coingecko"
+  "source": "market-data"
 }
 ```
 
@@ -237,7 +237,6 @@ curl http://localhost:5173/api/gas/1
 
    In Vercel Dashboard → Settings → Environment Variables:
    ```
-   COINGECKO_API_KEY=your_coingecko_api_key
    VITE_API_URL=https://your-backend-url.com
    ```
 
@@ -261,8 +260,6 @@ vercel
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `COINGECKO_API_KEY` | Recommended | CoinGecko Pro API key for higher rate limits |
-| `VITE_COINGECKO_API_KEY` | Fallback | Alternative CoinGecko key |
 | `VITE_API_URL` | Optional | Backend API URL for health checks |
 | `API_URL` | Optional | Alternative backend URL |
 
@@ -299,7 +296,7 @@ Access-Control-Allow-Headers: Content-Type
 
 ### Rate Limiting
 - Inherits Vercel's built-in rate limiting
-- CoinGecko API: 10-50 calls/minute (depending on plan)
+- Prices: served by Shaggy Dogg Crypto Market-Data (self-hosted, no vendor quota)
 - Explorer APIs: Varies by provider
 
 ### Best Practices
@@ -416,7 +413,6 @@ Future enhancements:
 ## 📚 Additional Resources
 
 - [Vercel Edge Functions](https://vercel.com/docs/functions/edge-functions)
-- [CoinGecko API Docs](https://www.coingecko.com/en/api)
 - [Etherscan Gas Tracker API](https://docs.etherscan.io/api-endpoints/gas-tracker)
 
 ---

@@ -62,8 +62,7 @@ Required environment variables (API in `server/`):
 - `ORIGIN` - front-end origin for CORS (default `http://localhost:5173`)
 - `AGGREGATOR_URL` (default `https://api.0x.org`)
 - `AGGREGATOR_API_KEY` (optional)
-- `COINGECKO_API_KEY` (optional, recommended)
-- `PRICE_API_FALLBACK` (default `https://api.coingecko.com/api/v3`)
+- `MARKET_DATA_URL` (default `http://localhost:8010`) - Shaggy Dogg Crypto Market-Data, the price source
 - `SUPABASE_WEBHOOK_SECRET` (optional, for DB webhooks)
 
 Canonical API choice:

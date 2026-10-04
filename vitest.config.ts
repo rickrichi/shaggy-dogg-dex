@@ -49,6 +49,8 @@ export default defineConfig({
     ],
     exclude: [
       '**/node_modules/**',
+      // API server tests run in Node via server/vitest.config.ts (npm --prefix server test)
+      'server/**',
       'dist/',
       '.next/',
       'coverage/',

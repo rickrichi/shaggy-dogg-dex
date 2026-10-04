@@ -90,3 +90,7 @@ release/
 deploy/base-node/.env.node
 deploy/base-node/reth-data/
 deploy/base-node/.grafana-admin
+
+# Python bytecode
+__pycache__/
+*.pyc

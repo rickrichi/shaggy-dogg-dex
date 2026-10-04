@@ -1,10 +1,16 @@
 // vite.config.ts - Shaggy Dogg DEX (2025 Standards)
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react-swc'  // ⚡ Using SWC for 5x faster builds
 import checker from 'vite-plugin-checker'
 import path from 'node:path'
+import { BASE_PUBLIC_RPC_URLS } from './src/lib/base-rpc'
 
 export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), 'VITE_ARB_');
+  const apiUrl = (env.VITE_ARB_API_URL || 'http://localhost:8000').replace(/\/+$/, '');
+  const wsUrl = env.VITE_ARB_WS_URL || `${apiUrl.replace(/^http/, 'ws')}/ws`;
+  const arbOrigins = `${new URL(apiUrl).origin} ${new URL(wsUrl).origin}`;
+  const rpcOrigins = [...BASE_PUBLIC_RPC_URLS, 'https://arb1.arbitrum.io', 'https://mainnet.optimism.io', 'https://polygon-rpc.com', 'https://rpc.sepolia.org'].map(url => new URL(url).origin).join(' ');
   return {
     // ── Vite 7.x Configuration ──────────────────────────────────────────────
     appType: 'spa',
@@ -63,10 +69,11 @@ export default defineConfig(({ mode }) => {
         'Content-Security-Policy-Report-Only': [
           "default-src 'self'",
           "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:5173",
+          "worker-src 'self' blob:",
           "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
           "img-src 'self' data: https: blob:",
           "font-src 'self' data: https://fonts.gstatic.com",
-          "connect-src 'self' http://localhost:5173 http://localhost:8788 ws://localhost:5173 https://ethereum.publicnode.com https://*.alchemy.com https://*.infura.io https://*.walletconnect.com https://*.walletconnect.org https://*.supabase.co https://*.supabase.in wss://*.walletconnect.com wss://*.walletconnect.org wss://*.supabase.co wss://*.supabase.in",
+          `connect-src ${arbOrigins} ${rpcOrigins} 'self' http://localhost:5173 http://localhost:8788 http://localhost:8000 http://127.0.0.1:8000 http://localhost:8010 ws://localhost:5173 ws://localhost:8000 ws://127.0.0.1:8000 https://ethereum.publicnode.com https://*.alchemy.com https://*.infura.io https://*.walletconnect.com https://*.walletconnect.org https://*.supabase.co https://*.supabase.in wss://*.walletconnect.com wss://*.walletconnect.org wss://*.supabase.co wss://*.supabase.in`,
           "object-src 'none'",
           "base-uri 'self'",
         ].join('; '),
@@ -89,6 +96,13 @@ export default defineConfig(({ mode }) => {
 
       // ── Proxy Configuration ─────────────────────────────────────────────
       proxy: {
+        // cryptostream live exchange gateway (../cryptostream, port 8080): REST + WebSocket
+        '/cryptostream': {
+          target: 'http://localhost:8080',
+          changeOrigin: true,
+          ws: true,
+          rewrite: (path) => path.replace(/^\/cryptostream/, ''),
+        },
         // Main API → Hono backend on port 8788 (8787 is reserved locally)
         '/api': {
           target: 'http://localhost:8788',
@@ -198,110 +212,8 @@ export default defineConfig(({ mode }) => {
         },
 
         output: {
-          // Manual chunk splitting for better caching
-          manualChunks: (id) => {
-            // Node modules only
-            if (!id.includes('node_modules')) return
-
-            // Core React
-            if (id.includes('react') || id.includes('react-dom') || id.includes('scheduler')) {
-              return 'vendor-react'
-            }
-            if (id.includes('react-router')) {
-              return 'vendor-router'
-            }
-
-            // Radix UI Components (split into groups for better caching)
-            if (id.includes('@radix-ui')) {
-              // Group by complexity/size
-              if (id.includes('dialog') || id.includes('dropdown') || id.includes('popover') || id.includes('select')) {
-                return 'ui-radix-overlay'
-              }
-              if (id.includes('accordion') || id.includes('tabs') || id.includes('collapsible')) {
-                return 'ui-radix-container'
-              }
-              return 'ui-radix-core'
-            }
-
-            // Form & Validation
-            if (id.includes('react-hook-form') || id.includes('@hookform') || id.includes('zod')) {
-              return 'vendor-forms'
-            }
-
-            // Web3 Core Stack
-            if (id.includes('viem') || id.includes('abitype') || id.includes('/ox/')) {
-              return 'web3-core'
-            }
-            if (id.includes('wagmi') || id.includes('@wagmi')) {
-              return 'web3-wagmi'
-            }
-            // Split WalletConnect ecosystem into separate chunks (very large)
-            if (id.includes('@walletconnect') || id.includes('qrcode')) {
-              return 'web3-walletconnect'
-            }
-            if (id.includes('@reown')) {
-              return 'web3-reown'
-            }
-            if (id.includes('porto')) {
-              return 'web3-porto'
-            }
-            if (id.includes('@rainbow-me')) {
-              return 'web3-rainbowkit'
-            }
-
-            // Data & Query Layer
-            if (id.includes('@tanstack/react-query')) {
-              return 'data-query'
-            }
-            if (id.includes('@supabase')) {
-              return 'data-supabase'
-            }
-
-            // Charts & Visualization
-            if (id.includes('recharts') || id.includes('d3-')) {
-              return 'vendor-charts'
-            }
-
-            // Animation & Motion
-            if (id.includes('framer-motion')) {
-              return 'vendor-motion'
-            }
-
-            // UI Utilities
-            if (id.includes('lucide-react')) {
-              return 'ui-icons'
-            }
-            if (id.includes('date-fns') || id.includes('react-day-picker')) {
-              return 'vendor-dates'
-            }
-            if (id.includes('cmdk') || id.includes('vaul') || id.includes('sonner')) {
-              return 'ui-components'
-            }
-
-            // Carousel & Embla
-            if (id.includes('embla-carousel')) {
-              return 'vendor-carousel'
-            }
-
-            // Markdown & Syntax Highlighting
-            if (id.includes('marked') || id.includes('highlight.js')) {
-              return 'vendor-markdown'
-            }
-
-            // Theme & Styling
-            if (id.includes('next-themes') || id.includes('tailwind') || id.includes('class-variance-authority') || id.includes('clsx')) {
-              return 'vendor-styling'
-            }
-
-            // Utility Libraries
-            if (id.includes('react-resizable-panels') || id.includes('input-otp')) {
-              return 'vendor-utils'
-            }
-
-            // Don't bundle everything else - let Vite decide
-            // This prevents a massive vendor-misc chunk
-          },
-
+          // Let Rollup preserve dependency initialization order. Manual wallet
+          // vendor groups introduced a Reown/WalletConnect circular initialization.
           // Clean file names
           chunkFileNames: (chunkInfo) => {
             const facadeName = chunkInfo.facadeModuleId
@@ -359,7 +271,7 @@ export default defineConfig(({ mode }) => {
           "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
           "img-src 'self' data: https: blob:",
           "font-src 'self' data: https://fonts.gstatic.com",
-          "connect-src 'self' https://*.alchemy.com https://*.infura.io https://*.walletconnect.com https://*.walletconnect.org https://*.supabase.co https://*.supabase.in wss://*.walletconnect.com wss://*.walletconnect.org wss://*.supabase.co wss://*.supabase.in",
+          `connect-src ${arbOrigins} ${rpcOrigins} 'self' https://*.alchemy.com https://*.infura.io https://*.walletconnect.com https://*.walletconnect.org https://*.supabase.co https://*.supabase.in wss://*.walletconnect.com wss://*.walletconnect.org wss://*.supabase.co wss://*.supabase.in`,
           "worker-src 'self' blob:",
           "object-src 'none'",
           "base-uri 'self'",
