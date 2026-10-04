@@ -1,0 +1,7 @@
+{
+  "name": "shaggy-dogg-desktop",
+  "version": "0.1.0",
+  "description": "Shaggy-Dogg-Dex Base terminal",
+  "author": "Shaggy-Dogg-Dex",
+  "main": "main.cjs"
+}

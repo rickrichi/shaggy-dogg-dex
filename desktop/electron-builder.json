@@ -1,0 +1,15 @@
+{
+  "appId": "com.shaggydogg.dex",
+  "productName": "Shaggy-Dogg-Dex",
+  "directories": { "app": "desktop", "output": "release/desktop" },
+  "files": ["*.cjs", "!*.test.cjs", "package.json", "!node_modules/**/*"],
+  "extraResources": [
+    { "from": "dist", "to": "dist" },
+    { "from": ".desktop-build/dist", "to": "backend" },
+    { "from": ".desktop-build/daemon", "to": "daemon" }
+  ],
+  "asar": true,
+  "npmRebuild": false,
+  "win": { "target": "nsis", "signAndEditExecutable": false },
+  "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true, "createDesktopShortcut": true }
+}
