@@ -29,6 +29,11 @@ contract YieldStakingVault {
 
     function discountDenominator() external pure returns (uint256) { return 10_000; }
 
+    // Share-price manipulation defence (OpenZeppelin-style virtual offset). Shares carry 6 extra
+    // decimals relative to the asset; the final withdrawer leaves at most a negligible rounding dust.
+    uint256 private constant VIRTUAL_SHARES = 1e6;
+    uint256 private constant VIRTUAL_ASSETS = 1;
+
     uint256 public totalShares;
     mapping(address => uint256) public sharesOf;
     mapping(address => uint256) public principalDeposited;
@@ -128,11 +133,8 @@ contract YieldStakingVault {
             IPool(aavePool).supply(address(underlyingAsset), amount, address(this), 0);
         }
 
-        if (totalShares == 0 || assetsBefore == 0) {
-            shares = amount;
-        } else {
-            shares = (amount * totalShares) / assetsBefore;
-        }
+        // Virtual shares/assets (decimals offset) make a first-depositor donation unprofitable.
+        shares = (amount * (totalShares + VIRTUAL_SHARES)) / (assetsBefore + VIRTUAL_ASSETS);
 
         require(shares > 0, "Deposit too small");
         totalShares += shares;
@@ -151,7 +153,7 @@ contract YieldStakingVault {
         require(sharesOf[msg.sender] >= shares, "Insufficient shares");
 
         uint256 totalA = totalAssets();
-        uint256 grossAmount = (shares * totalA) / totalShares;
+        uint256 grossAmount = (shares * (totalA + VIRTUAL_ASSETS)) / (totalShares + VIRTUAL_SHARES);
 
         totalShares -= shares;
         sharesOf[msg.sender] -= shares;

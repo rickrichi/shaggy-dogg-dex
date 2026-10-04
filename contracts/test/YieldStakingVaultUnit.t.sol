@@ -63,6 +63,10 @@ contract YieldStakingVaultUnitTest {
         _fund(BOB, 1_000_000 ether);
     }
 
+    function _near(uint256 a, uint256 b, uint256 tol, string memory why) internal pure {
+        require(a + tol >= b && b + tol >= a, why);
+    }
+
     function _fund(address who, uint256 amount) internal {
         usdc.transfer(who, amount);
         vm.prank(who);
@@ -79,7 +83,7 @@ contract YieldStakingVaultUnitTest {
 
     function testRoundTripWithoutYieldChargesNoFee() public {
         uint256 shares = _deposit(ALICE, 1_000 ether);
-        require(shares == 1_000 ether && vault.totalAssets() == 1_000 ether, "1:1 first deposit");
+        require(shares == 1_000 ether * 1e6 && vault.totalAssets() == 1_000 ether, "first deposit mints asset*1e6 shares");
         uint256 before = usdc.balanceOf(ALICE);
         vm.prank(ALICE);
         vault.withdraw(shares);
@@ -92,7 +96,7 @@ contract YieldStakingVaultUnitTest {
         _yield(100 ether);
         vm.prank(ALICE);
         vault.withdraw(shares);
-        require(usdc.balanceOf(TREASURY) == 10 ether, "10% of 100 yield");
+        _near(usdc.balanceOf(TREASURY), 10 ether, 10, "10% of 100 yield");
 
         // Bob stakes into the 5% discount tier: fee becomes 9.5% of yield.
         amutt.transfer(BOB, 10_000 ether);
@@ -105,22 +109,21 @@ contract YieldStakingVaultUnitTest {
         uint256 feeBefore = usdc.balanceOf(TREASURY);
         vm.prank(BOB);
         vault.withdraw(bobShares);
-        require(usdc.balanceOf(TREASURY) - feeBefore == 9.5 ether, "9.5% with 5% discount");
+        _near(usdc.balanceOf(TREASURY) - feeBefore, 9.5 ether, 10, "9.5% with 5% discount");
     }
 
     function testSharesAreProRataAcrossDepositors() public {
         uint256 a = _deposit(ALICE, 1_000 ether);
         _yield(1_000 ether);
         uint256 b = _deposit(BOB, 2_000 ether);
-        require(b == (2_000 ether * a) / (2_000 ether), "bob buys in at the higher price");
-        require(b == 1_000 ether, "2000 buys half the pre-existing share count");
+        _near(b, a, a / 1e12, "2000 buys in at the doubled price: the same share count as the first 1000");
     }
 
     function testZeroAndOverdrawRevert() public {
         try vault.deposit(0) { revert("zero deposit"); } catch {}
-        _deposit(ALICE, 10 ether);
+        uint256 owned = _deposit(ALICE, 10 ether);
         vm.prank(ALICE);
-        try vault.withdraw(11 ether) { revert("overdraw"); } catch {}
+        try vault.withdraw(owned + 1) { revert("overdraw"); } catch {}
         vm.prank(BOB);
         try vault.withdraw(1) { revert("no shares"); } catch {}
     }
@@ -150,21 +153,32 @@ contract YieldStakingVaultUnitTest {
 
     // ---- Known issues, characterised so reviewers can reproduce them (see audit/KNOWN-ISSUES.md) ----
 
-    /// KI-V1: share-price donation. A 1-unit first deposit plus a direct donation makes a later
-    /// depositor round down to a single share, so the attacker captures part of the victim's deposit.
-    function testKnownIssueFirstDepositorDonationCapturesVictimFunds() public {
-        // Attacker (Alice) deposits 1 wei and donates 10,000 straight to the vault.
+    /// Regression for the former KI-V1: with virtual shares a donation attack loses money for the attacker
+    /// and does not hurt the victim.
+    function testDonationAttackIsUnprofitable() public {
         uint256 aliceCost = 1 + 10_000 ether;
         _deposit(ALICE, 1);
         vm.prank(ALICE);
         usdc.transfer(address(vault), 10_000 ether);
-        // Victim deposits 15,000 and receives only one share (floor of 1.5).
         uint256 victimShares = _deposit(BOB, 15_000 ether);
-        require(victimShares == 1, "victim rounded down to a single share");
-        uint256 before = usdc.balanceOf(ALICE);
+        require(victimShares > 1_000_000, "victim receives a meaningful share count");
+        uint256 aliceBefore = usdc.balanceOf(ALICE);
         vm.prank(ALICE);
-        vault.withdraw(1);
-        require(usdc.balanceOf(ALICE) - before > aliceCost, "attacker profits despite the 10% performance fee");
+        vault.withdraw(1e6);
+        require(usdc.balanceOf(ALICE) - aliceBefore < aliceCost, "attacker loses money");
+        uint256 bobBefore = usdc.balanceOf(BOB);
+        vm.prank(BOB);
+        vault.withdraw(victimShares);
+        require(usdc.balanceOf(BOB) - bobBefore >= 15_000 ether - 0.01 ether, "victim loses at most a rounding amount (<0.01)");
+    }
+
+    /// A tiny deposit against a donated vault is rejected outright instead of silently donating funds.
+    function testTinyDepositAfterDonationReverts() public {
+        _deposit(ALICE, 1);
+        vm.prank(ALICE);
+        usdc.transfer(address(vault), 10_000 ether);
+        vm.prank(BOB);
+        try vault.deposit(1) { revert("expected zero-share revert"); } catch {}
     }
 
     /// KI-V2: the admin can repoint the vault at an arbitrary pool; later deposits are approved and sent to it.

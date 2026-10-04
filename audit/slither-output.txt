@@ -1,16 +1,3 @@
-Downloading cpython-3.12.14-linux-x86_64-gnu (download) (32.7MiB)
- Downloaded cpython-3.12.14-linux-x86_64-gnu (download)
-Downloading pydantic-core (2.0MiB)
-Downloading aiohttp (1.7MiB)
-Downloading cytoolz (2.7MiB)
-Downloading pycryptodome (2.2MiB)
-Downloading web3 (1.3MiB)
- Downloaded web3
- Downloaded aiohttp
- Downloaded pydantic-core
- Downloaded pycryptodome
- Downloaded cytoolz
-Installed 47 packages in 124ms
 
 Detector: reentrancy-balance
 Reentrancy in AtomicFlashArbitrageRouter._executeDualDexV2(address,bytes) (src/AtomicFlashArbitrageRouter.sol#363-403):
@@ -31,53 +18,53 @@ Reentrancy in AtomicFlashArbitrageRouter._executeDualDexV2(address,bytes) (src/A
 	Possible stale balance used after the call in a condition:
 	- require(bool,string)(tokenBBal > 0,Leg 1 returned zero) (src/AtomicFlashArbitrageRouter.sol#387)
 		- stale variable `tokenBBal`
-Reentrancy in CompoundYieldVault.deposit(uint256) (src/CompoundYieldVault.sol#112-135):
+Reentrancy in CompoundYieldVault.deposit(uint256) (src/CompoundYieldVault.sol#115-137):
 	External call allowing reentrancy:
-	- require(bool,string)(underlyingAsset.transferFrom(msg.sender,address(this),amount),Transfer failed) (src/CompoundYieldVault.sol#115-118)
+	- require(bool,string)(underlyingAsset.transferFrom(msg.sender,address(this),amount),Transfer failed) (src/CompoundYieldVault.sol#120-123)
 	Balance read before the call:
-	- assetsBefore = totalAssets() (src/CompoundYieldVault.sol#115)
+	- assetsBefore = totalAssets() (src/CompoundYieldVault.sol#120)
 	Possible stale balance used after the call in a condition:
-	- require(bool,string)(shares > 0,Deposit too small) (src/CompoundYieldVault.sol#128-129)
+	- require(bool,string)(shares > 0,Deposit too small) (src/CompoundYieldVault.sol#132-133)
 		- stale variable `shares`
-Reentrancy in YieldStakingVault.deposit(uint256) (src/YieldStakingVault.sol#112-139):
+Reentrancy in YieldStakingVault.deposit(uint256) (src/YieldStakingVault.sol#116-141):
 	External call allowing reentrancy:
-	- require(bool,string)(underlyingAsset.transferFrom(msg.sender,address(this),amount),Transfer failed) (src/YieldStakingVault.sol#118-122)
+	- require(bool,string)(underlyingAsset.transferFrom(msg.sender,address(this),amount),Transfer failed) (src/YieldStakingVault.sol#123-127)
 	Balance read before the call:
-	- assetsBefore = totalAssets() (src/YieldStakingVault.sol#117)
+	- assetsBefore = totalAssets() (src/YieldStakingVault.sol#122)
 	Possible stale balance used after the call in a condition:
-	- require(bool,string)(shares > 0,Deposit too small) (src/YieldStakingVault.sol#131-133)
+	- require(bool,string)(shares > 0,Deposit too small) (src/YieldStakingVault.sol#136-137)
 		- stale variable `shares`
-Reentrancy in CompoundYieldVault.deposit(uint256) (src/CompoundYieldVault.sol#112-135):
+Reentrancy in CompoundYieldVault.deposit(uint256) (src/CompoundYieldVault.sol#115-137):
 	External call allowing reentrancy:
-	- underlyingAsset.approve(address(comet),amount) (src/CompoundYieldVault.sol#120)
+	- underlyingAsset.approve(address(comet),amount) (src/CompoundYieldVault.sol#125)
 	Balance read before the call:
-	- assetsBefore = totalAssets() (src/CompoundYieldVault.sol#115)
+	- assetsBefore = totalAssets() (src/CompoundYieldVault.sol#120)
 	Possible stale balance used after the call in a condition:
-	- require(bool,string)(shares > 0,Deposit too small) (src/CompoundYieldVault.sol#128-129)
+	- require(bool,string)(shares > 0,Deposit too small) (src/CompoundYieldVault.sol#132-133)
 		- stale variable `shares`
-Reentrancy in YieldStakingVault.deposit(uint256) (src/YieldStakingVault.sol#112-139):
+Reentrancy in YieldStakingVault.deposit(uint256) (src/YieldStakingVault.sol#116-141):
 	External call allowing reentrancy:
-	- underlyingAsset.approve(aavePool,amount) (src/YieldStakingVault.sol#123-125)
+	- underlyingAsset.approve(aavePool,amount) (src/YieldStakingVault.sol#128-130)
 	Balance read before the call:
-	- assetsBefore = totalAssets() (src/YieldStakingVault.sol#117)
+	- assetsBefore = totalAssets() (src/YieldStakingVault.sol#122)
 	Possible stale balance used after the call in a condition:
-	- require(bool,string)(shares > 0,Deposit too small) (src/YieldStakingVault.sol#131-133)
+	- require(bool,string)(shares > 0,Deposit too small) (src/YieldStakingVault.sol#136-137)
 		- stale variable `shares`
-Reentrancy in CompoundYieldVault.deposit(uint256) (src/CompoundYieldVault.sol#112-135):
+Reentrancy in CompoundYieldVault.deposit(uint256) (src/CompoundYieldVault.sol#115-137):
 	External call allowing reentrancy:
-	- comet.supply(address(underlyingAsset),amount) (src/CompoundYieldVault.sol#121-123)
+	- comet.supply(address(underlyingAsset),amount) (src/CompoundYieldVault.sol#125-127)
 	Balance read before the call:
-	- assetsBefore = totalAssets() (src/CompoundYieldVault.sol#115)
+	- assetsBefore = totalAssets() (src/CompoundYieldVault.sol#120)
 	Possible stale balance used after the call in a condition:
-	- require(bool,string)(shares > 0,Deposit too small) (src/CompoundYieldVault.sol#128-129)
+	- require(bool,string)(shares > 0,Deposit too small) (src/CompoundYieldVault.sol#132-133)
 		- stale variable `shares`
-Reentrancy in YieldStakingVault.deposit(uint256) (src/YieldStakingVault.sol#112-139):
+Reentrancy in YieldStakingVault.deposit(uint256) (src/YieldStakingVault.sol#116-141):
 	External call allowing reentrancy:
-	- IPool(aavePool).supply(address(underlyingAsset),amount,address(this),0) (src/YieldStakingVault.sol#125-127)
+	- IPool(aavePool).supply(address(underlyingAsset),amount,address(this),0) (src/YieldStakingVault.sol#130-132)
 	Balance read before the call:
-	- assetsBefore = totalAssets() (src/YieldStakingVault.sol#117)
+	- assetsBefore = totalAssets() (src/YieldStakingVault.sol#122)
 	Possible stale balance used after the call in a condition:
-	- require(bool,string)(shares > 0,Deposit too small) (src/YieldStakingVault.sol#131-133)
+	- require(bool,string)(shares > 0,Deposit too small) (src/YieldStakingVault.sol#136-137)
 		- stale variable `shares`
 Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities
 
@@ -86,14 +73,10 @@ AtomicFlashArbitrageRouter._safeApprove(address,address,uint256) (src/AtomicFlas
 	- require(bool,string)(success && (data.length == 0 || abi.decode(data,(bool))),Approve failed) (src/AtomicFlashArbitrageRouter.sol#430)
 AtomicFlashArbitrageRouter._safeTransfer(address,address,uint256) (src/AtomicFlashArbitrageRouter.sol#433-438) uses a dangerous strict equality:
 	- require(bool,string)(success && (data.length == 0 || abi.decode(data,(bool))),Transfer failed) (src/AtomicFlashArbitrageRouter.sol#437)
-CompoundYieldVault.deposit(uint256) (src/CompoundYieldVault.sol#112-135) uses a dangerous strict equality:
-	- totalShares == 0 || assetsBefore == 0 (src/CompoundYieldVault.sol#123-124)
 IsolatedLendingVault.convertToAssets(uint256) (src/IsolatedLendingVault.sol#105-108) uses a dangerous strict equality:
 	- totalSupply == 0 (src/IsolatedLendingVault.sol#106)
 IsolatedLendingVault.convertToShares(uint256) (src/IsolatedLendingVault.sol#99-103) uses a dangerous strict equality:
 	- totalSupply == 0 || totalA == 0 (src/IsolatedLendingVault.sol#101)
-YieldStakingVault.deposit(uint256) (src/YieldStakingVault.sol#112-139) uses a dangerous strict equality:
-	- totalShares == 0 || assetsBefore == 0 (src/YieldStakingVault.sol#127-128)
 Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#dangerous-strict-equalities
 
 Detector: reentrancy-no-eth
@@ -124,27 +107,27 @@ Reentrancy in IsolatedLendingVault.mint(uint256,address) (src/IsolatedLendingVau
 Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-2
 
 Detector: unused-return
-CompoundYieldVault.deposit(uint256) (src/CompoundYieldVault.sol#112-135) ignores return value by underlyingAsset.approve(address(comet),amount) (src/CompoundYieldVault.sol#120)
+CompoundYieldVault.deposit(uint256) (src/CompoundYieldVault.sol#115-137) ignores return value by underlyingAsset.approve(address(comet),amount) (src/CompoundYieldVault.sol#125)
 IsolatedLendingVault.deposit(uint256,address) (src/IsolatedLendingVault.sol#110-131) ignores return value by assetToken.approve(lendingMarketAdapter,assets) (src/IsolatedLendingVault.sol#121)
 IsolatedLendingVault.deposit(uint256,address) (src/IsolatedLendingVault.sol#110-131) ignores return value by IMoonwellMToken(lendingMarketAdapter).mint(assets) (src/IsolatedLendingVault.sol#122)
 IsolatedLendingVault.mint(uint256,address) (src/IsolatedLendingVault.sol#133-151) ignores return value by assetToken.approve(lendingMarketAdapter,assets) (src/IsolatedLendingVault.sol#141)
 IsolatedLendingVault.mint(uint256,address) (src/IsolatedLendingVault.sol#133-151) ignores return value by IMoonwellMToken(lendingMarketAdapter).mint(assets) (src/IsolatedLendingVault.sol#142)
 IsolatedLendingVault._redeemInternal(uint256,address,address) (src/IsolatedLendingVault.sol#179-221) ignores return value by IMoonwellMToken(lendingMarketAdapter).redeemUnderlying(needed) (src/IsolatedLendingVault.sol#189)
-YieldStakingVault.deposit(uint256) (src/YieldStakingVault.sol#112-139) ignores return value by underlyingAsset.approve(aavePool,amount) (src/YieldStakingVault.sol#123-125)
-YieldStakingVault.withdraw(uint256) (src/YieldStakingVault.sol#143-190) ignores return value by IPool(aavePool).withdraw(address(underlyingAsset),deficit,address(this)) (src/YieldStakingVault.sol#184)
+YieldStakingVault.deposit(uint256) (src/YieldStakingVault.sol#116-141) ignores return value by underlyingAsset.approve(aavePool,amount) (src/YieldStakingVault.sol#128-130)
+YieldStakingVault.withdraw(uint256) (src/YieldStakingVault.sol#144-192) ignores return value by IPool(aavePool).withdraw(address(underlyingAsset),deficit,address(this)) (src/YieldStakingVault.sol#186)
 Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#unused-return
 
 Detector: missing-zero-check
 IsolatedLendingVault.setLendingMarketAdapter(address).newAdapter (src/IsolatedLendingVault.sol#253) lacks a zero-check on :
 		- lendingMarketAdapter = newAdapter (src/IsolatedLendingVault.sol#254)
-YieldStakingVault.constructor(address,address,address,address,address,address)._aavePool (src/YieldStakingVault.sol#57-58) lacks a zero-check on :
-		- aavePool = _aavePool (src/YieldStakingVault.sol#67-69)
-YieldStakingVault.constructor(address,address,address,address,address,address)._aToken (src/YieldStakingVault.sol#58) lacks a zero-check on :
-		- aToken = _aToken (src/YieldStakingVault.sol#69)
-YieldStakingVault.setAavePoolAndAToken(address,address).newPool (src/YieldStakingVault.sol#93-94) lacks a zero-check on :
-		- aavePool = newPool (src/YieldStakingVault.sol#97)
-YieldStakingVault.setAavePoolAndAToken(address,address).newAToken (src/YieldStakingVault.sol#94) lacks a zero-check on :
-		- aToken = newAToken (src/YieldStakingVault.sol#97)
+YieldStakingVault.constructor(address,address,address,address,address,address)._aavePool (src/YieldStakingVault.sol#61-62) lacks a zero-check on :
+		- aavePool = _aavePool (src/YieldStakingVault.sol#72-74)
+YieldStakingVault.constructor(address,address,address,address,address,address)._aToken (src/YieldStakingVault.sol#63) lacks a zero-check on :
+		- aToken = _aToken (src/YieldStakingVault.sol#74)
+YieldStakingVault.setAavePoolAndAToken(address,address).newPool (src/YieldStakingVault.sol#98-99) lacks a zero-check on :
+		- aavePool = newPool (src/YieldStakingVault.sol#101-102)
+YieldStakingVault.setAavePoolAndAToken(address,address).newAToken (src/YieldStakingVault.sol#99) lacks a zero-check on :
+		- aToken = newAToken (src/YieldStakingVault.sol#102)
 Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#missing-zero-address-validation
 
 Detector: calls-loop
@@ -157,15 +140,15 @@ AtomicFlashArbitrageRouter._executeGenericSteps(bytes) (src/AtomicFlashArbitrage
 Reference: https://github.com/crytic/slither/wiki/Detector-Documentation/#calls-inside-a-loop
 
 Detector: reentrancy-benign
-Reentrancy in CompoundYieldVault.deposit(uint256) (src/CompoundYieldVault.sol#112-135):
+Reentrancy in CompoundYieldVault.deposit(uint256) (src/CompoundYieldVault.sol#115-137):
 	External calls:
-	- require(bool,string)(underlyingAsset.transferFrom(msg.sender,address(this),amount),Transfer failed) (src/CompoundYieldVault.sol#115-118)
-	- underlyingAsset.approve(address(comet),amount) (src/CompoundYieldVault.sol#120)
-	- comet.supply(address(underlyingAsset),amount) (src/CompoundYieldVault.sol#121-123)
+	- require(bool,string)(underlyingAsset.transferFrom(msg.sender,address(this),amount),Transfer failed) (src/CompoundYieldVault.sol#120-123)
+	- underlyingAsset.approve(address(comet),amount) (src/CompoundYieldVault.sol#125)
+	- comet.supply(address(underlyingAsset),amount) (src/CompoundYieldVault.sol#125-127)
 	State variables written after the call(s):
-	- principalDeposited[msg.sender] += amount (src/CompoundYieldVault.sol#133)
-	- sharesOf[msg.sender] += shares (src/CompoundYieldVault.sol#130-131)
-	- totalShares += shares (src/CompoundYieldVault.sol#130)
+	- principalDeposited[msg.sender] += amount (src/CompoundYieldVault.sol#133-135)
+	- sharesOf[msg.sender] += shares (src/CompoundYieldVault.sol#133)
+	- totalShares += shares (src/CompoundYieldVault.sol#133)
 Reentrancy in IsolatedLendingVault.deposit(uint256,address) (src/IsolatedLendingVault.sol#110-131):
 	External calls:
 	- require(bool,string)(assetToken.transferFrom(msg.sender,address(this),assets),Transfer failed) (src/IsolatedLendingVault.sol#117)
@@ -174,15 +157,15 @@ Reentrancy in IsolatedLendingVault.deposit(uint256,address) (src/IsolatedLending
 	State variables written after the call(s):
 	- balanceOf[receiver] += shares (src/IsolatedLendingVault.sol#126)
 	- principalDeposited[receiver] += assets (src/IsolatedLendingVault.sol#127)
-Reentrancy in YieldStakingVault.deposit(uint256) (src/YieldStakingVault.sol#112-139):
+Reentrancy in YieldStakingVault.deposit(uint256) (src/YieldStakingVault.sol#116-141):
 	External calls:
-	- require(bool,string)(underlyingAsset.transferFrom(msg.sender,address(this),amount),Transfer failed) (src/YieldStakingVault.sol#118-122)
-	- underlyingAsset.approve(aavePool,amount) (src/YieldStakingVault.sol#123-125)
-	- IPool(aavePool).supply(address(underlyingAsset),amount,address(this),0) (src/YieldStakingVault.sol#125-127)
+	- require(bool,string)(underlyingAsset.transferFrom(msg.sender,address(this),amount),Transfer failed) (src/YieldStakingVault.sol#123-127)
+	- underlyingAsset.approve(aavePool,amount) (src/YieldStakingVault.sol#128-130)
+	- IPool(aavePool).supply(address(underlyingAsset),amount,address(this),0) (src/YieldStakingVault.sol#130-132)
 	State variables written after the call(s):
-	- principalDeposited[msg.sender] += amount (src/YieldStakingVault.sol#135-137)
-	- sharesOf[msg.sender] += shares (src/YieldStakingVault.sol#134)
-	- totalShares += shares (src/YieldStakingVault.sol#133-134)
+	- principalDeposited[msg.sender] += amount (src/YieldStakingVault.sol#137-139)
+	- sharesOf[msg.sender] += shares (src/YieldStakingVault.sol#137)
+	- totalShares += shares (src/YieldStakingVault.sol#137)
 Reentrancy in IsolatedLendingVault.mint(uint256,address) (src/IsolatedLendingVault.sol#133-151):
 	External calls:
 	- require(bool,string)(assetToken.transferFrom(msg.sender,address(this),assets),Transfer failed) (src/IsolatedLendingVault.sol#138)
@@ -261,7 +244,7 @@ FeeDiscountStaking.unstake(uint256) (src/FeeDiscountStaking.sol#127-150) uses ti
 	Dangerous comparisons:
 	- require(bool,string)(block.timestamp >= stakeTimestamp[msg.sender] + minimumStakePeriod,Stake locked) (src/FeeDiscountStaking.sol#133-137)
 Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#block-timestamp
-. analyzed (20 contracts with 76 detectors), 43 result(s) found
+. analyzed (20 contracts with 76 detectors), 41 result(s) found
 'forge clean' running (wd: /mnt/c/Users/fbada/source/repos/shaggy-dogg-dex/contracts)
 'forge config --json' running
 'forge build --build-info --deny never --skip ./test/** ./script/** --force' running (wd: /mnt/c/Users/fbada/source/repos/shaggy-dogg-dex/contracts)

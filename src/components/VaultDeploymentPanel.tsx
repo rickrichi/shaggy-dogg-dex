@@ -10,7 +10,7 @@ const legacy = "0x16a1E9c10B913912b7B7df4649D9596D95ce33E6";
 const usdc = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 const pool = "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5";
 const aToken = "0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB";
-const deploymentKey = "shaggy-corrected-vault-deployment-base";
+const deploymentKey = "shaggy-vault-v3-deployment-base";
 function savedHash(): Hash | undefined {
   try {
     const value = localStorage.getItem(deploymentKey);
@@ -87,7 +87,7 @@ export function VaultDeploymentPanel() {
     await checkReceipt(tx);
   });
   return <section className="space-y-3 border-t pt-4">
-    <h3 className="font-semibold">Deploy corrected USDC vault</h3>
+    <h3 className="font-semibold">Deploy USDC vault v3 (share-price protection)</h3>
     <p className="text-sm text-muted-foreground">Base mainnet · Aave USDC · 10% performance fee before staking discounts. Deployment preserves the current administrator and treasury. Existing deposits are not moved.</p>
     <Button variant="outline" disabled={busy || !!hash} onClick={() => void prepare()}>Review deployment estimate</Button>
     {review && <div className="space-y-2 break-all text-sm">

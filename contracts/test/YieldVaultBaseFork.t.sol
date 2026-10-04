@@ -44,7 +44,7 @@ contract YieldVaultBaseForkTest {
         uint256 beforeBalance = usdc.balanceOf(address(this));
         uint256 shares = vault.deposit(100e6);
         // At this pinned block Aave rounds a 100 USDC supply down by two micro-USDC.
-        require(shares == 100e6 && vault.totalAssets() >= 100e6-2 && vault.totalAssets() <= 100e6, "Aave deposit");
+        require(shares == 100e6 * 1e6 && vault.totalAssets() >= 100e6-2 && vault.totalAssets() <= 100e6, "Aave deposit");
         vault.withdraw(shares);
         require(usdc.balanceOf(address(this)) >= beforeBalance-4, "Aave withdrawal");
         require(vault.totalShares() == 0, "shares remain");
