@@ -5,7 +5,7 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=20.10.0"
+    "node": ">=22.13.0"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -15,13 +15,19 @@
     "build:tsc": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "clean": "rm -rf dist"
+    "test": "vitest run",
+    "clean": "rm -rf dist",
+    "rpc:dev": "tsx src/rpc/main.ts",
+    "rpc:keys": "tsx src/rpc/keys.ts",
+    "rpc:build": "tsup --config tsup.rpc.config.ts",
+    "rpc:start": "node dist-rpc/main.js"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.6",
     "@hono/zod-validator": "^0.7.2",
     "dotenv": "^17.2.2",
     "hono": "^4.10.6",
+    "viem": "^2.39.0",
     "zod": "^4.1.12"
   },
   "devDependencies": {

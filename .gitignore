@@ -76,3 +76,17 @@ cypress/screenshots/
 # ── Misc caches ──────────────────────────────────────────────────────────────
 .parcel-cache/
 .cache/
+
+# Desktop build outputs (never package credentials)
+.desktop-build/
+release/
+
+# Local execution journal and private provider configuration
+.hedge-state/
+.env.private-routing
+.remediation-*
+
+# Own Base node secrets/data
+deploy/base-node/.env.node
+deploy/base-node/reth-data/
+deploy/base-node/.grafana-admin

@@ -1,0 +1,8 @@
+# Replace rpc.example.com. Caddy obtains TLS automatically. Access logs are off so API keys
+# in /v1/base/<key> URLs are never recorded. Only the JSON-RPC and health paths are exposed.
+rpc.example.com {
+	log { output discard }
+	@api path /v1/base /v1/base/* /health/live /health/ready
+	handle @api { reverse_proxy 127.0.0.1:8790 }
+	respond 404
+}

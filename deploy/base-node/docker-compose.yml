@@ -1,0 +1,57 @@
+# Own Base mainnet node (execution + consensus), pinned image, loopback-only RPC.
+# Derived from base/base docker-compose.yml, hardened: upstream publishes RPC/metrics on all
+# interfaces and ships a public engine JWT. Here only P2P is public.
+# Usage: pwsh ./init.ps1   then   docker compose --env-file .env.node up -d
+name: shaggy-base-node
+x-node: &node
+  image: ghcr.io/base/node:${NODE_TAG:-v1.4.2}
+  restart: unless-stopped
+  env_file: [.env.node]
+services:
+  execution:
+    <<: *node
+    command: ["bash", "./execution-entrypoint"]
+    ports:
+      - "127.0.0.1:8545:8545"   # HTTP RPC -> SHAGGY_RPC_UPSTREAM
+      - "127.0.0.1:8546:8546"   # WebSocket
+      - "127.0.0.1:7301:6060"   # metrics
+      - "30303:30303"           # P2P TCP (public)
+      - "30303:30303/udp"       # P2P UDP (public)
+    volumes:
+      - ${HOST_DATA_DIR:-./reth-data}:/data
+  node:
+    <<: *node
+    depends_on: [execution]
+    command: ["bash", "./consensus-entrypoint"]
+    ports:
+      - "127.0.0.1:7545:8545"   # consensus RPC
+      - "9222:9222"             # P2P TCP (public)
+      - "9222:9222/udp"         # P2P UDP (public)
+      - "127.0.0.1:7300:7300"   # metrics
+  # --- optional profiles ---------------------------------------------------
+  prometheus:
+    profiles: [monitoring]
+    image: prom/prometheus:v2.55.1
+    restart: unless-stopped
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=30d"]
+    volumes: ["./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro", "prom-data:/prometheus"]
+    ports: ["127.0.0.1:9090:9090"]
+  grafana:
+    profiles: [monitoring]
+    image: grafana/grafana:11.3.0
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    secrets: [grafana_admin]
+    volumes: ["grafana-data:/var/lib/grafana"]
+    ports: ["127.0.0.1:3001:3000"]
+  caddy:
+    profiles: [public]
+    image: caddy:2.8
+    restart: unless-stopped
+    network_mode: host   # reaches the gateway on 127.0.0.1:8790; needs Linux host
+    volumes: ["./Caddyfile:/etc/caddy/Caddyfile:ro", "caddy-data:/data"]
+volumes: { prom-data: {}, grafana-data: {}, caddy-data: {} }
+secrets:
+  grafana_admin: { file: ./.grafana-admin }

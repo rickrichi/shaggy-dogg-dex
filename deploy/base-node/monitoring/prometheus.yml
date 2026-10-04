@@ -1,0 +1,7 @@
+global: { scrape_interval: 15s }
+scrape_configs:
+  - job_name: execution
+    metrics_path: /metrics   # verify path against the running image
+    static_configs: [{ targets: ["execution:6060"] }]
+  - job_name: consensus
+    static_configs: [{ targets: ["node:7300"] }]

@@ -1,3 +1,10 @@
 dist/
 .env
 *.log
+# Admin SQLite (settings + session hashes)
+data/
+
+# Provider builds and local keys
+dist-rpc/
+*.key
+.env.rpc
