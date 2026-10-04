@@ -1,0 +1,14 @@
+{
+  "note": "Human-assigned roles only. Facts (code, admin, verification) come from chain reads in base-mainnet.manifest.json.",
+  "0x051c758521971f5c5a84eDaF18EEA12854375469": { "ecosystem": "SD", "role": "GovernanceToken (SD)", "usedBy": ["src/lib/contracts.ts"] },
+  "0x42134CcC6c41149cF71C7b4994E33Ee66758aF20": { "ecosystem": "SD", "role": "FeeDiscountStaking", "usedBy": ["src/lib/contracts.ts"] },
+  "0x8531807Ef36560CD7Db230c95DB85791aA586Dda": { "ecosystem": "SD", "role": "YieldStakingVault (legacy discount scale)", "usedBy": ["src/lib/contracts.ts"] },
+  "0x38cccAFb4ae96A8ef187F07fB17D18eb63E43782": { "ecosystem": "SD", "role": "CompoundYieldVault (legacy discount scale)", "usedBy": ["src/lib/contracts.ts"] },
+  "0xA5b50037A8D2Fda22805F750252268AdAEB36480": { "ecosystem": "SD", "role": "AaveFlashBorrower", "usedBy": ["src/lib/contracts.ts"] },
+  "0xC3D1e0b1CD05081bD7Af4cf87f681512E3E90917": { "ecosystem": "SD", "role": "Uniswap V2 pair SD/WETH", "usedBy": ["src/lib/contracts.ts"] },
+  "0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7": { "ecosystem": "AMUTT", "role": "GovernanceToken (AMUTT)", "usedBy": ["src/lib/staking.ts"] },
+  "0x055BB4eD8d5464C25D71391E940ce53CA30845fC": { "ecosystem": "AMUTT", "role": "FeeDiscountStaking", "usedBy": ["src/lib/staking.ts"] },
+  "0x16a1E9c10B913912b7B7df4649D9596D95ce33E6": { "ecosystem": "AMUTT", "role": "YieldStakingVault (legacy discount scale; deposits disabled in app)", "usedBy": ["src/components/YieldVaultPanel.tsx"] },
+  "0x581B294FeC1A4332f17cf18B49D68087c09b6784": { "ecosystem": "AMUTT", "role": "Uniswap V2 pair AMUTT/WETH" },
+  "0x936a3D52c3037848879F3641dfBc9132aAe51bDF": { "ecosystem": "AMUTT", "role": "AaveFlashBorrower" }
+}
