@@ -64,7 +64,7 @@ Source: `contracts/src/{GovernanceToken,FeeDiscountStaking,FeeDiscountMath,Yield
   runtime code match this tag's `YieldStakingVault.sol`; verified on Blockscout). v2 `0xC29c…`, the legacy vaults and the
   Compound vault still lack it and hold zero assets.
 - Secrets: the router operator key (deployer `0xc1c3…`) was committed in `ddddb02` and must be treated as compromised
-  (see KNOWN-ISSUES KI-X5). It is not an admin key.
+  (see KNOWN-ISSUES KI-X5; purged from git history, still to be treated as burned). It is not an admin key.
 
 ## Questions to put to the auditors
 
