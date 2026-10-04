@@ -73,12 +73,18 @@
   },
   "0xC29c4b5aF82F6c1469bc47Cfa167386f93514981": {
     "ecosystem": "AMUTT",
-    "role": "YieldStakingVault v2 (10000-bps discount scale, current)",
+    "role": "YieldStakingVault v2 (10000-bps discount scale; superseded by v3 0x5c98...59e5; zero assets)",
+    "deploymentTx": "0x342b72fc23fe2505d9e07ef28d350cac009d160291dd093a1db8e7c2d2d71ab5",
+    "sourceCommit": "2b20a00"
+  },
+  "0x5c98f6bc9d17ba0eb02e1336bdf035938f5859e5": {
+    "ecosystem": "AMUTT",
+    "role": "YieldStakingVault v3 (share-price protection with 1e6 virtual shares + 10000-bps scale, active)",
     "usedBy": [
       "src/components/YieldVaultPanel.tsx (VITE_YIELD_VAULT_ADDRESS)"
     ],
-    "deploymentTx": "0x342b72fc23fe2505d9e07ef28d350cac009d160291dd093a1db8e7c2d2d71ab5",
-    "sourceCommit": "2b20a00"
+    "deploymentTx": "0x1f6acc736b603dd2259afdb285bf715802fab1ef4fd9988bdac195fdf2cdb2fc",
+    "sourceCommit": "99365d4"
   },
   "0x70315019D12a11556c837970675cdC8fa54d186b": {
     "ecosystem": "Arbitrage",

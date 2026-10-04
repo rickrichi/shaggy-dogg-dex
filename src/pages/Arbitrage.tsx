@@ -2869,9 +2869,9 @@ export default function Arbitrage() {
                     </p>
 
                     <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 p-2 text-center text-[11px] text-emerald-900">
-                      <span className="font-semibold">Proposed economics policy (not live):</span> 10% of
-                      net realized flash loan yield would go to weekly AMUTT staker distributions on
-                      Base. No distributor exists yet, so nothing is paid today.
+                      <span className="font-semibold">Proposed economics policy (not live):</span>{" "}
+                      10% of net realized flash loan yield would go to weekly AMUTT staker
+                      distributions on Base. No distributor exists yet, so nothing is paid today.
                     </div>
                   </div>
                 </CardContent>

@@ -19,7 +19,8 @@ Exception: the contracts deployed on 29-30 September (both tokens, both staking 
 | --- | --- | --- |
 | GovernanceToken (AMUTT) | `0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7` | Token that users stake |
 | FeeDiscountStaking | `0x055BB4eD8d5464C25D71391E940ce53CA30845fC` | Holds staked AMUTT; admin-controlled lock and fee |
-| YieldStakingVault v2 | `0xC29c4b5aF82F6c1469bc47Cfa167386f93514981` | Holds USDC deposits supplied to Aave V3; corrected discount scale; lacks the later share-price fix (a v3 with the fix is the intended audit target) |
+| YieldStakingVault v3 | `0x5c98f6bc9d17ba0eb02e1336bdf035938f5859e5` | Holds USDC deposits supplied to Aave V3; corrected discount scale (10,000 bps) and share-price protection (1e6 virtual shares) |
+| YieldStakingVault v2 | `0xC29c4b5aF82F6c1469bc47Cfa167386f93514981` | Superseded by v3; zero assets |
 | AtomicFlashArbitrageRouter | `0x70315019D12A11556C837970675cDC8Fa54d186b` | Executes Aave flash-loan arbitrage; called by an operator hot key |
 
 Source: `contracts/src/{GovernanceToken,FeeDiscountStaking,FeeDiscountMath,YieldStakingVault,AtomicFlashArbitrageRouter,Interfaces}.sol`.

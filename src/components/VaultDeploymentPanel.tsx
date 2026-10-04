@@ -148,6 +148,20 @@ export function VaultDeploymentPanel() {
         Base mainnet · Aave USDC · 10% performance fee before staking discounts. Deployment
         preserves the current administrator and treasury. Existing deposits are not moved.
       </p>
+      {import.meta.env.VITE_YIELD_VAULT_ADDRESS && (
+        <div className="rounded-md border border-emerald-200 bg-emerald-50/80 p-2.5 text-xs text-emerald-900">
+          <span className="font-semibold">Configured vault: </span>
+          <code className="font-mono">{import.meta.env.VITE_YIELD_VAULT_ADDRESS}</code>
+          <a
+            href={`https://basescan.org/address/${import.meta.env.VITE_YIELD_VAULT_ADDRESS}`}
+            target="_blank"
+            rel="noreferrer"
+            className="ml-2 font-semibold text-emerald-700 underline hover:text-emerald-900"
+          >
+            Basescan ↗
+          </a>
+        </div>
+      )}
       <Button variant="outline" disabled={busy || !!hash} onClick={() => void prepare()}>
         Review deployment estimate
       </Button>

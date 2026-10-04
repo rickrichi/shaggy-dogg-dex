@@ -1,6 +1,6 @@
 {
   "chainId": 8453,
-  "generatedAt": "2026-10-04T08:31:19.922Z",
+  "generatedAt": "2026-10-04T09:44:35.532Z",
   "source": "on-chain reads + Blockscout API",
   "contracts": [
     {
@@ -202,10 +202,7 @@
       "creationTx": "0x342b72fc23fe2505d9e07ef28d350cac009d160291dd093a1db8e7c2d2d71ab5",
       "label": {
         "ecosystem": "AMUTT",
-        "role": "YieldStakingVault v2 (10000-bps discount scale, current)",
-        "usedBy": [
-          "src/components/YieldVaultPanel.tsx (VITE_YIELD_VAULT_ADDRESS)"
-        ],
+        "role": "YieldStakingVault v2 (10000-bps discount scale; superseded by v3 0x5c98...59e5; zero assets)",
         "deploymentTx": "0x342b72fc23fe2505d9e07ef28d350cac009d160291dd093a1db8e7c2d2d71ab5",
         "sourceCommit": "2b20a00"
       }
@@ -226,6 +223,26 @@
           "scripts/arbitrage-bot-daemon.ts",
           "src/lib/launchpad/constants.ts"
         ]
+      }
+    },
+    {
+      "address": "0x5c98F6bC9d17ba0eB02e1336bDF035938f5859e5",
+      "hasCode": true,
+      "admin": "0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98",
+      "treasury": "0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98",
+      "discountDenominator": "10000",
+      "blockscoutVerified": true,
+      "contractName": "YieldStakingVault",
+      "creator": "0xc1c3d6552231DB22A22Bdf513C0833024FF3f42B",
+      "creationTx": "0x1f6acc736b603dd2259afdb285bf715802fab1ef4fd9988bdac195fdf2cdb2fc",
+      "label": {
+        "ecosystem": "AMUTT",
+        "role": "YieldStakingVault v3 (share-price protection with 1e6 virtual shares + 10000-bps scale, active)",
+        "usedBy": [
+          "src/components/YieldVaultPanel.tsx (VITE_YIELD_VAULT_ADDRESS)"
+        ],
+        "deploymentTx": "0x1f6acc736b603dd2259afdb285bf715802fab1ef4fd9988bdac195fdf2cdb2fc",
+        "sourceCommit": "99365d4"
       }
     }
   ],
