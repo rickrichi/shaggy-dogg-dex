@@ -1,0 +1,27 @@
+{
+  "status": "approved-not-live",
+  "chainId": 8453,
+  "enabled": false,
+  "rewards": {
+    "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "assetSymbol": "USDC",
+    "assetDecimals": 6,
+    "stakerShareBps": 1000,
+    "treasuryShareBps": 9000,
+    "epochDays": 7,
+    "profitBasis": "settled-proceeds-minus-capital-fees-gas-and-carried-losses",
+    "eligibility": "time-weighted-AMUTT-staked-during-epoch",
+    "funding": "realized-USDC-only",
+    "unsettledExecutions": "block-epoch-finalization",
+    "rounding": "down-to-USDC-base-units; carry-dust-forward"
+  },
+  "governance": {
+    "mode": "advisory",
+    "votingPeriodDays": 7,
+    "quorumBps": 500,
+    "approvalBps": 5001,
+    "votingPower": "AMUTT-staked-at-finalized-snapshot-block",
+    "contractExecutionAuthority": false,
+    "automaticTreasuryAccess": false
+  }
+}

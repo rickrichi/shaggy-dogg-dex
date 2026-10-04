@@ -19,10 +19,12 @@ import {
   Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
-import { formatUnits, parseUnits, erc20Abi, zeroAddress } from "viem";
+import { erc20Abi, formatUnits, parseUnits, zeroAddress } from "viem";
+import { base } from "viem/chains";
 import { useAccount, usePublicClient, useSwitchChain, useWalletClient } from "wagmi";
 
 import { LaunchpadNav } from "@/components/launchpad/LaunchpadNav";
+import { StakerRewardPoolPanel } from "@/components/StakerRewardPoolPanel";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,10 +32,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { base } from "viem/chains";
-import { BASE_STAKING, STAKING_ABI } from "@/lib/staking";
-import { positiveAmount } from "@/lib/amm/own-dex";
 import { YieldVaultPanel } from "@/components/YieldVaultPanel";
+import { positiveAmount } from "@/lib/amm/own-dex";
+import { BASE_STAKING, STAKING_ABI } from "@/lib/staking";
 
 interface TierInfo {
   name: string;
@@ -506,6 +507,12 @@ export default function Stake() {
           </CardContent>
         </Card>
       </div>
+
+      <StakerRewardPoolPanel
+        stakedBalance={stakedBalance}
+        totalProtocolStaked={totalProtocolStaked}
+        dataReady={dataReady}
+      />
 
       <YieldVaultPanel />
       {/* Main Interactive Interface & Tiers */}

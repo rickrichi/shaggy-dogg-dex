@@ -124,12 +124,16 @@ not 5%. Deposits that would mint zero shares revert. The updated contracts expos
 `discountDenominator()` and deployment artifacts have been regenerated. These
 source changes do not upgrade the existing immutable deployment.
 
-A concrete [economic policy proposal](protocol-economics-decision.md) now specifies
-10% of realized net USDC profit to time-weighted stakers, 90% to treasury, weekly
-epochs, loss carryforward and advisory governance. The accompanying configuration
-is explicitly disabled. Owner approval is outstanding; the reward distributor,
-event indexer and voting system are not deployed or active. Existing token balances
-do not create voting rights or discount standard V2 pool fees.
+The concrete [economic policy](protocol-economics.md) has **approved terms but is not live**
+(config/protocol-economics.json, `enabled: false`), specifying 10% (1,000 bps) of realized net USDC profit
+to time-weighted stakers, 90% (9,000 bps) to treasury, 7-day weekly epochs, loss carryforward
+and advisory governance. The staker reward pool is surfaced directly on /stake via
+StakerRewardPoolPanel and /arbitrage/flash-loans. The weekly accounting ledger
+(scripts/calculate-epoch-rewards.ts) computes auditable staker allocations from Base
+Mainnet events and trade fills, but it only calculates numbers: **no rewards are paid today**.
+The staking contract is immutable and has no reward or claim function, and no distributor
+contract exists. Paying stakers needs a new, reviewed and funded distribution mechanism,
+plus realized profit from the arbitrage desk, which has not yet run with real funds.
 
 ## Verification
 

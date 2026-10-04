@@ -45,11 +45,10 @@ import {
 import { CeDeFiStudio } from "@/components/arbitrage/CeDeFiStudio";
 import { LiveDeskTab } from "@/components/arbitrage/LiveDeskTab";
 import {
+  type MatrixPair,
   PAIR_MATRIX_DATA,
   PairMatrix100,
-  type MatrixPair,
 } from "@/components/arbitrage/PairMatrix100";
-import { useCeFiArbStream } from "@/hooks/useCeFiArbStream";
 import { LaunchpadNav } from "@/components/launchpad/LaunchpadNav";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -60,6 +59,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AERODROME_ROUTER_ABI, UNISWAP_V2_ROUTER_ABI } from "@/config/abis";
+import { useCeFiArbStream } from "@/hooks/useCeFiArbStream";
 import {
   AiArbitrageBotEngine,
   type BotConfig,
@@ -73,16 +73,21 @@ import { LAUNCHPAD_ARTIFACTS } from "@/lib/launchpad/artifacts";
 // ────────────────────────────────────────────────────────────────────────────
 const BASE_CHAIN_ID = 8453;
 const BASE_UNISWAP_ROUTER: Address =
-  (import.meta.env.VITE_UNISWAP_V2_ROUTER as Address) || "0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24";
+  (import.meta.env.VITE_UNISWAP_V2_ROUTER as Address) ||
+  "0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24";
 const BASE_AERODROME_ROUTER: Address =
-  (import.meta.env.VITE_AERODROME_ROUTER as Address) || "0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43";
+  (import.meta.env.VITE_AERODROME_ROUTER as Address) ||
+  "0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43";
 const BASE_AERODROME_FACTORY: Address =
-  (import.meta.env.VITE_AERODROME_FACTORY as Address) || "0x420DD381b31aEf6683db6B902084cB0FFECe40Da";
+  (import.meta.env.VITE_AERODROME_FACTORY as Address) ||
+  "0x420DD381b31aEf6683db6B902084cB0FFECe40Da";
 const BASE_AAVE_POOL: Address =
-  (import.meta.env.VITE_AAVE_POOL_ADDRESS as Address) || "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5";
+  (import.meta.env.VITE_AAVE_POOL_ADDRESS as Address) ||
+  "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5";
 const DEFAULT_AAVE_BORROWER: Address = "0x936a3D52c3037848879F3641dfBc9132aAe51bDF";
 const DEPLOYED_ATOMIC_ROUTER: Address =
-  (import.meta.env.VITE_ATOMIC_ROUTER_ADDRESS as Address) || "0x70315019d12a11556c837970675cdc8fa54d186b";
+  (import.meta.env.VITE_ATOMIC_ROUTER_ADDRESS as Address) ||
+  "0x70315019d12a11556c837970675cdc8fa54d186b";
 const DEFAULT_ATOMIC_ROUTER_KEY = "shaggy_dogg_atomic_router";
 
 const BASE_ASSETS = {
@@ -240,11 +245,12 @@ const PAGE_META = {
   },
 };
 
-export const ARBITRAGE_PAGE_META: typeof PAGE_META & Record<string, ArbitragePageMeta | undefined> = {
-  ...PAGE_META,
-  "cross-dex": PAGE_META.dualpool,
-  "flash-loans": PAGE_META.flashloan,
-};
+export const ARBITRAGE_PAGE_META: typeof PAGE_META & Record<string, ArbitragePageMeta | undefined> =
+  {
+    ...PAGE_META,
+    "cross-dex": PAGE_META.dualpool,
+    "flash-loans": PAGE_META.flashloan,
+  };
 
 export const TAB_ALIASES: Record<string, string> = {
   matrix: "matrix",
@@ -291,7 +297,10 @@ export default function Arbitrage() {
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
   const { data: blockNumber } = useBlockNumber({ watch: true });
-  const { data: gasPriceData } = useGasPrice({ chainId: BASE_CHAIN_ID, query: { refetchInterval: 10_000 } });
+  const { data: gasPriceData } = useGasPrice({
+    chainId: BASE_CHAIN_ID,
+    query: { refetchInterval: 10_000 },
+  });
 
   const isBaseNetwork = chainId === BASE_CHAIN_ID;
   const gasPriceGwei = gasPriceData ? Number((Number(gasPriceData) / 1e9).toFixed(4)) : 0.005;
@@ -316,9 +325,7 @@ export default function Arbitrage() {
 
   // Resolve canonical symbol from route param (e.g. "ETH-USDC" -> "ETH/USDC") or fallback to search param or default "ETH/USD"
   const rawSymbol = routeSymbol || searchParams.get("symbol");
-  const cleanSymbol = rawSymbol
-    ? decodeURIComponent(rawSymbol).replace("-", "/")
-    : "ETH/USD";
+  const cleanSymbol = rawSymbol ? decodeURIComponent(rawSymbol).replace("-", "/") : "ETH/USD";
 
   const [activeArbitrageTab, setActiveArbitrageTab] = useState<string>(canonicalTab);
   const [selectedMatrixSymbol, setSelectedMatrixSymbol] = useState<string>(cleanSymbol);
@@ -658,9 +665,7 @@ export default function Arbitrage() {
         );
 
         const amountInUsdc = parseUnits((dualUnits * refPrice).toFixed(6), 6);
-        const minAmountOutEth = parseEther(
-          (dualUnits * (1 - slippageBps / 10000)).toFixed(18)
-        );
+        const minAmountOutEth = parseEther((dualUnits * (1 - slippageBps / 10000)).toFixed(18));
 
         const aeroRoutes = [
           {
@@ -814,7 +819,17 @@ export default function Arbitrage() {
         lastDispatchTimeRef.current = Date.now();
       }
     },
-    [isConnected, address, isBaseNetwork, switchChain, dualUnits, dualPoolAPrice, dualPoolBPrice, writeContractAsync, addTerminalLog]
+    [
+      isConnected,
+      address,
+      isBaseNetwork,
+      switchChain,
+      dualUnits,
+      dualPoolAPrice,
+      dualPoolBPrice,
+      writeContractAsync,
+      addTerminalLog,
+    ]
   );
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -825,7 +840,11 @@ export default function Arbitrage() {
   const [flashVipTier, setFlashVipTier] = useState<number>(3);
   const [customBorrowerAddress, setCustomBorrowerAddress] = useState<string>(() => {
     const stored = localStorage.getItem(DEFAULT_ATOMIC_ROUTER_KEY);
-    if (!stored || !isAddress(stored) || stored.toLowerCase() === DEFAULT_AAVE_BORROWER.toLowerCase()) {
+    if (
+      !stored ||
+      !isAddress(stored) ||
+      stored.toLowerCase() === DEFAULT_AAVE_BORROWER.toLowerCase()
+    ) {
       return DEPLOYED_ATOMIC_ROUTER;
     }
     return stored;
@@ -883,9 +902,12 @@ export default function Arbitrage() {
         chain: null,
       });
 
-      toast.loading(`Deployment submitted: ${hash.substring(0, 10)}... Waiting for block confirmation...`, {
-        id: toastId,
-      });
+      toast.loading(
+        `Deployment submitted: ${hash.substring(0, 10)}... Waiting for block confirmation...`,
+        {
+          id: toastId,
+        }
+      );
 
       if (publicClient) {
         const receipt = await publicClient.waitForTransactionReceipt({ hash });
@@ -937,7 +959,8 @@ export default function Arbitrage() {
     );
 
     try {
-      const assetConfig = BASE_ASSETS[flashBorrowAsset as keyof typeof BASE_ASSETS] ?? BASE_ASSETS.USDC;
+      const assetConfig =
+        BASE_ASSETS[flashBorrowAsset as keyof typeof BASE_ASSETS] ?? BASE_ASSETS.USDC;
       const borrowAmountBigInt = parseUnits(flashBorrowAmount.toString(), assetConfig.decimals);
 
       const path: Address[] =
@@ -1139,8 +1162,7 @@ export default function Arbitrage() {
   const [isBotRunning, setIsBotRunning] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     return (
-      window.location.pathname.includes("autopilot") ||
-      window.location.search.includes("autopilot")
+      window.location.pathname.includes("autopilot") || window.location.search.includes("autopilot")
     );
   });
   const [minNetProfitTarget, setMinNetProfitTarget] = useState<number>(5.0);
@@ -1156,7 +1178,9 @@ export default function Arbitrage() {
   const [isSleepMode, setIsSleepMode] = useState<boolean>(true);
 
   // Terminal Channel Filter: All, Pair Matrix, or Base Flash
-  const [terminalChannel, setTerminalChannel] = useState<"ALL" | "MATRIX_100" | "FLASH_BASE">("ALL");
+  const [terminalChannel, setTerminalChannel] = useState<"ALL" | "MATRIX_100" | "FLASH_BASE">(
+    "ALL"
+  );
 
   // Top Qualified 100-Pair Signal (for 1-click "Snatch That Money" banner)
   const [topQualified100Pair, setTopQualified100Pair] = useState<{
@@ -1327,7 +1351,9 @@ export default function Arbitrage() {
             setBotStats((prev) => ({
               ...prev,
               tradesDispatched: prev.tradesDispatched + 1,
-              totalProfitUsd: Number((prev.totalProfitUsd + evalResult.projectedNetProfitUsd).toFixed(2)),
+              totalProfitUsd: Number(
+                (prev.totalProfitUsd + evalResult.projectedNetProfitUsd).toFixed(2)
+              ),
             }));
             params.handleExecuteLiveFlashLoan();
             return;
@@ -1340,7 +1366,9 @@ export default function Arbitrage() {
           setBotStats((prev) => ({
             ...prev,
             tradesDispatched: prev.tradesDispatched + 1,
-            totalProfitUsd: Number((prev.totalProfitUsd + evalResult.projectedNetProfitUsd).toFixed(2)),
+            totalProfitUsd: Number(
+              (prev.totalProfitUsd + evalResult.projectedNetProfitUsd).toFixed(2)
+            ),
           }));
 
           // Trigger execution based on strategy
@@ -1409,7 +1437,7 @@ export default function Arbitrage() {
 
         if (matchedOpp) {
           const hurdleBps = parseFloat(matchedOpp.pair.minNetEdgePct) * 100;
-          const netPctFormatted = (matchedOpp.netBps / 100).toFixed(2) + "%";
+          const netPctFormatted = `${(matchedOpp.netBps / 100).toFixed(2)}%`;
 
           if (matchedOpp.netBps >= hurdleBps) {
             setTopQualified100Pair({
@@ -1450,7 +1478,6 @@ export default function Arbitrage() {
                   "warn",
                   `⚠️ [PAPER MODE] Real cross-exchange execution requires funded accounts on BOTH ${matchedOpp.buyExchange.toUpperCase()} and ${matchedOpp.sellExchange.toUpperCase()}. No order was submitted.`
                 );
-
               }
             } else {
               if (params.autoSubmitTrades) {
@@ -1534,7 +1561,7 @@ export default function Arbitrage() {
       <LaunchpadNav />
 
       {/* ── Active Page Breadcrumb & Context Navigation Bar ── */}
-      <div className="flex flex-col gap-2 rounded-2xl border border-purple-100 bg-white/80 p-3.5 shadow-xs backdrop-blur-md md:flex-row md:items-center md:justify-between">
+      <div className="shadow-xs flex flex-col gap-2 rounded-2xl border border-purple-100 bg-white/80 p-3.5 backdrop-blur-md md:flex-row md:items-center md:justify-between">
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <span className="font-semibold text-slate-400">Arbitrage Studio</span>
           <ChevronRight className="size-3.5 text-slate-300" />
@@ -1547,7 +1574,7 @@ export default function Arbitrage() {
           {activeArbitrageTab === "cedefi" && (
             <>
               <ChevronRight className="size-3.5 text-slate-300" />
-              <Badge className="bg-purple-600 font-mono font-bold text-white shadow-xs">
+              <Badge className="shadow-xs bg-purple-600 font-mono font-bold text-white">
                 Active Pair: {selectedMatrixSymbol}
               </Badge>
             </>
@@ -1561,7 +1588,7 @@ export default function Arbitrage() {
               variant="outline"
               size="sm"
               onClick={handleBackToMatrix}
-              className="border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 font-bold text-xs"
+              className="border-emerald-300 bg-emerald-50 text-xs font-bold text-emerald-800 hover:bg-emerald-100"
             >
               <ArrowLeft className="mr-1.5 size-3.5 text-emerald-600" />
               📊 Return to Pair Matrix
@@ -1571,7 +1598,7 @@ export default function Arbitrage() {
               variant="outline"
               size="sm"
               onClick={() => handleTabChange("cedefi")}
-              className="border-indigo-300 bg-indigo-50 text-indigo-800 hover:bg-indigo-100 font-bold text-xs"
+              className="border-indigo-300 bg-indigo-50 text-xs font-bold text-indigo-800 hover:bg-indigo-100"
             >
               <Globe className="mr-1.5 size-3.5 text-indigo-600" />
               🌐 Open CeDeFi L2 Books ({selectedMatrixSymbol})
@@ -1585,9 +1612,9 @@ export default function Arbitrage() {
         <div>
           <div className="flex flex-wrap items-center gap-3">
             <h1
-              className={`bg-gradient-to-r ${currentMeta.gradient} bg-clip-text text-3xl font-black text-transparent flex items-center gap-2.5`}
+              className={`bg-gradient-to-r ${currentMeta.gradient} flex items-center gap-2.5 bg-clip-text text-3xl font-black text-transparent`}
             >
-              <CurrentIcon className="size-8 inline text-slate-800" />
+              <CurrentIcon className="inline size-8 text-slate-800" />
               {activeArbitrageTab === "cedefi"
                 ? `CeDeFi L2 Scanner: ${selectedMatrixSymbol}`
                 : currentMeta.name}
@@ -1609,13 +1636,14 @@ export default function Arbitrage() {
               </Badge>
             )}
 
-            <Badge variant="outline" className={`font-mono text-xs font-bold ${currentMeta.badgeBg}`}>
+            <Badge
+              variant="outline"
+              className={`font-mono text-xs font-bold ${currentMeta.badgeBg}`}
+            >
               {currentMeta.badge}
             </Badge>
           </div>
-          <p className="mt-1 text-sm text-slate-600 max-w-3xl">
-            {currentMeta.subtitle}
-          </p>
+          <p className="mt-1 max-w-3xl text-sm text-slate-600">{currentMeta.subtitle}</p>
         </div>
 
         {/* Global Controls & Mode Toggle */}
@@ -1624,7 +1652,7 @@ export default function Arbitrage() {
             <Button
               size="sm"
               onClick={handleBackToMatrix}
-              className="border-2 border-emerald-400 bg-emerald-600 font-black text-white hover:bg-emerald-700 shadow-sm"
+              className="border-2 border-emerald-400 bg-emerald-600 font-black text-white shadow-sm hover:bg-emerald-700"
             >
               <ArrowLeft className="mr-1.5 size-4" /> 📊 Return to 100 Pairs
             </Button>
@@ -1730,56 +1758,56 @@ export default function Arbitrage() {
         <TabsList className="grid w-full grid-cols-1 border border-purple-100 bg-white/70 p-1 shadow-sm sm:grid-cols-8">
           <TabsTrigger
             value="matrix"
-            className="flex items-center gap-2 font-bold data-[state=active]:bg-emerald-600 data-[state=active]:text-white text-emerald-800"
+            className="flex items-center gap-2 font-bold text-emerald-800 data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
           >
             <Sparkles className="size-4" />
             📊 Pair Matrix
           </TabsTrigger>
           <TabsTrigger
             value="cedefi"
-            className="flex items-center gap-2 font-bold data-[state=active]:bg-indigo-600 data-[state=active]:text-white text-indigo-800"
+            className="flex items-center gap-2 font-bold text-indigo-800 data-[state=active]:bg-indigo-600 data-[state=active]:text-white"
           >
             <Globe className="size-4" />
             🌐 CeDeFi L2 Books
           </TabsTrigger>
           <TabsTrigger
             value="autopilot"
-            className="flex items-center gap-2 font-bold data-[state=active]:bg-purple-600 data-[state=active]:text-white text-purple-800"
+            className="flex items-center gap-2 font-bold text-purple-800 data-[state=active]:bg-purple-600 data-[state=active]:text-white"
           >
             <Bot className="size-4" />
             🤖 AI Auto-Pilot
           </TabsTrigger>
           <TabsTrigger
             value="triangular"
-            className="flex items-center gap-2 font-semibold data-[state=active]:bg-purple-600 data-[state=active]:text-white text-slate-700"
+            className="flex items-center gap-2 font-semibold text-slate-700 data-[state=active]:bg-purple-600 data-[state=active]:text-white"
           >
             <TrendingUp className="size-4" />
             1. Triangular
           </TabsTrigger>
           <TabsTrigger
             value="dualpool"
-            className="flex items-center gap-2 font-semibold data-[state=active]:bg-indigo-600 data-[state=active]:text-white text-slate-700"
+            className="flex items-center gap-2 font-semibold text-slate-700 data-[state=active]:bg-indigo-600 data-[state=active]:text-white"
           >
             <Layers className="size-4" />
             2. Cross-DEX
           </TabsTrigger>
           <TabsTrigger
             value="flashloan"
-            className="flex items-center gap-2 font-semibold data-[state=active]:bg-amber-600 data-[state=active]:text-white text-slate-700"
+            className="flex items-center gap-2 font-semibold text-slate-700 data-[state=active]:bg-amber-600 data-[state=active]:text-white"
           >
             <Zap className="size-4" />
             3. Flash Loans
           </TabsTrigger>
           <TabsTrigger
             value="live"
-            className="flex items-center gap-2 font-bold data-[state=active]:bg-rose-600 data-[state=active]:text-white text-rose-700"
+            className="flex items-center gap-2 font-bold text-rose-700 data-[state=active]:bg-rose-600 data-[state=active]:text-white"
           >
             <Radio className="size-4" />
             🔴 Live Desk
           </TabsTrigger>
           <TabsTrigger
             value="console"
-            className="flex items-center gap-2 font-semibold data-[state=active]:bg-rose-600 data-[state=active]:text-white text-slate-700"
+            className="flex items-center gap-2 font-semibold text-slate-700 data-[state=active]:bg-rose-600 data-[state=active]:text-white"
           >
             <Activity className="size-4" />
             4. Console ({txHistory.length})
@@ -1883,13 +1911,16 @@ export default function Arbitrage() {
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-white">Capital Custody & Earnings Settlement Gate</span>
-                    <Badge className="border-emerald-500/30 bg-emerald-500/20 text-emerald-300 text-[10px]">
+                    <span className="text-sm font-bold text-white">
+                      Capital Custody & Earnings Settlement Gate
+                    </span>
+                    <Badge className="border-emerald-500/30 bg-emerald-500/20 text-[10px] text-emerald-300">
                       100% Retained Equity
                     </Badge>
                   </div>
                   <p className="text-xs text-slate-300">
-                    Your real capital is 100% safe. All captured arbitrage settles directly into your authenticated accounts with 0% platform fee.
+                    Your real capital is 100% safe. All captured arbitrage settles directly into
+                    your authenticated accounts with 0% platform fee.
                   </p>
                 </div>
               </div>
@@ -1897,10 +1928,12 @@ export default function Arbitrage() {
               <div className="flex flex-wrap items-center gap-2 text-xs">
                 {/* Destination 1: Kraken */}
                 <div className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/80 px-3 py-1.5">
-                  <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="size-2 animate-pulse rounded-full bg-emerald-400" />
                   <span className="text-slate-300">Kraken Spot:</span>
                   <span className="font-mono font-bold text-emerald-400">$108.58 USD</span>
-                  <span className="text-[10px] text-slate-400">(1.37 VVV • 0.011 ETH • 29.2 USDC • 77 SEI)</span>
+                  <span className="text-[10px] text-slate-400">
+                    (1.37 VVV • 0.011 ETH • 29.2 USDC • 77 SEI)
+                  </span>
                 </div>
 
                 {/* Destination 2: Web3 Wallet */}
@@ -1920,15 +1953,25 @@ export default function Arbitrage() {
               </div>
             </div>
 
-            <div className="mt-3 border-t border-slate-800/80 pt-2 flex flex-col md:flex-row md:items-center justify-between gap-2 text-[11px] text-slate-400">
+            <div className="mt-3 flex flex-col justify-between gap-2 border-t border-slate-800/80 pt-2 text-[11px] text-slate-400 md:flex-row md:items-center">
               <div className="flex items-center gap-1.5">
                 <Lock className="size-3 text-amber-400" />
                 <span>
-                  <strong>Anti-Loss Guarantee:</strong> No money disappears into thin air. Active session telemetry (+${botStats.totalProfitUsd.toFixed(2)} USD) tracks signals. Confirmed trades automatically deposit into the destinations above.
+                  <strong>Anti-Loss Guarantee:</strong> No money disappears into thin air. Active
+                  session telemetry (+${botStats.totalProfitUsd.toFixed(2)} USD) tracks signals.
+                  Confirmed trades automatically deposit into the destinations above.
                 </span>
               </div>
-              <div className="font-mono text-slate-400 shrink-0">
-                Router: <a href="https://basescan.org/address/0x70315019d12a11556c837970675cdc8fa54d186b" target="_blank" rel="noreferrer" className="text-slate-300 underline">0x7031...186b ↗</a>
+              <div className="shrink-0 font-mono text-slate-400">
+                Router:{" "}
+                <a
+                  href="https://basescan.org/address/0x70315019d12a11556c837970675cdc8fa54d186b"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-slate-300 underline"
+                >
+                  0x7031...186b ↗
+                </a>
               </div>
             </div>
           </div>
@@ -2095,24 +2138,26 @@ export default function Arbitrage() {
                   </div>
 
                   {/* 🌙 Autonomous Sleep Mode (Make Money In My Sleep) */}
-                  <div className="rounded-xl border border-indigo-300 bg-gradient-to-r from-indigo-50/90 via-purple-50/50 to-white p-3 shadow-xs">
+                  <div className="shadow-xs rounded-xl border border-indigo-300 bg-gradient-to-r from-indigo-50/90 via-purple-50/50 to-white p-3">
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5 pr-2">
                         <div className="flex items-center gap-1.5">
-                          <Moon className="size-4 text-indigo-600 animate-pulse" />
+                          <Moon className="size-4 animate-pulse text-indigo-600" />
                           <span className="text-xs font-black text-indigo-950">
                             🌙 Sleep Mode: Autonomous Auto-Clicker
                           </span>
                         </div>
                         <p className="text-[11px] leading-snug text-indigo-800">
-                          Automatically snatches qualified arbitrage while you sleep. Locks equity and deposits it directly into your wallet with zero manual clicks required.
+                          Automatically snatches qualified arbitrage while you sleep. Locks equity
+                          and deposits it directly into your wallet with zero manual clicks
+                          required.
                         </p>
                       </div>
                       <Switch
                         id="sleepMode"
                         checked={isSleepMode}
                         onCheckedChange={setIsSleepMode}
-                        className="data-[state=checked]:bg-indigo-600 cursor-pointer shrink-0"
+                        className="shrink-0 cursor-pointer data-[state=checked]:bg-indigo-600"
                       />
                     </div>
                   </div>
@@ -2143,29 +2188,33 @@ export default function Arbitrage() {
             <div className="space-y-4 lg:col-span-7">
               {/* 1-Click "Snatch That Money" Qualified Signal Banner */}
               {topQualified100Pair && (
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 rounded-xl border border-emerald-500/60 bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-950/90 p-3 text-emerald-200 shadow-md">
+                <div className="flex flex-col items-center justify-between gap-3 rounded-xl border border-emerald-500/60 bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-950/90 p-3 text-emerald-200 shadow-md sm:flex-row">
                   <div className="flex items-center gap-2.5">
                     <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400">
                       <Sparkles className="size-4 animate-spin" />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-emerald-300 text-xs sm:text-sm">
+                        <span className="text-xs font-bold text-emerald-300 sm:text-sm">
                           ⚡ 100-PAIR SIGNAL: {topQualified100Pair.symbol}
                         </span>
-                        <Badge className="bg-emerald-500/30 text-emerald-300 text-[10px] font-mono border-emerald-400/40">
-                          {topQualified100Pair.buyExchange.toUpperCase()} ➔ {topQualified100Pair.sellExchange.toUpperCase()}
+                        <Badge className="border-emerald-400/40 bg-emerald-500/30 font-mono text-[10px] text-emerald-300">
+                          {topQualified100Pair.buyExchange.toUpperCase()} ➔{" "}
+                          {topQualified100Pair.sellExchange.toUpperCase()}
                         </Badge>
                       </div>
                       <p className="font-mono text-[11px] text-emerald-400/90">
-                        Net Edge: +{topQualified100Pair.netPct} (Hurdle: {topQualified100Pair.hurdlePct}) • Est. Net: +${topQualified100Pair.estProfitUsd.toFixed(2)} USD • Kraken Ready ($67.35 USD)
+                        Net Edge: +{topQualified100Pair.netPct} (Hurdle:{" "}
+                        {topQualified100Pair.hurdlePct}) • Est. Net: +$
+                        {topQualified100Pair.estProfitUsd.toFixed(2)} USD • Kraken Ready ($67.35
+                        USD)
                       </p>
                     </div>
                   </div>
                   <Button
                     size="sm"
                     onClick={() => handleSelectPairFromMatrix(topQualified100Pair.symbol)}
-                    className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-md shrink-0 cursor-pointer"
+                    className="w-full shrink-0 cursor-pointer bg-emerald-500 text-xs font-black text-slate-950 shadow-md hover:bg-emerald-400 sm:w-auto"
                   >
                     <Zap className="mr-1.5 size-3.5 fill-current" />
                     {isSleepMode ? "⚡ Autonomous Auto-Snatch Active" : "Snatch That Money!"}
@@ -2187,7 +2236,7 @@ export default function Arbitrage() {
                     )}
                     {isSleepMode && (
                       <Badge className="flex items-center gap-1 border-indigo-700 bg-indigo-950/80 font-mono text-[10px] text-indigo-300">
-                        <Moon className="size-2.5 text-indigo-400 animate-pulse" />
+                        <Moon className="size-2.5 animate-pulse text-indigo-400" />
                         SLEEP AUTO-CLICKER: ON
                       </Badge>
                     )}
@@ -2199,7 +2248,7 @@ export default function Arbitrage() {
                       <button
                         type="button"
                         onClick={() => setTerminalChannel("ALL")}
-                        className={`rounded px-2 py-0.5 font-mono font-bold transition-colors cursor-pointer ${
+                        className={`cursor-pointer rounded px-2 py-0.5 font-mono font-bold transition-colors ${
                           terminalChannel === "ALL"
                             ? "bg-emerald-600 text-white"
                             : "text-slate-400 hover:text-slate-200"
@@ -2210,7 +2259,7 @@ export default function Arbitrage() {
                       <button
                         type="button"
                         onClick={() => setTerminalChannel("MATRIX_100")}
-                        className={`rounded px-2 py-0.5 font-mono font-bold transition-colors cursor-pointer ${
+                        className={`cursor-pointer rounded px-2 py-0.5 font-mono font-bold transition-colors ${
                           terminalChannel === "MATRIX_100"
                             ? "bg-purple-600 text-white"
                             : "text-slate-400 hover:text-slate-200"
@@ -2221,7 +2270,7 @@ export default function Arbitrage() {
                       <button
                         type="button"
                         onClick={() => setTerminalChannel("FLASH_BASE")}
-                        className={`rounded px-2 py-0.5 font-mono font-bold transition-colors cursor-pointer ${
+                        className={`cursor-pointer rounded px-2 py-0.5 font-mono font-bold transition-colors ${
                           terminalChannel === "FLASH_BASE"
                             ? "bg-amber-600 text-white"
                             : "text-slate-400 hover:text-slate-200"
@@ -2296,10 +2345,7 @@ export default function Arbitrage() {
 
         {/* ── TAB: 100-PAIR SPOT ARBITRAGE MATRIX ── */}
         <TabsContent value="matrix" className="space-y-6">
-          <PairMatrix100
-            snapshot={cefiStream.snapshot}
-            onSelectPair={handleSelectPairFromMatrix}
-          />
+          <PairMatrix100 snapshot={cefiStream.snapshot} onSelectPair={handleSelectPairFromMatrix} />
         </TabsContent>
 
         {/* ── TAB: CEDEFI & INSTITUTIONAL CEFI L2 ORDER BOOKS ── */}
@@ -2689,7 +2735,10 @@ export default function Arbitrage() {
                           ✓ Atomic Router Active
                         </Badge>
                       ) : (
-                        <Badge variant="outline" className="border-amber-300 font-mono text-[10px] text-amber-700">
+                        <Badge
+                          variant="outline"
+                          className="border-amber-300 font-mono text-[10px] text-amber-700"
+                        >
                           Legacy Stub (Reverts on Callback)
                         </Badge>
                       )}
@@ -2702,7 +2751,9 @@ export default function Arbitrage() {
                       placeholder="0x..."
                     />
                     <p className="text-[11px] leading-relaxed text-gray-600">
-                      Executes uncollateralized triangular arbitrage across Uniswap V2 &amp; Aerodrome, enforces atomic zero-loss guards, repays Aave v3, and wires net profit to your wallet.
+                      Executes uncollateralized triangular arbitrage across Uniswap V2 &amp;
+                      Aerodrome, enforces atomic zero-loss guards, repays Aave v3, and wires net
+                      profit to your wallet.
                     </p>
 
                     <Button
@@ -2767,6 +2818,29 @@ export default function Arbitrage() {
                           +${flashArbResult.netProfitUsd.toFixed(2)} USD
                         </span>
                       </div>
+
+                      {flashArbResult.isProfitable && (
+                        <div className="mt-2 space-y-1.5 rounded-lg border border-purple-100 bg-purple-50/50 p-2.5 text-[11px]">
+                          <div className="flex items-center justify-between font-bold text-purple-900">
+                            <span>Proposed profit sharing (not live):</span>
+                            <span className="font-mono text-xs text-purple-700">
+                              10% / 90% Split
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-gray-600">
+                            <span>↳ AMUTT stakers (10%, no payouts yet):</span>
+                            <span className="font-mono font-semibold text-emerald-600">
+                              +${(flashArbResult.netProfitUsd * 0.1).toFixed(2)} USDC
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-gray-600">
+                            <span>↳ Protocol treasury (90%, illustrative):</span>
+                            <span className="font-mono font-semibold text-indigo-600">
+                              +${(flashArbResult.netProfitUsd * 0.9).toFixed(2)} USDC
+                            </span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -2793,6 +2867,12 @@ export default function Arbitrage() {
                       Atomically executed: If net profit doesn&apos;t cover the 0.05% fee, the EVM
                       reverts with $0 capital loss.
                     </p>
+
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 p-2 text-center text-[11px] text-emerald-900">
+                      <span className="font-semibold">Proposed economics policy (not live):</span> 10% of
+                      net realized flash loan yield would go to weekly AMUTT staker distributions on
+                      Base. No distributor exists yet, so nothing is paid today.
+                    </div>
                   </div>
                 </CardContent>
               </Card>

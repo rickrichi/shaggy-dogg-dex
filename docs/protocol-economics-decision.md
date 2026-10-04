@@ -1,8 +1,8 @@
-# Proposed reward and governance policy
+# Reward and governance policy (approved terms, not live)
 
-This is a concrete proposal for the owner to approve or revise. It is **disabled**;
-no assets, admin rights or voting rights change when this file is edited.
-Machine-readable terms: `config/protocol-economics.proposed.json`.
+The owner approved these terms. **Nothing is paid today**: the staking contract has no reward
+function and no distributor is deployed. Machine-readable terms: `config/protocol-economics.json`
+(`enabled: false`). Full documentation: [docs/protocol-economics.md](protocol-economics.md).
 
 ## Rewards
 
@@ -38,8 +38,9 @@ Binding governance would require a separately reviewed governor, timelock,
 quorum policy and deliberate admin transfer. No such transfer is authorized by
 this proposal. The AMUTT token's name does not establish governance authority.
 
-## Decision still required
+## Final Decision Status
 
-Approve or revise the 10% allocation and advisory authority before implementing
-and funding the reward distributor. Deployment and enablement are separate
-steps; this proposal is not a live-trading authorization.
+The 10% staker allocation and advisory governance terms are approved in
+`config/protocol-economics.json`, with `enabled: false`. The weekly calculation ledger
+(`scripts/calculate-epoch-rewards.ts`) only calculates; it sends nothing. Turning payouts
+on requires a reviewed distributor contract, a funding source and realized profit.

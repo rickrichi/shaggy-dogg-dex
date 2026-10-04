@@ -98,3 +98,6 @@ __pycache__/
 # Merge/patch leftovers
 *.orig
 *.rej
+
+# Generated epoch ledger reports (may contain mock data)
+reports/
