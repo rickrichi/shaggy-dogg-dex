@@ -21,7 +21,7 @@ Fixes require a new deployment (the contract is not upgradeable).
 
 | ID | Severity | Issue | Test |
 | --- | --- | --- | --- |
-| KI-V1 | Medium, **fixed in source, not yet deployed** | First-depositor share-price donation. Fixed by virtual shares/assets (`VIRTUAL_SHARES = 1e6`, `VIRTUAL_ASSETS = 1`) in both vault sources: the attacker now loses about half the donation and the victim loses only a rounding amount (< 0.01 token on 15,000). Shares now carry 6 extra decimals. Deployed v1/v2/Compound vaults still have the issue. | `testDonationAttackIsUnprofitable`, `testTinyDepositAfterDonationReverts` (Aave and Compound vaults) |
+| KI-V1 | Medium, **fixed in v3 `0x5c98…`** (older vaults unchanged) | First-depositor share-price donation. Fixed by virtual shares/assets (`VIRTUAL_SHARES = 1e6`, `VIRTUAL_ASSETS = 1`) in both vault sources: the attacker now loses about half the donation and the victim loses only a rounding amount (< 0.01 token on 15,000). Shares now carry 6 extra decimals. The v1, v2 and Compound vaults still have the issue (zero assets). | `testDonationAttackIsUnprofitable`, `testTinyDepositAfterDonationReverts` (Aave and Compound vaults) |
 | KI-V2 | High (trust; the Compound vault has the same `setComet` issue) | `setAavePoolAndAToken` accepts any address. After the change, deposits are approved to and supplied to the admin-chosen contract. | `testKnownIssueAdminCanRedirectDepositsToArbitraryPool` |
 | KI-V3 | High (trust) | Repointing the pool or aToken away from one that still holds funds hides them from `totalAssets()`; no migration path exists. | `testKnownIssueRepointingHidesExistingFunds` |
 | KI-V4 | Medium | If the treasury cannot receive the asset (for example a USDC blocklist), `withdraw` reverts for any position with profit, because the fee transfer is `require`d. Not covered by a test. | none |
@@ -47,6 +47,7 @@ Aave-borrowed funds cannot be taken by an operator: the callback requires princi
 - KI-X2 (Medium): token supply is fully minted to the deployer at launch (`MAX_SUPPLY == initialMint`, the minter role is inert). Holder concentration is a market issue, not a contract bug.
 - KI-X3: current DEX pools hold only dust (about 0.0005 WETH each). Liquidity is not locked; the LP tokens are in the admin wallet.
 - KI-X4: contracts are immutable and have no pause or emergency exit.
+- KI-X5 (High, operations): a deployer private key (`0xc1c3…f42B`, router operator, about 0.0004 ETH) was hardcoded in a script and committed in `ddddb02`, and pushed to the private remote. A second hardcoded key (`0xD22a…AfD1`, empty on Base) was also in a tracked script. Both were removed from the working tree in `ea67044` but remain in git history. Treat both as compromised: revoke `0xc1c3…` as router operator and stop using the keys. The scripts now read `PRIVATE_KEY` from the environment only.
 
 ## Slither (41 results)
 

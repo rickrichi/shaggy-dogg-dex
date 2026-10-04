@@ -1,7 +1,8 @@
 # Audit scope — Shaggy-Dogg-Dex (Base mainnet, chain 8453)
 
-Frozen at the git tag `audit-candidate-1`. Source-to-chain correspondence:
+Frozen at the git tag `audit-candidate-2`. Source-to-chain correspondence:
 - Router: current source compiled with 0.8.28 matches the on-chain runtime code (only immutables and the metadata hash may differ).
+- v3 vault (`0x5c98…`): current source compiled with 0.8.28 matches the on-chain creation and runtime code.
 - v2 vault (`0xC29c…`): matches commit `2b20a00`, i.e. **before** the share-price fix; the sources in this tag differ from the deployed v2 by that fix.
 - Tokens, staking contracts and flash borrowers: the source files are unchanged since the deployment commit `3402261`;
   that commit's source (pragma relaxed, solc 0.8.36) matches the on-chain runtime code.
@@ -59,8 +60,11 @@ Source: `contracts/src/{GovernanceToken,FeeDiscountStaking,FeeDiscountMath,Yield
   YieldStakingVault 91%, CompoundYieldVault 90%. `IsolatedLendingVault` and `DeployEcosystem` are 0% (out of scope / deploy helper).
 - Slither: 41 results, every one triaged individually in `SLITHER-TRIAGE.md`.
 - Router line-by-line self-review: `ROUTER-REVIEW.md`.
-- Vault share-price fix (virtual shares) is in the sources of this tag but **no deployed vault contains it yet**:
-  the live v2 vault `0xC29c…` and the legacy vaults still have the first-depositor weakness. A v3 deployment is pending.
+- The vault share-price fix (virtual shares) is deployed in **v3 `0x5c98f6bc9d17ba0eb02e1336bdf035938f5859e5`** (creation and
+  runtime code match this tag's `YieldStakingVault.sol`; verified on Blockscout). v2 `0xC29c…`, the legacy vaults and the
+  Compound vault still lack it and hold zero assets.
+- Secrets: the router operator key (deployer `0xc1c3…`) was committed in `ddddb02` and must be treated as compromised
+  (see KNOWN-ISSUES KI-X5). It is not an admin key.
 
 ## Questions to put to the auditors
 
