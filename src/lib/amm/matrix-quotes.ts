@@ -13,11 +13,25 @@ import type { Address } from "viem";
 export const MATRIX_QUOTE_MAX_AGE_MS = 30_000;
 const wrapped = BASE_MAINNET_TOKENS.find((t) => t.symbol === "WETH")!;
 
-/** Only exact, chain-specific token mappings. Fiat and BTC are not wrapped-token aliases. */
+/**
+ * Standard CEX market symbol aliases mapped to Base mainnet on-chain equivalents:
+ * - ETH -> WETH (Canonical Base Wrapped Ether)
+ * - BTC -> cbBTC (Coinbase Wrapped BTC, canonical on Base; WBTC remains directly resolvable)
+ * - USD -> USDC (Circle native USD Coin, canonical USD peg on Base)
+ */
+export const BASE_SYMBOL_ALIASES: Record<string, string> = {
+  ETH: "WETH",
+  BTC: "cbBTC",
+  USD: "USDC",
+};
+
 export function matrixRoute(symbol: string) {
   const [from, to] = symbol.split("/");
-  const resolve = (s: string | undefined) =>
-    BASE_MAINNET_TOKENS.find((t) => t.symbol === (s === "ETH" ? "WETH" : s));
+  if (!from || !to) return null;
+  const resolve = (s: string) => {
+    const aliased = BASE_SYMBOL_ALIASES[s] ?? s;
+    return BASE_MAINNET_TOKENS.find((t) => t.symbol === aliased);
+  };
   const sell = resolve(from);
   const buy = resolve(to);
   if (!sell || !buy || sell.address === buy.address) return null;

@@ -46,6 +46,19 @@ export const PAIR_MATRIX_DATA: MatrixPair[] = MARKET_PAIRS.map((symbol, index) =
   };
 });
 
+const NON_BASE_L1_ASSETS = new Set([
+  "ADA", "ALGO", "APT", "AR", "ATOM", "AVAX", "BCH", "BNB", "CELO", "DASH",
+  "DOGE", "DOT", "EGLD", "EOS", "ETC", "FIL", "FLOW", "FTM", "HBAR", "ICP",
+  "INJ", "IOTA", "KAVA", "KDA", "KSM", "LTC", "MINA", "NEAR", "NEO", "ONE",
+  "ONT", "QTUM", "ROSE", "RUNE", "RVN", "SEI", "SOL", "STX", "SUI", "THETA",
+  "TIA", "TON", "TRX", "VET", "WAVES", "XCH", "XEC", "XEM", "XLM", "XMR",
+  "XRP", "XTZ", "ZEC", "ZEN", "ZIL",
+]);
+
+function isNonBaseL1(asset: string): boolean {
+  return NON_BASE_L1_ASSETS.has(asset.toUpperCase());
+}
+
 interface PairMatrix100Props {
   snapshot?: Snapshot | null;
   onSelectPair?: (symbol: string) => void;
@@ -56,6 +69,10 @@ interface PairMatrix100Props {
 
 export function PairMatrix100({ onSelectPair, krakenBalances, snapshot }: PairMatrix100Props) {
   const { quotes, now } = useMatrixDexQuotes(MARKET_PAIRS);
+  const baseMappedCount = useMemo(
+    () => PAIR_MATRIX_DATA.filter((p) => Boolean(matrixRoute(p.symbol))).length,
+    []
+  );
   const {
     coinbaseConnected,
     krakenConnected,
@@ -273,7 +290,7 @@ export function PairMatrix100({ onSelectPair, krakenBalances, snapshot }: PairMa
               }}
               className="h-6 px-2 text-[10px] font-bold"
             >
-              Shaggy-Dogg-Dex · Base mappings
+              Shaggy-Dogg-Dex · Base mappings ({baseMappedCount})
             </Button>
             {[
               { label: "🟢 My Funded Pairs", query: "", fundedOnly: true },
@@ -344,17 +361,23 @@ export function PairMatrix100({ onSelectPair, krakenBalances, snapshot }: PairMa
                     </td>
                     <td className="min-w-48 px-3 py-2 text-purple-700">
                       {!matrixRoute(pair.symbol) ? (
-                        "No Base token mapping"
+                        <span className="font-normal text-slate-400">
+                          {isNonBaseL1(pair.baseAsset)
+                            ? `Non-Base L1 (${pair.baseAsset})`
+                            : "No Base token mapping"}
+                        </span>
                       ) : (
                         <>
-                          <div>
+                          <div className="font-semibold">
                             {(() => {
                               const quote = quotes[pair.symbol];
-                              if (!quote) return "Checking route…";
+                              if (!quote) return <span className="font-normal text-slate-400">Checking route…</span>;
                               if (now - quote.checkedAt > MATRIX_QUOTE_MAX_AGE_MS)
-                                return "Stale quote";
-                              if (quote.status === "rpc-error") return "RPC unavailable";
-                              if (quote.status === "unavailable") return "Quote unavailable";
+                                return <span className="font-normal text-amber-600">Stale quote</span>;
+                              if (quote.status === "rpc-error")
+                                return <span className="font-normal text-rose-500">RPC unavailable</span>;
+                              if (quote.status === "unavailable")
+                                return <span className="font-normal text-slate-400">Pool unquoted</span>;
                               return `1 ${quote.inputSymbol} → ${quote.output} ${quote.outputSymbol}`;
                             })()}
                           </div>

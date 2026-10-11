@@ -13,7 +13,23 @@ describe("Matrix Base routes", () => {
     expect(matrixRoute("ETH/USDC")?.inputSymbol).toBe("WETH");
     expect(matrixRoute("ETH/USDC")?.amountIn).toBe(10n ** 18n);
     expect(matrixRoute("ETH/USDC")?.decimalsOut).toBe(6);
-    for (const symbol of ["BTC/USDC", "ETH/USD", "ETH/USDT", "ETH/WETH", "SOL/USDC"])
+
+    expect(matrixRoute("BTC/USDC")?.inputSymbol).toBe("cbBTC");
+    expect(matrixRoute("BTC/USDC")?.amountIn).toBe(10n ** 8n);
+    expect(matrixRoute("BTC/USDC")?.decimalsOut).toBe(6);
+
+    expect(matrixRoute("ETH/USD")?.inputSymbol).toBe("WETH");
+    expect(matrixRoute("ETH/USD")?.outputSymbol).toBe("USDC");
+    expect(matrixRoute("ETH/USD")?.decimalsOut).toBe(6);
+
+    expect(matrixRoute("ETH/USDT")?.inputSymbol).toBe("WETH");
+    expect(matrixRoute("ETH/USDT")?.outputSymbol).toBe("USDT");
+    expect(matrixRoute("ETH/USDT")?.decimalsOut).toBe(6);
+
+    expect(matrixRoute("AERO/USDC")?.inputSymbol).toBe("AERO");
+    expect(matrixRoute("AERO/USDC")?.outputSymbol).toBe("USDC");
+
+    for (const symbol of ["ETH/WETH", "SOL/USDC", "XRP/USDT", "ADA/USDT"])
       expect(matrixRoute(symbol)).toBeNull();
   });
   it("returns a real quote and distinguishes a failed route", async () => {
@@ -28,7 +44,7 @@ describe("Matrix Base routes", () => {
     expect(quote?.status).toBe("rpc-error");
     expect(quote?.output).toBeUndefined();
     multicall.mockClear();
-    expect(await fetchMatrixDexQuotes(["ETH/USD"])).toEqual({});
+    expect(await fetchMatrixDexQuotes(["SOL/USDC"])).toEqual({});
     expect(multicall).not.toHaveBeenCalled();
   });
 });
