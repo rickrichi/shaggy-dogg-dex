@@ -1,14 +1,17 @@
 // src/pages/Launchpad.tsx
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 
 import {
+  AlertCircle,
   ArrowRight,
   CheckCircle2,
   Coins,
   ExternalLink,
   Layers,
   Loader2,
+  Lock,
+  RefreshCw,
   Rocket,
   ShieldCheck,
   Sparkles,
@@ -27,11 +30,21 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { DEX_VENUES, LAUNCHPAD_ARCHETYPES } from "@/lib/launchpad/constants";
+import { WalletConnect } from "@/components/WalletConnect";
+import { CANONICAL_BASE_CONTRACTS, DEX_VENUES, LAUNCHPAD_ARCHETYPES } from "@/lib/launchpad/constants";
 import { executeLaunchpadDeployment } from "@/lib/launchpad/deployEngine";
 import { saveLaunchedToken } from "@/lib/launchpad/storage";
 
+import NotFound from "./NotFound";
+
 import type { DeployedEcosystemResult, LaunchpadFormState } from "@/lib/launchpad/types";
+
+const stepTabs: Record<string, string> = {
+  identity: "identity",
+  purpose: "archetype",
+  liquidity: "liquidity",
+  review: "review",
+};
 
 export default function Launchpad() {
   const { address, isConnected, chainId, chain } = useAccount();
@@ -39,18 +52,35 @@ export default function Launchpad() {
   const publicClient = usePublicClient();
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
 
-  const [activeTab, setActiveTab] = useState<string>("identity");
+  const adminAddress = CANONICAL_BASE_CONTRACTS.DeployerAdminWallet;
+  const isAdmin = Boolean(address && address.toLowerCase() === adminAddress.toLowerCase());
+
+  const { step } = useParams<{ step?: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const activeTab = stepTabs[step || "identity"];
+  const setActiveTab = (tab: string) => {
+    const nextStep = Object.keys(stepTabs).find((key) => stepTabs[key] === tab);
+    if (nextStep && nextStep !== step) {
+      navigate({ pathname: `/launchpad/${nextStep}`, search: location.search });
+    }
+  };
+
+  useEffect(() => {
+    if (!step) {
+      navigate({ pathname: "/launchpad/identity", search: location.search }, { replace: true });
+    }
+  }, [step, navigate, location.search]);
   const [isDeploying, setIsDeploying] = useState<boolean>(false);
   const [deploymentLog, setDeploymentLog] = useState<string[]>([]);
   const [deployedResult, setDeployedResult] = useState<DeployedEcosystemResult | null>(null);
 
   const [form, setForm] = useState<LaunchpadFormState>({
-    tokenName: "Astro Mutt",
-    tokenSymbol: "AMUTT",
+    tokenName: "",
+    tokenSymbol: "",
     decimals: 18,
-    initialSupply: "1000000",
-    description:
-      "Community-driven utility and isolated lending asset for the Shaggy Mutt DeFi ecosystem on Base.",
+    initialSupply: "",
+    description: "",
     selectedArchetype: "morpho_blue_isolated",
     performanceFeeBps: 1000, // 10%
     stakingLockDays: 7,
@@ -73,16 +103,38 @@ export default function Launchpad() {
       toast.error("Please connect your wallet first.");
       return;
     }
+    if (!isAdmin) {
+      toast.error(
+        `Deployment restricted: Only the protocol administrator (${adminAddress.slice(0, 6)}...${adminAddress.slice(-4)}) can deploy tokens.`
+      );
+      return;
+    }
     if (chainId !== 8453) {
       toast.error("Please switch to Base Mainnet before launching.");
+      try {
+        await switchChain({ chainId: 8453 });
+      } catch (err) {
+        console.error("Failed to switch chain:", err);
+      }
+      return;
+    }
+    if (!form.tokenName.trim()) {
+      toast.error("Please enter a Token Name in Step 1 (Token Identity).");
+      setActiveTab("identity");
+      return;
+    }
+    if (!form.tokenSymbol.trim()) {
+      toast.error("Please enter a Token Symbol in Step 1 (Token Identity).");
+      setActiveTab("identity");
+      return;
+    }
+    if (!form.initialSupply.trim() || Number(form.initialSupply) <= 0) {
+      toast.error("Please enter a valid Total Supply in Step 1 (Token Identity).");
+      setActiveTab("identity");
       return;
     }
     if (!walletClient || !publicClient) {
-      toast.error("Wallet client unavailable. Reconnect MetaMask.");
-      return;
-    }
-    if (!form.tokenName.trim() || !form.tokenSymbol.trim() || !form.initialSupply.trim()) {
-      toast.error("Please provide valid token identity fields.");
+      toast.error("Wallet client is initializing. Please ensure your wallet is unlocked and connected.");
       return;
     }
 
@@ -142,6 +194,8 @@ export default function Launchpad() {
     }
   };
 
+  if (!activeTab) return <NotFound />;
+
   return (
     <div className="space-y-6 pb-12">
       {/* Sub-Navigation Bar */}
@@ -150,11 +204,22 @@ export default function Launchpad() {
       {/* Hero Header */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-purple-900 via-indigo-900 to-blue-900 p-8 text-white shadow-xl">
         <div className="relative z-10 max-w-3xl space-y-4">
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Badge className="border-purple-400/40 bg-purple-500/30 text-purple-200">
               <Sparkles className="mr-1 size-3 text-purple-300" />
               Base Mainnet Protocol Studio
             </Badge>
+            {isAdmin ? (
+              <Badge className="border-emerald-400/40 bg-emerald-500/30 font-mono text-emerald-200">
+                <ShieldCheck className="mr-1 size-3 text-emerald-300" />
+                Verified Admin: ShaggyDogg (0x9dC0...7C98)
+              </Badge>
+            ) : (
+              <Badge className="border-amber-400/40 bg-amber-500/30 font-mono text-amber-200">
+                <Lock className="mr-1 size-3 text-amber-300" />
+                Operator Restricted (0x9dC0...7C98)
+              </Badge>
+            )}
             <Badge className="border-blue-400/40 bg-blue-500/30 text-blue-200">
               ERC-4626 & Isolated Risk Ready
             </Badge>
@@ -227,7 +292,7 @@ export default function Launchpad() {
       </div>
 
       {/* Main Studio Pipeline */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} activationMode="manual" className="space-y-6">
         <TabsList className="grid w-full grid-cols-4 border border-purple-100 bg-white/70 p-1 shadow-sm backdrop-blur">
           <TabsTrigger value="identity" className="flex items-center gap-2">
             <Coins className="size-4 text-purple-600" />
@@ -266,7 +331,7 @@ export default function Launchpad() {
                   <Label htmlFor="tokenName">Token Name</Label>
                   <Input
                     id="tokenName"
-                    placeholder="e.g. Astro Mutt"
+                    placeholder="e.g. My Token"
                     value={form.tokenName}
                     onChange={(e) => setForm({ ...form, tokenName: e.target.value })}
                   />
@@ -279,7 +344,7 @@ export default function Launchpad() {
                   <Label htmlFor="tokenSymbol">Token Symbol (Ticker)</Label>
                   <Input
                     id="tokenSymbol"
-                    placeholder="e.g. AMUTT"
+                    placeholder="e.g. MYTKN"
                     value={form.tokenSymbol}
                     onChange={(e) =>
                       setForm({ ...form, tokenSymbol: e.target.value.toUpperCase() })
@@ -663,6 +728,51 @@ export default function Launchpad() {
                 </p>
               </div>
 
+              {/* Pre-launch Status Checklist */}
+              <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-4 space-y-2.5">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  Launch Readiness Status
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                  <div className="flex items-center space-x-2">
+                    {isConnected ? (
+                      <CheckCircle2 className="size-4 text-emerald-600 shrink-0" />
+                    ) : (
+                      <AlertCircle className="size-4 text-amber-500 shrink-0" />
+                    )}
+                    <span className={isConnected ? "text-gray-900 font-medium" : "text-amber-800"}>
+                      {isConnected
+                        ? `Wallet: ${address?.slice(0, 6)}...${address?.slice(-4)}`
+                        : "Wallet Not Connected"}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    {chainId === 8453 ? (
+                      <CheckCircle2 className="size-4 text-emerald-600 shrink-0" />
+                    ) : (
+                      <AlertCircle className="size-4 text-amber-500 shrink-0" />
+                    )}
+                    <span className={chainId === 8453 ? "text-gray-900 font-medium" : "text-amber-800"}>
+                      {chainId === 8453
+                        ? "Base Mainnet Active"
+                        : `Network: ${chain?.name || `Chain ${chainId || "Unknown"}`}`}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    {form.tokenName.trim() && form.tokenSymbol.trim() && form.initialSupply.trim() ? (
+                      <CheckCircle2 className="size-4 text-emerald-600 shrink-0" />
+                    ) : (
+                      <AlertCircle className="size-4 text-amber-500 shrink-0" />
+                    )}
+                    <span className="text-gray-900 font-medium">
+                      {form.tokenSymbol ? `${form.tokenSymbol} Configured` : "Identity Incomplete"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
               {/* Launch Action */}
               <div className="flex flex-col items-center justify-between gap-4 border-t border-gray-100 pt-4 sm:flex-row">
                 <Button
@@ -672,23 +782,67 @@ export default function Launchpad() {
                 >
                   Back
                 </Button>
-                <Button
-                  onClick={handleLaunch}
-                  disabled={isDeploying || !isConnected || chainId !== 8453}
-                  className="w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 px-8 font-bold text-white shadow-lg hover:from-purple-700 hover:to-blue-700 sm:w-auto"
-                >
-                  {isDeploying ? (
-                    <>
-                      <Loader2 className="mr-2 size-4 animate-spin" />
-                      Deploying Ecosystem to Base...
-                    </>
-                  ) : (
-                    <>
-                      <Rocket className="mr-2 size-4" />
-                      Launch Token Ecosystem Now
-                    </>
-                  )}
-                </Button>
+
+                {!isConnected ? (
+                  <div className="flex flex-col sm:flex-row items-center gap-3">
+                    <p className="text-xs text-amber-700 font-medium">
+                      Connect your wallet to deploy on Base:
+                    </p>
+                    <WalletConnect />
+                  </div>
+                ) : !isAdmin ? (
+                  <div className="flex flex-col items-center sm:items-end gap-1.5 w-full sm:w-auto">
+                    <Button
+                      disabled
+                      className="w-full sm:w-auto cursor-not-allowed bg-slate-200 font-semibold text-slate-500 shadow-none hover:bg-slate-200"
+                    >
+                      <Lock className="mr-2 size-4 text-slate-500" />
+                      Deployment Restricted (Admin Only)
+                    </Button>
+                    <span className="text-[11px] text-slate-500">
+                      Studio restricted to Admin:{" "}
+                      <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[10px] font-bold text-slate-700">
+                        {adminAddress.slice(0, 6)}...{adminAddress.slice(-4)}
+                      </code>
+                    </span>
+                  </div>
+                ) : chainId !== 8453 ? (
+                  <Button
+                    onClick={() => switchChain({ chainId: 8453 })}
+                    disabled={isSwitchingChain}
+                    className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 shadow-md"
+                  >
+                    {isSwitchingChain ? (
+                      <>
+                        <Loader2 className="mr-2 size-4 animate-spin" />
+                        Switching to Base...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="mr-2 size-4" />
+                        Switch to Base Mainnet ({chain?.name || "Current"} ➔ Base)
+                      </>
+                    )}
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleLaunch}
+                    disabled={isDeploying}
+                    className="w-full sm:w-auto bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 px-8 font-bold text-white shadow-lg hover:from-purple-700 hover:to-blue-700"
+                  >
+                    {isDeploying ? (
+                      <>
+                        <Loader2 className="mr-2 size-4 animate-spin" />
+                        Deploying Ecosystem to Base...
+                      </>
+                    ) : (
+                      <>
+                        <Rocket className="mr-2 size-4" />
+                        Launch Token Ecosystem Now
+                      </>
+                    )}
+                  </Button>
+                )}
               </div>
 
               {/* Real-Time Deployment Log */}

@@ -14,8 +14,16 @@ export async function executeLaunchpadDeployment(
   form: LaunchpadFormState,
   userAddress: Address
 ): Promise<DeployedEcosystemResult> {
+  const adminWallet = CANONICAL_BASE_CONTRACTS.DeployerAdminWallet.toLowerCase();
+  if (userAddress.toLowerCase() !== adminWallet) {
+    throw new Error(
+      `Deployment restricted: Only protocol administrator (${CANONICAL_BASE_CONTRACTS.DeployerAdminWallet}) can launch tokens.`
+    );
+  }
+
   const supplyUnits = parseUnits(form.initialSupply, form.decimals || 18);
   const recipient = (form.recipientAdminAddress?.trim() as Address) || userAddress;
+  const activeChain = walletClient.chain;
 
   // ────────────────────────────────────────────────────────────────────────────
   // Step 1: Deploy Token (GovernanceToken.sol)
@@ -32,7 +40,7 @@ export async function executeLaunchpadDeployment(
       supplyUnits,
     ],
     account: userAddress,
-    chain: null,
+    chain: activeChain,
   });
 
   const tokenReceipt = await publicClient.waitForTransactionReceipt({ hash: tokenTxHash });
@@ -64,7 +72,7 @@ export async function executeLaunchpadDeployment(
       bytecode: LAUNCHPAD_ARTIFACTS.FeeDiscountStaking.bytecode,
       args: [tokenAddress, recipient, recipient],
       account: userAddress,
-      chain: null,
+      chain: activeChain,
     });
     const stakingReceipt = await publicClient.waitForTransactionReceipt({ hash: stakingHash });
     stakingAddress = stakingReceipt.contractAddress ?? undefined;
@@ -92,7 +100,7 @@ export async function executeLaunchpadDeployment(
         recipient,
       ],
       account: userAddress,
-      chain: null,
+      chain: activeChain,
     });
     const vaultReceipt = await publicClient.waitForTransactionReceipt({ hash: vaultHash });
     vaultAddress = vaultReceipt.contractAddress ?? undefined;
@@ -111,7 +119,7 @@ export async function executeLaunchpadDeployment(
         recipient,
       ],
       account: userAddress,
-      chain: null,
+      chain: activeChain,
     });
     const vaultReceipt = await publicClient.waitForTransactionReceipt({ hash: vaultHash });
     vaultAddress = vaultReceipt.contractAddress ?? undefined;
@@ -129,7 +137,7 @@ export async function executeLaunchpadDeployment(
         recipient,
       ],
       account: userAddress,
-      chain: null,
+      chain: activeChain,
     });
     const vaultReceipt = await publicClient.waitForTransactionReceipt({ hash: vaultHash });
     vaultAddress = vaultReceipt.contractAddress ?? undefined;
@@ -141,7 +149,7 @@ export async function executeLaunchpadDeployment(
       bytecode: LAUNCHPAD_ARTIFACTS.AaveFlashBorrower.bytecode,
       args: [CANONICAL_BASE_CONTRACTS.AaveV3Pool, recipient],
       account: userAddress,
-      chain: null,
+      chain: activeChain,
     });
     const borrowerReceipt = await publicClient.waitForTransactionReceipt({ hash: borrowerHash });
     borrowerAddress = borrowerReceipt.contractAddress ?? undefined;
@@ -152,45 +160,49 @@ export async function executeLaunchpadDeployment(
   // Step 4: Multi-DEX Liquidity Seeding (Optional)
   // ────────────────────────────────────────────────────────────────────────────
   if (form.enableDexSeeding && form.initialEthLiquidity && Number(form.initialEthLiquidity) > 0) {
-    const venue = DEX_VENUES.find((v) => v.id === form.selectedDex) ?? DEX_VENUES[0]!;
-    const router = venue.routerAddress;
-    const ethAmount = parseEther(form.initialEthLiquidity);
-    const tokenPercent = Math.min(Math.max(form.initialTokenLiquidityPercent || 50, 1), 100);
-    const tokenAmount = (supplyUnits * BigInt(tokenPercent)) / 100n;
+    try {
+      const venue = DEX_VENUES.find((v) => v.id === form.selectedDex) ?? DEX_VENUES[0]!;
+      const router = venue.routerAddress;
+      const ethAmount = parseEther(form.initialEthLiquidity);
+      const tokenPercent = Math.min(Math.max(form.initialTokenLiquidityPercent || 50, 1), 100);
+      const tokenAmount = (supplyUnits * BigInt(tokenPercent)) / 100n;
 
-    console.log(
-      `[Launchpad] Approving ${venue.name} router for ${tokenAmount.toString()} tokens...`
-    );
-    const approveHash = await walletClient.writeContract({
-      address: tokenAddress,
-      abi: ERC20_ABI,
-      functionName: "approve",
-      args: [router, tokenAmount],
-      account: userAddress,
-      chain: null,
-    });
-    await publicClient.waitForTransactionReceipt({ hash: approveHash });
+      console.log(
+        `[Launchpad] Approving ${venue.name} router for ${tokenAmount.toString()} tokens...`
+      );
+      const approveHash = await walletClient.writeContract({
+        address: tokenAddress,
+        abi: ERC20_ABI,
+        functionName: "approve",
+        args: [router, tokenAmount],
+        account: userAddress,
+        chain: activeChain,
+      });
+      await publicClient.waitForTransactionReceipt({ hash: approveHash });
 
-    console.log(`[Launchpad] Adding initial liquidity to ${venue.name}...`);
-    const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200); // 20 mins
-    const liqHash = await walletClient.writeContract({
-      address: router,
-      abi: UNISWAP_V2_ROUTER_ABI,
-      functionName: "addLiquidityETH",
-      args: [
-        tokenAddress,
-        tokenAmount,
-        (tokenAmount * 95n) / 100n, // 5% slippage floor for initial seed
-        (ethAmount * 95n) / 100n,
-        recipient,
-        deadline,
-      ],
-      value: ethAmount,
-      account: userAddress,
-      chain: null,
-    });
-    await publicClient.waitForTransactionReceipt({ hash: liqHash });
-    console.log(`[Launchpad] Liquidity added successfully to ${venue.name}!`);
+      console.log(`[Launchpad] Adding initial liquidity to ${venue.name}...`);
+      const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200); // 20 mins
+      const liqHash = await walletClient.writeContract({
+        address: router,
+        abi: UNISWAP_V2_ROUTER_ABI,
+        functionName: "addLiquidityETH",
+        args: [
+          tokenAddress,
+          tokenAmount,
+          (tokenAmount * 95n) / 100n, // 5% slippage floor for initial seed
+          (ethAmount * 95n) / 100n,
+          recipient,
+          deadline,
+        ],
+        value: ethAmount,
+        account: userAddress,
+        chain: activeChain,
+      });
+      await publicClient.waitForTransactionReceipt({ hash: liqHash });
+      console.log(`[Launchpad] Liquidity added successfully to ${venue.name}!`);
+    } catch (seedErr) {
+      console.warn("[Launchpad] Liquidity seeding warning (token is already deployed):", seedErr);
+    }
   }
 
   return {
