@@ -378,7 +378,41 @@ export function PairMatrix100({ onSelectPair, krakenBalances, snapshot }: PairMa
                                 return <span className="font-normal text-rose-500">RPC unavailable</span>;
                               if (quote.status === "unavailable")
                                 return <span className="font-normal text-slate-400">Pool unquoted</span>;
-                              return `1 ${quote.inputSymbol} → ${quote.output} ${quote.outputSymbol}`;
+
+                              // Illiquidity / Deviation Guard against ghost pools
+                              const cbQuote = getCoinbaseQuote(pair.symbol);
+                              const krQuote = getKrakenQuote(pair.symbol);
+                              const refPrice = cbQuote?.bid ?? krQuote?.bid;
+                              const dexNum = parseFloat(quote.output || "0");
+                              const isUsdQuote = ["USD", "USDC", "USDT"].includes(pair.quoteAsset);
+
+                              if (refPrice && refPrice > 0 && dexNum > 0 && isUsdQuote) {
+                                const deviation = Math.abs(dexNum - refPrice) / refPrice;
+                                if (deviation > 0.15) {
+                                  return (
+                                    <div className="space-y-0.5">
+                                      <div className="flex items-center gap-1 font-semibold text-amber-600">
+                                        <span className="inline-block size-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                        <span>⚠️ Low Depth / Out of Range</span>
+                                      </div>
+                                      <div className="text-[10px] text-slate-400 font-normal">
+                                        1 {quote.inputSymbol} → {quote.output} {quote.outputSymbol} ({(deviation * 100).toFixed(0)}% slippage)
+                                      </div>
+                                    </div>
+                                  );
+                                }
+                              }
+
+                              return (
+                                <div>
+                                  <span>{`1 ${quote.inputSymbol} → ${quote.output} ${quote.outputSymbol}`}</span>
+                                  {quote.feeTier && (
+                                    <span className="ml-1 text-[9px] font-normal text-purple-600">
+                                      ({quote.feeTier})
+                                    </span>
+                                  )}
+                                </div>
+                              );
                             })()}
                           </div>
                           <span className="text-[10px] text-slate-500">

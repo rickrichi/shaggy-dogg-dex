@@ -20,5 +20,8 @@ export function getUniswapV2Factory(chainId?: number): Address {
   return "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f" as Address; // Ethereum Mainnet
 }
 
+export const UNISWAP_V3_QUOTER_V2_BASE: Address =
+  "0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a";
+
 export const DEFAULT_SLIPPAGE = 0.5; // percent
 export const SWAP_DEADLINE_BUFFER = 60 * 15; // 15 minutes in seconds

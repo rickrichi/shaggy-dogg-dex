@@ -38,6 +38,14 @@ describe("Matrix Base routes", () => {
     multicall.mockResolvedValueOnce([{ status: "failure", error: new Error("revert") }]);
     expect((await fetchMatrixDexQuotes(["ETH/USDC"]))["ETH/USDC"]?.status).toBe("unavailable");
   });
+  it("processes Uniswap V3 QuoterV2 concentrated liquidity tuples correctly", async () => {
+    multicall.mockResolvedValueOnce([
+      { status: "success", result: [83450000000n, 123456789n, 2, 75000n] },
+    ]);
+    const quote = (await fetchMatrixDexQuotes(["BTC/USDC"]))["BTC/USDC"];
+    expect(quote?.output).toBe("83450");
+    expect(quote?.venueLabel).toContain("Uniswap V3");
+  });
   it("does not retain a price after an RPC failure or request unsupported pairs", async () => {
     multicall.mockRejectedValueOnce(new Error("offline"));
     const quote = (await fetchMatrixDexQuotes(["ETH/USDC"]))["ETH/USDC"];
