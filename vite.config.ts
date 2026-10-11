@@ -73,7 +73,7 @@ export default defineConfig(({ mode }) => {
           "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
           "img-src 'self' data: https: blob:",
           "font-src 'self' data: https://fonts.gstatic.com",
-          `connect-src ${arbOrigins} ${rpcOrigins} 'self' http://localhost:5173 http://localhost:8788 http://localhost:8000 http://127.0.0.1:8000 http://localhost:8010 ws://localhost:5173 ws://localhost:8000 ws://127.0.0.1:8000 https://ethereum.publicnode.com https://*.alchemy.com https://*.infura.io https://*.walletconnect.com https://*.walletconnect.org https://*.supabase.co https://*.supabase.in wss://*.walletconnect.com wss://*.walletconnect.org wss://*.supabase.co wss://*.supabase.in`,
+          `connect-src ${arbOrigins} ${rpcOrigins} 'self' http://localhost:5173 http://localhost:8788 http://localhost:8000 http://127.0.0.1:8000 http://localhost:8010 ws://localhost:5173 ws://localhost:8000 ws://127.0.0.1:8000 https://ethereum.publicnode.com https://*.alchemy.com https://*.infura.io https://*.walletconnect.com https://*.walletconnect.org https://*.supabase.co https://*.supabase.in wss://*.walletconnect.com wss://*.walletconnect.org wss://*.supabase.co wss://*.supabase.in https://api.exchange.coinbase.com https://api.coinbase.com wss://ws-feed.exchange.coinbase.com https://*.coinbase.com wss://*.coinbase.com`,
           "object-src 'none'",
           "base-uri 'self'",
         ].join('; '),
