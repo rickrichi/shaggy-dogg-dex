@@ -9,6 +9,7 @@ import { ARB_API_URL } from "@/config/crypto-arb";
 import thresholds from "@/config/market-pair-thresholds.json";
 import MARKET_PAIRS from "@/config/market-pairs.json";
 import { useMatrixDexQuotes } from "@/hooks/useMatrixDexQuotes";
+import { useCeFiMatrixFeeds } from "@/hooks/useCeFiMatrixFeeds";
 import { MATRIX_QUOTE_MAX_AGE_MS, matrixRoute } from "@/lib/amm/matrix-quotes";
 
 import type { Snapshot } from "@/types/crypto-arb";
@@ -55,6 +56,12 @@ interface PairMatrix100Props {
 
 export function PairMatrix100({ onSelectPair, krakenBalances, snapshot }: PairMatrix100Props) {
   const { quotes, now } = useMatrixDexQuotes(MARKET_PAIRS);
+  const {
+    coinbaseConnected,
+    krakenConnected,
+    getCoinbaseQuote,
+    getKrakenQuote,
+  } = useCeFiMatrixFeeds();
   const [dexOnly, setDexOnly] = useState(false);
   const venueIndex = useMemo(
     () => new Map(snapshot?.venues.map((v) => [`${v.exchange}:${v.symbol}`, v]) ?? []),
@@ -145,6 +152,23 @@ export function PairMatrix100({ onSelectPair, krakenBalances, snapshot }: PairMa
   }, [search, filterFundedOnly, freeAssets, dexOnly]);
 
   const cexQuote = (exchange: string, symbol: string) => {
+    // 1. Direct live Coinbase feed
+    if (exchange === "coinbase") {
+      const live = getCoinbaseQuote(symbol);
+      if (live) {
+        return `Bid ${live.bid.toLocaleString(undefined, { maximumSignificantDigits: 7 })} / Ask ${live.ask.toLocaleString(undefined, { maximumSignificantDigits: 7 })}`;
+      }
+    }
+
+    // 2. Direct live Kraken feed
+    if (exchange === "kraken") {
+      const live = getKrakenQuote(symbol);
+      if (live) {
+        return `Bid ${live.bid.toLocaleString(undefined, { maximumSignificantDigits: 7 })} / Ask ${live.ask.toLocaleString(undefined, { maximumSignificantDigits: 7 })}`;
+      }
+    }
+
+    // 3. Fall back to snapshot venueIndex if present
     const venue = venueIndex.get(`${exchange}:${symbol}`);
     if (!venue) return "Unverified";
     if (venue.status !== "live") return venue.status;
@@ -159,17 +183,45 @@ export function PairMatrix100({ onSelectPair, krakenBalances, snapshot }: PairMa
       <CardHeader className="border-b border-slate-100 bg-slate-50/60 pb-4">
         <div className="flex flex-col items-start justify-between gap-3 md:flex-row md:items-center">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Sparkles className="size-4 text-purple-600" />
               <CardTitle className="text-base font-bold text-slate-900">
                 {PAIR_MATRIX_DATA.length}-Pair Spot Arbitrage Matrix
               </CardTitle>
+              <div className="flex items-center gap-1.5 pl-2">
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                    coinbaseConnected
+                      ? "border border-emerald-200 bg-emerald-50 text-emerald-800"
+                      : "border border-slate-200 bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  <span
+                    className={`size-1.5 rounded-full ${
+                      coinbaseConnected ? "animate-pulse bg-emerald-500" : "bg-slate-400"
+                    }`}
+                  />
+                  Coinbase: {coinbaseConnected ? "Streaming Live" : "Connecting…"}
+                </span>
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                    krakenConnected
+                      ? "border border-purple-200 bg-purple-50 text-purple-800"
+                      : "border border-slate-200 bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  <span
+                    className={`size-1.5 rounded-full ${
+                      krakenConnected ? "animate-pulse bg-purple-500" : "bg-slate-400"
+                    }`}
+                  />
+                  Kraken: {krakenConnected ? "Streaming Live" : "Connecting…"}
+                </span>
+              </div>
             </div>
             <CardDescription className="text-xs">
               CeDeFi comparison: Shaggy-Dogg-Dex routed sell quotes on Base alongside centralized
-              exchange bid/ask prices. Prices use each pair’s quote asset. DEX quotes sell 1 base
-              token, include pool fees and exclude gas; CEX prices are top-of-book before fees. ETH
-              routes use WETH. Kraken capital is separate from your wallet.
+              exchange bid/ask prices streamed directly from Coinbase &amp; Kraken public WebSockets.
             </CardDescription>
           </div>
 
@@ -312,11 +364,28 @@ export function PairMatrix100({ onSelectPair, krakenBalances, snapshot }: PairMa
                         </>
                       )}
                     </td>
-                    {(["binance", "bybit", "okx", "coinbase", "kraken"] as const).map((venue) => (
-                      <td key={venue} className="px-3 py-2 text-center text-slate-600">
-                        {cexQuote(venue, pair.symbol)}
-                      </td>
-                    ))}
+                    {(["binance", "bybit", "okx", "coinbase", "kraken"] as const).map((venue) => {
+                      const quote = cexQuote(venue, pair.symbol);
+                      const isLive =
+                        quote !== "Unverified" &&
+                        quote !== "Stale" &&
+                        quote !== "Awaiting book";
+                      const colorClass = isLive
+                        ? venue === "coinbase"
+                          ? "text-emerald-700 font-semibold bg-emerald-50/30"
+                          : venue === "kraken"
+                            ? "text-purple-700 font-semibold bg-purple-50/30"
+                            : "text-slate-800"
+                        : "text-slate-400";
+                      return (
+                        <td
+                          key={venue}
+                          className={`px-3 py-2 text-center text-xs transition-colors ${colorClass}`}
+                        >
+                          {quote}
+                        </td>
+                      );
+                    })}
                     <td className="px-3 py-2 font-bold text-emerald-600">{pair.minNetEdgePct}</td>
                     <td className="px-3 py-2">
                       <span
