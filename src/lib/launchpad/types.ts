@@ -68,6 +68,7 @@ export interface DeployedEcosystemResult {
   stakingAddress?: Address | undefined;
   vaultAddress?: Address | undefined;
   borrowerAddress?: Address | undefined;
+  compoundVaultAddress?: Address | undefined;
   pairAddress?: Address | undefined;
   txHash: string;
   deploymentMode: DeploymentExecutionMode;
@@ -84,6 +85,8 @@ export interface LaunchedTokenRecord {
   archetype: ArchetypeId;
   stakingAddress?: Address | undefined;
   vaultAddress?: Address | undefined;
+  borrowerAddress?: Address | undefined;
+  compoundVaultAddress?: Address | undefined;
   pairAddress?: Address | undefined;
   creatorAddress: Address;
   chainId: number;

@@ -52,6 +52,7 @@ export async function executeLaunchpadDeployment(
   let stakingAddress: Address | undefined;
   let vaultAddress: Address | undefined;
   let borrowerAddress: Address | undefined;
+  let compoundVaultAddress: Address | undefined;
   const pairAddress: Address | undefined = undefined;
 
   // ────────────────────────────────────────────────────────────────────────────
@@ -85,7 +86,8 @@ export async function executeLaunchpadDeployment(
   if (
     form.selectedArchetype === "moonwell_lending" ||
     form.selectedArchetype === "morpho_blue_isolated" ||
-    form.selectedArchetype === "silo_isolated_vault"
+    form.selectedArchetype === "silo_isolated_vault" ||
+    form.selectedArchetype === "fluid_hybrid_amm"
   ) {
     console.log(`[Launchpad] Deploying IsolatedLendingVault (ERC-4626) on Base...`);
     const vaultHash = await walletClient.deployContract({
@@ -142,6 +144,24 @@ export async function executeLaunchpadDeployment(
     const vaultReceipt = await publicClient.waitForTransactionReceipt({ hash: vaultHash });
     vaultAddress = vaultReceipt.contractAddress ?? undefined;
     console.log(`[Launchpad] Yield Staking Vault deployed at: ${vaultAddress}`);
+
+    console.log(`[Launchpad] Deploying CompoundYieldVault suite component...`);
+    const compHash = await walletClient.deployContract({
+      abi: LAUNCHPAD_ARTIFACTS.CompoundYieldVault.abi,
+      bytecode: LAUNCHPAD_ARTIFACTS.CompoundYieldVault.bytecode,
+      args: [
+        CANONICAL_BASE_CONTRACTS.USDC,
+        CANONICAL_BASE_CONTRACTS.CompoundComet,
+        stakingAddress ?? "0x0000000000000000000000000000000000000000",
+        recipient,
+        recipient,
+      ],
+      account: userAddress,
+      chain: activeChain,
+    });
+    const compReceipt = await publicClient.waitForTransactionReceipt({ hash: compHash });
+    compoundVaultAddress = compReceipt.contractAddress ?? undefined;
+    console.log(`[Launchpad] Compound Yield Vault deployed at: ${compoundVaultAddress}`);
 
     console.log(`[Launchpad] Deploying AaveFlashBorrower suite component...`);
     const borrowerHash = await walletClient.deployContract({
@@ -210,6 +230,7 @@ export async function executeLaunchpadDeployment(
     stakingAddress,
     vaultAddress,
     borrowerAddress,
+    compoundVaultAddress,
     pairAddress,
     txHash: tokenTxHash,
     deploymentMode: form.executionMode,

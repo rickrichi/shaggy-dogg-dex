@@ -164,6 +164,8 @@ export default function Launchpad() {
       addLog(`Token successfully deployed at ${result.tokenAddress}`);
       if (result.stakingAddress) addLog(`Staking vault deployed at ${result.stakingAddress}`);
       if (result.vaultAddress) addLog(`Lending vault deployed at ${result.vaultAddress}`);
+      if (result.compoundVaultAddress) addLog(`Compound v3 vault deployed at ${result.compoundVaultAddress}`);
+      if (result.borrowerAddress) addLog(`Flash Loan borrower deployed at ${result.borrowerAddress}`);
       if (form.enableDexSeeding) addLog(`Liquidity seeded on ${selectedDexDef.name}!`);
 
       setDeployedResult(result);
@@ -177,6 +179,8 @@ export default function Launchpad() {
         archetype: form.selectedArchetype,
         stakingAddress: result.stakingAddress,
         vaultAddress: result.vaultAddress,
+        borrowerAddress: result.borrowerAddress,
+        compoundVaultAddress: result.compoundVaultAddress,
         pairAddress: result.pairAddress,
         creatorAddress: address,
         chainId: chainId || 8453,
@@ -900,6 +904,32 @@ export default function Launchpad() {
                           className="font-mono text-emerald-700 underline"
                         >
                           {deployedResult.stakingAddress}
+                        </a>
+                      </p>
+                    )}
+                    {deployedResult.compoundVaultAddress && (
+                      <p>
+                        <strong>Compound v3 Vault:</strong>{" "}
+                        <a
+                          href={`https://basescan.org/address/${deployedResult.compoundVaultAddress}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-mono text-emerald-700 underline"
+                        >
+                          {deployedResult.compoundVaultAddress}
+                        </a>
+                      </p>
+                    )}
+                    {deployedResult.borrowerAddress && (
+                      <p>
+                        <strong>Flash Loan Borrower:</strong>{" "}
+                        <a
+                          href={`https://basescan.org/address/${deployedResult.borrowerAddress}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-mono text-emerald-700 underline"
+                        >
+                          {deployedResult.borrowerAddress}
                         </a>
                       </p>
                     )}
