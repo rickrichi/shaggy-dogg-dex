@@ -235,10 +235,14 @@ export function LpLockCard() {
         abi: V3_POSITION_MANAGER_ABI,
         functionName: "approve",
         args: [SOVEREIGN_V3_TIMELOCK_ADDRESS, SD_V3_NFT_TOKEN_ID],
+        chainId: 8453,
       });
 
       if (publicClient) {
-        await publicClient.waitForTransactionReceipt({ hash });
+        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        if (receipt.status !== "success") {
+          throw new Error("Approval transaction reverted on-chain");
+        }
       }
       toast.success("Sovereign Locker approved successfully!");
       refetchAll();
@@ -263,10 +267,14 @@ export function LpLockCard() {
         abi: SOVEREIGN_V3_TIMELOCK_ABI,
         functionName: "lockPosition",
         args: [SD_V3_NFT_TOKEN_ID, unlockTimestamp],
+        chainId: 8453,
       });
 
       if (publicClient) {
-        await publicClient.waitForTransactionReceipt({ hash });
+        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        if (receipt.status !== "success") {
+          throw new Error("Locking transaction reverted on-chain");
+        }
       }
       toast.success(`Position locked cryptographically until ${previewUnlock.unlockDate}!`);
       refetchAll();
@@ -290,10 +298,14 @@ export function LpLockCard() {
         abi: SOVEREIGN_V3_TIMELOCK_ABI,
         functionName: "harvestTradingFees",
         args: [SD_V3_NFT_TOKEN_ID],
+        chainId: 8453,
       });
 
       if (publicClient) {
-        await publicClient.waitForTransactionReceipt({ hash });
+        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        if (receipt.status !== "success") {
+          throw new Error("Fee harvest transaction reverted on-chain");
+        }
       }
       toast.success("Trading fees harvested directly into your wallet!");
       refetchAll();
@@ -317,10 +329,14 @@ export function LpLockCard() {
         abi: SOVEREIGN_V3_TIMELOCK_ABI,
         functionName: "withdraw",
         args: [SD_V3_NFT_TOKEN_ID],
+        chainId: 8453,
       });
 
       if (publicClient) {
-        await publicClient.waitForTransactionReceipt({ hash });
+        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        if (receipt.status !== "success") {
+          throw new Error("Withdrawal transaction reverted on-chain");
+        }
       }
       toast.success("Position NFT withdrawn back to your wallet!");
       refetchAll();
@@ -335,6 +351,14 @@ export function LpLockCard() {
   // Unclaimed fees display
   const tokensOwed0 = positionInfo ? formatUnits(positionInfo[10] ?? 0n, 18) : "0.00";
   const tokensOwed1 = positionInfo ? formatUnits(positionInfo[11] ?? 0n, 18) : "0.00";
+
+  const formattedUnlockDate = lockInfo?.unlockTimestamp
+    ? new Date(lockInfo.unlockTimestamp * 1000).toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      })
+    : previewUnlock.unlockDate;
 
   return (
     <Card className="overflow-hidden border-indigo-200/80 bg-gradient-to-br from-white via-indigo-50/20 to-purple-50/30 shadow-md">
@@ -470,6 +494,9 @@ export function LpLockCard() {
                   <p className="mt-1 text-xs text-gray-600">
                     Whenever swaps occur on your pool, trading fees accumulate. Harvest 100% of accumulated fees anytime without touching your locked principal.
                   </p>
+                  <p className="mt-1 text-[11px] text-gray-500 italic">
+                    Note: Uncollected fee growth is computed and settled on-chain upon harvest.
+                  </p>
 
                   <div className="mt-3 flex items-center gap-6">
                     <div>
@@ -500,7 +527,7 @@ export function LpLockCard() {
                 <span className="block text-xs font-bold text-gray-900">Principal Withdrawal</span>
                 <span className="text-xs text-gray-500">
                   {timeLeft && !timeLeft.isExpired
-                    ? "Withdrawal button activates automatically once the 12-month lock timer reaches zero."
+                    ? "Withdrawal button activates automatically once the lock timer reaches zero."
                     : "Lock duration has completed! You can now withdraw your NFT position back to your wallet."}
                 </span>
               </div>
@@ -517,7 +544,7 @@ export function LpLockCard() {
               >
                 {timeLeft && !timeLeft.isExpired ? (
                   <>
-                    <Lock className="size-4" /> Locked Until Oct 12, 2027
+                    <Lock className="size-4" /> Locked Until {formattedUnlockDate}
                   </>
                 ) : (
                   <>

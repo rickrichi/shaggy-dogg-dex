@@ -52,8 +52,7 @@
   To clear the warning so other users don't see it when importing AMUTT:
 
   1. Lock or Burn LP Tokens:
-      • Deposit the LP tokens into a standard on-chain locker (e.g. Uncx, Team Finance, or PinkLock) for 3–12 months, or send excess
-      LP to the dead address. Once scanners see lp_locked: 100%, the biggest red flag disappears.
+      • Deposit the LP tokens into a standard on-chain locker (e.g. Uncx, Team Finance, or PinkLock) for 3–12 months.  
   2. Increase Liquidity & Holder Distribution:
       • Once liquidity is migrated or seeded into the V3 pool with deeper liquidity and traded across more unique wallets, the
       automated score improves drastically.
