@@ -27,6 +27,12 @@ export const LOCKER_PLATFORMS = [
     badge: "Official Base Partner",
   },
   {
+    name: "FlokiFi Locker",
+    description: "Multi-chain digital asset and NFT locker by Floki supporting Base liquidity locking.",
+    url: "https://www.flokifi.com/",
+    badge: "Audited by CertiK",
+  },
+  {
     name: "Team Finance",
     description: "Audited liquidity locker supporting Base Uniswap V3 NFT positions.",
     url: "https://app.team.finance",
@@ -321,7 +327,7 @@ export function LpLockCard() {
             <span className="text-[11px] text-gray-500">Direct external dApp links</span>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             {LOCKER_PLATFORMS.map((locker) => (
               <a
                 key={locker.name}
