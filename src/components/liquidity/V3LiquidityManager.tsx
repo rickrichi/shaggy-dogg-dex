@@ -1,17 +1,9 @@
 // src/components/liquidity/V3LiquidityManager.tsx
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import {
-  Coins,
-  ExternalLink,
-  Layers,
-  Loader2,
-  Plus,
-  RefreshCw,
-  TrendingUp,
-} from "lucide-react";
+import { Coins, ExternalLink, Layers, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { type Address, formatUnits, type Hash, parseAbi } from "viem";
+import { type Address } from "viem";
 import { base } from "viem/chains";
 import { useAccount, usePublicClient, useWalletClient } from "wagmi";
 
@@ -21,7 +13,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import {
   NONFUNGIBLE_POSITION_MANAGER_ABI,
   NONFUNGIBLE_POSITION_MANAGER_BASE,
-  WETH_BASE,
 } from "@/lib/amm/uniswap-v3";
 
 interface V3Position {
@@ -44,9 +35,13 @@ export function V3LiquidityManager() {
   const [positions, setPositions] = useState<readonly V3Position[]>([]);
   const [loading, setLoading] = useState(false);
   const [busyTokenId, setBusyTokenId] = useState<bigint | null>(null);
+  const scope = useRef("");
+  scope.current = `${userAddress}:${chainId}`;
 
   const fetchPositions = useCallback(async () => {
+    setPositions([]);
     if (!publicClient || !userAddress || chainId !== base.id) return;
+    const captured = scope.current;
     setLoading(true);
     try {
       const balance = await publicClient.readContract({
@@ -98,7 +93,7 @@ export function V3LiquidityManager() {
         })
       );
 
-      setPositions(posDetails);
+      if (scope.current === captured) setPositions(posDetails);
     } catch (e) {
       console.error("Failed to fetch V3 positions:", e);
     } finally {
@@ -111,7 +106,15 @@ export function V3LiquidityManager() {
   }, [fetchPositions]);
 
   const handleCollect = async (pos: V3Position) => {
-    if (!walletClient || !publicClient || !userAddress) return;
+    if (
+      !walletClient ||
+      !publicClient ||
+      !userAddress ||
+      chainId !== base.id ||
+      busyTokenId !== null
+    )
+      return;
+    const captured = scope.current;
     setBusyTokenId(pos.tokenId);
     try {
       const max128 = (1n << 128n) - 1n;
@@ -130,6 +133,13 @@ export function V3LiquidityManager() {
         account: userAddress,
       });
 
+      if (
+        scope.current !== captured ||
+        (await walletClient.getChainId()) !== base.id ||
+        (await walletClient.getAddresses())[0]?.toLowerCase() !== userAddress.toLowerCase()
+      ) {
+        throw new Error("Wallet changed. Refresh your positions.");
+      }
       const tx = await walletClient.writeContract({ ...request, chain: base });
       toast.info("Collecting fees from Uniswap V3 position...");
       const receipt = await publicClient.waitForTransactionReceipt({ hash: tx });
@@ -137,9 +147,9 @@ export function V3LiquidityManager() {
 
       toast.success(`Collected fees for NFT #${pos.tokenId.toString()}!`);
       await fetchPositions();
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      toast.error(err?.message ?? "Failed to collect fees");
+      toast.error(err instanceof Error ? err.message : "Failed to collect fees");
     } finally {
       setBusyTokenId(null);
     }
@@ -155,14 +165,14 @@ export function V3LiquidityManager() {
               Your Uniswap V3 Positions
             </CardTitle>
             <CardDescription className="text-xs text-gray-500">
-              Concentrated liquidity positions represented as NFTs on Base Mainnet.
+              Up to 10 NFT positions on Base Mainnet. Collected WETH remains WETH.
             </CardDescription>
           </div>
           <Button
             variant="outline"
             size="sm"
             onClick={() => void fetchPositions()}
-            disabled={loading}
+            disabled={loading || !isConnected || chainId !== base.id}
             className="text-xs"
           >
             <RefreshCw className={`mr-1 size-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
@@ -174,7 +184,9 @@ export function V3LiquidityManager() {
         {positions.length === 0 ? (
           <div className="rounded-xl border border-dashed border-gray-200 py-8 text-center">
             <Coins className="mx-auto size-8 text-gray-400" />
-            <p className="mt-2 text-sm font-semibold text-gray-700">No Uniswap V3 Positions Found</p>
+            <p className="mt-2 text-sm font-semibold text-gray-700">
+              No Uniswap V3 Positions Found
+            </p>
             <p className="text-xs text-gray-500">
               Use the Migration Assistant or V3 Position Creator to supply liquidity.
             </p>
@@ -203,7 +215,8 @@ export function V3LiquidityManager() {
                       )}
                     </div>
                     <p className="mt-1 font-mono text-xs text-gray-500">
-                      Tokens: {p.token0.slice(0, 6)}...{p.token0.slice(-4)} / {p.token1.slice(0, 6)}...{p.token1.slice(-4)}
+                      Tokens: {p.token0.slice(0, 6)}...{p.token0.slice(-4)} / {p.token1.slice(0, 6)}
+                      ...{p.token1.slice(-4)}
                     </p>
                     <p className="text-xs text-gray-600">
                       Liquidity units: <span className="font-mono">{p.liquidity.toString()}</span>
@@ -215,7 +228,7 @@ export function V3LiquidityManager() {
                       size="sm"
                       variant="outline"
                       className="border-indigo-300 text-xs text-indigo-700 hover:bg-indigo-50"
-                      disabled={busyTokenId === p.tokenId}
+                      disabled={busyTokenId !== null || !isConnected || chainId !== base.id}
                       onClick={() => void handleCollect(p)}
                     >
                       {busyTokenId === p.tokenId ? (

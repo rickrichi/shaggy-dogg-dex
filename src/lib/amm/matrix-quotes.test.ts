@@ -33,7 +33,7 @@ describe("Matrix Base routes", () => {
       expect(matrixRoute(symbol)).toBeNull();
   });
   it("returns a real quote and distinguishes a failed route", async () => {
-    multicall.mockResolvedValueOnce([{ status: "success", result: [10n ** 18n, 2500250000n] }]);
+    multicall.mockResolvedValueOnce([{ status: "success", result: [2500250000n, 1n, 0, 75000n] }]);
     expect((await fetchMatrixDexQuotes(["ETH/USDC"]))["ETH/USDC"]?.output).toBe("2500.25");
     multicall.mockResolvedValueOnce([{ status: "failure", error: new Error("revert") }]);
     expect((await fetchMatrixDexQuotes(["ETH/USDC"]))["ETH/USDC"]?.status).toBe("unavailable");
@@ -45,6 +45,10 @@ describe("Matrix Base routes", () => {
     const quote = (await fetchMatrixDexQuotes(["BTC/USDC"]))["BTC/USDC"];
     expect(quote?.output).toBe("83450");
     expect(quote?.venueLabel).toContain("Uniswap V3");
+  });
+  it("rejects a V2-shaped result from a V3 quoter", async () => {
+    multicall.mockResolvedValueOnce([{ status: "success", result: [10n ** 18n, 2500250000n] }]);
+    expect((await fetchMatrixDexQuotes(["ETH/USDC"]))["ETH/USDC"]?.status).toBe("unavailable");
   });
   it("does not retain a price after an RPC failure or request unsupported pairs", async () => {
     multicall.mockRejectedValueOnce(new Error("offline"));

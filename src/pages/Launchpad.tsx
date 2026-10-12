@@ -31,7 +31,11 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { WalletConnect } from "@/components/WalletConnect";
-import { CANONICAL_BASE_CONTRACTS, DEX_VENUES, LAUNCHPAD_ARCHETYPES } from "@/lib/launchpad/constants";
+import {
+  CANONICAL_BASE_CONTRACTS,
+  DEX_VENUES,
+  LAUNCHPAD_ARCHETYPES,
+} from "@/lib/launchpad/constants";
 import { executeLaunchpadDeployment } from "@/lib/launchpad/deployEngine";
 import { saveLaunchedToken } from "@/lib/launchpad/storage";
 
@@ -134,7 +138,9 @@ export default function Launchpad() {
       return;
     }
     if (!walletClient || !publicClient) {
-      toast.error("Wallet client is initializing. Please ensure your wallet is unlocked and connected.");
+      toast.error(
+        "Wallet client is initializing. Please ensure your wallet is unlocked and connected."
+      );
       return;
     }
 
@@ -164,8 +170,10 @@ export default function Launchpad() {
       addLog(`Token successfully deployed at ${result.tokenAddress}`);
       if (result.stakingAddress) addLog(`Staking vault deployed at ${result.stakingAddress}`);
       if (result.vaultAddress) addLog(`Lending vault deployed at ${result.vaultAddress}`);
-      if (result.compoundVaultAddress) addLog(`Compound v3 vault deployed at ${result.compoundVaultAddress}`);
-      if (result.borrowerAddress) addLog(`Flash Loan borrower deployed at ${result.borrowerAddress}`);
+      if (result.compoundVaultAddress)
+        addLog(`Compound v3 vault deployed at ${result.compoundVaultAddress}`);
+      if (result.borrowerAddress)
+        addLog(`Flash Loan borrower deployed at ${result.borrowerAddress}`);
       if (form.enableDexSeeding) addLog(`Liquidity seeded on ${selectedDexDef.name}!`);
 
       setDeployedResult(result);
@@ -187,7 +195,14 @@ export default function Launchpad() {
         deployedAt: Date.now(),
         txHash: result.txHash,
       });
-      toast.success("Ecosystem deployed successfully on Base Mainnet!");
+      if (result.liquiditySeedingError) {
+        setDeploymentLog((prev) => [...prev, `[LIQUIDITY FAILED] ${result.liquiditySeedingError}`]);
+        toast.warning(
+          `Contracts deployed; liquidity seeding failed: ${result.liquiditySeedingError}`
+        );
+      } else {
+        toast.success("Ecosystem deployed successfully on Base Mainnet!");
+      }
     } catch (err: unknown) {
       console.error(err);
       const msg = err instanceof Error ? err.message : "Deployment failed";
@@ -296,7 +311,12 @@ export default function Launchpad() {
       </div>
 
       {/* Main Studio Pipeline */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} activationMode="manual" className="space-y-6">
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        activationMode="manual"
+        className="space-y-6"
+      >
         <TabsList className="grid w-full grid-cols-4 border border-purple-100 bg-white/70 p-1 shadow-sm backdrop-blur">
           <TabsTrigger value="identity" className="flex items-center gap-2">
             <Coins className="size-4 text-purple-600" />
@@ -733,18 +753,18 @@ export default function Launchpad() {
               </div>
 
               {/* Pre-launch Status Checklist */}
-              <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-4 space-y-2.5">
+              <div className="space-y-2.5 rounded-xl border border-gray-200 bg-gray-50/80 p-4">
                 <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500">
                   Launch Readiness Status
                 </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-3">
                   <div className="flex items-center space-x-2">
                     {isConnected ? (
-                      <CheckCircle2 className="size-4 text-emerald-600 shrink-0" />
+                      <CheckCircle2 className="size-4 shrink-0 text-emerald-600" />
                     ) : (
-                      <AlertCircle className="size-4 text-amber-500 shrink-0" />
+                      <AlertCircle className="size-4 shrink-0 text-amber-500" />
                     )}
-                    <span className={isConnected ? "text-gray-900 font-medium" : "text-amber-800"}>
+                    <span className={isConnected ? "font-medium text-gray-900" : "text-amber-800"}>
                       {isConnected
                         ? `Wallet: ${address?.slice(0, 6)}...${address?.slice(-4)}`
                         : "Wallet Not Connected"}
@@ -753,11 +773,13 @@ export default function Launchpad() {
 
                   <div className="flex items-center space-x-2">
                     {chainId === 8453 ? (
-                      <CheckCircle2 className="size-4 text-emerald-600 shrink-0" />
+                      <CheckCircle2 className="size-4 shrink-0 text-emerald-600" />
                     ) : (
-                      <AlertCircle className="size-4 text-amber-500 shrink-0" />
+                      <AlertCircle className="size-4 shrink-0 text-amber-500" />
                     )}
-                    <span className={chainId === 8453 ? "text-gray-900 font-medium" : "text-amber-800"}>
+                    <span
+                      className={chainId === 8453 ? "font-medium text-gray-900" : "text-amber-800"}
+                    >
                       {chainId === 8453
                         ? "Base Mainnet Active"
                         : `Network: ${chain?.name || `Chain ${chainId || "Unknown"}`}`}
@@ -765,12 +787,14 @@ export default function Launchpad() {
                   </div>
 
                   <div className="flex items-center space-x-2">
-                    {form.tokenName.trim() && form.tokenSymbol.trim() && form.initialSupply.trim() ? (
-                      <CheckCircle2 className="size-4 text-emerald-600 shrink-0" />
+                    {form.tokenName.trim() &&
+                    form.tokenSymbol.trim() &&
+                    form.initialSupply.trim() ? (
+                      <CheckCircle2 className="size-4 shrink-0 text-emerald-600" />
                     ) : (
-                      <AlertCircle className="size-4 text-amber-500 shrink-0" />
+                      <AlertCircle className="size-4 shrink-0 text-amber-500" />
                     )}
-                    <span className="text-gray-900 font-medium">
+                    <span className="font-medium text-gray-900">
                       {form.tokenSymbol ? `${form.tokenSymbol} Configured` : "Identity Incomplete"}
                     </span>
                   </div>
@@ -788,17 +812,17 @@ export default function Launchpad() {
                 </Button>
 
                 {!isConnected ? (
-                  <div className="flex flex-col sm:flex-row items-center gap-3">
-                    <p className="text-xs text-amber-700 font-medium">
+                  <div className="flex flex-col items-center gap-3 sm:flex-row">
+                    <p className="text-xs font-medium text-amber-700">
                       Connect your wallet to deploy on Base:
                     </p>
                     <WalletConnect />
                   </div>
                 ) : !isAdmin ? (
-                  <div className="flex flex-col items-center sm:items-end gap-1.5 w-full sm:w-auto">
+                  <div className="flex w-full flex-col items-center gap-1.5 sm:w-auto sm:items-end">
                     <Button
                       disabled
-                      className="w-full sm:w-auto cursor-not-allowed bg-slate-200 font-semibold text-slate-500 shadow-none hover:bg-slate-200"
+                      className="w-full cursor-not-allowed bg-slate-200 font-semibold text-slate-500 shadow-none hover:bg-slate-200 sm:w-auto"
                     >
                       <Lock className="mr-2 size-4 text-slate-500" />
                       Deployment Restricted (Admin Only)
@@ -814,7 +838,7 @@ export default function Launchpad() {
                   <Button
                     onClick={() => switchChain({ chainId: 8453 })}
                     disabled={isSwitchingChain}
-                    className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 shadow-md"
+                    className="w-full bg-blue-600 px-6 font-bold text-white shadow-md hover:bg-blue-700 sm:w-auto"
                   >
                     {isSwitchingChain ? (
                       <>
@@ -832,7 +856,7 @@ export default function Launchpad() {
                   <Button
                     onClick={handleLaunch}
                     disabled={isDeploying}
-                    className="w-full sm:w-auto bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 px-8 font-bold text-white shadow-lg hover:from-purple-700 hover:to-blue-700"
+                    className="w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 px-8 font-bold text-white shadow-lg hover:from-purple-700 hover:to-blue-700 sm:w-auto"
                   >
                     {isDeploying ? (
                       <>

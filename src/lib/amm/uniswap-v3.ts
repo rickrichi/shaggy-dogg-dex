@@ -1,19 +1,17 @@
 // src/lib/amm/uniswap-v3.ts - Uniswap V3 Canonical Base Integration & Math
-import { type Address, parseAbi } from "viem";
+import { type Address, encodeFunctionData, isAddress, parseAbi, zeroAddress } from "viem";
 
-export const UNISWAP_V3_FACTORY_BASE: Address =
-  "0x33128a8fC17869897dcE68Ed026d694621f6FDfD";
+export const UNISWAP_V3_FACTORY_BASE: Address = "0x33128a8fC17869897dcE68Ed026d694621f6FDfD";
 
 export const NONFUNGIBLE_POSITION_MANAGER_BASE: Address =
   "0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1";
 
-export const WETH_BASE: Address =
-  "0x4200000000000000000000000000000000000006";
+export const WETH_BASE: Address = "0x4200000000000000000000000000000000000006";
 
-export const UNISWAP_V3_ROUTER_BASE: Address =
-  "0x2626664c2603336E57B271c5C0b26F421741e481";
+export const UNISWAP_V3_ROUTER_BASE: Address = "0x2626664c2603336E57B271c5C0b26F421741e481";
 
 export const V3_FEE_TIERS = [
+  { fee: 100, label: "0.01% (Stable)", tickSpacing: 1 },
   { fee: 500, label: "0.05% (Stable / Pegged)", tickSpacing: 10 },
   { fee: 3000, label: "0.3% (Standard Altcoins)", tickSpacing: 60 },
   { fee: 10000, label: "1.0% (Community / High Volatility)", tickSpacing: 200 },
@@ -55,7 +53,7 @@ export const UNISWAP_V3_POOL_ABI = parseAbi([
 export function bigintSqrt(value: bigint): bigint {
   if (value < 0n) throw new Error("Square root of negative numbers is not defined");
   if (value < 2n) return value;
-  let x0 = value / 2n;
+  let x0 = value;
   let x1 = (x0 + value / x0) / 2n;
   while (x1 < x0) {
     x0 = x1;
@@ -68,9 +66,16 @@ export function bigintSqrt(value: bigint): bigint {
  * Sorts two token addresses canonically (token0 < token1)
  */
 export function sortTokens(tokenA: Address, tokenB: Address): [Address, Address] {
-  return tokenA.toLowerCase() < tokenB.toLowerCase()
-    ? [tokenA, tokenB]
-    : [tokenB, tokenA];
+  if (
+    !isAddress(tokenA) ||
+    !isAddress(tokenB) ||
+    tokenA.toLowerCase() === tokenB.toLowerCase() ||
+    tokenA === zeroAddress ||
+    tokenB === zeroAddress
+  ) {
+    throw new Error("V3 requires two distinct non-zero token addresses");
+  }
+  return tokenA.toLowerCase() < tokenB.toLowerCase() ? [tokenA, tokenB] : [tokenB, tokenA];
 }
 
 /**
@@ -81,19 +86,74 @@ export function encodeSqrtPriceX96(amount0: bigint, amount1: bigint): bigint {
   if (amount0 <= 0n || amount1 <= 0n) {
     throw new Error("Both reserve amounts must be positive to compute sqrtPriceX96");
   }
-  const numerator = amount1 * (2n ** 192n);
+  const numerator = amount1 * 2n ** 192n;
   const ratio = numerator / amount0;
-  return bigintSqrt(ratio);
+  const price = bigintSqrt(ratio);
+  if (price < 4295128739n || price >= 1461446703485210103287273052203988822378723970342n) {
+    throw new Error("Initial price is outside Uniswap V3 TickMath bounds");
+  }
+  return price;
 }
 
 /**
  * Returns the tick bounds for a Full Range position matching Uniswap V2 behavior.
  */
 export function getFullRangeTicks(fee: number): { tickLower: number; tickUpper: number } {
-  const tickSpacing =
-    fee === 500 ? 10 : fee === 3000 ? 60 : fee === 10000 ? 200 : 60;
+  const tickSpacing = V3_FEE_TIERS.find((tier) => tier.fee === fee)?.tickSpacing;
+  if (!tickSpacing) throw new Error("Unsupported V3 fee tier");
   const maxTick = 887272;
   const tickUpper = Math.floor(maxTick / tickSpacing) * tickSpacing;
   const tickLower = -tickUpper;
   return { tickLower, tickUpper };
+}
+
+/** Initialize (including an existing uninitialized pool) and mint atomically.
+ * Both desired amounts express the user's intended ratio. Reject a deposit if
+ * the pool cannot consume at least 99.5% of each; never silently disable protection.
+ */
+export function buildV3MintCall(
+  tokenA: Address,
+  tokenB: Address,
+  amountA: bigint,
+  amountB: bigint,
+  fee: number,
+  recipient: Address,
+  deadline: bigint
+) {
+  const [token0, token1] = sortTokens(tokenA, tokenB);
+  const [amount0Desired, amount1Desired] =
+    token0.toLowerCase() === tokenA.toLowerCase() ? [amountA, amountB] : [amountB, amountA];
+  const sqrtPriceX96 = encodeSqrtPriceX96(amount0Desired, amount1Desired);
+  const minimum = (amount: bigint) => (amount * 9950n + 9999n) / 10000n;
+  const mint = {
+    token0,
+    token1,
+    fee,
+    ...getFullRangeTicks(fee),
+    amount0Desired,
+    amount1Desired,
+    amount0Min: minimum(amount0Desired),
+    amount1Min: minimum(amount1Desired),
+    recipient,
+    deadline,
+  };
+  return {
+    address: NONFUNGIBLE_POSITION_MANAGER_BASE,
+    abi: NONFUNGIBLE_POSITION_MANAGER_ABI,
+    functionName: "multicall" as const,
+    args: [
+      [
+        encodeFunctionData({
+          abi: NONFUNGIBLE_POSITION_MANAGER_ABI,
+          functionName: "createAndInitializePoolIfNecessary",
+          args: [token0, token1, fee, sqrtPriceX96],
+        }),
+        encodeFunctionData({
+          abi: NONFUNGIBLE_POSITION_MANAGER_ABI,
+          functionName: "mint",
+          args: [mint],
+        }),
+      ],
+    ] as const,
+  };
 }

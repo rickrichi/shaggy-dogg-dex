@@ -1,10 +1,10 @@
 // src/hooks/useUserActivity.ts
 import { useCallback, useEffect, useState } from "react";
+
 import { formatUnits } from "viem";
 import { useAccount } from "wagmi";
 
 import {
-  CHAIN_CONFIG,
   getChainConfig,
   getEnvString,
   SUPPORTED_CHAIN_IDS,
@@ -48,7 +48,9 @@ interface AlchemyTransfer {
   metadata: { blockTimestamp: string };
 }
 
-function parseTransferValue(input: unknown): { amount: number; unit: "display" } | { amount: bigint; unit: "base" } {
+function parseTransferValue(
+  input: unknown
+): { amount: number; unit: "display" } | { amount: bigint; unit: "base" } {
   if (typeof input === "number" && Number.isFinite(input)) {
     return { amount: input, unit: "display" };
   }
@@ -73,7 +75,7 @@ function parseTransferValue(input: unknown): { amount: number; unit: "display" }
 
 export function useUserActivity() {
   const { address, isConnected } = useAccount();
-  const { price: ethPrice } = useTokenPrice("ETH", "usd");
+  const { price: ethPrice } = useTokenPrice("ETH");
 
   const [transactions, setTransactions] = useState<UserTransaction[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
@@ -158,12 +160,11 @@ export function useUserActivity() {
 
             return uniqueTransfers.map((t): UserTransaction => {
               const symbol =
-                t.category === "erc20" ? t.erc20Metadata?.symbol ?? t.asset : t.asset;
+                t.category === "erc20" ? (t.erc20Metadata?.symbol ?? t.asset) : t.asset;
               const parsed = parseTransferValue(t.value);
               let amountDisplay = 0;
               if (parsed.unit === "base") {
-                const decimals =
-                  t.category === "erc20" ? t.erc20Metadata?.decimals ?? 18 : 18;
+                const decimals = t.category === "erc20" ? (t.erc20Metadata?.decimals ?? 18) : 18;
                 amountDisplay = Number(formatUnits(parsed.amount, decimals));
               } else {
                 amountDisplay = parsed.amount;

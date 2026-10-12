@@ -674,6 +674,7 @@ export type UniswapV3QuoterV2ABI = typeof UNISWAP_V3_QUOTER_V2_ABI;
  * Uniswap V3 SwapRouter02 ABI (Base Mainnet canonical swap router)
  */
 export const UNISWAP_V3_SWAP_ROUTER_02_ABI = [
+  { type: "function", name: "refundETH", stateMutability: "payable", inputs: [], outputs: [] },
   {
     type: "function",
     name: "exactInputSingle",

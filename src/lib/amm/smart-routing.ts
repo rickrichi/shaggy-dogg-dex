@@ -1,4 +1,4 @@
-import { encodeFunctionData, type Abi, type Address, type PublicClient } from "viem";
+import { type Abi, type Address, encodeFunctionData, type PublicClient } from "viem";
 
 import {
   AERODROME_ROUTER_ABI,
@@ -12,6 +12,8 @@ import {
   UNISWAP_V3_ROUTER_BASE,
 } from "@/config/contracts";
 import { getWrappedNativeAddress, type Token } from "@/config/tokens";
+
+import { V3_FEE_TIERS } from "./uniswap-v3";
 
 export const AERODROME_ROUTER: Address = "0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43";
 export const AERODROME_FACTORY: Address = "0x420DD381b31aEf6683db6B902084cB0FFECe40Da";
@@ -48,7 +50,7 @@ export function routeCandidates(sell: Token, buy: Token): SmartRoute[] {
     if (sell.chainId !== 8453) return [uniV2];
     const uniV3: SmartRoute[] =
       path.length === 2
-        ? [500, 3000, 10000].map((fee) => ({
+        ? V3_FEE_TIERS.map(({ fee }) => ({
             venue: "Uniswap V3" as const,
             router: UNISWAP_V3_ROUTER_BASE,
             path,
@@ -102,50 +104,62 @@ export function routeSwapCall(
   deadline: bigint
 ) {
   if (route.venue === "Uniswap V3") {
-    if (buy.address === "native") {
-      const swapData = encodeFunctionData({
-        abi: UNISWAP_V3_SWAP_ROUTER_02_ABI,
-        functionName: "exactInputSingle",
-        args: [
-          {
-            tokenIn: route.path[0]!,
-            tokenOut: route.path[1]!,
-            fee: route.fee ?? 3000,
-            recipient: "0x0000000000000000000000000000000000000002" as Address,
-            amountIn: amount,
-            amountOutMinimum: minimum,
-            sqrtPriceLimitX96: 0n,
-          },
-        ],
-      });
-      const unwrapData = encodeFunctionData({
-        abi: UNISWAP_V3_SWAP_ROUTER_02_ABI,
-        functionName: "unwrapWETH9",
-        args: [minimum, recipient],
-      });
-      return {
-        address: route.router,
-        abi: UNISWAP_V3_SWAP_ROUTER_02_ABI as Abi,
-        functionName: "multicall",
-        args: [deadline, [swapData, unwrapData]],
-      };
+    if (
+      sell.chainId !== 8453 ||
+      buy.chainId !== 8453 ||
+      route.path.length !== 2 ||
+      amount <= 0n ||
+      minimum <= 0n ||
+      !V3_FEE_TIERS.some((tier) => tier.fee === route.fee)
+    ) {
+      throw new Error("Invalid Base V3 swap parameters");
     }
-
-    return {
-      address: route.router,
-      abi: UNISWAP_V3_SWAP_ROUTER_02_ABI as Abi,
+    const from = sell.address === "native" ? getWrappedNativeAddress(8453) : sell.address;
+    const to = buy.address === "native" ? getWrappedNativeAddress(8453) : buy.address;
+    if (
+      route.router.toLowerCase() !== UNISWAP_V3_ROUTER_BASE.toLowerCase() ||
+      route.path[0]?.toLowerCase() !== from.toLowerCase() ||
+      route.path[1]?.toLowerCase() !== to.toLowerCase()
+    ) {
+      throw new Error("V3 route does not match the selected tokens and router");
+    }
+    const swapData = encodeFunctionData({
+      abi: UNISWAP_V3_SWAP_ROUTER_02_ABI,
       functionName: "exactInputSingle",
       args: [
         {
           tokenIn: route.path[0]!,
           tokenOut: route.path[1]!,
           fee: route.fee ?? 3000,
-          recipient,
+          recipient:
+            buy.address === "native" ? "0x0000000000000000000000000000000000000002" : recipient,
           amountIn: amount,
           amountOutMinimum: minimum,
           sqrtPriceLimitX96: 0n,
         },
       ],
+    });
+    const calls = [swapData];
+    if (buy.address === "native")
+      calls.push(
+        encodeFunctionData({
+          abi: UNISWAP_V3_SWAP_ROUTER_02_ABI,
+          functionName: "unwrapWETH9",
+          args: [minimum, recipient],
+        })
+      );
+    if (sell.address === "native")
+      calls.push(
+        encodeFunctionData({
+          abi: UNISWAP_V3_SWAP_ROUTER_02_ABI,
+          functionName: "refundETH",
+        })
+      );
+    return {
+      address: route.router,
+      abi: UNISWAP_V3_SWAP_ROUTER_02_ABI as Abi,
+      functionName: "multicall",
+      args: [deadline, calls],
       ...(sell.address === "native" ? { value: amount } : {}),
     };
   }
@@ -199,4 +213,3 @@ export async function quoteSmartRoutes(
     .sort((a, b) => (a.output > b.output ? -1 : a.output < b.output ? 1 : 0));
   return { quotes, blockNumber, observedAt, best: quotes[0] ?? null };
 }
-

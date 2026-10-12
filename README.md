@@ -3,6 +3,16 @@
 A multi-chain DEX application under active development. Market swaps and Uniswap V2 liquidity
 flows are implemented; limit orders remain preview-only and must not be presented as executable.
 
+Base Mainnet also supports Uniswap V3 single-pool swaps, full-range NFT minting, and fee
+collection through canonical Uniswap contracts. V3 swaps use deadline-protected SwapRouter02
+multicalls; minting uses atomic initialization with 0.5% minimum consumption protection on
+both selected deposit amounts. Existing pools require deposits matching their current ratio.
+V2 withdrawal and V3 deposit remain separate transactions.
+
+See the [V3 compatibility audit](audit/UNISWAP-V3-COMPATIBILITY.md) for fixes, verified scope,
+test results, and remaining limitations. Run `npm run contracts:test:v3-fork` for the pinned
+Base fork checks. Compatibility does not certify the separate staking, lending, or arbitrage contracts.
+
 ## Verified status
 
 As of 2026-09-16, the frontend production build, frontend/backend TypeScript checks, ESLint,

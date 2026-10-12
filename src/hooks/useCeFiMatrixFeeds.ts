@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 export interface MatrixCexPrice {
   bid: number;
@@ -113,12 +113,8 @@ const KRAKEN_PAIRS = [
 ];
 
 export function useCeFiMatrixFeeds() {
-  const [coinbaseQuotes, setCoinbaseQuotes] = useState<
-    Record<string, MatrixCexPrice>
-  >({});
-  const [krakenQuotes, setKrakenQuotes] = useState<
-    Record<string, MatrixCexPrice>
-  >({});
+  const [coinbaseQuotes, setCoinbaseQuotes] = useState<Record<string, MatrixCexPrice>>({});
+  const [krakenQuotes, setKrakenQuotes] = useState<Record<string, MatrixCexPrice>>({});
   const [coinbaseConnected, setCoinbaseConnected] = useState(false);
   const [krakenConnected, setKrakenConnected] = useState(false);
 
@@ -287,10 +283,13 @@ export function useCeFiMatrixFeeds() {
       if (!baseAsset) return null;
 
       if (quoteAsset === "USDT" || quoteAsset === "USD" || quoteAsset === "USDC") {
-        if (coinbaseQuotes[`${baseAsset}-USD`]) return coinbaseQuotes[`${baseAsset}-USD`];
-        if (coinbaseQuotes[`${baseAsset}-USDC`]) return coinbaseQuotes[`${baseAsset}-USDC`];
-        if (coinbaseQuotes[`${baseAsset}/USD`]) return coinbaseQuotes[`${baseAsset}/USD`];
-        if (coinbaseQuotes[`${baseAsset}/USDC`]) return coinbaseQuotes[`${baseAsset}/USDC`];
+        return (
+          coinbaseQuotes[`${baseAsset}-USD`] ??
+          coinbaseQuotes[`${baseAsset}-USDC`] ??
+          coinbaseQuotes[`${baseAsset}/USD`] ??
+          coinbaseQuotes[`${baseAsset}/USDC`] ??
+          null
+        );
       }
 
       return null;
@@ -314,10 +313,13 @@ export function useCeFiMatrixFeeds() {
       const baseKraken = baseAsset === "BTC" ? "XBT" : baseAsset === "DOGE" ? "XDG" : baseAsset;
 
       if (quoteAsset === "USDT" || quoteAsset === "USD" || quoteAsset === "USDC") {
-        if (krakenQuotes[`${baseKraken}/USD`]) return krakenQuotes[`${baseKraken}/USD`];
-        if (krakenQuotes[`${baseKraken}/USDC`]) return krakenQuotes[`${baseKraken}/USDC`];
-        if (krakenQuotes[`${baseAsset}/USD`]) return krakenQuotes[`${baseAsset}/USD`];
-        if (krakenQuotes[`${baseAsset}/USDC`]) return krakenQuotes[`${baseAsset}/USDC`];
+        return (
+          krakenQuotes[`${baseKraken}/USD`] ??
+          krakenQuotes[`${baseKraken}/USDC`] ??
+          krakenQuotes[`${baseAsset}/USD`] ??
+          krakenQuotes[`${baseAsset}/USDC`] ??
+          null
+        );
       }
 
       return null;

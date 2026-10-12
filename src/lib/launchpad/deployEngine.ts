@@ -1,12 +1,15 @@
-import { parseAbi, type Address, parseEther, parseUnits, type PublicClient, type WalletClient } from "viem";
+import {
+  type Address,
+  parseAbi,
+  parseEther,
+  parseUnits,
+  type PublicClient,
+  type WalletClient,
+} from "viem";
+import { base } from "viem/chains";
 
 import { ERC20_ABI, UNISWAP_V2_ROUTER_ABI } from "@/config/abis";
-import {
-  encodeSqrtPriceX96,
-  getFullRangeTicks,
-  NONFUNGIBLE_POSITION_MANAGER_ABI,
-  sortTokens,
-} from "@/lib/amm/uniswap-v3";
+import { buildV3MintCall } from "@/lib/amm/uniswap-v3";
 
 import { LAUNCHPAD_ARTIFACTS } from "./artifacts";
 import { CANONICAL_BASE_CONTRACTS, DEX_VENUES } from "./constants";
@@ -19,6 +22,17 @@ export async function executeLaunchpadDeployment(
   form: LaunchpadFormState,
   userAddress: Address
 ): Promise<DeployedEcosystemResult> {
+  if (publicClient.chain?.id !== 8453 || (await walletClient.getChainId()) !== 8453) {
+    throw new Error("Launchpad deployment requires Base Mainnet");
+  }
+  if (form.decimals !== 18) throw new Error("GovernanceToken uses 18 decimals");
+  if (
+    form.enableDexSeeding &&
+    form.recipientAdminAddress &&
+    form.recipientAdminAddress.toLowerCase() !== userAddress.toLowerCase()
+  ) {
+    throw new Error("Initial liquidity must be seeded by the wallet receiving the token supply");
+  }
   const adminWallet = CANONICAL_BASE_CONTRACTS.DeployerAdminWallet.toLowerCase();
   if (userAddress.toLowerCase() !== adminWallet) {
     throw new Error(
@@ -28,7 +42,7 @@ export async function executeLaunchpadDeployment(
 
   const supplyUnits = parseUnits(form.initialSupply, form.decimals || 18);
   const recipient = (form.recipientAdminAddress?.trim() as Address) || userAddress;
-  const activeChain = walletClient.chain;
+  const activeChain = base;
 
   // ────────────────────────────────────────────────────────────────────────────
   // Step 1: Deploy Token (GovernanceToken.sol)
@@ -59,6 +73,11 @@ export async function executeLaunchpadDeployment(
   let borrowerAddress: Address | undefined;
   let compoundVaultAddress: Address | undefined;
   const pairAddress: Address | undefined = undefined;
+  let liquiditySeedingError: string | undefined;
+  const confirm = async (hash: `0x${string}`) => {
+    const receipt = await publicClient.waitForTransactionReceipt({ hash });
+    if (receipt.status !== "success") throw new Error("Liquidity transaction reverted");
+  };
 
   // ────────────────────────────────────────────────────────────────────────────
   // Step 2: Deploy Staking if Archetype requires it
@@ -195,11 +214,6 @@ export async function executeLaunchpadDeployment(
       if (venue.id === "uniswap_v3") {
         console.log(`[Launchpad] Initializing & Minting Uniswap V3 Pool...`);
         const posMgr = CANONICAL_BASE_CONTRACTS.UniswapV3PositionManager;
-        const [token0, token1] = sortTokens(CANONICAL_BASE_CONTRACTS.WETH, tokenAddress);
-        const isToken0Weth = token0.toLowerCase() === CANONICAL_BASE_CONTRACTS.WETH.toLowerCase();
-        const amount0 = isToken0Weth ? ethAmount : tokenAmount;
-        const amount1 = isToken0Weth ? tokenAmount : ethAmount;
-        const sqrtPriceX96 = encodeSqrtPriceX96(amount0, amount1);
         const feeTier = 10000; // 1% for community tokens
 
         // 1. Wrap ETH to WETH
@@ -212,18 +226,7 @@ export async function executeLaunchpadDeployment(
           account: userAddress,
           chain: activeChain,
         });
-        await publicClient.waitForTransactionReceipt({ hash: wrapTx });
-
-        // 2. Initialize V3 Pool if needed
-        const initTx = await walletClient.writeContract({
-          address: posMgr,
-          abi: NONFUNGIBLE_POSITION_MANAGER_ABI,
-          functionName: "createAndInitializePoolIfNecessary",
-          args: [token0, token1, feeTier, sqrtPriceX96],
-          account: userAddress,
-          chain: activeChain,
-        });
-        await publicClient.waitForTransactionReceipt({ hash: initTx });
+        await confirm(wrapTx);
 
         // 3. Approve WETH & Token for Position Manager
         const approveToken = await walletClient.writeContract({
@@ -234,7 +237,7 @@ export async function executeLaunchpadDeployment(
           account: userAddress,
           chain: activeChain,
         });
-        await publicClient.waitForTransactionReceipt({ hash: approveToken });
+        await confirm(approveToken);
 
         const approveWeth = await walletClient.writeContract({
           address: CANONICAL_BASE_CONTRACTS.WETH,
@@ -244,34 +247,24 @@ export async function executeLaunchpadDeployment(
           account: userAddress,
           chain: activeChain,
         });
-        await publicClient.waitForTransactionReceipt({ hash: approveWeth });
+        await confirm(approveWeth);
 
         // 4. Mint Full Range Position
-        const { tickLower, tickUpper } = getFullRangeTicks(feeTier);
         const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200);
-        const mintTx = await walletClient.writeContract({
-          address: posMgr,
-          abi: NONFUNGIBLE_POSITION_MANAGER_ABI,
-          functionName: "mint",
-          args: [
-            {
-              token0,
-              token1,
-              fee: feeTier,
-              tickLower,
-              tickUpper,
-              amount0Desired: amount0,
-              amount1Desired: amount1,
-              amount0Min: 0n,
-              amount1Min: 0n,
-              recipient,
-              deadline,
-            },
-          ],
+        const { request } = await publicClient.simulateContract({
+          ...buildV3MintCall(
+            CANONICAL_BASE_CONTRACTS.WETH,
+            tokenAddress,
+            ethAmount,
+            tokenAmount,
+            feeTier,
+            recipient,
+            deadline
+          ),
           account: userAddress,
-          chain: activeChain,
         });
-        await publicClient.waitForTransactionReceipt({ hash: mintTx });
+        const mintTx = await walletClient.writeContract({ ...request, chain: activeChain });
+        await confirm(mintTx);
         console.log(`[Launchpad] Uniswap V3 position minted successfully!`);
       } else {
         console.log(
@@ -309,6 +302,8 @@ export async function executeLaunchpadDeployment(
         console.log(`[Launchpad] Liquidity added successfully to ${venue.name}!`);
       }
     } catch (seedErr) {
+      liquiditySeedingError =
+        seedErr instanceof Error ? seedErr.message : "Liquidity seeding failed";
       console.warn("[Launchpad] Liquidity seeding warning (token is already deployed):", seedErr);
     }
   }
@@ -320,6 +315,7 @@ export async function executeLaunchpadDeployment(
     borrowerAddress,
     compoundVaultAddress,
     pairAddress,
+    liquiditySeedingError,
     txHash: tokenTxHash,
     deploymentMode: form.executionMode,
     archetype: form.selectedArchetype,

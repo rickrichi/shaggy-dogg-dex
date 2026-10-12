@@ -64,6 +64,7 @@ export interface LaunchpadFormState {
 }
 
 export interface DeployedEcosystemResult {
+  liquiditySeedingError?: string | undefined;
   tokenAddress: Address;
   stakingAddress?: Address | undefined;
   vaultAddress?: Address | undefined;

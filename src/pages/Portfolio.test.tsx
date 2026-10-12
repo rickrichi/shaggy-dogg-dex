@@ -1,10 +1,13 @@
 // src/pages/Portfolio.test.tsx
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
-import Portfolio from "./Portfolio";
+
+import { render, screen } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as wagmi from "wagmi";
+
 import * as usePortfolioModule from "@/hooks/usePortfolio";
+
+import Portfolio from "./Portfolio";
 
 vi.mock("wagmi", async () => {
   const actual = await vi.importActual<typeof import("wagmi")>("wagmi");
@@ -50,16 +53,22 @@ describe("Portfolio Page - Permanent On-Chain Flow", () => {
       </BrowserRouter>
     );
 
-    expect(
-      screen.getByText(/Connect Your Wallet to View Portfolio/i)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Connect Your Wallet to View Portfolio/i)).toBeInTheDocument();
     expect(screen.getByText(/Go to Swap/i)).toBeInTheDocument();
   });
 
   it("renders on-chain token balances when wallet is connected", () => {
     vi.mocked(wagmi.useAccount).mockReturnValue({
       address: "0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98",
+      addresses: ["0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98"],
+      chain: undefined,
+      chainId: 8453,
+      connector: {} as NonNullable<ReturnType<typeof wagmi.useAccount>["connector"]>,
       isConnected: true,
+      isConnecting: false,
+      isDisconnected: false,
+      isReconnecting: false,
+      status: "connected",
     } as ReturnType<typeof wagmi.useAccount>);
     vi.mocked(wagmi.useChainId).mockReturnValue(8453);
     vi.mocked(usePortfolioModule.usePortfolio).mockReturnValue({

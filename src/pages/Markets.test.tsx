@@ -1,7 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, act } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
+
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act, render, screen } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import Markets from "./Markets";
 
 // Mock WebSocket
@@ -27,7 +29,8 @@ class MockWebSocket {
   });
 }
 
-(globalThis as unknown as { WebSocket: typeof WebSocket }).WebSocket = MockWebSocket as unknown as typeof WebSocket;
+(globalThis as unknown as { WebSocket: typeof WebSocket }).WebSocket =
+  MockWebSocket as unknown as typeof WebSocket;
 
 describe("Markets Page - Live Exchange Streaming", () => {
   let queryClient: QueryClient;
@@ -64,9 +67,8 @@ describe("Markets Page - Live Exchange Streaming", () => {
 
     expect(MockWebSocket.instances.length).toBeGreaterThan(0);
     const ws = MockWebSocket.instances[0];
-    expect(ws.send).toHaveBeenCalledWith(
-      expect.stringContaining('"channels":["ticker"]')
-    );
+    if (!ws) throw new Error("Expected a market websocket");
+    expect(ws.send).toHaveBeenCalledWith(expect.stringContaining('"channels":["ticker"]'));
   });
 
   it("updates market rows and live tickers when ticker message arrives", async () => {
@@ -83,6 +85,7 @@ describe("Markets Page - Live Exchange Streaming", () => {
     });
 
     const ws = MockWebSocket.instances[0];
+    if (!ws) throw new Error("Expected a market websocket");
 
     // Simulate incoming ticker messages
     await act(async () => {

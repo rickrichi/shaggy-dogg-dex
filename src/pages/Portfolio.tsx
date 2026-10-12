@@ -8,12 +8,9 @@ import {
   Coins,
   Copy,
   ExternalLink,
-  Layers,
-  Loader2,
   PieChart,
   RefreshCw,
   ShieldCheck,
-  TrendingUp,
   Wallet,
 } from "lucide-react";
 import { useAccount, useChainId } from "wagmi";
@@ -29,7 +26,7 @@ import { type Token, usePortfolio } from "@/hooks/usePortfolio";
 export default function Portfolio() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
-  const { tokens, summary, isLoading, error, refetch } = usePortfolio();
+  const { tokens, summary, isLoading, refetch } = usePortfolio();
 
   const [hideZeroBalances, setHideZeroBalances] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -146,7 +143,11 @@ export default function Portfolio() {
               className="text-gray-400 hover:text-purple-600"
               title="Copy address"
             >
-              {copied ? <Check className="size-3.5 text-green-600" /> : <Copy className="size-3.5" />}
+              {copied ? (
+                <Check className="size-3.5 text-green-600" />
+              ) : (
+                <Copy className="size-3.5" />
+              )}
             </button>
             <span>·</span>
             <a
@@ -227,21 +228,15 @@ export default function Portfolio() {
               {isLoading ? (
                 <Skeleton className="h-8 w-24" />
               ) : (
-                `${(
-                  Number(
-                    tokens.find(
-                      (t) =>
-                        t.address.toLowerCase() ===
-                        "0x0000000000000000000000000000000000000000"
-                    )?.balanceFormatted || "0"
-                  )
+                `${Number(
+                  tokens.find(
+                    (t) => t.address.toLowerCase() === "0x0000000000000000000000000000000000000000"
+                  )?.balanceFormatted || "0"
                 ).toFixed(4)} ETH`
               )}
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-0 text-xs text-gray-500">
-            Gas & trading reserve
-          </CardContent>
+          <CardContent className="pt-0 text-xs text-gray-500">Gas & trading reserve</CardContent>
         </Card>
 
         {/* Active Tokens Detected */}
@@ -279,9 +274,7 @@ export default function Portfolio() {
               )}
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-0 text-xs text-gray-500">
-            Primary asset in wallet
-          </CardContent>
+          <CardContent className="pt-0 text-xs text-gray-500">Primary asset in wallet</CardContent>
         </Card>
       </div>
 
@@ -290,9 +283,7 @@ export default function Portfolio() {
         <CardHeader className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
             <CardTitle className="text-xl font-bold text-gray-900">Wallet Holdings</CardTitle>
-            <CardDescription>
-              On-chain balances verified on {chainName} Mainnet
-            </CardDescription>
+            <CardDescription>On-chain balances verified on {chainName} Mainnet</CardDescription>
           </div>
           <div className="flex items-center gap-2 text-sm text-gray-600">
             <Switch
@@ -315,27 +306,38 @@ export default function Portfolio() {
             </div>
           ) : visibleTokens.length === 0 ? (
             <div className="py-12 text-center text-sm text-gray-500">
-              No holdings found with non-zero balances. Toggle &quot;Hide zero balances&quot; to see all
-              tracked assets.
+              No holdings found with non-zero balances. Toggle &quot;Hide zero balances&quot; to see
+              all tracked assets.
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm text-gray-600">
                 <thead className="border-b border-purple-100 text-xs font-semibold uppercase text-gray-500">
                   <tr>
-                    <th scope="col" className="py-3 pr-4">Asset</th>
-                    <th scope="col" className="px-4 py-3">Contract</th>
-                    <th scope="col" className="px-4 py-3 text-right">Balance</th>
-                    <th scope="col" className="px-4 py-3 text-right">Price</th>
-                    <th scope="col" className="px-4 py-3 text-right">Value (USD)</th>
-                    <th scope="col" className="py-3 pl-4 text-right">Actions</th>
+                    <th scope="col" className="py-3 pr-4">
+                      Asset
+                    </th>
+                    <th scope="col" className="px-4 py-3">
+                      Contract
+                    </th>
+                    <th scope="col" className="px-4 py-3 text-right">
+                      Balance
+                    </th>
+                    <th scope="col" className="px-4 py-3 text-right">
+                      Price
+                    </th>
+                    <th scope="col" className="px-4 py-3 text-right">
+                      Value (USD)
+                    </th>
+                    <th scope="col" className="py-3 pl-4 text-right">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {visibleTokens.map((token: Token) => {
                     const isNative =
-                      token.address.toLowerCase() ===
-                      "0x0000000000000000000000000000000000000000";
+                      token.address.toLowerCase() === "0x0000000000000000000000000000000000000000";
                     const formattedBalance = Number(token.balanceFormatted).toLocaleString(
                       undefined,
                       {
@@ -359,9 +361,11 @@ export default function Portfolio() {
                         </td>
 
                         {/* Contract */}
-                        <td className="px-4 py-4 text-xs">
+                        <td className="p-4 text-xs">
                           {isNative ? (
-                            <Badge variant="secondary" className="text-xs">Native</Badge>
+                            <Badge variant="secondary" className="text-xs">
+                              Native
+                            </Badge>
                           ) : (
                             <a
                               href={`${explorerUrl}/token/${token.address}`}
@@ -376,20 +380,20 @@ export default function Portfolio() {
                         </td>
 
                         {/* Balance */}
-                        <td className="px-4 py-4 text-right font-medium text-gray-900">
+                        <td className="p-4 text-right font-medium text-gray-900">
                           <div>{formattedBalance}</div>
                           <div className="text-xs text-gray-400">{token.symbol}</div>
                         </td>
 
                         {/* Price */}
-                        <td className="px-4 py-4 text-right text-gray-600">
+                        <td className="p-4 text-right text-gray-600">
                           {token.priceUsd > 0
                             ? `$${token.priceUsd.toFixed(token.priceUsd < 0.01 ? 6 : 2)}`
                             : "—"}
                         </td>
 
                         {/* Value */}
-                        <td className="px-4 py-4 text-right font-semibold text-gray-900">
+                        <td className="p-4 text-right font-semibold text-gray-900">
                           {token.usdValue > 0
                             ? `$${token.usdValue.toLocaleString(undefined, {
                                 minimumFractionDigits: 2,
@@ -401,7 +405,11 @@ export default function Portfolio() {
                         {/* Actions */}
                         <td className="py-4 pl-4 text-right">
                           <Link to={`/swap?inputToken=${token.address}`}>
-                            <Button size="sm" variant="outline" className="border-purple-200 text-purple-700 hover:bg-purple-50">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-purple-200 text-purple-700 hover:bg-purple-50"
+                            >
                               <ArrowLeftRight className="mr-1.5 size-3.5" />
                               Swap
                             </Button>

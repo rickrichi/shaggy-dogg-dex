@@ -8,8 +8,7 @@ import { BASE_MAINNET_TOKENS } from "@/config/tokens";
 import { verifyDexDeployment } from "@/lib/amm/own-dex";
 import { createBaseReadTransport } from "@/lib/base-rpc";
 
-import type { Address } from "viem";
-import type { Token } from "@/config/tokens";
+import type { Abi, Address } from "viem";
 
 export const MATRIX_QUOTE_MAX_AGE_MS = 30_000;
 const wrapped = BASE_MAINNET_TOKENS.find((t) => t.symbol === "WETH")!;
@@ -212,7 +211,7 @@ export async function fetchMatrixDexQuotes(
     const candidates = buildV3Candidates(routes);
     const results = await client.multicall({
       allowFailure: true,
-      contracts: candidates.map((c) => c.call),
+      contracts: candidates.map((c) => ({ ...c.call, abi: c.call.abi as Abi })),
     });
 
     const bestQuotes = new Map<
@@ -231,15 +230,11 @@ export async function fetchMatrixDexQuotes(
         const candidate = candidates[i];
         if (!candidate) return;
 
-        // In Uniswap V3 QuoterV2, result[0] is amountOut (uint256)
-        // If length is 2 (e.g. legacy/mock V2 array [amountIn, amountOut]), take result[1]
-        const amountOut = Array.isArray(res.result)
-          ? res.result.length === 2
-            ? (res.result[1] as bigint)
-            : (res.result[0] as bigint)
-          : typeof res.result === "bigint"
-          ? (res.result as bigint)
-          : 0n;
+        // QuoterV2 always returns four values; reject V2 or malformed responses.
+        const amountOut =
+          Array.isArray(res.result) && res.result.length === 4 && typeof res.result[0] === "bigint"
+            ? res.result[0]
+            : 0n;
 
         if (amountOut > 0n) {
           const existing = bestQuotes.get(candidate.symbol);

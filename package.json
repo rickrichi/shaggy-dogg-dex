@@ -9,6 +9,7 @@
     "contracts:compile": "forge build --root contracts",
     "contracts:test": "forge test --root contracts",
     "contracts:test:amm-fork": "forge test --root contracts --match-path test/AmmFork.t.sol -vvv",
+    "contracts:test:v3-fork": "forge test --root contracts --match-contract UniswapV3BaseForkTest -vv",
     "contracts:check": "npm run contracts:verify && npm run contracts:compile && npm run contracts:test",
     "dev": "concurrently -k -n \"vite,api\" -c \"cyan,magenta\" \"vite\" \"npm --prefix server run dev\"",
     "dev:vite": "vite",

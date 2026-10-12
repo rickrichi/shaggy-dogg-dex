@@ -1,15 +1,11 @@
 // src/components/liquidity/V2ToV3MigrationWizard.tsx
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   AlertCircle,
-  ArrowRight,
   CheckCircle2,
   ExternalLink,
-  Flame,
-  Layers,
   Loader2,
-  Lock,
   RefreshCw,
   Sparkles,
   Unlock,
@@ -32,8 +28,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -41,14 +37,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ERC20_ABI, UNISWAP_V2_PAIR_ABI, UNISWAP_V2_ROUTER_ABI } from "@/config/abis";
+import { UNISWAP_V2_PAIR_ABI, UNISWAP_V2_ROUTER_ABI } from "@/config/abis";
 import { getUniswapV2Router } from "@/config/contracts";
+import { positiveAmount } from "@/lib/amm/own-dex";
 import {
-  encodeSqrtPriceX96,
-  getFullRangeTicks,
-  NONFUNGIBLE_POSITION_MANAGER_ABI,
+  buildV3MintCall,
   NONFUNGIBLE_POSITION_MANAGER_BASE,
-  sortTokens,
   UNISWAP_V3_FACTORY_ABI,
   UNISWAP_V3_FACTORY_BASE,
   V3_FEE_TIERS,
@@ -101,6 +95,8 @@ export function V2ToV3MigrationWizard() {
   const [busy, setBusy] = useState(false);
   const [stepNotice, setStepNotice] = useState<string>("");
   const [lastTxHash, setLastTxHash] = useState<Hash | null>(null);
+  const [depositToken, setDepositToken] = useState("");
+  const [depositWeth, setDepositWeth] = useState("");
 
   // Live on-chain pool info
   const [v2LpBalance, setV2LpBalance] = useState<bigint>(0n);
@@ -117,14 +113,34 @@ export function V2ToV3MigrationWizard() {
   const [v3PoolAddress, setV3PoolAddress] = useState<Address | null>(null);
 
   const activePair = useMemo(
-    () => KNOWN_PAIRS.find((p) => p.id === selectedPairId) ?? KNOWN_PAIRS[0],
+    () => KNOWN_PAIRS.find((p) => p.id === selectedPairId) ?? KNOWN_PAIRS[0]!,
     [selectedPairId]
   );
 
   const v2Router = useMemo(() => getUniswapV2Router(8453), []);
+  const scope = useRef("");
+  const walletScope = `${userAddress}:${chainId}:${selectedPairId}:${feeTier}`;
+  scope.current = walletScope;
+  const assertWallet = async () => {
+    if (
+      !walletClient ||
+      scope.current !== walletScope ||
+      (await walletClient.getChainId()) !== base.id ||
+      (await walletClient.getAddresses())[0]?.toLowerCase() !== userAddress?.toLowerCase()
+    ) {
+      throw new Error("Wallet or migration selection changed. Review the amounts again.");
+    }
+  };
 
   const refreshData = useCallback(async () => {
-    if (!publicClient || !userAddress) return;
+    setV2LpBalance(0n);
+    setTokenBalance(0n);
+    setWethBalance(0n);
+    setEthBalance(0n);
+    setV3PoolExists(false);
+    setV3PoolAddress(null);
+    if (!publicClient || !userAddress || chainId !== base.id) return;
+    const captured = scope.current;
     try {
       const pair = activePair.v2PairAddress;
       const [t0, t1, reserves, totalLp, userLp, userTok, userWeth, userEth, v3Pool] =
@@ -176,6 +192,15 @@ export function V2ToV3MigrationWizard() {
           }),
         ]);
 
+      if (scope.current !== captured) return;
+      const expectedTokens = [WETH_BASE.toLowerCase(), activePair.tokenAddress.toLowerCase()];
+      if (
+        !expectedTokens.includes(t0.toLowerCase()) ||
+        !expectedTokens.includes(t1.toLowerCase()) ||
+        t0 === t1
+      ) {
+        throw new Error("V2 pair tokens do not match the selected migration pair");
+      }
       setV2Token0(t0);
       setV2Reserves({ reserve0: reserves[0], reserve1: reserves[1] });
       setV2TotalSupply(totalLp);
@@ -189,7 +214,7 @@ export function V2ToV3MigrationWizard() {
     } catch (e) {
       console.error("Failed to refresh migration data:", e);
     }
-  }, [publicClient, userAddress, activePair, feeTier]);
+  }, [publicClient, userAddress, chainId, activePair, feeTier]);
 
   useEffect(() => {
     void refreshData();
@@ -239,12 +264,14 @@ export function V2ToV3MigrationWizard() {
 
       if (allowance < v2LpBalance) {
         setStepNotice("Please approve LP tokens for Uniswap V2 Router in wallet...");
+        await assertWallet();
         const approveTx = await walletClient.writeContract({
           address: pair,
           abi: erc20Abi,
           functionName: "approve",
           args: [v2Router, maxUint256],
           chain: base,
+          account: userAddress,
         });
         setLastTxHash(approveTx);
         setStepNotice("Waiting for LP approval confirmation on Base...");
@@ -262,17 +289,11 @@ export function V2ToV3MigrationWizard() {
         address: v2Router,
         abi: UNISWAP_V2_ROUTER_ABI,
         functionName: "removeLiquidityETH",
-        args: [
-          activePair.tokenAddress,
-          v2LpBalance,
-          minToken,
-          minEth,
-          userAddress,
-          deadline,
-        ],
+        args: [activePair.tokenAddress, v2LpBalance, minToken, minEth, userAddress, deadline],
         account: userAddress,
       });
 
+      await assertWallet();
       const removeTx = await walletClient.writeContract({ ...request, chain: base });
       setLastTxHash(removeTx);
       setStepNotice("Removing liquidity on Base...");
@@ -282,9 +303,9 @@ export function V2ToV3MigrationWizard() {
       toast.success("Successfully removed liquidity from Uniswap V2!");
       setStepNotice("Liquidity removed. Ready for Step 2 (Uniswap V3 initialization & mint)!");
       await refreshData();
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      toast.error(err?.message ?? "Failed to remove liquidity from V2");
+      toast.error(err instanceof Error ? err.message : "Failed to remove liquidity from V2");
       setStepNotice("");
     } finally {
       setBusy(false);
@@ -304,12 +325,12 @@ export function V2ToV3MigrationWizard() {
     setBusy(true);
     setLastTxHash(null);
     try {
-      const [token0, token1] = sortTokens(WETH_BASE, activePair.tokenAddress);
-      const isToken0Weth = token0.toLowerCase() === WETH_BASE.toLowerCase();
-
-      // Need WETH for V3 deposit. If user has raw ETH but not enough WETH, wrap ETH automatically!
-      const neededWeth = underlyingAmounts.ethAmount > 0n ? underlyingAmounts.ethAmount : parseUnits("0.001", 18);
-      const tokenDesired = tokenBalance;
+      if (!positiveAmount(depositToken, activePair.decimals) || !positiveAmount(depositWeth, 18)) {
+        throw new Error("Enter positive token and WETH deposit amounts");
+      }
+      const neededWeth = parseUnits(depositWeth, 18);
+      const tokenDesired = parseUnits(depositToken, activePair.decimals);
+      if (tokenDesired > tokenBalance) throw new Error("Deposit exceeds your token balance");
 
       // Check WETH balance
       if (wethBalance < neededWeth) {
@@ -319,38 +340,18 @@ export function V2ToV3MigrationWizard() {
         }
         setStepNotice(`Wrapping ${formatUnits(wrapShortfall, 18).slice(0, 8)} ETH into WETH...`);
         const wrapAbi = parseAbi(["function deposit() payable"]);
+        await assertWallet();
         const wrapTx = await walletClient.writeContract({
           address: WETH_BASE,
           abi: wrapAbi,
           functionName: "deposit",
           value: wrapShortfall,
           chain: base,
-        });
-        setLastTxHash(wrapTx);
-        await publicClient.waitForTransactionReceipt({ hash: wrapTx });
-      }
-
-      // Check / Initialize Pool
-      if (!v3PoolExists) {
-        setStepNotice(`Initializing Uniswap V3 Pool on Base (${activePair.name}, ${feeTier / 10000}% fee)...`);
-        // Calculate sqrtPriceX96 matching current ratio
-        const amount0 = isToken0Weth ? neededWeth : tokenDesired;
-        const amount1 = isToken0Weth ? tokenDesired : neededWeth;
-        const sqrtPriceX96 = encodeSqrtPriceX96(amount0, amount1);
-
-        const { request } = await publicClient.simulateContract({
-          address: NONFUNGIBLE_POSITION_MANAGER_BASE,
-          abi: NONFUNGIBLE_POSITION_MANAGER_ABI,
-          functionName: "createAndInitializePoolIfNecessary",
-          args: [token0, token1, feeTier, sqrtPriceX96],
           account: userAddress,
         });
-
-        const initTx = await walletClient.writeContract({ ...request, chain: base });
-        setLastTxHash(initTx);
-        setStepNotice("Waiting for pool initialization confirmation on Base...");
-        const initReceipt = await publicClient.waitForTransactionReceipt({ hash: initTx });
-        if (initReceipt.status !== "success") throw new Error("Pool initialization reverted");
+        setLastTxHash(wrapTx);
+        const wrapReceipt = await publicClient.waitForTransactionReceipt({ hash: wrapTx });
+        if (wrapReceipt.status !== "success") throw new Error("WETH wrapping reverted");
       }
 
       // Approve Position Manager for Token
@@ -364,15 +365,18 @@ export function V2ToV3MigrationWizard() {
 
       if (tokenAllowance < tokenDesired) {
         setStepNotice(`Approve ${activePair.tokenSymbol} for Uniswap V3 Position Manager...`);
+        await assertWallet();
         const approveTokenTx = await walletClient.writeContract({
           address: activePair.tokenAddress,
           abi: erc20Abi,
           functionName: "approve",
-          args: [NONFUNGIBLE_POSITION_MANAGER_BASE, maxUint256],
+          args: [NONFUNGIBLE_POSITION_MANAGER_BASE, tokenDesired],
           chain: base,
+          account: userAddress,
         });
         setLastTxHash(approveTokenTx);
-        await publicClient.waitForTransactionReceipt({ hash: approveTokenTx });
+        const approval = await publicClient.waitForTransactionReceipt({ hash: approveTokenTx });
+        if (approval.status !== "success") throw new Error("Token approval reverted");
       }
 
       // Approve Position Manager for WETH
@@ -386,46 +390,38 @@ export function V2ToV3MigrationWizard() {
 
       if (wethAllowance < neededWeth) {
         setStepNotice("Approve WETH for Uniswap V3 Position Manager...");
+        await assertWallet();
         const approveWethTx = await walletClient.writeContract({
           address: WETH_BASE,
           abi: erc20Abi,
           functionName: "approve",
-          args: [NONFUNGIBLE_POSITION_MANAGER_BASE, maxUint256],
+          args: [NONFUNGIBLE_POSITION_MANAGER_BASE, neededWeth],
           chain: base,
+          account: userAddress,
         });
         setLastTxHash(approveWethTx);
-        await publicClient.waitForTransactionReceipt({ hash: approveWethTx });
+        const approval = await publicClient.waitForTransactionReceipt({ hash: approveWethTx });
+        if (approval.status !== "success") throw new Error("WETH approval reverted");
       }
 
       // Mint Full Range Position
       setStepNotice("Minting Full-Range Uniswap V3 position NFT...");
-      const { tickLower, tickUpper } = getFullRangeTicks(feeTier);
-      const amount0Desired = isToken0Weth ? neededWeth : tokenDesired;
-      const amount1Desired = isToken0Weth ? tokenDesired : neededWeth;
       const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200);
-
-      const mintParams = {
-        token0,
-        token1,
-        fee: feeTier,
-        tickLower,
-        tickUpper,
-        amount0Desired,
-        amount1Desired,
-        amount0Min: 0n, // Full range initial mint
-        amount1Min: 0n,
-        recipient: userAddress,
-        deadline,
-      };
-
+      const mintCall = buildV3MintCall(
+        WETH_BASE,
+        activePair.tokenAddress,
+        neededWeth,
+        tokenDesired,
+        feeTier,
+        userAddress,
+        deadline
+      );
       const { request: mintReq } = await publicClient.simulateContract({
-        address: NONFUNGIBLE_POSITION_MANAGER_BASE,
-        abi: NONFUNGIBLE_POSITION_MANAGER_ABI,
-        functionName: "mint",
-        args: [mintParams],
+        ...mintCall,
         account: userAddress,
       });
 
+      await assertWallet();
       const mintTx = await walletClient.writeContract({ ...mintReq, chain: base });
       setLastTxHash(mintTx);
       setStepNotice("Confirming Uniswap V3 position mint on Base...");
@@ -435,9 +431,9 @@ export function V2ToV3MigrationWizard() {
       toast.success("Successfully minted Uniswap V3 position on Base!");
       setStepNotice("Migration Complete! You now hold a live Uniswap V3 Position NFT on Base.");
       await refreshData();
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      toast.error(err?.message ?? "Failed to supply into Uniswap V3");
+      toast.error(err instanceof Error ? err.message : "Failed to supply into Uniswap V3");
       setStepNotice("");
     } finally {
       setBusy(false);
@@ -481,7 +477,11 @@ export function V2ToV3MigrationWizard() {
             <Label className="text-xs font-semibold text-gray-700">Target Migration Pair</Label>
             <Select
               value={selectedPairId}
-              onValueChange={(val) => setSelectedPairId(val)}
+              onValueChange={(val) => {
+                setSelectedPairId(val);
+                setDepositToken("");
+                setDepositWeth("");
+              }}
               disabled={busy}
             >
               <SelectTrigger className="w-full bg-white font-medium">
@@ -519,7 +519,7 @@ export function V2ToV3MigrationWizard() {
         </div>
 
         {/* Current V2 Pool State Overview */}
-        <div className="rounded-xl border border-purple-100 bg-white p-4 shadow-xs">
+        <div className="shadow-xs rounded-xl border border-purple-100 bg-white p-4">
           <div className="flex items-center justify-between border-b border-gray-100 pb-2">
             <span className="text-xs font-bold text-gray-700">Your Uniswap V2 Position</span>
             <a
@@ -538,7 +538,7 @@ export function V2ToV3MigrationWizard() {
               <p className="font-mono text-base font-bold text-gray-900">
                 {formatUnits(v2LpBalance, 18).slice(0, 9)} LP
               </p>
-              <p className="text-[10px] text-purple-600 font-medium">
+              <p className="text-[10px] font-medium text-purple-600">
                 {userShareOfV2.toFixed(4)}% pool ownership
               </p>
             </div>
@@ -546,10 +546,9 @@ export function V2ToV3MigrationWizard() {
             <div>
               <p className="text-[11px] text-gray-500">Underlying {activePair.tokenSymbol}</p>
               <p className="font-mono text-base font-bold text-gray-900">
-                {Number(formatUnits(underlyingAmounts.tokenAmount, activePair.decimals)).toLocaleString(
-                  undefined,
-                  { maximumFractionDigits: 2 }
-                )}
+                {Number(
+                  formatUnits(underlyingAmounts.tokenAmount, activePair.decimals)
+                ).toLocaleString(undefined, { maximumFractionDigits: 2 })}
               </p>
               <p className="text-[10px] text-gray-500">
                 Wallet held:{" "}
@@ -626,14 +625,39 @@ export function V2ToV3MigrationWizard() {
                 Initialize & Supply into Uniswap V3
               </h4>
               <p className="mt-1 text-xs text-gray-500">
-                Initializes the V3 pool on Base (if uninitialized), sets starting price matching V2,
-                and mints a Full-Range Uniswap V3 Position NFT to your wallet.
+                Initializes a new pool at your deposit ratio and mints a full-range NFT. For
+                existing pools, match the current pool ratio. Both amounts have a 0.5% minimum
+                consumption tolerance; an imbalanced deposit will revert. Any WETH shortfall is
+                wrapped from ETH.
               </p>
+              <Label htmlFor="v3-token-amount">{activePair.tokenSymbol} to deposit</Label>
+              <Input
+                id="v3-token-amount"
+                inputMode="decimal"
+                value={depositToken}
+                onChange={(event) => setDepositToken(event.target.value)}
+                disabled={busy}
+              />
+              <Label htmlFor="v3-weth-amount">WETH to deposit</Label>
+              <Input
+                id="v3-weth-amount"
+                inputMode="decimal"
+                value={depositWeth}
+                onChange={(event) => setDepositWeth(event.target.value)}
+                disabled={busy}
+              />
             </div>
 
             <Button
               className="mt-4 w-full bg-gradient-to-r from-indigo-600 to-purple-600 font-bold text-white hover:from-indigo-700 hover:to-purple-700"
-              disabled={busy || tokenBalance === 0n || !isConnected}
+              disabled={
+                busy ||
+                tokenBalance === 0n ||
+                !isConnected ||
+                chainId !== base.id ||
+                !positiveAmount(depositToken, activePair.decimals) ||
+                !positiveAmount(depositWeth, 18)
+              }
               onClick={() => void handleSupplyV3()}
             >
               {busy ? (
@@ -650,7 +674,7 @@ export function V2ToV3MigrationWizard() {
         {stepNotice && (
           <Alert className="border-indigo-200 bg-indigo-50/80 text-indigo-950">
             <AlertCircle className="size-4 text-indigo-600" />
-            <AlertTitle className="font-semibold text-xs">Migration Status</AlertTitle>
+            <AlertTitle className="text-xs font-semibold">Migration Status</AlertTitle>
             <AlertDescription className="text-xs">
               <p>{stepNotice}</p>
               {lastTxHash && (

@@ -17,11 +17,9 @@ const usdc = BASE_MAINNET_TOKENS.find((t) => t.symbol === "USDC")!;
 describe("Executable router plans", () => {
   it("compares Uniswap V3 fee tiers, Uniswap V2, and Aerodrome pools without degenerate wrapped routes", () => {
     const routes = routeCandidates(usdc, weth);
-    expect(routes).toHaveLength(6);
+    expect(routes).toHaveLength(7);
     expect(routes.filter((r) => r.venue === "Uniswap V3").map((r) => r.fee)).toEqual([
-      500,
-      3000,
-      10000,
+      100, 500, 3000, 10000,
     ]);
     expect(routes.filter((r) => r.venue === "Uniswap V2")).toHaveLength(1);
     expect(routes.filter((r) => r.venue === "Aerodrome").map((r) => r.stable)).toEqual([
@@ -48,8 +46,15 @@ describe("Executable router plans", () => {
           abi: UNISWAP_V3_SWAP_ROUTER_02_ABI,
           data: encodeFunctionData(call),
         });
-        expect(decoded.functionName).toBe("exactInputSingle");
-        const params = decoded.args?.[0] as {
+        expect(decoded.functionName).toBe("multicall");
+        if (decoded.functionName !== "multicall") throw new Error("Expected deadline multicall");
+        expect(decoded.args[0]).toBe(2000000000n);
+        const swap = decodeFunctionData({
+          abi: UNISWAP_V3_SWAP_ROUTER_02_ABI,
+          data: decoded.args[1][0]!,
+        });
+        expect(swap.functionName).toBe("exactInputSingle");
+        const params = swap.args?.[0] as {
           tokenIn: string;
           tokenOut: string;
           fee: number;
@@ -104,11 +109,17 @@ describe("Executable router plans", () => {
       abi: UNISWAP_V3_SWAP_ROUTER_02_ABI,
       data: encodeFunctionData(ethToTokenCall),
     });
-    expect(decodedBuy.functionName).toBe("exactInputSingle");
+    expect(decodedBuy.functionName).toBe("multicall");
+    if (decodedBuy.functionName !== "multicall") throw new Error("Expected deadline multicall");
+    expect(decodedBuy.args[0]).toBe(2000000000n);
+    expect(
+      decodeFunctionData({ abi: UNISWAP_V3_SWAP_ROUTER_02_ABI, data: decodedBuy.args[1][1]! })
+        .functionName
+    ).toBe("refundETH");
 
     // USDC -> Native ETH (multicall with unwrapWETH9)
     const tokenToEthCall = routeSwapCall(
-      v3Route!,
+      routeCandidates(usdc, nativeEth).find((r) => r.venue === "Uniswap V3")!,
       usdc,
       nativeEth,
       1000000n,
@@ -121,6 +132,26 @@ describe("Executable router plans", () => {
       data: encodeFunctionData(tokenToEthCall),
     });
     expect(decodedSell.functionName).toBe("multicall");
+    if (decodedSell.functionName !== "multicall") throw new Error("Expected deadline multicall");
+    const swap = decodeFunctionData({
+      abi: UNISWAP_V3_SWAP_ROUTER_02_ABI,
+      data: decodedSell.args[1][0]!,
+    });
+    if (swap.functionName !== "exactInputSingle") throw new Error("Expected swap");
+    expect(swap.args[0].recipient).toBe("0x0000000000000000000000000000000000000002");
+    const unwrap = decodeFunctionData({
+      abi: UNISWAP_V3_SWAP_ROUTER_02_ABI,
+      data: decodedSell.args[1][1]!,
+    });
+    expect(unwrap.functionName).toBe("unwrapWETH9");
+    expect(unwrap.args).toEqual([300000000000000n, AERODROME_ROUTER]);
+  });
+  it("rejects wrong-chain, mismatched-route and unprotected V3 swaps", () => {
+    const route = routeCandidates(usdc, weth)[0]!;
+    expect(() => routeSwapCall(route, usdc, weth, 1n, 0n, AERODROME_ROUTER, 1n)).toThrow();
+    expect(() => routeSwapCall(route, weth, usdc, 1n, 1n, AERODROME_ROUTER, 1n)).toThrow();
+    expect(() =>
+      routeSwapCall(route, { ...usdc, chainId: 1 }, weth, 1n, 1n, AERODROME_ROUTER, 1n)
+    ).toThrow();
   });
 });
-
