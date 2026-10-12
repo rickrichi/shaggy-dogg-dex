@@ -44,11 +44,12 @@ export function BaseExecutionComparison({ notional }: { notional: number }) {
               Quoted at block {quote.data.blockNumber.toString()} ·{" "}
               {new Date(quote.data.observedAt).toLocaleTimeString()}
             </p>
-            {["Uniswap V2", "Aerodrome"].map((venue) => {
+            {(["Uniswap V3", "Uniswap V2", "Aerodrome"] as const).map((venue) => {
               const route = quote.data.quotes.find((q) => q.route.venue === venue);
+              const extraLabel = route?.route.fee ? ` (${route.route.fee / 10000}%)` : "";
               return (
                 <p key={venue}>
-                  {venue}:{" "}
+                  {venue}{extraLabel}:{" "}
                   {route ? `${formatUnits(route.output, 18)} WETH` : "No executable pool route"}
                 </p>
               );

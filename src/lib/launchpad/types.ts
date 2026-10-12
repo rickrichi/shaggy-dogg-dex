@@ -11,7 +11,7 @@ export type ArchetypeId =
   | "fluid_hybrid_amm"
   | "full_defi_suite";
 
-export type DexVenueId = "uniswap_v2" | "pancakeswap_v2" | "aerodrome";
+export type DexVenueId = "uniswap_v2" | "uniswap_v3" | "pancakeswap_v2" | "aerodrome";
 
 export type DeploymentExecutionMode = "metamask" | "deployer_worker";
 
@@ -68,6 +68,7 @@ export interface DeployedEcosystemResult {
   stakingAddress?: Address | undefined;
   vaultAddress?: Address | undefined;
   borrowerAddress?: Address | undefined;
+  compoundVaultAddress?: Address | undefined;
   pairAddress?: Address | undefined;
   txHash: string;
   deploymentMode: DeploymentExecutionMode;
@@ -84,6 +85,8 @@ export interface LaunchedTokenRecord {
   archetype: ArchetypeId;
   stakingAddress?: Address | undefined;
   vaultAddress?: Address | undefined;
+  borrowerAddress?: Address | undefined;
+  compoundVaultAddress?: Address | undefined;
   pairAddress?: Address | undefined;
   creatorAddress: Address;
   chainId: number;

@@ -18,7 +18,7 @@ import { calculateMinimumAmountOut } from "@/lib/amm/swap-protection";
 
 import type { Abi, Address, Hash } from "viem";
 
-const tokens = BASE_MAINNET_TOKENS.filter((t) => t.kind === "erc20" && t.symbol !== "SD");
+const tokens = BASE_MAINNET_TOKENS.filter((t) => t.kind === "erc20");
 const wethAbi = parseAbi(["function deposit() payable", "function withdraw(uint256)"]);
 type Mode = "swap" | "add" | "remove";
 const short = (value: string) => `${value.slice(0, 6)}…${value.slice(-4)}`;
@@ -338,6 +338,29 @@ export default function BaseDex({ initialMode = "swap" }: { initialMode?: Mode }
           )}
         </CardContent>
       </Card>
+      <div className="rounded-xl border border-purple-200 bg-gradient-to-r from-purple-900/10 via-indigo-900/10 to-pink-900/10 p-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="rounded-full bg-purple-600 px-2 py-0.5 text-xs font-semibold text-white">
+                Uniswap V3 Universal
+              </span>
+              <p className="font-semibold text-sm text-slate-900 dark:text-slate-100">
+                Concentrated Liquidity & V2 Migration Wizard
+              </p>
+            </div>
+            <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+              Migrate classic V2 LP positions to Uniswap V3 concentrated positions or manage custom fee tiers (0.05%, 0.3%, 1.0%) with 1-click execution.
+            </p>
+          </div>
+          <Link
+            to="/liquidity"
+            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-purple-700 transition"
+          >
+            Open V3 Manager & Migration →
+          </Link>
+        </div>
+      </div>
       <Card>
         <CardHeader>
           <CardTitle>Trade and manage liquidity</CardTitle>
@@ -377,7 +400,7 @@ export default function BaseDex({ initialMode = "swap" }: { initialMode?: Mode }
                   >
                     {tokens.map((t) => (
                       <option key={t.address} value={t.symbol}>
-                        {t.symbol}
+                        {t.symbol} ({t.name})
                       </option>
                     ))}
                   </select>

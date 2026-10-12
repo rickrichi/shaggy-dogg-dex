@@ -1,0 +1,38 @@
+  • If you launch commercially / charge platform fees:
+      • Vercel Pro (~$20/mo) satisfies Vercel's commercial terms.
+      • Render Starter (~$7/mo) stops the backend from going to "sleep" after 15 minutes of inactivity so prices load
+      instantly.
+
+=================================
+
+
+Analysis of the configuration reveals the first platform hosts the frontend, domain, and handles user interface. The
+  second platform hosts backend API services. API requests from the frontend are proxied to the backend services. The
+  deployment command indicates that a recent deployment has been completed on the first platform.
+  You are using BOTH.
+  Your architecture is split into two parts:
+  ──────
+  ### 1. Vercel = Your Frontend Website
+
+  • What it hosts: The user interface and website at https://dex.lumsian.com.
+  • What it does:
+      • Delivers the React web pages (Swap, Liquidity, Portfolio).
+      • Connects to MetaMask and builds Uniswap transactions.
+      • Handles the domain name (dex.lumsian.com).
+  • Deployment: This is where we ran npx vercel deploy.
+  ──────
+  ### 2. Render = Your Backend API & Market Data
+
+  • What it hosts: Your two background server applications:
+      1. https://shaggy-dogg-api.onrender.com (API server for block diagnostics, pricing, and CeDeFi).
+      2. https://shaggy-dogg-market-data.onrender.com (Python service that reads exchange order books).
+  • What it does: Runs the background processes that scrape prices and crunch market data.
+  ──────
+  ### How they work together:
+
+  When someone visits dex.lumsian.com:
+
+  1. Vercel delivers the buttons, charts, and wallet interface to their browser.
+  2. Whenever the site needs backend price or market data (requests to /api/...), Vercel automatically forwards those
+  req• For now (testing & development): The free tiers on both Vercel and Render are completely fine.
+ 

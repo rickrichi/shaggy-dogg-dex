@@ -59,7 +59,7 @@ export function StakerRewardPoolPanel({
                 </Badge>
               </div>
               <CardDescription className="text-xs text-gray-500">
-                Proposed policy: 10% of net realized flash loan &amp; CeDeFi arbitrage profit in
+                Proposed policy: 10% of net realized protocol arbitrage fee revenue in
                 Base USDC, if distributions go live. Nothing is paid today.
               </CardDescription>
             </div>
@@ -67,7 +67,7 @@ export function StakerRewardPoolPanel({
 
           <div className="flex flex-wrap items-center gap-1.5">
             <Badge variant="outline" className="border-purple-300 bg-purple-50 text-purple-700">
-              10% Net Profit Share
+              10% Net Fee Allocation
             </Badge>
             <Badge variant="outline" className="border-blue-300 bg-blue-50 text-blue-700">
               7-Day Weekly Epochs
@@ -108,7 +108,7 @@ export function StakerRewardPoolPanel({
           {/* Allocation Split Ratio */}
           <div className="shadow-xs rounded-xl border border-purple-100 bg-white p-4">
             <div className="flex items-center justify-between text-xs text-gray-500">
-              <span>Protocol Profit Split</span>
+              <span>Protocol Fee Allocation Split</span>
               <Scale className="size-4 text-indigo-600" />
             </div>
             <div className="mt-1 flex items-baseline gap-2">
@@ -150,7 +150,7 @@ export function StakerRewardPoolPanel({
             <p className="mt-1.5 text-[11px] leading-relaxed text-indigo-800/90">
               Today no rewards are paid: the staking contract has no reward function and no
               distributor is deployed. If distributions go live, they would come only from{" "}
-              <strong>realized net arbitrage profit</strong> (after capital, fees, gas and carried
+              <strong>realized net protocol fee revenue</strong> (after capital, fees, gas and carried
               losses). Staking does not guarantee any yield or APY.
             </p>
           </div>

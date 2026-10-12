@@ -7,10 +7,12 @@ import { useAccount } from "wagmi";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useUserActivity } from "@/hooks/useUserActivity";
 import { SUPPORTED_CHAINS } from "@/lib/config";
 
 export default function Home() {
   const { isConnected } = useAccount();
+  const { stats, loading } = useUserActivity();
 
   const features = [
     {
@@ -99,19 +101,42 @@ export default function Home() {
       </div>
 
       {/* Stats Section */}
-      <Card className="border-0 bg-gradient-to-r from-purple-600 to-pink-600 text-white">
+      <Card className="border-0 bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg">
         <CardContent className="p-8">
           <div className="grid grid-cols-1 gap-8 text-center md:grid-cols-3">
             <div>
-              <div className="text-3xl font-bold">$0</div>
-              <div className="text-purple-100">Total Volume</div>
+              <div className="text-3xl font-bold">
+                {loading
+                  ? "..."
+                  : isConnected
+                    ? stats.totalVolumeUsd > 0
+                      ? `$${stats.totalVolumeUsd.toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}`
+                      : stats.totalVolumeEth > 0
+                        ? `${stats.totalVolumeEth.toFixed(4)} ETH`
+                        : "$0.00"
+                    : "$0.00"}
+              </div>
+              <div className="text-purple-100">
+                {isConnected ? "Your Trading Volume" : "Total Volume"}
+              </div>
             </div>
+            <Link to="/activity" className="group block transition-transform hover:scale-105">
+              <div className="text-3xl font-bold">
+                {loading ? "..." : isConnected ? stats.totalSwaps : 0}
+              </div>
+              <div className="text-purple-100 group-hover:underline underline-offset-4">
+                {isConnected ? "Your Total Swaps" : "Total Swaps"}
+              </div>
+            </Link>
             <div>
-              <div className="text-3xl font-bold">0</div>
-              <div className="text-purple-100">Total Swaps</div>
-            </div>
-            <div>
-              <div className="text-3xl font-bold">{SUPPORTED_CHAINS.length}</div>
+              <div className="text-3xl font-bold">
+                {isConnected && stats.activeChains > 0
+                  ? `${stats.activeChains} Active / ${SUPPORTED_CHAINS.length}`
+                  : SUPPORTED_CHAINS.length}
+              </div>
               <div className="text-purple-100">Supported Chains</div>
             </div>
           </div>

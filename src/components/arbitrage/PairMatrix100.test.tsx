@@ -52,10 +52,11 @@ describe("PairMatrix100 Component", () => {
     expect(screen.getByText("1 WETH → 2500.25 USDC")).toBeInTheDocument();
     expect(screen.getByText("Bid 2,501 / Ask 2,502")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Shaggy-Dogg-Dex · Base mappings/ }));
-    expect(screen.queryByText("BTC/USDT")).not.toBeInTheDocument();
+    expect(screen.queryByText("SOL/USDT")).not.toBeInTheDocument();
     expect(screen.getByText("ETH/USDC")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: `Show All (${PAIR_MATRIX_DATA.length})` }));
     expect(screen.getByText("BTC/USDT")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: `Show All (${PAIR_MATRIX_DATA.length})` }));
+    expect(screen.getByText("SOL/USDT")).toBeInTheDocument();
   });
   it("renders the expanded matrix", () => {
     render(<PairMatrix100 krakenBalances={{ free: {} }} />);

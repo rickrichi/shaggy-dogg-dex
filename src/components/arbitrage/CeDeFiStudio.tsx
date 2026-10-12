@@ -24,7 +24,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { UNISWAP_V2_ROUTER_ABI } from "@/config/abis";
+import { UNISWAP_V2_ROUTER_ABI, UNISWAP_V3_QUOTER_V2_ABI } from "@/config/abis";
+import { UNISWAP_V3_QUOTER_V2_BASE } from "@/config/contracts";
 import { ARB_API_URL } from "@/config/crypto-arb";
 import { useCeFiArbStream } from "@/hooks/useCeFiArbStream";
 import { useLiveAccounts } from "@/hooks/useLiveAccounts";
@@ -255,7 +256,28 @@ export function CeDeFiStudio({
     [venues, selectedSymbol]
   );
 
-  // Query live Uniswap V2 router for real WETH/USDC quote on Base Mainnet
+  // Query live Uniswap V3 concentrated quoter for primary WETH/USDC price on Base (0.05% tier)
+  const { data: v3Quote } = useReadContract({
+    address: UNISWAP_V3_QUOTER_V2_BASE,
+    chainId: 8453,
+    abi: UNISWAP_V3_QUOTER_V2_ABI,
+    functionName: "quoteExactInputSingle",
+    args: [
+      {
+        tokenIn: WETH_ADDRESS,
+        tokenOut: USDC_ADDRESS,
+        amountIn: parseEther("1"),
+        fee: 500,
+        sqrtPriceLimitX96: 0n,
+      },
+    ],
+    query: {
+      refetchInterval: 12_000,
+      staleTime: 6_000,
+    },
+  });
+
+  // Query live Uniswap V2 router as fallback
   const { data: wethUsdcQuote } = useReadContract({
     address: BASE_UNISWAP_ROUTER,
     chainId: 8453,
@@ -269,11 +291,14 @@ export function CeDeFiStudio({
   });
 
   const onChainWethPrice = useMemo(() => {
+    if (v3Quote && Array.isArray(v3Quote) && (v3Quote[0] as bigint) > 0n) {
+      return Number(v3Quote[0]) / 1e6;
+    }
     if (wethUsdcQuote && Array.isArray(wethUsdcQuote) && wethUsdcQuote.length > 1) {
       return Number(wethUsdcQuote[1]) / 1e6;
     }
     return null;
-  }, [wethUsdcQuote]);
+  }, [v3Quote, wethUsdcQuote]);
 
   // Extract reference CEX prices for active pair from streaming venues
   const activeVenues = useMemo(
@@ -1060,7 +1085,11 @@ export function CeDeFiStudio({
                   ${dexRefPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </p>
                 <span className="text-[11px] text-slate-500">
-                  {onChainWethPrice ? "Live Uniswap V2 on Base" : "Base AMM Reference"}
+                  {onChainWethPrice
+                    ? v3Quote
+                      ? "Live Uniswap V3 (0.05%) on Base"
+                      : "Live Uniswap V2 on Base"
+                    : "Base AMM Reference"}
                 </span>
               </div>
 

@@ -24,6 +24,7 @@ import { base } from "viem/chains";
 import { useAccount, usePublicClient, useSwitchChain, useWalletClient } from "wagmi";
 
 import { LaunchpadNav } from "@/components/launchpad/LaunchpadNav";
+import { RouterOperatorPanel } from "@/components/RouterOperatorPanel";
 import { StakerRewardPoolPanel } from "@/components/StakerRewardPoolPanel";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -515,6 +516,7 @@ export default function Stake() {
       />
 
       <YieldVaultPanel />
+      <RouterOperatorPanel />
       {/* Main Interactive Interface & Tiers */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         {/* Staking / Unstaking Form */}
@@ -744,7 +746,7 @@ export default function Stake() {
                 VIP Staking Tiers
               </CardTitle>
               <CardDescription>
-                Live contract tiers. Standard Uniswap V2 pools do not apply these discounts.
+                Live contract tiers. Standard Uniswap V2 & V3 external pools charge their fixed fees; VIP discounts apply across integrated protocol vaults and DEX routers.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -794,6 +796,13 @@ export default function Stake() {
                 💡 <span className="font-semibold text-slate-700">Contract terms:</span> Staked
                 tokens are held by the staking contract. Its administrators can change tiers, lock
                 periods, and withdrawal fees.
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border border-indigo-100 bg-indigo-50/50 p-2.5 text-xs text-indigo-900">
+                <span>Looking to supply concentrated liquidity?</span>
+                <Link to="/liquidity?version=v3" className="font-semibold text-indigo-700 underline hover:text-indigo-900">
+                  Uniswap V3 Portal ↗
+                </Link>
               </div>
             </CardContent>
           </Card>

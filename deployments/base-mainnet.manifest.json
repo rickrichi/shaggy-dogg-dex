@@ -244,6 +244,34 @@
         "deploymentTx": "0x1f6acc736b603dd2259afdb285bf715802fab1ef4fd9988bdac195fdf2cdb2fc",
         "sourceCommit": "99365d4"
       }
+    },
+    {
+      "address": "0xb8f3D5143ffddB99688BB31E7c2c3894a1E17263",
+      "hasCode": true,
+      "name": "Foundational Black American",
+      "symbol": "FBA",
+      "admin": "0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98",
+      "minter": "0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98",
+      "totalSupply": "1000000000000000000000000",
+      "contractName": "GovernanceToken",
+      "label": {
+        "ecosystem": "FBA",
+        "role": "GovernanceToken (FBA)",
+        "usedBy": [
+          "src/config/tokens.ts",
+          "src/lib/tokens.ts",
+          "src/pages/Portfolio.tsx"
+        ]
+      }
+    },
+    {
+      "address": "0x916ed75C0636Ddd7404DB79B7dc5CF80e8446c47",
+      "hasCode": true,
+      "contractName": "UniswapV2Pair",
+      "label": {
+        "ecosystem": "FBA",
+        "role": "Uniswap V2 pair FBA/WETH"
+      }
     }
   ],
   "adminAddresses": [

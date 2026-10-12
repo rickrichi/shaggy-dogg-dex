@@ -6,7 +6,7 @@
  *
  * @runtime edge
  */
-import { forwardToBackend } from './_proxy'
+import { forwardToBackend } from './_proxy.js'
 
 export const config = { runtime: 'edge' }
 
