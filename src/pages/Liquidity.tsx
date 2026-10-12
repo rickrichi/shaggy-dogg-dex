@@ -15,6 +15,7 @@ import {
 
 import { V2ToV3MigrationWizard } from "@/components/liquidity/V2ToV3MigrationWizard";
 import { V3LiquidityManager } from "@/components/liquidity/V3LiquidityManager";
+import { LpLockCard } from "@/components/liquidity/LpLockCard";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1010,6 +1011,11 @@ export default function Liquidity() {
         </div>
       </div>
       )}
+
+      {/* ── Lock LP Tokens ─────────────────────────────────────────────────── */}
+      <div className="pt-2">
+        <LpLockCard />
+      </div>
     </div>
   );
 }
