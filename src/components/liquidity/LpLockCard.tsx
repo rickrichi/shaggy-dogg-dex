@@ -22,26 +22,21 @@ import { CANONICAL_BASE_CONTRACTS } from "@/lib/launchpad/constants";
 export const LOCKER_PLATFORMS = [
   {
     name: "UNCX Network",
-    description: "Premier decentralized LP locker. Direct native support for Base V2 pairs and V3 concentrated NFTs.",
-    url: "https://app.uncx.network/services/lock-liquidity",
+    description: "Premier decentralized LP locker. Direct native support for Uniswap V3 position NFTs on Base.",
+    url: "https://app.uncx.network/lockers/manage/lockers-v3",
     badge: "Official Base Partner",
   },
   {
     name: "Team Finance",
-    description: "Audited liquidity and token vesting locker supporting Base V2 pairs and V3 NFT positions.",
-    url: "https://team.finance",
+    description: "Audited liquidity locker supporting Base Uniswap V3 NFT positions.",
+    url: "https://app.team.finance",
     badge: "Top Security Rating",
-  },
-  {
-    name: "PinkLock",
-    description: "Standard on-chain liquidity locker with automatic DexScreener & security scanner indexing.",
-    url: "https://pinklock.finance",
-    badge: "Fast Indexing",
   },
 ] as const;
 
-// Known Pair & Manager Addresses on Base
-const AMUTT_V2_PAIR = "0x581b294fec1a4332f17cf18b49d68087c09b6784";
+// Known Pool & Manager Addresses on Base
+const SD_V3_POOL = "0x449730674404a29856c6b1e5941549d73c5b8f10";
+const SD_V3_NFT_TOKEN_ID = "6245990";
 const V3_POSITION_MANAGER = CANONICAL_BASE_CONTRACTS.UniswapV3PositionManager;
 
 type LockDuration = 3 | 12;
@@ -211,30 +206,73 @@ export function LpLockCard() {
           </div>
         </div>
 
-        {/* Copy Addresses Needed for Lockers */}
+        {/* Copy Addresses & NFT ID Needed for Lockers */}
         <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-slate-800 uppercase tracking-wide">
-              Step 2: Copy Contract Addresses
+              Step 2: Copy Contract Addresses & V3 NFT ID
             </span>
-            <span className="text-[11px] text-slate-500">Paste into your chosen locker platform</span>
+            <span className="text-[11px] text-slate-500">Provide to UNCX or Team Finance locker</span>
           </div>
 
-          <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+          <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+            {/* V3 Position NFT */}
+            <div className="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50/40 px-3 py-2 text-xs">
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-semibold text-emerald-950">V3 Position NFT ID</span>
+                  <Badge variant="outline" className="border-emerald-300 bg-white text-[10px] text-emerald-700">
+                    Active
+                  </Badge>
+                </div>
+                <span className="font-mono text-sm font-bold text-emerald-800">
+                  #{SD_V3_NFT_TOKEN_ID}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1 bg-white text-[11px]"
+                  onClick={() => handleCopy(SD_V3_NFT_TOKEN_ID, "nft", "Position NFT Token ID")}
+                >
+                  {copiedKey === "nft" ? (
+                    <>
+                      <Check className="size-3 text-emerald-600" /> Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="size-3" /> Copy
+                    </>
+                  )}
+                </Button>
+                <a
+                  href={`https://base.blockscout.com/token/${V3_POSITION_MANAGER}/instance/${SD_V3_NFT_TOKEN_ID}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 hover:text-emerald-700"
+                  title="View NFT on Base Blockscout"
+                >
+                  <ExternalLink className="size-3.5" />
+                </a>
+              </div>
+            </div>
+
+            {/* V3 Pool */}
             <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs">
               <div>
-                <span className="block font-semibold text-slate-700">AMUTT / WETH V2 Pair</span>
+                <span className="block font-semibold text-slate-700">SD / WETH V3 Pool (1.0%)</span>
                 <span className="font-mono text-[11px] text-slate-500">
-                  {AMUTT_V2_PAIR.slice(0, 8)}...{AMUTT_V2_PAIR.slice(-6)}
+                  {SD_V3_POOL.slice(0, 8)}...{SD_V3_POOL.slice(-6)}
                 </span>
               </div>
               <Button
                 variant="outline"
                 size="sm"
                 className="h-7 gap-1 text-[11px]"
-                onClick={() => handleCopy(AMUTT_V2_PAIR, "pair", "V2 Pair Address")}
+                onClick={() => handleCopy(SD_V3_POOL, "pool", "V3 Pool Address")}
               >
-                {copiedKey === "pair" ? (
+                {copiedKey === "pool" ? (
                   <>
                     <Check className="size-3 text-emerald-600" /> Copied
                   </>
@@ -246,9 +284,10 @@ export function LpLockCard() {
               </Button>
             </div>
 
+            {/* Position Manager */}
             <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs">
               <div>
-                <span className="block font-semibold text-slate-700">Uniswap V3 Position Manager</span>
+                <span className="block font-semibold text-slate-700">V3 Position Manager</span>
                 <span className="font-mono text-[11px] text-slate-500">
                   {V3_POSITION_MANAGER.slice(0, 8)}...{V3_POSITION_MANAGER.slice(-6)}
                 </span>
@@ -282,7 +321,7 @@ export function LpLockCard() {
             <span className="text-[11px] text-gray-500">Direct external dApp links</span>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {LOCKER_PLATFORMS.map((locker) => (
               <a
                 key={locker.name}
@@ -328,10 +367,10 @@ export function LpLockCard() {
           <div className="rounded-xl border border-purple-100 bg-white p-3.5 text-xs shadow-xs">
             <div className="flex items-center gap-1.5 font-bold text-purple-900">
               <Layers className="size-4 text-purple-600" />
-              <span>Recommended: Migrate to V3 First</span>
+              <span>Locking Uniswap V3 NFTs</span>
             </div>
             <p className="mt-1 text-[11px] leading-relaxed text-gray-500">
-              Migrate liquidity to Uniswap V3 concentrated liquidity above before locking, so you can lock the resulting V3 NFT directly without being held back by a V2 timer.
+              Uniswap V3 liquidity is represented as an NFT (#6245990). In UNCX or Team Finance, select the Uniswap V3 locker option to lock your Position NFT directly.
             </p>
           </div>
         </div>
