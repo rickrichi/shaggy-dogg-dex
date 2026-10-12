@@ -10,7 +10,7 @@ export const LaunchpadNav = () => {
 
   const navItems = [
     {
-      name: "Token Studio",
+      name: "Create Token",
       href: "/launchpad",
       icon: Rocket,
       description: "Deploy new tokens & lending vaults",
@@ -32,47 +32,58 @@ export const LaunchpadNav = () => {
       href: "/protocol",
       icon: Sparkles,
       description: "Live contract custody & pool seeding",
+      mobileOnly: true,
     },
     {
       name: "VIP Staking",
       href: "/stake",
       icon: ShieldCheck,
       description: "Fee discounts & single-sided staking",
+      mobileOnly: true,
     },
     {
       name: "Arbitrage Studio",
       href: "/arbitrage/matrix",
       icon: Zap,
       description: "Triangular & Flash Loan Arbitrage",
+      mobileOnly: true,
     },
   ];
 
   return (
-    <div className="mb-6 flex flex-wrap items-center gap-2 rounded-2xl border border-purple-100 bg-white/70 p-2 shadow-sm backdrop-blur-md">
+    <nav
+      aria-label="Token Studio"
+      className="mb-6 flex flex-wrap items-center gap-2 rounded-2xl border border-purple-100 bg-white/70 p-2 shadow-sm backdrop-blur-md"
+    >
       {navItems.map((item) => {
         const Icon = item.icon;
         const isActive =
           location.pathname === item.href ||
           (item.href === "/launchpad" && location.pathname === "/create-token") ||
+          (item.href === "/launchpad" &&
+            /^\/launchpad\/(identity|purpose|liquidity|review)\/?$/.test(location.pathname)) ||
           (item.href.startsWith("/arbitrage") && location.pathname.startsWith("/arbitrage"));
 
         return (
-          <Link key={item.name} to={item.href}>
-            <Button
-              variant={isActive ? "default" : "ghost"}
-              size="sm"
-              className={
-                isActive
-                  ? "bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 font-bold text-white shadow-sm hover:from-purple-700 hover:to-pink-700"
-                  : "font-semibold text-slate-600 hover:bg-purple-50 hover:text-purple-700"
-              }
-            >
+          <Button
+            key={item.name}
+            asChild
+            variant={isActive ? "default" : "ghost"}
+            size="sm"
+            className={
+              (item.mobileOnly ? "md:hidden " : "") +
+              (isActive
+                ? "bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 font-bold text-white shadow-sm hover:from-purple-700 hover:to-pink-700"
+                : "font-semibold text-slate-600 hover:bg-purple-50 hover:text-purple-700")
+            }
+          >
+            <Link to={item.href} aria-current={isActive ? "page" : undefined}>
               <Icon className="mr-1.5 size-4" />
               {item.name}
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         );
       })}
-    </div>
+    </nav>
   );
 };

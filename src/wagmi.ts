@@ -9,9 +9,9 @@ import type { Config } from "wagmi";
 
 // ---------- ENV ----------
 const ALCHEMY_API_KEY = import.meta.env.VITE_ALCHEMY_API_KEY as string | undefined;
-const WALLETCONNECT_PROJECT_ID = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID as
-  | string
-  | undefined;
+const WALLETCONNECT_PROJECT_ID =
+  (import.meta.env.VITE_WALLETCONNECT_PROJECT_ID as string | undefined) ||
+  "201e649b61c74e9bd7ed7f414b5976f2";
 const APP_NAME = (import.meta.env.VITE_APP_NAME as string | undefined) || "Shaggy Dogg DEX";
 
 // ---------- CHAINS ----------
@@ -82,13 +82,14 @@ const createTransport = (network: string) => {
 
 // ---------- CONNECTORS ----------
 const connectors = [
+  injected({ target: "metaMask", shimDisconnect: true }),
+  injected({ shimDisconnect: true }), // MetaMask extension + other injected wallets
   metaMask({
     dappMetadata: {
       name: APP_NAME,
       url: typeof window !== "undefined" ? window.location.origin : "http://localhost:5173",
     },
   }),
-  injected({ shimDisconnect: true }), // Other injected wallets
   coinbaseWallet({
     appName: APP_NAME,
     preference: "smartWalletOnly",

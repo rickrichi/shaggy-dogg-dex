@@ -1,0 +1,80 @@
+Here's a plain overview, not legal advice. Which of these apply depends heavily on where you and your users are, so a crypto or securities lawyer is the right person to sort it out.
+
+1. Securities and investment rules
+- The "10% of net arbitrage profit to AMUTT stakers" panel is the biggest flag. People putting tokens in expecting profit from your work is the pattern regulators look at, even when the text says "proposed, not live."
+- The staking tiers and the yield vault raise similar questions, such as pooled deposits and return expectations.
+=================================
+2. Money-services and licensing rules
+- Some jurisdictions treat running a swap, deposit, or yield interface as a regulated money or asset service, especially if you control any part of it or take fees. A fee or discount system you administer can strengthen that argument.
+=================================
+3. Sanctions and anti-money-laundering
+- A public swap and token launcher with no screening can be used by sanctioned addresses. Regulators have pursued frontends and developers, not only the underlying contracts.
+- Some countries also have rules about who may be served at all.
+================================
+4. Token launchpad exposure
+- Letting anyone create and seed tokens means scam or rug-pull tokens can appear under your brand. That brings fraud, consumer-protection, and takedown pressure.
+- Also consider impersonation, trademarked names or logos in tokens, and copyright in token images and lists.
+=================================
+5. Misrepresentation and consumer protection
+- Claims like "yield", "profit share", "safe", or "audited" must be accurate. Your own docs reference an audit candidate, and the site currently hosts unaudited contracts.
+- Users losing funds to a contract bug is a common source of claims.
+=================================
+6. Privacy and data
+- You use analytics and Supabase. GDPR (EU/UK), CCPA (California), and similar laws expect a privacy policy, a lawful basis, and consent for tracking. The site currently has none visible.
+==================================
+7. Missing paperwork
+- No Terms of Use, risk disclosure, or disclaimers are visible. These don't make you immune, but their absence weakens your position.
+==================================
+8. Personal liability and structure
+- Operating as an individual can expose personal assets. People commonly use a legal entity, though the right form is a legal question.
+==================================
+9. Tax
+- Fee income, token holdings, and any distributions you make have tax consequences for you. Users' trades do too, and some jurisdictions expect platforms to help report them.
+===================================
+10. Third-party terms
+- Vercel's free plan is for non-commercial use. Exchange, RPC, and 0x API terms may restrict commercial or redistributed use of their data.
+
+You don't have to move everything at once. Here is how to switch each piece, in the order I'd do it. Plans and prices change, so confirm each on the provider's pricing and terms page.
+
+1. Vercel (the one with a clear commercial restriction)
+- Go to vercel.com → your team → Settings → Billing (or the Upgrade button) and choose Pro. It's a per-seat monthly fee, roughly $20 per user at last check.
+- Nothing about your project changes. Same domain, same deploys, no redeploy needed.
+- Do this before you earn any fees from the site.
+
+2. Render (API and market-data)
+- The free tier doesn't have the same restriction, but it sleeps and cold-starts.
+- To fix both at once, open each service → Settings → Instance Type and pick a paid one (Starter, a few dollars per month). It stays awake, and the "warming up" problem mostly disappears.
+
+3. RPC provider (Alchemy)
+- Alchemy's free tier is usable in production within its limits. The paid tiers add capacity and support.
+- You don't switch anything in the code. Upgrade the plan on the same app, which keeps the same key URL.
+- Also restrict the key to dex.lumsian.com in their dashboard, as discussed earlier.
+
+4. 0x (swap routing)
+- 0x ties commercial use to its plans, and its fee and revenue-share terms matter once you route trades. Read their current terms and pricing page.
+- You'd register your app there, and the plan determines what you may charge or collect.
+
+5. Price data
+- Your market-data service reads public exchange order books (Coinbase, Kraken, Bitstamp, Gemini, OKX, Binance.US). Exchanges' public APIs have terms about commercial use and redistributing their data. Some allow display with attribution and others don't.
+- The usual commercial alternatives are a paid data provider (CoinGecko API, CoinMarketCap, Kaiko, CoinAPI) or on-chain oracles such as Chainlink. Switching means changing the market-data service, which I can do when you pick one.
+
+6. Supabase
+- The free tier is OK to start. Pro is around $25 per month if you need backups, higher limits, or support.
+
+Cheapest sensible path while pre-revenue
+1. Keep Render, Alchemy, and Supabase on free.
+2. Move Vercel to Pro before the first fee or staking activity.
+3. Read each exchange's and 0x's terms, then decide whether to keep your own order-book prices or buy a data feed.
+======================================
+======================================
+======================================
+
+
+What to bring to a lawyer
+- Screenshots of /stake and /protocol, the contract list, and your repo's SECURITY.md.
+- A summary of who admins the contracts, which is currently the wallet 0x9dc0…7c98.
+- Where you live and where you expect users to be.
+
+A reasonable holding position
+
+While you wait, you could turn on Vercel's Deployment Protection, so the site is private to you. Otherwise the site stays public with a staking profit-share panel and yield vault visible. That choice is yours to weigh. Get some sleep, and ping me when you're back.
