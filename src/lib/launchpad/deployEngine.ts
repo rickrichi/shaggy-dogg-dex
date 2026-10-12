@@ -1,7 +1,12 @@
-// src/lib/launchpad/deployEngine.ts
-import { type Address, parseEther, parseUnits, type PublicClient, type WalletClient } from "viem";
+import { parseAbi, type Address, parseEther, parseUnits, type PublicClient, type WalletClient } from "viem";
 
 import { ERC20_ABI, UNISWAP_V2_ROUTER_ABI } from "@/config/abis";
+import {
+  encodeSqrtPriceX96,
+  getFullRangeTicks,
+  NONFUNGIBLE_POSITION_MANAGER_ABI,
+  sortTokens,
+} from "@/lib/amm/uniswap-v3";
 
 import { LAUNCHPAD_ARTIFACTS } from "./artifacts";
 import { CANONICAL_BASE_CONTRACTS, DEX_VENUES } from "./constants";
@@ -187,39 +192,122 @@ export async function executeLaunchpadDeployment(
       const tokenPercent = Math.min(Math.max(form.initialTokenLiquidityPercent || 50, 1), 100);
       const tokenAmount = (supplyUnits * BigInt(tokenPercent)) / 100n;
 
-      console.log(
-        `[Launchpad] Approving ${venue.name} router for ${tokenAmount.toString()} tokens...`
-      );
-      const approveHash = await walletClient.writeContract({
-        address: tokenAddress,
-        abi: ERC20_ABI,
-        functionName: "approve",
-        args: [router, tokenAmount],
-        account: userAddress,
-        chain: activeChain,
-      });
-      await publicClient.waitForTransactionReceipt({ hash: approveHash });
+      if (venue.id === "uniswap_v3") {
+        console.log(`[Launchpad] Initializing & Minting Uniswap V3 Pool...`);
+        const posMgr = CANONICAL_BASE_CONTRACTS.UniswapV3PositionManager;
+        const [token0, token1] = sortTokens(CANONICAL_BASE_CONTRACTS.WETH, tokenAddress);
+        const isToken0Weth = token0.toLowerCase() === CANONICAL_BASE_CONTRACTS.WETH.toLowerCase();
+        const amount0 = isToken0Weth ? ethAmount : tokenAmount;
+        const amount1 = isToken0Weth ? tokenAmount : ethAmount;
+        const sqrtPriceX96 = encodeSqrtPriceX96(amount0, amount1);
+        const feeTier = 10000; // 1% for community tokens
 
-      console.log(`[Launchpad] Adding initial liquidity to ${venue.name}...`);
-      const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200); // 20 mins
-      const liqHash = await walletClient.writeContract({
-        address: router,
-        abi: UNISWAP_V2_ROUTER_ABI,
-        functionName: "addLiquidityETH",
-        args: [
-          tokenAddress,
-          tokenAmount,
-          (tokenAmount * 95n) / 100n, // 5% slippage floor for initial seed
-          (ethAmount * 95n) / 100n,
-          recipient,
-          deadline,
-        ],
-        value: ethAmount,
-        account: userAddress,
-        chain: activeChain,
-      });
-      await publicClient.waitForTransactionReceipt({ hash: liqHash });
-      console.log(`[Launchpad] Liquidity added successfully to ${venue.name}!`);
+        // 1. Wrap ETH to WETH
+        const wrapAbi = parseAbi(["function deposit() payable"]);
+        const wrapTx = await walletClient.writeContract({
+          address: CANONICAL_BASE_CONTRACTS.WETH,
+          abi: wrapAbi,
+          functionName: "deposit",
+          value: ethAmount,
+          account: userAddress,
+          chain: activeChain,
+        });
+        await publicClient.waitForTransactionReceipt({ hash: wrapTx });
+
+        // 2. Initialize V3 Pool if needed
+        const initTx = await walletClient.writeContract({
+          address: posMgr,
+          abi: NONFUNGIBLE_POSITION_MANAGER_ABI,
+          functionName: "createAndInitializePoolIfNecessary",
+          args: [token0, token1, feeTier, sqrtPriceX96],
+          account: userAddress,
+          chain: activeChain,
+        });
+        await publicClient.waitForTransactionReceipt({ hash: initTx });
+
+        // 3. Approve WETH & Token for Position Manager
+        const approveToken = await walletClient.writeContract({
+          address: tokenAddress,
+          abi: ERC20_ABI,
+          functionName: "approve",
+          args: [posMgr, tokenAmount],
+          account: userAddress,
+          chain: activeChain,
+        });
+        await publicClient.waitForTransactionReceipt({ hash: approveToken });
+
+        const approveWeth = await walletClient.writeContract({
+          address: CANONICAL_BASE_CONTRACTS.WETH,
+          abi: ERC20_ABI,
+          functionName: "approve",
+          args: [posMgr, ethAmount],
+          account: userAddress,
+          chain: activeChain,
+        });
+        await publicClient.waitForTransactionReceipt({ hash: approveWeth });
+
+        // 4. Mint Full Range Position
+        const { tickLower, tickUpper } = getFullRangeTicks(feeTier);
+        const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200);
+        const mintTx = await walletClient.writeContract({
+          address: posMgr,
+          abi: NONFUNGIBLE_POSITION_MANAGER_ABI,
+          functionName: "mint",
+          args: [
+            {
+              token0,
+              token1,
+              fee: feeTier,
+              tickLower,
+              tickUpper,
+              amount0Desired: amount0,
+              amount1Desired: amount1,
+              amount0Min: 0n,
+              amount1Min: 0n,
+              recipient,
+              deadline,
+            },
+          ],
+          account: userAddress,
+          chain: activeChain,
+        });
+        await publicClient.waitForTransactionReceipt({ hash: mintTx });
+        console.log(`[Launchpad] Uniswap V3 position minted successfully!`);
+      } else {
+        console.log(
+          `[Launchpad] Approving ${venue.name} router for ${tokenAmount.toString()} tokens...`
+        );
+        const approveHash = await walletClient.writeContract({
+          address: tokenAddress,
+          abi: ERC20_ABI,
+          functionName: "approve",
+          args: [router, tokenAmount],
+          account: userAddress,
+          chain: activeChain,
+        });
+        await publicClient.waitForTransactionReceipt({ hash: approveHash });
+
+        console.log(`[Launchpad] Adding initial liquidity to ${venue.name}...`);
+        const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200); // 20 mins
+        const liqHash = await walletClient.writeContract({
+          address: router,
+          abi: UNISWAP_V2_ROUTER_ABI,
+          functionName: "addLiquidityETH",
+          args: [
+            tokenAddress,
+            tokenAmount,
+            (tokenAmount * 95n) / 100n, // 5% slippage floor for initial seed
+            (ethAmount * 95n) / 100n,
+            recipient,
+            deadline,
+          ],
+          value: ethAmount,
+          account: userAddress,
+          chain: activeChain,
+        });
+        await publicClient.waitForTransactionReceipt({ hash: liqHash });
+        console.log(`[Launchpad] Liquidity added successfully to ${venue.name}!`);
+      }
     } catch (seedErr) {
       console.warn("[Launchpad] Liquidity seeding warning (token is already deployed):", seedErr);
     }

@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { type Address, parseEther, parseUnits } from "viem";
-import { useAccount, usePublicClient, useWalletClient } from "wagmi";
+import { useAccount, usePublicClient, useReadContract, useWalletClient } from "wagmi";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -29,17 +29,57 @@ import { LAUNCHPAD_ARTIFACTS } from "@/lib/launchpad/artifacts";
 import { CANONICAL_BASE_CONTRACTS } from "@/lib/launchpad/constants";
 
 export const AMUTT_DEPLOYMENT = {
+  tokenSymbol: "AMUTT",
   tokenAddress: "0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7" as Address,
   stakingAddress: "0x055BB4eD8d5464C25D71391E940ce53CA30845fC" as Address,
-  yieldVaultAddress: "0x16a1E9c10B913912b7B7df4649D9596D95ce33E6" as Address,
+  yieldVaultAddress: "0x5c98f6bc9d17ba0eb02e1336bdf035938f5859e5" as Address,
   flashBorrowerAddress: "0x936a3D52c3037848879F3641dfBc9132aAe51bDF" as Address,
   uniswapRouterAddress: CANONICAL_BASE_CONTRACTS.UniswapV2Router,
 };
+
+// Read-only access-control getters on the FeeDiscountStaking contract. The operator tools below
+// are shown only to these wallets; the contract itself enforces who may actually transact.
+const OPERATOR_ABI = [
+  {
+    type: "function",
+    name: "admin",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "address" }],
+  },
+  {
+    type: "function",
+    name: "tierAdmin",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "address" }],
+  },
+] as const;
 
 export function ActiveProtocolManager() {
   const { address, isConnected, chainId } = useAccount();
   const { data: walletClient } = useWalletClient();
   const publicClient = usePublicClient();
+
+  // Operator gate: only the staking contract's admin / tierAdmin see the owner-only tools.
+  const { data: contractAdmin } = useReadContract({
+    abi: OPERATOR_ABI,
+    address: AMUTT_DEPLOYMENT.stakingAddress,
+    functionName: "admin",
+    chainId: 8453,
+  });
+  const { data: contractTierAdmin } = useReadContract({
+    abi: OPERATOR_ABI,
+    address: AMUTT_DEPLOYMENT.stakingAddress,
+    functionName: "tierAdmin",
+    chainId: 8453,
+  });
+  const isOperator =
+    isConnected &&
+    !!address &&
+    [contractAdmin, contractTierAdmin].some(
+      (operator) => !!operator && operator.toLowerCase() === address.toLowerCase()
+    );
 
   // Liquidity Seeding State
   const [ethAmount, setEthAmount] = useState<string>("0.0005");
@@ -166,42 +206,49 @@ export function ActiveProtocolManager() {
   // Action 3: One-Click Import Token into MetaMask (EIP-747)
   // ────────────────────────────────────────────────────────────────────────────
   const handleWatchToken = async () => {
+    interface Eip1193 {
+      request: (args: { method: string; params?: unknown }) => Promise<unknown>;
+    }
+    const ethereum = (window as unknown as { ethereum?: Eip1193 }).ethereum;
+    const symbol = AMUTT_DEPLOYMENT.tokenSymbol;
+    const asset = {
+      type: "ERC20" as const,
+      options: { address: AMUTT_DEPLOYMENT.tokenAddress, symbol, decimals: 18 },
+    };
+
     try {
-      if (walletClient) {
-        await walletClient.watchAsset({
-          type: "ERC20",
-          options: {
-            address: AMUTT_DEPLOYMENT.tokenAddress,
-            symbol: "AMUTT",
-            decimals: 18,
-          },
-        });
-        toast.success("Astro Mutt (AMUTT) added to MetaMask!");
+      if (!ethereum) {
+        if (!walletClient) {
+          toast.error(
+            "No browser wallet found. Install MetaMask, or open this page in your wallet's browser."
+          );
+          return;
+        }
+        await walletClient.watchAsset(asset);
+        toast.success("Token added to your wallet.");
         return;
       }
 
-      const ethereum = (
-        window as unknown as { ethereum?: { request: (args: unknown) => Promise<unknown> } }
-      ).ethereum;
-      if (!ethereum) {
-        toast.error("MetaMask provider not found.");
-        return;
+      // Wallets add tokens to the *current* network and verify the contract there,
+      // so make sure the wallet is on Base (0x2105) first.
+      const chainHex = (await ethereum.request({ method: "eth_chainId" })) as string;
+      if (chainHex?.toLowerCase() !== "0x2105") {
+        await ethereum.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: "0x2105" }],
+        });
       }
-      await ethereum.request({
-        method: "wallet_watchAsset",
-        params: {
-          type: "ERC20",
-          options: {
-            address: AMUTT_DEPLOYMENT.tokenAddress,
-            symbol: "AMUTT",
-            decimals: 18,
-          },
-        },
-      });
-      toast.success("Astro Mutt (AMUTT) added to MetaMask!");
+
+      const added = await ethereum.request({ method: "wallet_watchAsset", params: asset });
+      if (added) {
+        toast.success("Token added to your wallet.");
+      } else {
+        toast.info("The wallet dismissed the request. The token was not added.");
+      }
     } catch (err: unknown) {
       console.error(err);
-      toast.error(err instanceof Error ? err.message : "Failed to add token to MetaMask.");
+      const message = err instanceof Error ? err.message : "Failed to add token to your wallet.";
+      toast.error(message);
     }
   };
 
@@ -306,7 +353,7 @@ export function ActiveProtocolManager() {
             onClick={handleWatchToken}
             className="bg-purple-700 text-xs font-bold text-white shadow-sm hover:bg-purple-800"
           >
-            Add AMUTT to MetaMask
+            Add token to MetaMask
           </Button>
         </div>
       </CardHeader>
@@ -367,259 +414,289 @@ export function ActiveProtocolManager() {
           </div>
         </div>
 
-        {/* ── OPERATION A: SEED LIQUIDITY ── */}
-        <div className="space-y-4 rounded-xl border border-blue-200 bg-blue-50/40 p-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Droplets className="size-5 text-blue-600" />
-              <h3 className="text-base font-bold text-gray-900">
-                Step 1: Initialize Uniswap V2 Pool
-              </h3>
-            </div>
-            <Badge className="border-blue-200 bg-blue-100 text-blue-800">
-              50M AMUTT Pre-Approved
-            </Badge>
-          </div>
-          <p className="text-xs leading-relaxed text-gray-600">
-            Your 50,000,000 AMUTT allowance is already approved to the Uniswap V2 Router. Enter an
-            initial ETH amount within your balance (e.g. 0.0005 ETH) to pair with AMUTT and launch
-            the trading market.
-          </p>
+        {/* Owner-only tools: shown to the protocol admin wallet; the contract enforces access. */}
+        {isOperator ? (
+          <>
+            {/* ── OPERATION A: SEED LIQUIDITY ── */}
+            <div className="space-y-4 rounded-xl border border-blue-200 bg-blue-50/40 p-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Droplets className="size-5 text-blue-600" />
+                  <h3 className="text-base font-bold text-gray-900">
+                    Step 1: Initialize Uniswap V2 Pool
+                  </h3>
+                </div>
+                <Badge className="border-blue-200 bg-blue-100 text-blue-800">
+                  50M AMUTT Pre-Approved
+                </Badge>
+              </div>
+              <p className="text-xs leading-relaxed text-gray-600">
+                Your 50,000,000 AMUTT allowance is already approved to the Uniswap V2 Router. Enter
+                an initial ETH amount within your balance (e.g. 0.0005 ETH) to pair with AMUTT and
+                launch the trading market.
+              </p>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="ethAmount" className="text-xs font-semibold text-gray-700">
-                ETH Liquidity Amount
-              </Label>
-              <Input
-                id="ethAmount"
-                value={ethAmount}
-                onChange={(e) => setEthAmount(e.target.value)}
-                placeholder="0.0005"
-                className="bg-white"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="tokenAmount" className="text-xs font-semibold text-gray-700">
-                AMUTT Amount
-              </Label>
-              <Input
-                id="tokenAmount"
-                value={tokenAmount}
-                onChange={(e) => setTokenAmount(e.target.value)}
-                placeholder="50000000"
-                className="bg-white"
-              />
-            </div>
-          </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="ethAmount" className="text-xs font-semibold text-gray-700">
+                    ETH Liquidity Amount
+                  </Label>
+                  <Input
+                    id="ethAmount"
+                    value={ethAmount}
+                    onChange={(e) => setEthAmount(e.target.value)}
+                    placeholder="0.0005"
+                    className="bg-white"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="tokenAmount" className="text-xs font-semibold text-gray-700">
+                    AMUTT Amount
+                  </Label>
+                  <Input
+                    id="tokenAmount"
+                    value={tokenAmount}
+                    onChange={(e) => setTokenAmount(e.target.value)}
+                    placeholder="50000000"
+                    className="bg-white"
+                  />
+                </div>
+              </div>
 
-          <Button
-            onClick={handleAddLiquidity}
-            disabled={isSeeding || !isConnected || chainId !== 8453}
-            className="w-full bg-blue-600 font-bold text-white hover:bg-blue-700 sm:w-auto"
-          >
-            {isSeeding ? (
-              <>
-                <Loader2 className="mr-2 size-4 animate-spin" />
-                Seeding Uniswap V2 Pool...
-              </>
-            ) : (
-              <>
-                <Droplets className="mr-2 size-4" />
-                Initialize Liquidity with MetaMask
-              </>
-            )}
-          </Button>
+              <Button
+                onClick={handleAddLiquidity}
+                disabled={isSeeding || !isConnected || chainId !== 8453}
+                className="w-full bg-blue-600 font-bold text-white hover:bg-blue-700 sm:w-auto"
+              >
+                {isSeeding ? (
+                  <>
+                    <Loader2 className="mr-2 size-4 animate-spin" />
+                    Seeding Uniswap V2 Pool...
+                  </>
+                ) : (
+                  <>
+                    <Droplets className="mr-2 size-4" />
+                    Initialize Liquidity with MetaMask
+                  </>
+                )}
+              </Button>
 
-          {seedTxHash && (
-            <Alert className="border-blue-300 bg-white text-blue-950">
-              <CheckCircle2 className="size-4 text-blue-600" />
-              <AlertTitle className="text-sm font-bold">Uniswap V2 Pair Live!</AlertTitle>
-              <AlertDescription className="text-xs">
-                Transaction confirmed:{" "}
-                <a
-                  href={`https://basescan.org/tx/${seedTxHash}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-mono text-blue-700 underline"
-                >
-                  {seedTxHash}
-                </a>
-              </AlertDescription>
-            </Alert>
-          )}
-        </div>
+              {seedTxHash && (
+                <Alert className="border-blue-300 bg-white text-blue-950">
+                  <CheckCircle2 className="size-4 text-blue-600" />
+                  <AlertTitle className="text-sm font-bold">Uniswap V2 Pair Live!</AlertTitle>
+                  <AlertDescription className="text-xs">
+                    Transaction confirmed:{" "}
+                    <a
+                      href={`https://basescan.org/tx/${seedTxHash}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-mono text-blue-700 underline"
+                    >
+                      {seedTxHash}
+                    </a>
+                  </AlertDescription>
+                </Alert>
+              )}
 
-        {/* ── OPERATION B: CONFIGURE VIP STAKING TIERS ── */}
-        <div className="space-y-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="size-5 text-indigo-600" />
-              <h3 className="text-base font-bold text-gray-900">
-                Step 3: Activate VIP Staking Tiers
-              </h3>
-            </div>
-            <Badge className="border-indigo-200 bg-indigo-100 text-indigo-800">
-              Fee Discount Loyalty
-            </Badge>
-          </div>
-          <p className="text-xs leading-relaxed text-gray-600">
-            Configure the 4 VIP loyalty tiers on your FeeDiscountStaking contract to grant fee
-            discounts to AMUTT stakers.
-          </p>
-
-          <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
-            <div className="rounded-lg border border-indigo-100 bg-white p-2.5">
-              <span className="font-semibold text-gray-700">Tier 1: Bronze</span>
-              <p className="mt-0.5 font-bold text-gray-900">10,000 AMUTT</p>
-              <p className="text-[11px] font-medium text-indigo-600">5% Fee Discount</p>
-            </div>
-            <div className="rounded-lg border border-indigo-100 bg-white p-2.5">
-              <span className="font-semibold text-gray-700">Tier 2: Silver</span>
-              <p className="mt-0.5 font-bold text-gray-900">50,000 AMUTT</p>
-              <p className="text-[11px] font-medium text-indigo-600">10% Fee Discount</p>
-            </div>
-            <div className="rounded-lg border border-indigo-100 bg-white p-2.5">
-              <span className="font-semibold text-gray-700">Tier 3: Gold</span>
-              <p className="mt-0.5 font-bold text-gray-900">200,000 AMUTT</p>
-              <p className="text-[11px] font-medium text-indigo-600">20% Fee Discount</p>
-            </div>
-            <div className="rounded-lg border border-indigo-100 bg-white p-2.5">
-              <span className="font-semibold text-gray-700">Tier 4: Diamond</span>
-              <p className="mt-0.5 font-bold text-gray-900">1,000,000 AMUTT</p>
-              <p className="text-[11px] font-medium text-indigo-600">30% Fee Discount</p>
-            </div>
-          </div>
-
-          <Button
-            onClick={handleConfigureTiers}
-            disabled={isSettingTiers || !isConnected || chainId !== 8453}
-            className="w-full bg-indigo-600 font-bold text-white hover:bg-indigo-700 sm:w-auto"
-          >
-            {isSettingTiers ? (
-              <>
-                <Loader2 className="mr-2 size-4 animate-spin" />
-                Configuring Staking Tiers...
-              </>
-            ) : (
-              <>
-                <ShieldCheck className="mr-2 size-4" />
-                Activate 4 VIP Tiers with MetaMask
-              </>
-            )}
-          </Button>
-
-          {tiersTxHash && (
-            <Alert className="border-indigo-300 bg-white text-indigo-950">
-              <CheckCircle2 className="size-4 text-indigo-600" />
-              <AlertTitle className="text-sm font-bold">Staking Tiers Activated!</AlertTitle>
-              <AlertDescription className="text-xs">
-                Transaction confirmed:{" "}
-                <a
-                  href={`https://basescan.org/tx/${tiersTxHash}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-mono text-indigo-700 underline"
-                >
-                  {tiersTxHash}
-                </a>
-              </AlertDescription>
-            </Alert>
-          )}
-        </div>
-
-        {/* ── OPERATION: INITIAL MARKET TRADE ── */}
-        <div className="space-y-4 rounded-xl border border-emerald-200 bg-emerald-50/40 p-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="size-5 text-emerald-600" />
-              <h3 className="text-base font-bold text-gray-900">
-                Step 4: Execute Initial Market Trade (First Buy)
-              </h3>
-            </div>
-            <Badge className="border-emerald-200 bg-emerald-100 text-emerald-800">
-              Live DEX Market Starter
-            </Badge>
-          </div>
-          <p className="text-xs leading-relaxed text-gray-600">
-            Execute the very first trade on your Uniswap V2 AMUTT/WETH pool. Swapping a tiny
-            fraction of ETH (e.g. 0.00005 ETH ≈ $0.13) creates the first on-chain buy, establishes
-            the initial USD price, draws the first candlestick on DexScreener, and activates 24h
-            volume and price on DexScreener! The swap uses a fresh router quote, a 0.5%
-            minimum-output floor, and a two-minute expiry so it cannot execute at an arbitrary
-            price.
-          </p>
-
-          <div className="max-w-xs space-y-1.5">
-            <Label htmlFor="swapEthAmount" className="text-xs font-semibold text-gray-700">
-              ETH Amount to Swap for AMUTT
-            </Label>
-            <Input
-              id="swapEthAmount"
-              value={swapEthAmount}
-              onChange={(e) => setSwapEthAmount(e.target.value)}
-              placeholder="0.00005"
-              className="bg-white"
-            />
-          </div>
-
-          <Button
-            onClick={handleExecuteInitialSwap}
-            disabled={isSwapping || !isConnected || chainId !== 8453}
-            className="w-full bg-emerald-600 font-bold text-white hover:bg-emerald-700 sm:w-auto"
-          >
-            {isSwapping ? (
-              <>
-                <Loader2 className="mr-2 size-4 animate-spin" />
-                Executing Swap on Base...
-              </>
-            ) : (
-              <>
-                <TrendingUp className="mr-2 size-4" />
-                Execute First Buy via MetaMask ({swapEthAmount} ETH)
-              </>
-            )}
-          </Button>
-
-          {swapTxHash && (
-            <Alert className="border-emerald-300 bg-white text-emerald-950">
-              <CheckCircle2 className="size-4 text-emerald-600" />
-              <AlertTitle className="text-sm font-bold">First Market Swap Confirmed!</AlertTitle>
-              <AlertDescription className="mt-1 space-y-2 text-xs">
+              <div className="mt-3 flex items-center justify-between rounded-lg border border-purple-200 bg-purple-50/60 p-3 text-xs text-purple-950">
                 <div>
-                  Transaction hash:{" "}
-                  <a
-                    href={`https://basescan.org/tx/${swapTxHash}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="font-mono text-emerald-700 underline"
-                  >
-                    {swapTxHash}
-                  </a>
+                  <span className="font-bold">Uniswap V3 Upgrade Available: </span>
+                  <span>Migrate AMUTT liquidity to Uniswap V3 concentrated liquidity on Base.</span>
                 </div>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  <a
-                    href="https://dexscreener.com/base/0x581B294FeC1A4332f17cf18B49D68087c09b6784"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center text-xs font-semibold text-purple-700 hover:underline"
-                  >
-                    View on DexScreener <ExternalLink className="ml-1 size-3" />
-                  </a>
-                  <span className="text-gray-300">•</span>
-                  <a
-                    href="https://dexscreener.com/base/0x581B294FeC1A4332f17cf18B49D68087c09b6784"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center text-xs font-semibold text-emerald-700 hover:underline"
-                  >
-                    View on DexScreener <ExternalLink className="ml-1 size-3" />
-                  </a>
+                <Link to="/liquidity?version=migrate&token=AMUTT">
+                  <Button size="sm" variant="outline" className="border-purple-300 bg-white text-xs font-semibold text-purple-700 hover:bg-purple-50">
+                    <Sparkles className="mr-1 size-3.5" /> V3 Migration
+                  </Button>
+                </Link>
+              </div>
+            </div>
+
+            {/* ── OPERATION B: CONFIGURE VIP STAKING TIERS ── */}
+            <div className="space-y-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="size-5 text-indigo-600" />
+                  <h3 className="text-base font-bold text-gray-900">
+                    Step 3: Activate VIP Staking Tiers
+                  </h3>
                 </div>
-              </AlertDescription>
-            </Alert>
-          )}
-        </div>
+                <Badge className="border-indigo-200 bg-indigo-100 text-indigo-800">
+                  Fee Discount Loyalty
+                </Badge>
+              </div>
+              <p className="text-xs leading-relaxed text-gray-600">
+                Configure the 4 VIP loyalty tiers on your FeeDiscountStaking contract to grant fee
+                discounts to AMUTT stakers.
+              </p>
+
+              <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+                <div className="rounded-lg border border-indigo-100 bg-white p-2.5">
+                  <span className="font-semibold text-gray-700">Tier 1: Bronze</span>
+                  <p className="mt-0.5 font-bold text-gray-900">10,000 AMUTT</p>
+                  <p className="text-[11px] font-medium text-indigo-600">5% Fee Discount</p>
+                </div>
+                <div className="rounded-lg border border-indigo-100 bg-white p-2.5">
+                  <span className="font-semibold text-gray-700">Tier 2: Silver</span>
+                  <p className="mt-0.5 font-bold text-gray-900">50,000 AMUTT</p>
+                  <p className="text-[11px] font-medium text-indigo-600">10% Fee Discount</p>
+                </div>
+                <div className="rounded-lg border border-indigo-100 bg-white p-2.5">
+                  <span className="font-semibold text-gray-700">Tier 3: Gold</span>
+                  <p className="mt-0.5 font-bold text-gray-900">200,000 AMUTT</p>
+                  <p className="text-[11px] font-medium text-indigo-600">20% Fee Discount</p>
+                </div>
+                <div className="rounded-lg border border-indigo-100 bg-white p-2.5">
+                  <span className="font-semibold text-gray-700">Tier 4: Diamond</span>
+                  <p className="mt-0.5 font-bold text-gray-900">1,000,000 AMUTT</p>
+                  <p className="text-[11px] font-medium text-indigo-600">30% Fee Discount</p>
+                </div>
+              </div>
+
+              <Button
+                onClick={handleConfigureTiers}
+                disabled={isSettingTiers || !isConnected || chainId !== 8453}
+                className="w-full bg-indigo-600 font-bold text-white hover:bg-indigo-700 sm:w-auto"
+              >
+                {isSettingTiers ? (
+                  <>
+                    <Loader2 className="mr-2 size-4 animate-spin" />
+                    Configuring Staking Tiers...
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="mr-2 size-4" />
+                    Activate 4 VIP Tiers with MetaMask
+                  </>
+                )}
+              </Button>
+
+              {tiersTxHash && (
+                <Alert className="border-indigo-300 bg-white text-indigo-950">
+                  <CheckCircle2 className="size-4 text-indigo-600" />
+                  <AlertTitle className="text-sm font-bold">Staking Tiers Activated!</AlertTitle>
+                  <AlertDescription className="text-xs">
+                    Transaction confirmed:{" "}
+                    <a
+                      href={`https://basescan.org/tx/${tiersTxHash}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-mono text-indigo-700 underline"
+                    >
+                      {tiersTxHash}
+                    </a>
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+
+            {/* ── OPERATION: INITIAL MARKET TRADE ── */}
+            <div className="space-y-4 rounded-xl border border-emerald-200 bg-emerald-50/40 p-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="size-5 text-emerald-600" />
+                  <h3 className="text-base font-bold text-gray-900">
+                    Step 4: Execute Initial Market Trade (First Buy)
+                  </h3>
+                </div>
+                <Badge className="border-emerald-200 bg-emerald-100 text-emerald-800">
+                  Live DEX Market Starter
+                </Badge>
+              </div>
+              <p className="text-xs leading-relaxed text-gray-600">
+                Execute the very first trade on your Uniswap V2 AMUTT/WETH pool. Swapping a tiny
+                fraction of ETH (e.g. 0.00005 ETH ≈ $0.13) creates the first on-chain buy,
+                establishes the initial USD price, draws the first candlestick on DexScreener, and
+                activates 24h volume and price on DexScreener! The swap uses a fresh router quote, a
+                0.5% minimum-output floor, and a two-minute expiry so it cannot execute at an
+                arbitrary price.
+              </p>
+
+              <div className="max-w-xs space-y-1.5">
+                <Label htmlFor="swapEthAmount" className="text-xs font-semibold text-gray-700">
+                  ETH Amount to Swap for AMUTT
+                </Label>
+                <Input
+                  id="swapEthAmount"
+                  value={swapEthAmount}
+                  onChange={(e) => setSwapEthAmount(e.target.value)}
+                  placeholder="0.00005"
+                  className="bg-white"
+                />
+              </div>
+
+              <Button
+                onClick={handleExecuteInitialSwap}
+                disabled={isSwapping || !isConnected || chainId !== 8453}
+                className="w-full bg-emerald-600 font-bold text-white hover:bg-emerald-700 sm:w-auto"
+              >
+                {isSwapping ? (
+                  <>
+                    <Loader2 className="mr-2 size-4 animate-spin" />
+                    Executing Swap on Base...
+                  </>
+                ) : (
+                  <>
+                    <TrendingUp className="mr-2 size-4" />
+                    Execute First Buy via MetaMask ({swapEthAmount} ETH)
+                  </>
+                )}
+              </Button>
+
+              {swapTxHash && (
+                <Alert className="border-emerald-300 bg-white text-emerald-950">
+                  <CheckCircle2 className="size-4 text-emerald-600" />
+                  <AlertTitle className="text-sm font-bold">
+                    First Market Swap Confirmed!
+                  </AlertTitle>
+                  <AlertDescription className="mt-1 space-y-2 text-xs">
+                    <div>
+                      Transaction hash:{" "}
+                      <a
+                        href={`https://basescan.org/tx/${swapTxHash}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-mono text-emerald-700 underline"
+                      >
+                        {swapTxHash}
+                      </a>
+                    </div>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <a
+                        href="https://dexscreener.com/base/0x581B294FeC1A4332f17cf18B49D68087c09b6784"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center text-xs font-semibold text-purple-700 hover:underline"
+                      >
+                        View on DexScreener <ExternalLink className="ml-1 size-3" />
+                      </a>
+                      <span className="text-gray-300">•</span>
+                      <a
+                        href="https://dexscreener.com/base/0x581B294FeC1A4332f17cf18B49D68087c09b6784"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center text-xs font-semibold text-emerald-700 hover:underline"
+                      >
+                        View on DexScreener <ExternalLink className="ml-1 size-3" />
+                      </a>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+          </>
+        ) : (
+          <Alert className="border-slate-300 bg-white text-slate-900">
+            <AlertTitle className="text-sm font-bold">Operator tools</AlertTitle>
+            <AlertDescription className="text-xs">
+              Liquidity seeding, VIP tier activation, and the first market trade are available to
+              the protocol admin wallet only.{" "}
+              {isConnected
+                ? "The connected wallet is not the protocol admin."
+                : "Connect the admin wallet to manage them."}
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Quick Navigation Links */}
         <div className="flex flex-wrap gap-3 pt-2">

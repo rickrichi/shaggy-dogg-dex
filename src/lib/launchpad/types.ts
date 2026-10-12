@@ -11,7 +11,7 @@ export type ArchetypeId =
   | "fluid_hybrid_amm"
   | "full_defi_suite";
 
-export type DexVenueId = "uniswap_v2" | "pancakeswap_v2" | "aerodrome";
+export type DexVenueId = "uniswap_v2" | "uniswap_v3" | "pancakeswap_v2" | "aerodrome";
 
 export type DeploymentExecutionMode = "metamask" | "deployer_worker";
 

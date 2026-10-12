@@ -255,7 +255,8 @@ export const SwapCard = memo<SwapCardProps>(
           {quote.bestVenue && (
             <div className="text-xs text-slate-600">
               <p>
-                Uniswap V2: {quote.uniswapAmountOut ?? "No route"} · Aerodrome:{" "}
+                Uniswap V3: {quote.uniswapV3AmountOut ?? "No route"} · Uniswap V2:{" "}
+                {quote.uniswapAmountOut ?? "No route"} · Aerodrome:{" "}
                 {quote.aerodromeAmountOut ?? "No route"} {state.buyToken.symbol}
               </p>
               <p>

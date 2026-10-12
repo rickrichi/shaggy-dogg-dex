@@ -86,7 +86,7 @@ export default function Launchpad() {
     stakingLockDays: 7,
     earlyUnstakeFeeBps: 100, // 1%
     enableDexSeeding: true,
-    selectedDex: "uniswap_v2",
+    selectedDex: "uniswap_v3",
     pairAsset: "ETH",
     initialEthLiquidity: "0.0005",
     initialTokenLiquidityPercent: 50,

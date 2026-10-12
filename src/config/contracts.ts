@@ -23,5 +23,8 @@ export function getUniswapV2Factory(chainId?: number): Address {
 export const UNISWAP_V3_QUOTER_V2_BASE: Address =
   "0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a";
 
+export const UNISWAP_V3_ROUTER_BASE: Address =
+  "0x2626664c2603336E57B271c5C0b26F421741e481";
+
 export const DEFAULT_SLIPPAGE = 0.5; // percent
 export const SWAP_DEADLINE_BUFFER = 60 * 15; // 15 minutes in seconds
