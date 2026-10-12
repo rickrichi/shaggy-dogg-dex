@@ -1,0 +1,45 @@
+# Files excluded from `vercel deploy` uploads (CLI deploys ignore nothing by default
+# except .gitignore'd paths). The frontend build needs only: src/, public/, api/,
+# index.html, package*.json, and the root config files.
+
+# Docs / notes / screenshots (~160 MB)
+docs/
+documentation/
+audit/
+reports/
+.agents/
+.zencoder/
+shaggyimages/
+shaggy-dogg-sol_files/
+
+# Not part of the web build
+contracts/
+deploy/
+deployments/
+desktop/
+release/
+.desktop-build/
+scripts/
+server/
+supabase/
+coverage/
+dist/
+
+# Never upload local env / key material
+.env
+.env.local
+.env.*.local
+.env.bot
+.env.deployer
+.env.private-routing
+
+# Local tooling
+.claude/
+.github/
+
+# Gitignored build/audit leftovers (CLI uses .vercelignore INSTEAD of .gitignore)
+.remediation-*
+.rpc-*
+*.log
+*.tsbuildinfo
+.env.example.orig

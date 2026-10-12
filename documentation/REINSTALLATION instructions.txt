@@ -1,4 +1,4 @@
-reinstall with npm install (and npm install --prefix server if the backend has its own deps). Keep your lockfiles (package-lock.json/yarn.lock) so reinstalls are reproducible.
+reinstall with npm install (and npm install --prefix server if the backend has its own deps). Keep your lockfiles (package-lock.json) so reinstalls are reproducible.
 
 Give me the start commands for my application, please.
 

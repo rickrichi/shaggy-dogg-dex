@@ -38,13 +38,10 @@ out/
 !.env.example
 
 # ── Package manager lockfiles ────────────────────────────────────────────────
-# Keep EXACTLY ONE lockfile (commit it) depending on your PM:
-# pnpm:
+# This project uses npm: package-lock.json is the one committed lockfile.
+# Ignore other package managers' lockfiles so they can't drift in.
 pnpm-lock.yaml
-# yarn:
-# yarn.lock
-# npm:
-# package-lock.json
+yarn.lock
 
 # If you're standardizing on pnpm, ensure you DO NOT ignore pnpm-lock.yaml.
 # (You had package-lock.json ignored; that's fine if you're not using npm.)
@@ -101,3 +98,6 @@ __pycache__/
 
 # Generated epoch ledger reports (may contain mock data)
 reports/
+
+.vercel
+.env*

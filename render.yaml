@@ -1,0 +1,23 @@
+# Render Blueprint — API only. The market-data service has its own repo/blueprint.
+services:
+  - type: web
+    name: shaggy-dogg-api
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 22.13.0
+      - key: NODE_ENV
+        value: production
+      - key: ORIGIN
+        value: https://dex.lumsian.com
+      # Set after the market-data service is live, e.g. https://shaggy-dogg-market-data.onrender.com
+      - key: MARKET_DATA_URL
+        sync: false
+      # Empty = wallet admin sign-in disabled on the public API.
+      - key: ADMIN_WALLETS
+        value: ""

@@ -17,7 +17,7 @@ Hot Module Replacement (HMR): It supports HMR, allowing for a better development
 Getting Started with React-SWC
 To get started with React-SWC, you can follow these steps:
 
-Install React-SWC: You can install React-SWC using npm or yarn. For example, using npm:
+Install React-SWC: You can install React-SWC using npm. For example:
 
 sh
 

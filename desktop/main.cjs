@@ -28,7 +28,12 @@ else app.whenReady().then(async () => {
   catch { dialog.showErrorBox('Desktop port unavailable', 'Port 5174 is already in use. Close the other process and reopen the app.'); app.quit(); return; }
   window = new BrowserWindow({ width: 1440, height: 960, webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true } });
   window.webContents.setWindowOpenHandler(({ url }) => {
-    if (new URL(url).protocol === 'https:') void shell.openExternal(url);
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol === 'https:' || parsed.hostname === '127.0.0.1' || parsed.hostname === 'localhost') {
+        void shell.openExternal(url);
+      }
+    } catch {}
     return { action: 'deny' };
   });
   window.webContents.on('will-navigate', (event, url) => { if (new URL(url).origin !== origin) event.preventDefault(); });
