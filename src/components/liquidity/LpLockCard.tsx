@@ -92,6 +92,9 @@ export function LpLockCard() {
     functionName: "ownerOf",
     args: [SD_V3_NFT_TOKEN_ID],
     chainId: 8453,
+    query: {
+      refetchInterval: 5_000,
+    },
   });
 
   // 2. Check Timelock Details from Sovereign Contract
@@ -104,6 +107,9 @@ export function LpLockCard() {
     functionName: "getLock",
     args: [SD_V3_NFT_TOKEN_ID],
     chainId: 8453,
+    query: {
+      refetchInterval: 5_000,
+    },
   });
 
   // 3. Check Approval for Timelock Contract
@@ -116,6 +122,9 @@ export function LpLockCard() {
     functionName: "getApproved",
     args: [SD_V3_NFT_TOKEN_ID],
     chainId: 8453,
+    query: {
+      refetchInterval: 5_000,
+    },
   });
 
   const {
@@ -127,6 +136,9 @@ export function LpLockCard() {
     functionName: "isApprovedForAll",
     args: [userAddress ?? "0x0000000000000000000000000000000000000000", SOVEREIGN_V3_TIMELOCK_ADDRESS],
     chainId: 8453,
+    query: {
+      refetchInterval: 10_000,
+    },
   });
 
   // 4. Query Accrued Trading Fees from Position Manager
@@ -139,6 +151,9 @@ export function LpLockCard() {
     functionName: "positions",
     args: [SD_V3_NFT_TOKEN_ID],
     chainId: 8453,
+    query: {
+      refetchInterval: 10_000,
+    },
   });
 
   // Parse lock status
@@ -154,9 +169,10 @@ export function LpLockCard() {
   }, [lockData]);
 
   const isPositionInTimelock = useMemo(() => {
-    if (!nftOwner) return false;
-    return isAddressEqual(nftOwner, SOVEREIGN_V3_TIMELOCK_ADDRESS);
-  }, [nftOwner]);
+    if (lockInfo?.owner && !isAddressEqual(lockInfo.owner, "0x0000000000000000000000000000000000000000")) return true;
+    if (nftOwner && isAddressEqual(nftOwner, SOVEREIGN_V3_TIMELOCK_ADDRESS)) return true;
+    return false;
+  }, [nftOwner, lockInfo]);
 
   const isApproved = useMemo(() => {
     if (isApprovedForAll) return true;
@@ -222,6 +238,7 @@ export function LpLockCard() {
     refetchApproval();
     refetchApprovalAll();
     refetchPositionInfo();
+    toast.info("Refreshed on-chain lock status from Base");
   }, [refetchNftOwner, refetchLock, refetchApproval, refetchApprovalAll, refetchPositionInfo]);
 
   // 1. Approve Sovereign Timelock to take custody of NFT
