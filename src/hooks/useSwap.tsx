@@ -6,7 +6,7 @@ import { type Address, erc20Abi, formatUnits, parseUnits } from "viem";
 import { useAccount, useBalance, usePublicClient, useWalletClient } from "wagmi";
 
 import { DEFAULT_SLIPPAGE, SWAP_DEADLINE_BUFFER } from "@/config/contracts";
-import { type Token } from "@/config/tokens";
+import { matchTokenOnChain, type Token } from "@/config/tokens";
 import { positiveAmount } from "@/lib/amm/own-dex";
 import { getRoutePriceImpact, HIGH_PRICE_IMPACT } from "@/lib/amm/price-impact";
 import { quoteSmartRoutes, routeQuoteCall, routeSwapCall } from "@/lib/amm/smart-routing";
@@ -306,8 +306,26 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
     actions: {
       setSellAmount: (sellAmount) => setState((s) => ({ ...s, sellAmount })),
       setBuyAmount: () => {},
-      setSellToken: (sellToken) => setState((s) => ({ ...s, sellToken, sellAmount: "" })),
-      setBuyToken: (buyToken) => setState((s) => ({ ...s, buyToken })),
+      setSellToken: (sellToken) =>
+        setState((s) => ({
+          ...s,
+          sellToken,
+          buyToken:
+            s.buyToken.chainId === sellToken.chainId && s.buyToken.symbol !== sellToken.symbol
+              ? s.buyToken
+              : matchTokenOnChain(s.buyToken, sellToken),
+          sellAmount: "",
+          buyAmount: "",
+        })),
+      setBuyToken: (buyToken) =>
+        setState((s) => ({
+          ...s,
+          sellToken:
+            s.sellToken.chainId === buyToken.chainId && s.sellToken.symbol !== buyToken.symbol
+              ? s.sellToken
+              : matchTokenOnChain(s.sellToken, buyToken),
+          buyToken,
+        })),
       setSlippage: (slippage) => {
         if (Number.isFinite(slippage) && slippage >= 0 && slippage <= 10)
           setState((s) => ({ ...s, slippage }));

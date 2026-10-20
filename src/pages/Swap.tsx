@@ -13,7 +13,12 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { isSwapChain } from "@/config/contracts";
-import { getTokensForChain, isErc20Token, type Token } from "@/config/tokens";
+import {
+  getSwapDropdownTokens,
+  getTokensForChain,
+  isErc20Token,
+  type Token,
+} from "@/config/tokens";
 import { useSwap } from "@/hooks/useSwap";
 import { fetchPrices } from "@/lib/api/prices";
 
@@ -74,7 +79,7 @@ function parseTradeMode(param: string | null): TradeMode {
  * Get initial token from URL param or fallback to index
  */
 function getInitialToken(param: string | null, fallbackIndex: number, chainId?: number): Token {
-  const chainTokens = getTokensForChain(chainId);
+  const chainTokens = getSwapDropdownTokens(chainId);
   const fallback = chainTokens[fallbackIndex] ?? chainTokens[0];
   if (!fallback) {
     throw new Error("Tokens list must include at least one token");
@@ -97,6 +102,7 @@ function getInitialToken(param: string | null, fallbackIndex: number, chainId?: 
       avax: "uavax",
       near: "unear",
       atom: "uatom",
+      xtz: "wxtz",
       zec: "uzec",
       loop: "lrc",
     }[normalized] ?? normalized;
@@ -139,7 +145,6 @@ export default function Swap() {
   const { data: gasPrice } = useGasPrice({ chainId: chain?.id ?? 8453 });
   const { isPending: isSwitchingChain, switchChain } = useSwitchChain();
   const [searchParams, setSearchParams] = useSearchParams();
-  const isCorrectNetwork = !isConnected || isSwapChain(chain?.id);
 
   // ────────────────────────────────────────────────────────────────────────────
   // URL State Management
@@ -177,7 +182,7 @@ export default function Swap() {
   // Token Selection Logic
   // ────────────────────────────────────────────────────────────────────────────
 
-  const chainTokens = useMemo(() => getTokensForChain(chain?.id ?? 8453), [chain?.id]);
+  const chainTokens = useMemo(() => getSwapDropdownTokens(chain?.id ?? 8453), [chain?.id]);
 
   const baseTokens = useMemo(
     () => ({
@@ -392,9 +397,15 @@ export default function Swap() {
                     <SwapCard
                       swap={swapInstances[tabMode]}
                       tokens={chainTokens}
-                      isCorrectNetwork={isCorrectNetwork}
+                      isCorrectNetwork={
+                        !isConnected ||
+                        (isSwapChain(chain?.id) &&
+                          chain?.id === swapInstances[tabMode].state.sellToken.chainId)
+                      }
                       isSwitchingNetwork={isSwitchingChain}
-                      onSwitchNetwork={() => switchChain({ chainId: 8453 })}
+                      onSwitchNetwork={() =>
+                        switchChain({ chainId: swapInstances[tabMode].state.sellToken.chainId })
+                      }
                       showSettings={showSettings}
                       onSettingsChange={setShowSettings}
                     />

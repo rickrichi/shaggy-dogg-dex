@@ -830,10 +830,26 @@ export const BASE_MAINNET_TOKENS = [
   },
   {
     kind: "erc20",
+    address: "0x91F9CC2649AC70A071602cadE9b0c1A5868Af51d" as Address,
+    symbol: "WXTZ",
+    name: "Tezos (Wrapped XTZ)",
+    decimals: 18,
+    chainId: 8453,
+  },
+  {
+    kind: "erc20",
     address: "0x2416092f143378750bb29b79eD961ab195CcEea5" as Address,
     symbol: "uZEC",
     name: "Zcash (Universal)",
     decimals: 18,
+    chainId: 8453,
+  },
+  {
+    kind: "erc20",
+    address: "0xb2000000000000000000008501B13360000cb2EC" as Address,
+    symbol: "cbZEC",
+    name: "Zcash (Coinbase Wrapped)",
+    decimals: 8,
     chainId: 8453,
   },
   {
@@ -950,6 +966,160 @@ export function getTokensForChain(chainId?: number): readonly [Token, Token, ...
     default:
       return MAINNET_TOKENS;
   }
+}
+
+const DROPDOWN_SYMBOL_ORDER: readonly string[] = [
+  "ETH",
+  "AMUTT",
+  "SD",
+  "FBA",
+  "USDC",
+  "USDT",
+  "DAI",
+  "cbBTC",
+  "WBTC",
+  "uSOL",
+  "SOL",
+  "BNB",
+  "cbXRP",
+  "cbADA",
+  "TRX",
+  "uAVAX",
+  "uNEAR",
+  "NEAR",
+  "LINK",
+  "uATOM",
+  "ICP",
+  "INJ",
+  "FTM",
+  "WXTZ",
+  "uZEC",
+  "cbZEC",
+  "UNI",
+  "AAVE",
+  "MKR",
+  "LDO",
+  "CRV",
+  "COMP",
+  "SNX",
+  "RUNE",
+  "CAKE",
+  "ENA",
+  "SKY",
+  "BGB",
+  "OKB",
+  "KCS",
+  "YFI",
+  "1INCH",
+  "FXS",
+  "DYDX",
+  "RPL",
+  "ARB",
+  "MATIC",
+  "POL",
+  "MNT",
+  "IMX",
+  "STRK",
+  "METIS",
+  "LRC",
+  "GRT",
+  "QNT",
+  "ANKR",
+  "LPT",
+  "WLD",
+  "TAO",
+  "FET",
+  "RNDR",
+  "GLM",
+  "ONDO",
+  "XAUT",
+  "PAXG",
+  "WLFI",
+  "BEAM",
+  "SAND",
+  "MANA",
+  "GALA",
+  "AXS",
+  "APE",
+  "ENJ",
+  "CHZ",
+  "VVV",
+  "AERO",
+  "VIRTUAL",
+  "BRETT",
+  "DEGEN",
+  "TOSHI",
+  "WETH",
+  "LUMIORO",
+];
+
+/**
+ * Unified Swap / Buy / Sell / Limit dropdown token list combining verified
+ * tradable tokens across Base Mainnet (8453) and Ethereum Mainnet (1).
+ * For symbols present on both chains, the active chain's token takes precedence.
+ */
+export function getSwapDropdownTokens(chainId?: number): readonly [Token, Token, ...Token[]] {
+  if (chainId === 42161 || chainId === 10 || chainId === 137 || chainId === 11155111) {
+    return getTokensForChain(chainId);
+  }
+  const primary = chainId === 1 ? MAINNET_TOKENS : BASE_MAINNET_TOKENS;
+  const secondary = chainId === 1 ? BASE_MAINNET_TOKENS : MAINNET_TOKENS;
+  const bySymbol = new Map<string, Token>();
+  for (const token of primary) {
+    bySymbol.set(token.symbol, token);
+  }
+  for (const token of secondary) {
+    if (!bySymbol.has(token.symbol)) {
+      bySymbol.set(token.symbol, token);
+    }
+  }
+  const ordered: Token[] = [];
+  for (const sym of DROPDOWN_SYMBOL_ORDER) {
+    const found = bySymbol.get(sym);
+    if (found) {
+      ordered.push(found);
+      bySymbol.delete(sym);
+    }
+  }
+  for (const remaining of bySymbol.values()) {
+    ordered.push(remaining);
+  }
+  return ordered as unknown as readonly [Token, Token, ...Token[]];
+}
+
+/**
+ * Maps a counterparty token to a matching token on `targetChainId` (or falls back
+ * to native ETH / USDC on `targetChainId` so sellToken and buyToken always share a chain
+ * and are never identical).
+ */
+export function matchTokenOnChain(
+  counterparty: Token,
+  selectedToken: Token
+): Token {
+  const targetChainId = selectedToken.chainId;
+  const chainTokens = getTokensForChain(targetChainId);
+  const crossAliases: Record<string, string> = {
+    uSOL: "SOL",
+    SOL: "uSOL",
+    uNEAR: "NEAR",
+    NEAR: "uNEAR",
+  };
+  const candidate =
+    chainTokens.find((t) => t.symbol === counterparty.symbol) ??
+    (crossAliases[counterparty.symbol]
+      ? chainTokens.find((t) => t.symbol === crossAliases[counterparty.symbol])
+      : undefined);
+
+  if (
+    candidate &&
+    (candidate.address !== selectedToken.address || candidate.symbol !== selectedToken.symbol)
+  ) {
+    return candidate;
+  }
+
+  const native = chainTokens.find((t) => t.kind === "native") ?? chainTokens[0];
+  const usdc = chainTokens.find((t) => t.symbol === "USDC") ?? chainTokens[1];
+  return selectedToken.address === "native" ? usdc : native;
 }
 
 /** Literal union of known symbols inferred from MAINNET_TOKENS */

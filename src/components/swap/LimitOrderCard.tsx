@@ -239,14 +239,15 @@ export const LimitOrderCard = memo<LimitOrderCardProps>(
                   if (token) actions.setSellToken(token);
                 }}
               >
-                <SelectTrigger className="w-32" aria-label="Select token to sell">
+                <SelectTrigger className="w-36" aria-label="Select token to sell">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="min-w-64">
                   {tokens.map((token) => (
                     <SelectItem key={token.symbol} value={token.symbol}>
                       <div className="flex items-center gap-2">
-                        <span className="font-medium">{token.symbol}</span>
+                        <span className="font-semibold">{token.symbol}</span>
+                        <span className="truncate text-xs text-slate-500">{token.name}</span>
                       </div>
                     </SelectItem>
                   ))}
@@ -307,14 +308,15 @@ export const LimitOrderCard = memo<LimitOrderCardProps>(
                   if (token) actions.setBuyToken(token);
                 }}
               >
-                <SelectTrigger className="w-32" aria-label="Select token to receive">
+                <SelectTrigger className="w-36" aria-label="Select token to receive">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="min-w-64">
                   {tokens.map((token) => (
                     <SelectItem key={token.symbol} value={token.symbol}>
                       <div className="flex items-center gap-2">
-                        <span className="font-medium">{token.symbol}</span>
+                        <span className="font-semibold">{token.symbol}</span>
+                        <span className="truncate text-xs text-slate-500">{token.name}</span>
                       </div>
                     </SelectItem>
                   ))}
