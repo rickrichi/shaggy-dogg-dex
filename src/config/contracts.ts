@@ -83,5 +83,40 @@ export const UNISWAP_V3_QUOTER_V2_BASE: Address =
 export const UNISWAP_V3_ROUTER_BASE: Address =
   "0x2626664c2603336E57B271c5C0b26F421741e481";
 
+export interface V3Deployment {
+  readonly factory: Address;
+  readonly quoter: Address;
+  readonly router: Address;
+}
+
+export const UNISWAP_V3: Readonly<Record<number, V3Deployment>> = {
+  1: {
+    factory: "0x1F98431c8aD98523631AE4a59f267346ea31F984",
+    quoter: "0x61fFE014bA17989E743c5F6cB21bF9697530B21e",
+    router: "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+  },
+  8453: {
+    factory: "0x33128a8fC17869897dcE68Ed026d694621f6FDfD",
+    quoter: UNISWAP_V3_QUOTER_V2_BASE,
+    router: UNISWAP_V3_ROUTER_BASE,
+  },
+};
+
+export function getUniswapV3Deployment(chainId?: number): V3Deployment | undefined {
+  return chainId !== undefined ? UNISWAP_V3[chainId] : undefined;
+}
+
+export const CHAIN_USDC: Readonly<Record<number, Address>> = {
+  1: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+  8453: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+  42161: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+  10: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
+  137: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
+};
+
+export function getChainUsdcAddress(chainId?: number): Address | undefined {
+  return chainId !== undefined ? CHAIN_USDC[chainId] : undefined;
+}
+
 export const DEFAULT_SLIPPAGE = 0.5; // percent
 export const SWAP_DEADLINE_BUFFER = 60 * 15; // 15 minutes in seconds

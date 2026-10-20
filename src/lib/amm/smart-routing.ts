@@ -7,9 +7,11 @@ import {
   UNISWAP_V3_SWAP_ROUTER_02_ABI,
 } from "@/config/abis";
 import {
+  getChainUsdcAddress,
   getUniswapV2Router,
+  getUniswapV3Deployment,
+  UNISWAP_V3,
   UNISWAP_V3_QUOTER_V2_BASE,
-  UNISWAP_V3_ROUTER_BASE,
 } from "@/config/contracts";
 import { getWrappedNativeAddress, type Token } from "@/config/tokens";
 
@@ -34,12 +36,17 @@ export const aeroRoutes = (route: SmartRoute) =>
 export function routeCandidates(sell: Token, buy: Token): SmartRoute[] {
   if (sell.chainId !== buy.chainId) return [];
   const wrapped = getWrappedNativeAddress(sell.chainId);
+  const usdc = getChainUsdcAddress(sell.chainId);
   const from = sell.address === "native" ? wrapped : sell.address;
   const to = buy.address === "native" ? wrapped : buy.address;
   if (from.toLowerCase() === to.toLowerCase()) return [];
   const paths: Address[][] = [[from, to]];
-  if (from.toLowerCase() !== wrapped.toLowerCase() && to.toLowerCase() !== wrapped.toLowerCase())
-    paths.push([from, wrapped, to]);
+  for (const mid of [wrapped, ...(usdc ? [usdc] : [])]) {
+    if (from.toLowerCase() !== mid.toLowerCase() && to.toLowerCase() !== mid.toLowerCase()) {
+      paths.push([from, mid, to]);
+    }
+  }
+  const v3 = getUniswapV3Deployment(sell.chainId);
   return paths.flatMap((path) => {
     const uniV2: SmartRoute = {
       venue: "Uniswap V2",
@@ -47,33 +54,39 @@ export function routeCandidates(sell: Token, buy: Token): SmartRoute[] {
       path,
       stable: [],
     };
-    if (sell.chainId !== 8453) return [uniV2];
     const uniV3: SmartRoute[] =
-      path.length === 2
+      v3 && path.length === 2
         ? V3_FEE_TIERS.map(({ fee }) => ({
             venue: "Uniswap V3" as const,
-            router: UNISWAP_V3_ROUTER_BASE,
+            router: v3.router,
             path,
             stable: [],
             fee,
           }))
         : [];
-    const aero: SmartRoute[] = Array.from(
-      { length: 2 ** (path.length - 1) },
-      (_, mask): SmartRoute => ({
-        venue: "Aerodrome",
-        router: AERODROME_ROUTER,
-        path,
-        stable: path.slice(1).map((_, i) => Boolean(mask & (1 << i))),
-      })
-    );
+    const aero: SmartRoute[] =
+      sell.chainId === 8453
+        ? Array.from(
+            { length: 2 ** (path.length - 1) },
+            (_, mask): SmartRoute => ({
+              venue: "Aerodrome",
+              router: AERODROME_ROUTER,
+              path,
+              stable: path.slice(1).map((_, i) => Boolean(mask & (1 << i))),
+            })
+          )
+        : [];
     return [...uniV3, uniV2, ...aero];
   });
 }
 export function routeQuoteCall(route: SmartRoute, amount: bigint) {
   if (route.venue === "Uniswap V3") {
+    const v3Quoter =
+      Object.values(UNISWAP_V3).find(
+        (d) => d.router.toLowerCase() === route.router.toLowerCase()
+      )?.quoter ?? UNISWAP_V3_QUOTER_V2_BASE;
     return {
-      address: UNISWAP_V3_QUOTER_V2_BASE,
+      address: v3Quoter,
       abi: UNISWAP_V3_QUOTER_V2_ABI as Abi,
       functionName: "quoteExactInputSingle",
       args: [
@@ -104,20 +117,22 @@ export function routeSwapCall(
   deadline: bigint
 ) {
   if (route.venue === "Uniswap V3") {
+    const v3 = getUniswapV3Deployment(sell.chainId);
     if (
-      sell.chainId !== 8453 ||
-      buy.chainId !== 8453 ||
+      !v3 ||
+      sell.chainId !== buy.chainId ||
       route.path.length !== 2 ||
       amount <= 0n ||
       minimum <= 0n ||
       !V3_FEE_TIERS.some((tier) => tier.fee === route.fee)
     ) {
-      throw new Error("Invalid Base V3 swap parameters");
+      throw new Error("Invalid V3 swap parameters");
     }
-    const from = sell.address === "native" ? getWrappedNativeAddress(8453) : sell.address;
-    const to = buy.address === "native" ? getWrappedNativeAddress(8453) : buy.address;
+    const wrapped = getWrappedNativeAddress(sell.chainId);
+    const from = sell.address === "native" ? wrapped : sell.address;
+    const to = buy.address === "native" ? wrapped : buy.address;
     if (
-      route.router.toLowerCase() !== UNISWAP_V3_ROUTER_BASE.toLowerCase() ||
+      route.router.toLowerCase() !== v3.router.toLowerCase() ||
       route.path[0]?.toLowerCase() !== from.toLowerCase() ||
       route.path[1]?.toLowerCase() !== to.toLowerCase()
     ) {

@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { isSwapChain } from "@/config/contracts";
-import { getTokensForChain, isErc20Token, type Token, type TokenSymbol } from "@/config/tokens";
+import { getTokensForChain, isErc20Token, type Token } from "@/config/tokens";
 import { useSwap } from "@/hooks/useSwap";
 import { fetchPrices } from "@/lib/api/prices";
 
@@ -88,9 +88,22 @@ function getInitialToken(param: string | null, fallbackIndex: number, chainId?: 
   }
 
   const normalized = param.toLowerCase();
-  const found = chainTokens.find(
-    (t) => t.address.toLowerCase() === normalized || t.symbol.toLowerCase() === normalized
-  );
+  const aliasedSymbol =
+    {
+      btc: "cbbtc",
+      sol: "usol",
+      xrp: "cbxrp",
+      ada: "cbada",
+      avax: "uavax",
+      near: "unear",
+      atom: "uatom",
+      zec: "uzec",
+      loop: "lrc",
+    }[normalized] ?? normalized;
+  const found =
+    chainTokens.find(
+      (t) => t.address.toLowerCase() === normalized || t.symbol.toLowerCase() === normalized
+    ) ?? chainTokens.find((t) => t.symbol.toLowerCase() === aliasedSymbol);
   return found ?? fallback;
 }
 
@@ -237,30 +250,6 @@ export default function Swap() {
   // Chart Configuration
   // ────────────────────────────────────────────────────────────────────────────
 
-  const chartBaseSymbol = useMemo(() => {
-    // In buy mode, chart the asset being acquired. Otherwise chart the asset being sold.
-    return mode === "buy" ? buyToken.symbol : sellToken.symbol;
-  }, [mode, sellToken.symbol, buyToken.symbol]);
-
-  const chartQuoteSymbol = useMemo<TokenSymbol>(() => {
-    // Prefer a stable quote that is part of the trade, otherwise fall back to deep-liquidity stables.
-    const preferredQuotes: TokenSymbol[] = [];
-
-    [buyToken.symbol, sellToken.symbol].forEach((symbol) => {
-      if (isStableSymbol(symbol) && symbol !== chartBaseSymbol) {
-        preferredQuotes.push(symbol as TokenSymbol);
-      }
-    });
-
-    (["USDT", "USDC", "DAI"] as const).forEach((symbol) => {
-      if (symbol !== chartBaseSymbol) {
-        preferredQuotes.push(symbol);
-      }
-    });
-
-    return preferredQuotes.find((symbol) => symbol !== chartBaseSymbol) ?? "USDT";
-  }, [buyToken.symbol, sellToken.symbol, chartBaseSymbol]);
-
   // ────────────────────────────────────────────────────────────────────────────
   // Tab Configuration (DRY - eliminates repetitive TabsContent)
   // ────────────────────────────────────────────────────────────────────────────
@@ -369,7 +358,7 @@ export default function Swap() {
           {blockNumber && (
             <div className="flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-slate-600">
               <Activity className="size-4" />
-              <span>#{blockNumber.toString().slice(-6)}</span>
+              <span>#{blockNumber.toLocaleString()}</span>
             </div>
           )}
         </div>
@@ -377,12 +366,53 @@ export default function Swap() {
 
       {/* Main Grid Layout */}
       <div className="mx-auto grid max-w-7xl grid-cols-1 items-start gap-6 lg:grid-cols-3 lg:gap-8">
-        {/* Left Column: Chart & Info */}
-        <div className="h-full min-h-[400px] lg:col-span-2">
-          <PriceChart
-            baseToken={chainTokens.find((token) => token.symbol === chartBaseSymbol) ?? sellToken}
-            quoteToken={chainTokens.find((token) => token.symbol === chartQuoteSymbol) ?? buyToken}
-          />
+        {/* Swap comes first in both reading order and mobile layout. */}
+        <div className="order-1 min-w-0 lg:col-span-1">
+          <div className="relative space-y-3">
+            <Tabs value={mode} onValueChange={handleModeChange}>
+              <TabsList className="mb-3 grid w-full grid-cols-4">
+                {tabConfigs.map(({ mode: tabMode, label }) => (
+                  <TabsTrigger key={tabMode} value={tabMode}>
+                    {label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+
+              {/* DRY: Map over config instead of duplicating TabsContent */}
+              {tabConfigs.map(({ mode: tabMode }) => (
+                <TabsContent key={tabMode} value={tabMode} className="mt-0">
+                  {tabMode === "limit" ? (
+                    <LimitOrderCard
+                      swap={swapInstances[tabMode]}
+                      tokens={chainTokens}
+                      showSettings={showSettings}
+                      onSettingsChange={setShowSettings}
+                    />
+                  ) : (
+                    <SwapCard
+                      swap={swapInstances[tabMode]}
+                      tokens={chainTokens}
+                      isCorrectNetwork={isCorrectNetwork}
+                      isSwitchingNetwork={isSwitchingChain}
+                      onSwitchNetwork={() => switchChain({ chainId: 8453 })}
+                      showSettings={showSettings}
+                      onSettingsChange={setShowSettings}
+                    />
+                  )}
+                </TabsContent>
+              ))}
+            </Tabs>
+
+            {!isConnected && (
+              <div className="mt-1 rounded-lg border border-amber-100 bg-amber-50/50 p-4 text-center text-sm text-amber-800">
+                Connect wallet to execute trades. Viewing mode active.
+              </div>
+            )}
+          </div>
+        </div>
+        {/* Trade comparison and market tools */}
+        <div className="order-2 min-w-0 lg:col-span-2">
+          <PriceChart swap={activeSwap} />
 
           <Card className="mt-6 border-slate-200/70 bg-white/70 p-4 shadow-sm backdrop-blur-sm">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -459,51 +489,6 @@ export default function Swap() {
               )}
             </div>
           </Card>
-        </div>
-
-        {/* Right Column: The Swap Interface */}
-        <div className="lg:col-span-1">
-          <div className="relative space-y-3">
-            <Tabs value={mode} onValueChange={handleModeChange}>
-              <TabsList className="mb-3 grid w-full grid-cols-4">
-                {tabConfigs.map(({ mode: tabMode, label }) => (
-                  <TabsTrigger key={tabMode} value={tabMode}>
-                    {label}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-
-              {/* DRY: Map over config instead of duplicating TabsContent */}
-              {tabConfigs.map(({ mode: tabMode }) => (
-                <TabsContent key={tabMode} value={tabMode} className="mt-0">
-                  {tabMode === "limit" ? (
-                    <LimitOrderCard
-                      swap={swapInstances[tabMode]}
-                      tokens={chainTokens}
-                      showSettings={showSettings}
-                      onSettingsChange={setShowSettings}
-                    />
-                  ) : (
-                    <SwapCard
-                      swap={swapInstances[tabMode]}
-                      tokens={chainTokens}
-                      isCorrectNetwork={isCorrectNetwork}
-                      isSwitchingNetwork={isSwitchingChain}
-                      onSwitchNetwork={() => switchChain({ chainId: 8453 })}
-                      showSettings={showSettings}
-                      onSettingsChange={setShowSettings}
-                    />
-                  )}
-                </TabsContent>
-              ))}
-            </Tabs>
-
-            {!isConnected && (
-              <div className="mt-1 rounded-lg border border-amber-100 bg-amber-50/50 p-4 text-center text-sm text-amber-800">
-                Connect wallet to execute trades. Viewing mode active.
-              </div>
-            )}
-          </div>
         </div>
       </div>
     </div>
