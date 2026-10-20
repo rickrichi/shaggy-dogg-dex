@@ -1,4 +1,6 @@
 // src/config/tokens.ts
+import { getV2WrappedNative } from "./contracts";
+
 import type { Address } from "viem";
 
 /** ————— Core token model (discriminated union) ————— */
@@ -265,11 +267,57 @@ export const BASE_MAINNET_TOKENS = [
   },
 ] as const satisfies readonly [Token, Token, ...Token[]];
 
+/* ————— Arbitrum, Optimism, Polygon and Sepolia —————
+ * Addresses from Circle's USDC list, Uniswap's default token list and the
+ * chains' Uniswap V2 routers (WETH()), checked 2026-10-20.
+ */
+const ETH_LOGO = "https://tokens.1inch.io/0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.png";
+const WETH_LOGO = "https://tokens.1inch.io/0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2.png";
+const USDC_LOGO = "https://tokens.1inch.io/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48.png";
+const USDT_LOGO = "https://tokens.1inch.io/0xdac17f958d2ee523a2206206994597c13d831ec7.png";
+
+export const ARBITRUM_TOKENS = [
+  { kind: "native", address: "native", symbol: "ETH", name: "Ether", decimals: 18, logoURI: ETH_LOGO, chainId: 42161 },
+  { kind: "erc20", address: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831" as Address, symbol: "USDC", name: "USD Coin", decimals: 6, logoURI: USDC_LOGO, chainId: 42161 },
+  { kind: "erc20", address: "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9" as Address, symbol: "USDT", name: "Tether USD", decimals: 6, logoURI: USDT_LOGO, chainId: 42161 },
+  { kind: "erc20", address: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1" as Address, symbol: "WETH", name: "Wrapped Ether", decimals: 18, logoURI: WETH_LOGO, chainId: 42161 },
+] as const satisfies readonly [Token, Token, ...Token[]];
+
+export const OPTIMISM_TOKENS = [
+  { kind: "native", address: "native", symbol: "ETH", name: "Ether", decimals: 18, logoURI: ETH_LOGO, chainId: 10 },
+  { kind: "erc20", address: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85" as Address, symbol: "USDC", name: "USD Coin", decimals: 6, logoURI: USDC_LOGO, chainId: 10 },
+  { kind: "erc20", address: "0x94b008aA00579c1307B0EF2c499aD98a8ce58e58" as Address, symbol: "USDT", name: "Tether USD", decimals: 6, logoURI: USDT_LOGO, chainId: 10 },
+  { kind: "erc20", address: "0x4200000000000000000000000000000000000006" as Address, symbol: "WETH", name: "Wrapped Ether", decimals: 18, logoURI: WETH_LOGO, chainId: 10 },
+] as const satisfies readonly [Token, Token, ...Token[]];
+
+export const POLYGON_TOKENS = [
+  { kind: "native", address: "native", symbol: "POL", name: "POL", decimals: 18, chainId: 137 },
+  { kind: "erc20", address: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359" as Address, symbol: "USDC", name: "USD Coin", decimals: 6, logoURI: USDC_LOGO, chainId: 137 },
+  { kind: "erc20", address: "0xc2132D05D31c914a87C6611C10748AEb04B58e8F" as Address, symbol: "USDT", name: "Tether USD", decimals: 6, logoURI: USDT_LOGO, chainId: 137 },
+  { kind: "erc20", address: "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270" as Address, symbol: "WPOL", name: "Wrapped POL", decimals: 18, chainId: 137 },
+] as const satisfies readonly [Token, Token, ...Token[]];
+
+export const SEPOLIA_TOKENS = [
+  { kind: "native", address: "native", symbol: "ETH", name: "Sepolia Ether", decimals: 18, logoURI: ETH_LOGO, chainId: 11155111 },
+  { kind: "erc20", address: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238" as Address, symbol: "USDC", name: "USD Coin (test)", decimals: 6, logoURI: USDC_LOGO, chainId: 11155111 },
+  { kind: "erc20", address: "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14" as Address, symbol: "WETH", name: "Wrapped Ether", decimals: 18, logoURI: WETH_LOGO, chainId: 11155111 },
+] as const satisfies readonly [Token, Token, ...Token[]];
+
 export function getTokensForChain(chainId?: number): readonly [Token, Token, ...Token[]] {
-  if (chainId === 8453) {
-    return BASE_MAINNET_TOKENS;
+  switch (chainId) {
+    case 8453:
+      return BASE_MAINNET_TOKENS;
+    case 42161:
+      return ARBITRUM_TOKENS;
+    case 10:
+      return OPTIMISM_TOKENS;
+    case 137:
+      return POLYGON_TOKENS;
+    case 11155111:
+      return SEPOLIA_TOKENS;
+    default:
+      return MAINNET_TOKENS;
   }
-  return MAINNET_TOKENS;
 }
 
 /** Literal union of known symbols inferred from MAINNET_TOKENS */
@@ -327,9 +375,7 @@ if (!wrappedNative || wrappedNative.kind !== "erc20") {
 
 export const WRAPPED_NATIVE_ADDRESS: Address = wrappedNative.address;
 
+/** The chain's wrapped native token, as its Uniswap V2 router uses it. */
 export function getWrappedNativeAddress(chainId?: number): Address {
-  if (chainId === 8453) {
-    return "0x4200000000000000000000000000000000000006" as Address;
-  }
-  return WRAPPED_NATIVE_ADDRESS;
+  return getV2WrappedNative(chainId);
 }

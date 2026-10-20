@@ -5,7 +5,6 @@ import { useSearchParams } from "react-router-dom";
 import { Activity, Fuel, Play, RefreshCw, Square } from "lucide-react";
 import { formatGwei } from "viem";
 import { useAccount, useBlockNumber, useGasPrice, useSwitchChain } from "wagmi";
-import { mainnet } from "wagmi/chains";
 
 import { LimitOrderCard } from "@/components/swap/LimitOrderCard";
 import { PriceChart } from "@/components/swap/PriceChart";
@@ -13,6 +12,7 @@ import { SwapCard } from "@/components/swap/SwapCard";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { isSwapChain } from "@/config/contracts";
 import { getTokensForChain, isErc20Token, type Token, type TokenSymbol } from "@/config/tokens";
 import { useSwap } from "@/hooks/useSwap";
 import { fetchPrices } from "@/lib/api/prices";
@@ -126,7 +126,7 @@ export default function Swap() {
   const { data: gasPrice } = useGasPrice({ chainId: chain?.id ?? 8453 });
   const { isPending: isSwitchingChain, switchChain } = useSwitchChain();
   const [searchParams, setSearchParams] = useSearchParams();
-  const isCorrectNetwork = !isConnected || chain?.id === mainnet.id || chain?.id === 8453;
+  const isCorrectNetwork = !isConnected || isSwapChain(chain?.id);
 
   // ────────────────────────────────────────────────────────────────────────────
   // URL State Management
