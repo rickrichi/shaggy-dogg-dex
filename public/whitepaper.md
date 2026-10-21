@@ -2,12 +2,13 @@
 
 ## Technical whitepaper
 
-**Version 1.0 · 21 October 2026**\
+**Version 1.1 · 21 October 2026**\
 **Multi-chain trading, liquidity infrastructure, and the Astro Mutt ecosystem**
 
 Project website: [dex.lumsian.com](https://dex.lumsian.com/)\
 Source repository: [rickrichi/shaggy-dogg-dex](https://github.com/rickrichi/shaggy-dogg-dex)\
-Implementation baseline: `d662703f6294fe96c61581b6c734be664910b2c4`
+Implementation baseline: `d662703f6294fe96c61581b6c734be664910b2c4`\
+Reward-distribution revision: `cdb1d4af973bf4da6d66c6bd5b7c8620221c5c2a`
 
 ### Abstract
 
@@ -15,7 +16,7 @@ Shaggy Dogg DEX is a wallet-connected application for trading tokens, managing d
 
 The project combines market swaps, Uniswap-compatible liquidity tools, token deployment tooling, fee-discount staking, lending-vault implementations, and operator tools for arbitrage research and execution. These components have different maturity levels and trust assumptions. A deployed token, an implemented contract, and an enabled financial product are separate milestones.
 
-This paper describes the implementation and published deployment records available at the baseline above. It explains token mechanics, fee flows, administrative powers, and development priorities. AMUTT profit-sharing terms are approved but disabled: the existing staking contract has no reward-claim function. Governance policy is advisory and does not give token holders automatic control over contracts or treasury assets.
+This paper describes the implementation and published deployment records available at the baseline above. It explains token mechanics, fee flows, administrative powers, and development priorities. AMUTT profit-sharing terms are approved but not yet active. Version 1.1 adds a USDC distributor contract, staking-history accounting, and a claim interface; these are implemented and tested but not deployed, funded, or enabled. The 10% staker share is reserved for stakers outside the project: the AMUTT project wallet receives no staker allocation. Governance policy is advisory and does not give token holders automatic control over contracts or treasury assets.
 
 ### Reading this paper
 
@@ -38,7 +39,7 @@ The application does not introduce a new consensus network. It relies on existin
 | V3 position timelock | Source and Base deployment record available |
 | Token launchpad | Deployment tooling and token templates; a generated token has its own configuration and permissions |
 | Arbitrage tooling | Research, quoting, and operator execution components; neither a quote nor a displayed spread proves realized profit |
-| AMUTT USDC rewards | Approved policy, disabled; no deployed distributor established by the reviewed policy |
+| AMUTT USDC rewards | Approved policy; distributor, accounting, and claim interface implemented and tested; not deployed, funded, or enabled |
 | Governance | Advisory policy; no automatic treasury access or binding contract execution |
 | Limit orders | Preview-only according to the repository's documented product scope |
 
@@ -167,7 +168,7 @@ The reviewed implementation has several material properties:
 - The administrator can change the minimum period and set a withdrawal fee up to 5,000 basis points, or 50%. Those mutable values are read when withdrawing.
 - A separate tier administrator can replace the tier list. The administrator can replace that role.
 - Withheld withdrawal fees remain in the staking contract under the reviewed implementation; the withdrawal function does not route them to the treasury.
-- The contract contains no built-in interest accrual or USDC reward claim function.
+- The contract contains no built-in interest accrual or USDC reward claim function. Approved rewards would be paid by the separate distributor described in §8.3, using this contract's recorded stake history.
 
 Discounts apply only where another contract explicitly reads the staking tier and uses it in fee calculation. The reviewed Aave and Compound vault implementations do so when configured with a discount-staking contract. Direct swaps through external routers do not automatically reduce an external pool's fee because the wallet holds or stakes AMUTT. Sources: [R7], [R8].
 
@@ -205,25 +206,51 @@ The basic `AaveFlashBorrower` source verifies its callback origin and repayment 
 
 An on-chain flash-loan transaction must satisfy its repayment checks within the transaction or revert. A centralized-exchange trade cannot participate in the same atomic rollback. Cross-venue hedging therefore introduces partial-fill, custody, timing, and inventory risks. Neither flash lending nor strategy automation establishes risk-free profit.
 
-### 8.2 Approved policy, not an active payout product
+### 8.2 Approved policy, not yet active
 
-The machine-readable policy is `approved-not-live` with `enabled: false`. It proposes weekly settlement in native Base USDC, allocating 10% of eligible realized net arbitrage profit to eligible AMUTT stakers and 90% to treasury. This is a share of eligible profit, not a promised percentage return on deposits.
+The machine-readable policy is `approved-not-live` with `enabled: false`. It specifies weekly settlement in native Base USDC, allocating 10% of eligible realized net arbitrage profit to eligible AMUTT stakers and 90% to treasury. This is a share of eligible profit, not a promised percentage return on deposits.
 
-An epoch's eligible profit is calculated after recovering deployed capital, execution and funding costs, and carried losses:
+An epoch's eligible profit is calculated after recovering deployed capital, execution and funding costs, and carried losses. All amounts are integer USDC base units (six decimals):
 
 ```text
 eligibleProfit = max(0, settledProceeds − deployedCapital − verifiedCosts − carriedLosses)
-stakerPool = 10% × eligibleProfit
-treasuryShare = 90% × eligibleProfit
-stakeWeight(account) = sum(stakedAMUTT × eligibleTimeInterval)
-allocation(account) = floor(stakerPool × stakeWeight(account) / totalStakeWeight)
+stakerPool = floor(10% × eligibleProfit)
+treasuryShare = eligibleProfit − stakerPool
+distributable = stakerPool + carriedDust
+stakeWeight(account) = sum(stakedAMUTT × secondsStakedDuringEpoch)   (excluded wallets omitted)
+allocation(account) = floor(distributable × stakeWeight(account) / totalStakeWeight)
 ```
 
-The allocation formula requires a positive total stake weight. When no eligible stake exists, the current calculation library creates no account distributions and carries the unallocated staker pool forward in its dust accounting. Otherwise, allocations are rounded down to USDC base units and residual dust carries forward. Tokens held outside the eligible staking contract do not qualify.
+The allocation formula requires a positive total stake weight. When no eligible stake exists, no account allocations are made and the distributable amount carries forward. Otherwise, allocations are rounded down to USDC base units and residual dust carries forward to the next week. Tokens held outside the staking contract do not qualify.
 
-For example, proceeds of 100 USDC above recovered capital, minus 20 USDC of verified costs and 10 USDC of carried losses, produce 70 USDC eligible profit: 7 USDC for eligible stakers and 63 USDC for treasury. Zero or negative eligible profit produces no distribution.
+For example, proceeds of 100 USDC above recovered capital, minus 20 USDC of verified costs and 10 USDC of carried losses, produce 70 USDC eligible profit: 7 USDC for eligible stakers and 63 USDC for treasury. Zero or negative eligible profit produces no distribution and carries the loss forward.
 
-Unresolved exchange fills, missing receipts, or missing valuations block epoch finalization. The existing calculation script sends no funds. Activation requires a reviewed distributor, staking-event indexing, a funded pool backed by realized proceeds, published allocation records, and a verified claim or distribution process. No reward APR or launch date is promised. Source reference: [R10].
+Unresolved exchange fills, missing receipts, or missing valuations block epoch finalization. No reward APR or launch date is promised. Source references: [R10], [R11].
+
+### 8.3 Distribution mechanism (implemented, not deployed)
+
+The `WeeklyUsdcDistributor` contract pays allocations; the staking contract is unchanged. Week *N* covers `[origin + (N − 1) × 7 days, origin + N × 7 days)` and can be published only after it ends, in strict sequence. Weeks without profit are published with a zero allocation so no period can be skipped or reused.
+
+- **Publication.** The distributor owner publishes a week's Merkle root, the hash of the week's full ledger, and its total allocation. The same transaction pulls exactly that amount of USDC from the owner, so a published week is always fully funded.
+- **Claims.** Each allocation is proven against the root. A proof is bound to the chain, the distributor, the week, the account, and the amount. Each account can claim a week once; anyone may submit a claim, but payment always goes to the proven account. Earlier allocations remain claimable after unstaking.
+- **No discretionary withdrawal.** The contract has no clawback, expiry, pause, upgrade path, or owner withdrawal. Unclaimed USDC remains claimable indefinitely. USDC sent to the contract outside publication cannot be recovered.
+- **Ownership.** Ownership transfers in two steps. This edition does not identify a deployed owner; a multisignature owner is the stated intent.
+
+Off-chain accounting reads finalized `Staked` and `Unstaked` events from the staking contract's deployment onward and replays every balance. If any replayed balance differs from the contract's `stakedBalance`, or if any RPC request fails, the week is not calculated; no substitute data is used. Each week produces a public ledger whose hash is the one committed on-chain, the claim manifest the app verifies, and unsigned transactions for the owner's wallet.
+
+**Trust boundary:** the contract enforces funding, sequencing, and single claims, but it cannot verify that a ledger's profit is real. The owner attests to the ledger; the committed hash lets anyone confirm that the published ledger is the one the owner funded. Source reference: [R11].
+
+### 8.4 Project wallets do not share the staker pool
+
+The 10% staker share is reserved for stakers outside the project. Wallets controlled by the project may stake, but their stake is omitted from the weight calculation, and the full staker pool is divided among the remaining stakers. Each weekly ledger lists every excluded wallet and the stake weight it would otherwise have had.
+
+| Excluded wallet | Role | Recorded holding |
+| --- | --- | --- |
+| [0x88315fb3A3dC6ce4c997caeCdc74637C72857d28](https://basescan.org/address/0x88315fb3A3dC6ce4c997caeCdc74637C72857d28) | AMUTT project wallet | 500,000 AMUTT (0.5% of supply), none staked, at Base block 52,893,733 |
+
+The reason is proportion. At that block the staking contract held 5,000 AMUTT. Had the project wallet staked its balance without exclusion, it would have held about 99% of the stake weight and received about 99% of the staker pool. Per 100 USDC of eligible profit, the exclusion produces 90 USDC to treasury, 10 USDC to outside stakers, and nothing to the project wallet through the staker pool.
+
+The exclusion applies only to listed wallets. Further team, treasury, or market-making wallets are to be listed before they stake, and every list change appears in the following week's ledger. Source reference: [R11].
 
 ## 9. Governance and administrative authority
 
@@ -238,8 +265,9 @@ Current contract roles continue to govern administration. An accepted advisory p
 | Lending vaults | Admin changes treasury, fee within its cap, and lending configuration |
 | Flash-loan tooling | Admin and, in the atomic router, authorized operators control execution |
 | V3PositionTimelock | Recorded owner collects, extends, and withdraws after expiry; no admin override in source |
+| WeeklyUsdcDistributor (not deployed) | Owner publishes funded weekly roots in sequence and transfers ownership in two steps; no withdrawal, clawback, or pause |
 
-A contract name containing “governance,” “sovereign,” or “decentralized” does not remove these powers. This edition does not claim that existing roles are held by a multisignature or transferred to a DAO. Sources: [R4], [R7]–[R10].
+A contract name containing “governance,” “sovereign,” or “decentralized” does not remove these powers. This edition does not claim that existing roles are held by a multisignature or transferred to a DAO. Sources: [R4], [R7]–[R11].
 
 ## 10. Base contract inventory
 
@@ -260,9 +288,10 @@ All addresses below refer to **Base mainnet, chain ID 8453**. They are identifie
 | FBA token | [0xb8f3d5143ffddb99688bb31e7c2c3894a1e17263](https://basescan.org/address/0xb8f3d5143ffddb99688bb31e7c2c3894a1e17263) | Token registry |
 | V3 position timelock | [0xb5c9bedb57f4e348e40a5e6326c90de474072e25](https://basescan.org/address/0xb5c9bedb57f4e348e40a5e6326c90de474072e25) | Deployment recorded at block 52,527,662 |
 | V3 position manager used by timelock | [0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1](https://basescan.org/address/0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1) | Timelock deployment configuration |
-| USDC designated for future rewards | [0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913](https://basescan.org/address/0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913) | Approved economics policy |
+| USDC designated for future rewards | [0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913](https://basescan.org/address/0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913) | Approved economics policy; distributor reward asset |
+| AMUTT project wallet | [0x88315fb3A3dC6ce4c997caeCdc74637C72857d28](https://basescan.org/address/0x88315fb3A3dC6ce4c997caeCdc74637C72857d28) | Excluded from staker allocations (§8.4) |
 
-The timelock deployment record identifies transaction [0xf9fd35c9c716e32ae22e5ed3844cd173e97faecd4e003d7a547edafd3dd7ec09](https://basescan.org/tx/0xf9fd35c9c716e32ae22e5ed3844cd173e97faecd4e003d7a547edafd3dd7ec09). An NFT lock requires a separate position-specific transaction and cannot be inferred from deployment alone. Sources: [R4]–[R7], [R10].
+The timelock deployment record identifies transaction [0xf9fd35c9c716e32ae22e5ed3844cd173e97faecd4e003d7a547edafd3dd7ec09](https://basescan.org/tx/0xf9fd35c9c716e32ae22e5ed3844cd173e97faecd4e003d7a547edafd3dd7ec09). An NFT lock requires a separate position-specific transaction and cannot be inferred from deployment alone. `WeeklyUsdcDistributor` has no deployment in this edition; its address will be added only after deployment and source verification. Sources: [R4]–[R7], [R10], [R11].
 
 ## 11. Security model and limitations
 
@@ -273,6 +302,7 @@ The system's main risk boundaries are concrete:
 - **Administration:** compromised keys or adverse parameter changes can affect withdrawal conditions, fees, and lending destinations. The staking source does not cap the minimum stake duration.
 - **Dependencies:** RPC services, wallet connections, external lending markets, centralized venues, and market feeds can fail or report incomplete data.
 - **Supply concentration:** constructor allocation to one administrator creates initial concentration. Subsequent distribution and lock claims require on-chain evidence.
+- **Reward attestation:** distributor payouts rely on the owner's profit ledger. The contract guarantees funding and single claims, not the economic accuracy of the ledger.
 - **Version mismatch:** a locally improved contract does not upgrade an older deployed instance. Changes to deployment addresses or user migrations require separate verification.
 
 The repository contains unit, integration, and fork tests and a documented V3 compatibility review. Those records describe specific scopes and historical runs. Source publication, explorer verification, domain allowlisting, and passing tests do not constitute an independent security audit or a guarantee against loss. This whitepaper does not assert completion of an independent audit across the ecosystem.
@@ -287,8 +317,8 @@ Roadmap stages describe acceptance criteria rather than promised dates.
 | --- | --- | --- |
 | Deployment transparency | Versioned inventory for each supported token and contract | Chain, address, creation transaction, verified source, compiler settings, and block-pinned roles and parameters |
 | Execution reliability | Broader route coverage and clearer cost comparison | Reproducible quote and execution checks; gas-aware comparison; chain-specific integration tests |
-| Contract assurance | Review staking, vaults, timelock, and operator execution contracts | Independent findings, fixes, retests, and a deployment-specific release decision |
-| Reward activation | USDC distributor and finalized staking-event accounting | Reviewed distributor, funded realized profit, published ledger, tested allocation and claim process, explicit activation |
+| Contract assurance | Review staking, vaults, timelock, reward distributor, and operator execution contracts | Independent findings, fixes, retests, and a deployment-specific release decision |
+| Reward activation | Deploy and fund the implemented USDC distributor | Independent review; multi-week Base Sepolia rehearsal; verified mainnet deployment by the designated owner; first ledger reconciled from settled profit; claim confirmed from the app; explicit activation |
 | Governance operations | Traceable advisory proposals and administrator responses | Snapshot rules, published votes, decisions, and resulting transaction records |
 | Further decentralization | Evaluate multisignature administration and binding governance | Reviewed governance contracts, migration plan, and explicit authority transfers |
 
@@ -296,7 +326,7 @@ Features that depend on these stages remain conditional. In particular, a websit
 
 ## 13. Evidence and references
 
-Repository references below are pinned to the implementation baseline of this edition. They document code and recorded configuration; explorer links identify deployments. External protocol documentation explains mechanisms of the underlying protocols and does not endorse this project.
+Repository references [R1]–[R10] are pinned to the implementation baseline; [R11] is pinned to the reward-distribution revision. They document code and recorded configuration; explorer links identify deployments. External protocol documentation explains mechanisms of the underlying protocols and does not endorse this project.
 
 - **[R1] Network and venue configuration:** [contracts.ts](https://github.com/rickrichi/shaggy-dogg-dex/blob/d662703f6294fe96c61581b6c734be664910b2c4/src/config/contracts.ts), [chain configuration](https://github.com/rickrichi/shaggy-dogg-dex/blob/d662703f6294fe96c61581b6c734be664910b2c4/src/config/chains/config.ts).
 - **[R2] Routing and transaction workflow:** [smart-routing.ts](https://github.com/rickrichi/shaggy-dogg-dex/blob/d662703f6294fe96c61581b6c734be664910b2c4/src/lib/amm/smart-routing.ts), [useSwap.tsx](https://github.com/rickrichi/shaggy-dogg-dex/blob/d662703f6294fe96c61581b6c734be664910b2c4/src/hooks/useSwap.tsx).
@@ -308,7 +338,10 @@ Repository references below are pinned to the implementation baseline of this ed
 - **[R8] Vault accounting:** [YieldStakingVault.sol](https://github.com/rickrichi/shaggy-dogg-dex/blob/d662703f6294fe96c61581b6c734be664910b2c4/contracts/src/YieldStakingVault.sol), [CompoundYieldVault.sol](https://github.com/rickrichi/shaggy-dogg-dex/blob/d662703f6294fe96c61581b6c734be664910b2c4/contracts/src/CompoundYieldVault.sol), [FeeDiscountMath.sol](https://github.com/rickrichi/shaggy-dogg-dex/blob/d662703f6294fe96c61581b6c734be664910b2c4/contracts/src/FeeDiscountMath.sol).
 - **[R9] Flash-loan implementations:** [AaveFlashBorrower.sol](https://github.com/rickrichi/shaggy-dogg-dex/blob/d662703f6294fe96c61581b6c734be664910b2c4/contracts/src/AaveFlashBorrower.sol), [AtomicFlashArbitrageRouter.sol](https://github.com/rickrichi/shaggy-dogg-dex/blob/d662703f6294fe96c61581b6c734be664910b2c4/contracts/src/AtomicFlashArbitrageRouter.sol).
 - **[R10] Approved economics and activation requirements:** [policy JSON](https://github.com/rickrichi/shaggy-dogg-dex/blob/d662703f6294fe96c61581b6c734be664910b2c4/config/protocol-economics.json), [decision record](https://github.com/rickrichi/shaggy-dogg-dex/blob/d662703f6294fe96c61581b6c734be664910b2c4/docs/protocol-economics-decision.md), [epoch calculation script](https://github.com/rickrichi/shaggy-dogg-dex/blob/d662703f6294fe96c61581b6c734be664910b2c4/scripts/calculate-epoch-rewards.ts), [allocation library](https://github.com/rickrichi/shaggy-dogg-dex/blob/d662703f6294fe96c61581b6c734be664910b2c4/scripts/lib/epoch-rewards.ts).
+- **[R11] Reward distribution:** [WeeklyUsdcDistributor.sol](https://github.com/rickrichi/shaggy-dogg-dex/blob/cdb1d4af973bf4da6d66c6bd5b7c8620221c5c2a/contracts/src/WeeklyUsdcDistributor.sol), [distributor tests](https://github.com/rickrichi/shaggy-dogg-dex/blob/cdb1d4af973bf4da6d66c6bd5b7c8620221c5c2a/contracts/test/WeeklyUsdcDistributor.t.sol), [accounting](https://github.com/rickrichi/shaggy-dogg-dex/blob/cdb1d4af973bf4da6d66c6bd5b7c8620221c5c2a/scripts/lib/epoch-rewards.ts), [staking history](https://github.com/rickrichi/shaggy-dogg-dex/blob/cdb1d4af973bf4da6d66c6bd5b7c8620221c5c2a/scripts/lib/staking-history.ts), [claim tree](https://github.com/rickrichi/shaggy-dogg-dex/blob/cdb1d4af973bf4da6d66c6bd5b7c8620221c5c2a/scripts/lib/reward-merkle.ts), [deployment and exclusion configuration](https://github.com/rickrichi/shaggy-dogg-dex/blob/cdb1d4af973bf4da6d66c6bd5b7c8620221c5c2a/config/reward-deployment.json), [operator runbook](https://github.com/rickrichi/shaggy-dogg-dex/blob/cdb1d4af973bf4da6d66c6bd5b7c8620221c5c2a/docs/reward-distribution-runbook.md).
 
 ### Publication record
 
-Version 1.0 establishes the technical scope, recorded Base inventory, token mechanics, approved but inactive economics, and administrative boundaries. Future editions should identify their source revision and explain material changes to addresses, permissions, fees, and activation status. This document describes the project; it does not offer a guaranteed return or certify the safety of any asset or contract.
+Version 1.0 establishes the technical scope, recorded Base inventory, token mechanics, approved but inactive economics, and administrative boundaries.
+
+Version 1.1 (21 October 2026) describes the implemented but undeployed USDC distributor, its staking-history accounting and trust boundary, and the exclusion of the AMUTT project wallet from staker allocations. The 10% staker and 90% treasury split is unchanged. Future editions should identify their source revision and explain material changes to addresses, permissions, fees, and activation status. This document describes the project; it does not offer a guaranteed return or certify the safety of any asset or contract.
