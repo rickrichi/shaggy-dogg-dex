@@ -41,8 +41,12 @@ Choose:
   `config/reward-deployment.json`; the epoch CLI refuses to run if the deployed contract's owner
   differs. This single-key wallet also holds every AMUTT token and staking admin role, so its key
   alone controls publication. It must hold the USDC for each week it funds.
-- **Epoch origin**: a Unix timestamp marking the start of week 1, e.g. the next Monday 00:00 UTC.
+- **Epoch origin**: `1795996800` = Monday 30 November 2026, 00:00 UTC (chosen 2026-10-21), recorded
+  as `epochOrigin` in `config/reward-deployment.json`. Week 1 ends Monday 7 December 2026.
   Week *N* covers `[origin + (N−1)·7d, origin + N·7d)` and can be published only after it ends.
+  Deploy the mainnet distributor before the origin (target 18–20 November) and announce week 1 about
+  a week ahead so outside stakers can join. The origin is immutable once deployed; if the review or
+  rehearsal slips, move it to a later Monday here before deploying.
 
 ```sh
 forge build --root contracts
@@ -85,6 +89,9 @@ Use `[]` for a week with no trades; it must still be published, because epochs a
 ```sh
 npm run rewards:epoch -- --epoch 1 --trades records/epoch-1-trades.json --rpc <archive RPC with eth_getLogs>
 ```
+
+Without `--rpc`, both CLIs read `REWARDS_RPC_URL` from the git-ignored `.env.local`. Use a server
+key with no domain restriction (e.g. an Alchemy Base URL), separate from the site's browser key.
 
 The CLI refuses to run if the distributor's token, origin, or next expected epoch differ from the
 config; if the previous ledger does not hash to the on-chain `ledgerHash`; if the epoch end is not

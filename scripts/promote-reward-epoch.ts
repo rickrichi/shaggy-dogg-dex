@@ -39,7 +39,9 @@ async function main() {
   }
 
   const chain = config.chainId === base.id ? base : baseSepolia;
-  const client = createPublicClient({ chain, transport: http(arg("--rpc") ?? chain.rpcUrls.default.http[0]) });
+  if (existsSync(".env.local")) process.loadEnvFile(".env.local");
+  const rpc = arg("--rpc") ?? process.env.REWARDS_RPC_URL ?? chain.rpcUrls.default.http[0];
+  const client = createPublicClient({ chain, transport: http(rpc) });
   const epoch = await client.readContract({
     address: getAddress(config.distributor),
     abi: REWARD_ABI,

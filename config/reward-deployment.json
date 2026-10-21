@@ -6,7 +6,7 @@
   "stakingContract": "0x055BB4eD8d5464C25D71391E940ce53CA30845fC",
   "stakingDeploymentBlock": "52015576",
   "deploymentBlock": null,
-  "epochOrigin": null,
+  "epochOrigin": 1795996800,
   "indexUrl": "/rewards/index.json",
   "excludedAccounts": [
     {

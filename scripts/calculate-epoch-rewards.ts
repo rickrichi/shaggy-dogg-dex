@@ -89,7 +89,9 @@ async function main() {
   const trades = loadTrades(arg("--trades"));
 
   const chain = config.chainId === base.id ? base : baseSepolia;
-  const rpc = arg("--rpc") ?? chain.rpcUrls.default.http[0];
+  // REWARDS_RPC_URL (git-ignored .env.local) should be an archive RPC with eth_getLogs access.
+  if (existsSync(".env.local")) process.loadEnvFile(".env.local");
+  const rpc = arg("--rpc") ?? process.env.REWARDS_RPC_URL ?? chain.rpcUrls.default.http[0];
   // No chain formatters: only plain reads are needed, and the chain ID is checked explicitly below.
   const client = createPublicClient({ transport: http(rpc, { timeout: 30_000, retryCount: 3 }) });
   if ((await client.getChainId()) !== config.chainId) fail("RPC chain does not match the configuration.");
