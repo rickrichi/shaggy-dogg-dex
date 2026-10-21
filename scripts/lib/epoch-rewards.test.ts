@@ -3,225 +3,220 @@ import { describe, expect, it } from "vitest";
 
 import {
   calculateEpochRewards,
-  type EpochAccountingInput,
+  computeStakeWeights,
+  formatUsdc,
+  parseUsdc,
   type StakingEventRecord,
   type TradeExecutionRecord,
 } from "./epoch-rewards";
 
-describe("Epoch Rewards Accounting Ledger", () => {
-  const ALICE = "0x1111111111111111111111111111111111111111" as const;
-  const BOB = "0x2222222222222222222222222222222222222222" as const;
-  const CHARLIE = "0x3333333333333333333333333333333333333333" as const;
+const ALICE = "0x1111111111111111111111111111111111111111" as const;
+const BOB = "0x2222222222222222222222222222222222222222" as const;
+const CHARLIE = "0x3333333333333333333333333333333333333333" as const;
+const TOKEN = 10n ** 18n;
 
-  const EPOCH_START = 1700000000;
-  const EPOCH_END = 1700000000 + 7 * 86400; // 7 days later
+const EPOCH_START = 1_700_000_000;
+const EPOCH_END = EPOCH_START + 7 * 86_400;
 
-  const validTrades: TradeExecutionRecord[] = [
-    {
-      txHash: "0xaaa1",
-      venue: "BaseMainnet",
-      timestamp: EPOCH_START + 1000,
-      grossProceedsUsdc: 10_000,
-      principalCapitalUsdc: 9_500,
-      tradingFeesUsdc: 15,
-      flashLoanFeesUsdc: 5,
-      gasCostUsdc: 10,
-      status: "filled",
-      hasVerifiedValuation: true,
-    },
-    {
-      txHash: "0xaaa2",
-      venue: "BaseMainnet",
-      timestamp: EPOCH_START + 2000,
-      grossProceedsUsdc: 5_200,
-      principalCapitalUsdc: 5_000,
-      tradingFeesUsdc: 10,
-      flashLoanFeesUsdc: 2.5,
-      gasCostUsdc: 7.5,
-      status: "filled",
-      hasVerifiedValuation: true,
-    },
-  ];
+let logIndex = 0;
+function event(type: "Staked" | "Unstaked", user: `0x${string}`, tokens: bigint, timestamp: number): StakingEventRecord {
+  logIndex += 1;
+  return {
+    type,
+    user,
+    amount: tokens * TOKEN,
+    timestamp,
+    blockNumber: BigInt(timestamp),
+    logIndex,
+    txHash: `0x${logIndex.toString(16).padStart(64, "0")}`,
+  };
+}
 
-  it("calculates exact 10% staker and 90% treasury split on positive net profits", () => {
-    // Trade 1 net: 10000 - 9500 - 15 - 5 - 10 = 470 USDC
-    // Trade 2 net: 5200 - 5000 - 10 - 2.5 - 7.5 = 180 USDC
-    // Total net profit = 650 USDC
-    // 10% Stakers = 65.00 USDC
-    // 90% Treasury = 585.00 USDC
+const validTrades: TradeExecutionRecord[] = [
+  {
+    txHash: "0xaaa1",
+    venue: "BaseMainnet",
+    timestamp: EPOCH_START + 1000,
+    grossProceedsUsdc: "10000",
+    principalCapitalUsdc: "9500",
+    tradingFeesUsdc: "15",
+    flashLoanFeesUsdc: "5",
+    gasCostUsdc: "10",
+    status: "filled",
+    hasVerifiedValuation: true,
+  },
+  {
+    txHash: "0xaaa2",
+    venue: "BaseMainnet",
+    timestamp: EPOCH_START + 2000,
+    grossProceedsUsdc: "5200",
+    principalCapitalUsdc: "5000",
+    tradingFeesUsdc: "10",
+    flashLoanFeesUsdc: "2.5",
+    gasCostUsdc: "7.5",
+    status: "filled",
+    hasVerifiedValuation: true,
+  },
+];
 
-    const input: EpochAccountingInput = {
-      epochId: 1,
-      startTimestamp: EPOCH_START,
-      endTimestamp: EPOCH_END,
-      trades: validTrades,
-      initialStakes: [
-        { user: ALICE, balance: 1_000n * 10n ** 18n },
-        { user: BOB, balance: 1_000n * 10n ** 18n },
-      ],
-      stakingEvents: [],
-      carriedLossUsdc: 0,
-      carriedDustUnits: 0n,
-    };
+const openingStakes = [
+  event("Staked", ALICE, 1_000n, EPOCH_START - 50_000),
+  event("Staked", BOB, 1_000n, EPOCH_START - 40_000),
+];
 
-    const ledger = calculateEpochRewards(input);
+describe("USDC amount parsing", () => {
+  it("parses decimal strings exactly into base units", () => {
+    expect(parseUsdc("0", "x")).toBe(0n);
+    expect(parseUsdc("2.5", "x")).toBe(2_500_000n);
+    expect(parseUsdc("250450.000001", "x")).toBe(250_450_000_001n);
+    expect(formatUsdc(-1_500_001n)).toBe("-1.500001");
+  });
 
-    expect(ledger.accounting.grossProceedsUsdc).toBe(15_200);
-    expect(ledger.accounting.netTradeProceedsUsdc).toBe(650);
-    expect(ledger.accounting.eligibleNetProfitUsdc).toBe(650);
-    expect(ledger.accounting.stakerRewardPoolUsdc).toBe(65);
-    expect(ledger.accounting.treasuryShareUsdc).toBe(585);
-    expect(ledger.accounting.newCarriedLossUsdc).toBe(0);
+  it("rejects floats, negatives and excess precision", () => {
+    for (const bad of [1.5, "-1", "1.0000001", "1e6", "", " 1"]) {
+      expect(() => parseUsdc(bad, "field")).toThrow(/decimal string/);
+    }
+  });
+});
 
-    // Alice and Bob held equal stake for the entire epoch
-    expect(ledger.stakerMetrics.distributions).toHaveLength(2);
-    const aliceDist = ledger.stakerMetrics.distributions.find((d) => d.address === ALICE)!;
-    const bobDist = ledger.stakerMetrics.distributions.find((d) => d.address === BOB)!;
+describe("staking history replay", () => {
+  it("derives the opening balance from events before the epoch", () => {
+    const { weights, closingBalances } = computeStakeWeights(openingStakes, EPOCH_START, EPOCH_END);
+    expect(weights.get(ALICE)).toBe(1_000n * TOKEN * BigInt(EPOCH_END - EPOCH_START));
+    expect(closingBalances.get(BOB)).toBe(1_000n * TOKEN);
+  });
 
-    expect(aliceDist.rewardUnits).toBe(32_500_000n); // 32.50 USDC
-    expect(bobDist.rewardUnits).toBe(32_500_000n); // 32.50 USDC
-    expect(aliceDist.rewardUsdcFormatted).toBe("32.500000");
-    expect(bobDist.rewardUsdcFormatted).toBe("32.500000");
+  it("weights mid-epoch stake and unstake by duration", () => {
+    const events = [
+      event("Staked", ALICE, 1_000n, EPOCH_START - 1),
+      event("Unstaked", ALICE, 400n, EPOCH_START + 100),
+      event("Staked", CHARLIE, 10n, EPOCH_START + 200),
+    ];
+    const { weights, closingBalances } = computeStakeWeights(events, EPOCH_START, EPOCH_END);
+    expect(weights.get(ALICE)).toBe(1_000n * TOKEN * 100n + 600n * TOKEN * BigInt(EPOCH_END - EPOCH_START - 100));
+    expect(weights.get(CHARLIE)).toBe(10n * TOKEN * BigInt(EPOCH_END - EPOCH_START - 200));
+    expect(closingBalances.get(ALICE)).toBe(600n * TOKEN);
+  });
+
+  it("excludes accounts fully unstaked before the epoch", () => {
+    const events = [event("Staked", BOB, 5n, EPOCH_START - 10), event("Unstaked", BOB, 5n, EPOCH_START - 5)];
+    expect(computeStakeWeights(events, EPOCH_START, EPOCH_END).weights.size).toBe(0);
+  });
+
+  it("orders events by block and log index, not array order", () => {
+    const stake = event("Staked", ALICE, 5n, EPOCH_START + 10);
+    const unstake = event("Unstaked", ALICE, 5n, EPOCH_START + 10);
+    expect(() => computeStakeWeights([unstake, stake], EPOCH_START, EPOCH_END)).not.toThrow();
+  });
+
+  it("rejects incomplete history and events after the epoch end", () => {
+    expect(() => computeStakeWeights([event("Unstaked", ALICE, 1n, EPOCH_START)], EPOCH_START, EPOCH_END)).toThrow(
+      /incomplete/,
+    );
+    expect(() => computeStakeWeights([event("Staked", ALICE, 1n, EPOCH_END)], EPOCH_START, EPOCH_END)).toThrow(
+      /after the epoch end/,
+    );
+  });
+});
+
+describe("epoch accounting", () => {
+  const base = { epochId: 1, startTimestamp: EPOCH_START, endTimestamp: EPOCH_END, stakingEvents: openingStakes };
+
+  it("splits positive profit exactly 10% / 90% in base units", () => {
+    // Net: 470 + 180 = 650 USDC → 65 to stakers, 585 to treasury.
+    const ledger = calculateEpochRewards({ ...base, trades: validTrades });
+    expect(ledger.accounting.netTradeProceedsUnits).toBe(650_000_000n);
+    expect(ledger.accounting.stakerPoolUnits).toBe(65_000_000n);
+    expect(ledger.accounting.treasuryShareUnits).toBe(585_000_000n);
+    expect(ledger.stakerMetrics.distributions.map((d) => d.rewardUnits)).toEqual([32_500_000n, 32_500_000n]);
+    expect(ledger.accounting.totalDistributedUnits).toBe(65_000_000n);
     expect(ledger.accounting.newCarriedDustUnits).toBe(0n);
   });
 
-  it("deducts carried losses before allocating to stakers", () => {
-    // Total net: 650 USDC. Carried loss: 200 USDC.
-    // Eligible net profit: 450 USDC.
-    // 10% Stakers = 45.00 USDC.
-    // 90% Treasury = 405.00 USDC.
-
-    const input: EpochAccountingInput = {
-      epochId: 2,
-      startTimestamp: EPOCH_START,
-      endTimestamp: EPOCH_END,
-      trades: validTrades,
-      initialStakes: [{ user: ALICE, balance: 500n * 10n ** 18n }],
-      stakingEvents: [],
-      carriedLossUsdc: 200,
-    };
-
-    const ledger = calculateEpochRewards(input);
-    expect(ledger.accounting.netTradeProceedsUsdc).toBe(650);
-    expect(ledger.accounting.eligibleNetProfitUsdc).toBe(450);
-    expect(ledger.accounting.stakerRewardPoolUsdc).toBe(45);
-    expect(ledger.accounting.treasuryShareUsdc).toBe(405);
-    expect(ledger.accounting.newCarriedLossUsdc).toBe(0);
+  it("deducts carried losses before allocation", () => {
+    const ledger = calculateEpochRewards({ ...base, trades: validTrades, carriedLossUnits: 200_000_000n });
+    expect(ledger.accounting.eligibleNetProfitUnits).toBe(450_000_000n);
+    expect(ledger.accounting.stakerPoolUnits).toBe(45_000_000n);
+    expect(ledger.accounting.treasuryShareUnits).toBe(405_000_000n);
   });
 
-  it("yields zero rewards and carries forward deficit when net profit is negative", () => {
-    // Loss trade: Gross 4,800, Capital 5,000, Gas 10 -> Net -210 USDC
-    const lossTrades: TradeExecutionRecord[] = [
-      {
-        txHash: "0xloss",
-        venue: "BaseMainnet",
-        timestamp: EPOCH_START + 500,
-        grossProceedsUsdc: 4_800,
-        principalCapitalUsdc: 5_000,
-        tradingFeesUsdc: 0,
-        flashLoanFeesUsdc: 0,
-        gasCostUsdc: 10,
-        status: "filled",
-        hasVerifiedValuation: true,
-      },
-    ];
-
-    const input: EpochAccountingInput = {
-      epochId: 3,
-      startTimestamp: EPOCH_START,
-      endTimestamp: EPOCH_END,
-      trades: lossTrades,
-      initialStakes: [{ user: ALICE, balance: 1_000n * 10n ** 18n }],
-      stakingEvents: [],
-      carriedLossUsdc: 50, // Existing loss
+  it("carries a loss forward and allocates nothing", () => {
+    const loss: TradeExecutionRecord = {
+      ...validTrades[0]!,
+      txHash: "0xloss",
+      grossProceedsUsdc: "4800",
+      principalCapitalUsdc: "5000",
+      tradingFeesUsdc: "0",
+      flashLoanFeesUsdc: "0",
+      gasCostUsdc: "10",
     };
-
-    const ledger = calculateEpochRewards(input);
-    expect(ledger.accounting.netTradeProceedsUsdc).toBe(-210);
-    expect(ledger.accounting.eligibleNetProfitUsdc).toBe(-260);
-    expect(ledger.accounting.stakerRewardPoolUsdc).toBe(0);
-    expect(ledger.accounting.treasuryShareUsdc).toBe(0);
-    expect(ledger.accounting.newCarriedLossUsdc).toBe(260);
+    const ledger = calculateEpochRewards({ ...base, trades: [loss], carriedLossUnits: 50_000_000n });
+    expect(ledger.accounting.eligibleNetProfitUnits).toBe(-260_000_000n);
+    expect(ledger.accounting.newCarriedLossUnits).toBe(260_000_000n);
+    expect(ledger.accounting.totalDistributedUnits).toBe(0n);
     expect(ledger.stakerMetrics.distributions).toHaveLength(0);
   });
 
-  it("blocks epoch finalization on unhedged or unverified trades", () => {
-    const unhedgedTrades: TradeExecutionRecord[] = [
-      {
-        ...validTrades[0],
-        status: "unhedged",
-      },
-    ];
-
-    expect(() =>
-      calculateEpochRewards({
-        epochId: 4,
-        startTimestamp: EPOCH_START,
-        endTimestamp: EPOCH_END,
-        trades: unhedgedTrades,
-        initialStakes: [],
-        stakingEvents: [],
-      })
-    ).toThrowError(/Epoch finalization blocked: Trade .* status 'unhedged'/);
-
-    const unverifiedTrades: TradeExecutionRecord[] = [
-      {
-        ...validTrades[0],
-        hasVerifiedValuation: false,
-      },
-    ];
-
-    expect(() =>
-      calculateEpochRewards({
-        epochId: 5,
-        startTimestamp: EPOCH_START,
-        endTimestamp: EPOCH_END,
-        trades: unverifiedTrades,
-        initialStakes: [],
-        stakingEvents: [],
-      })
-    ).toThrowError(/unverified expense valuation/);
+  it("carries the staker pool forward as dust when nobody is staked", () => {
+    const ledger = calculateEpochRewards({ ...base, stakingEvents: [], trades: validTrades, carriedDustUnits: 3n });
+    expect(ledger.accounting.totalDistributedUnits).toBe(0n);
+    expect(ledger.accounting.newCarriedDustUnits).toBe(65_000_003n);
   });
 
-  it("accurately weights mid-epoch stakes and unstakes", () => {
-    // Epoch duration: 7 days = 604,800 seconds
-    // Midpoint: EPOCH_START + 302,400 seconds
-    // Alice stakes 1,000 AMUTT for whole epoch (604,800s) => Weight = 1,000 * 604,800 = 604,800,000
-    // Charlie stakes 1,000 AMUTT at midpoint => Weight = 1,000 * 302,400 = 302,400,000
-    // Total weight = 907,200,000 (Alice has 2/3 weight, Charlie has 1/3 weight)
-
-    const events: StakingEventRecord[] = [
-      {
-        type: "Staked",
-        user: CHARLIE,
-        amount: 1_000n * 10n ** 18n,
-        timestamp: EPOCH_START + 302_400,
-        txHash: "0xcharlie_stake",
-      },
+  it("rounds down per account and carries the remainder", () => {
+    const events = [
+      event("Staked", ALICE, 1_000n, EPOCH_START - 1),
+      event("Staked", CHARLIE, 1_000n, EPOCH_START + 302_400),
     ];
-
-    const input: EpochAccountingInput = {
-      epochId: 6,
-      startTimestamp: EPOCH_START,
-      endTimestamp: EPOCH_END,
-      trades: validTrades, // 650 USDC net profit => 65 USDC staker pool
-      initialStakes: [{ user: ALICE, balance: 1_000n * 10n ** 18n }],
-      stakingEvents: events,
-      carriedLossUsdc: 0,
-      carriedDustUnits: 0n,
-    };
-
-    const ledger = calculateEpochRewards(input);
-    expect(ledger.stakerMetrics.distributions).toHaveLength(2);
-
-    const alice = ledger.stakerMetrics.distributions.find((d) => d.address === ALICE)!;
-    const charlie = ledger.stakerMetrics.distributions.find((d) => d.address === CHARLIE)!;
-
-    // Alice gets 2/3 of 65 USDC = 43.333333 USDC
-    // Charlie gets 1/3 of 65 USDC = 21.666666 USDC
-    // Dust: 65,000,000 - (43,333,333 + 21,666,666) = 1 micro-USDC
-    expect(alice.rewardUnits).toBe(43_333_333n);
-    expect(charlie.rewardUnits).toBe(21_666_666n);
+    const ledger = calculateEpochRewards({ ...base, stakingEvents: events, trades: validTrades });
+    const byAccount = new Map(ledger.stakerMetrics.distributions.map((d) => [d.address, d.rewardUnits]));
+    expect(byAccount.get(ALICE)).toBe(43_333_333n);
+    expect(byAccount.get(CHARLIE)).toBe(21_666_666n);
     expect(ledger.accounting.newCarriedDustUnits).toBe(1n);
+  });
+
+  it("gives an excluded project wallet nothing and the full staker pool to everyone else", () => {
+    const PROJECT = "0x88315fb3A3dC6ce4c997caeCdc74637C72857d28" as const;
+    const events = [
+      event("Staked", PROJECT, 500_000n, EPOCH_START - 1),
+      event("Staked", ALICE, 3_000n, EPOCH_START - 1),
+      event("Staked", BOB, 2_000n, EPOCH_START - 1),
+    ];
+    const ledger = calculateEpochRewards({
+      ...base,
+      stakingEvents: events,
+      trades: validTrades,
+      excludedAccounts: [PROJECT.toLowerCase() as `0x${string}`, PROJECT],
+    });
+    const byAccount = new Map(ledger.stakerMetrics.distributions.map((d) => [d.address, d.rewardUnits]));
+    expect(byAccount.has(PROJECT)).toBe(false);
+    expect(byAccount.get(ALICE)).toBe(39_000_000n); // 3/5 of 65 USDC
+    expect(byAccount.get(BOB)).toBe(26_000_000n); // 2/5 of 65 USDC
+    expect(ledger.accounting.totalDistributedUnits).toBe(65_000_000n);
+    expect(ledger.stakerMetrics.totalEligibleStakers).toBe(2);
+    expect(ledger.stakerMetrics.excluded).toEqual([
+      { address: PROJECT, timeWeightedTokenSeconds: 500_000n * TOKEN * BigInt(EPOCH_END - EPOCH_START) },
+    ]);
+  });
+
+  it("carries the pool forward when only excluded wallets are staked", () => {
+    const PROJECT = "0x88315fb3A3dC6ce4c997caeCdc74637C72857d28" as const;
+    const ledger = calculateEpochRewards({
+      ...base,
+      stakingEvents: [event("Staked", PROJECT, 500_000n, EPOCH_START - 1)],
+      trades: validTrades,
+      excludedAccounts: [PROJECT],
+    });
+    expect(ledger.accounting.totalDistributedUnits).toBe(0n);
+    expect(ledger.accounting.newCarriedDustUnits).toBe(65_000_000n);
+  });
+
+  it("blocks finalization on unsettled, unverified, duplicate or out-of-window trades", () => {
+    const run = (trades: TradeExecutionRecord[]) => () => calculateEpochRewards({ ...base, trades });
+    expect(run([{ ...validTrades[0]!, status: "unhedged" }])).toThrow(/status 'unhedged'/);
+    expect(run([{ ...validTrades[0]!, hasVerifiedValuation: false }])).toThrow(/unverified/);
+    expect(run([validTrades[0]!, validTrades[0]!])).toThrow(/Duplicate/);
+    expect(run([{ ...validTrades[0]!, timestamp: EPOCH_END }])).toThrow(/outside epoch window/);
+    expect(run([{ ...validTrades[0]!, gasCostUsdc: 0.1 as unknown as string }])).toThrow(/decimal string/);
   });
 });

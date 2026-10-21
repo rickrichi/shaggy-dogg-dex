@@ -1,192 +1,215 @@
 // scripts/calculate-epoch-rewards.ts
-// Auditable off-chain accounting ledger for weekly epoch staker profit-sharing.
+// Prepares one weekly AMUTT reward epoch for WeeklyUsdcDistributor. It reads finalized
+// staking history from chain and operator-supplied settled trades, then writes:
+//   <out>/epoch-<N>/ledger.json    exact accounting (its keccak256 is published on-chain)
+//   <out>/epoch-<N>/manifest.json  Merkle root and per-account claims for the app
+//   <out>/epoch-<N>/publish.json   unsigned approve + publishEpoch calls for the owner wallet
+// It never signs or broadcasts. Run:
+//   npx tsx scripts/calculate-epoch-rewards.ts --epoch 1 --trades records/epoch-1-trades.json \
+//     [--config config/reward-deployment.json] [--rpc <archive RPC>] [--from-block <n>] [--out reports/rewards]
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { join } from "node:path";
 
-import { type Address, createPublicClient, getAddress, http, parseAbiItem } from "viem";
-import { base } from "viem/chains";
+import {
+  type Address,
+  createPublicClient,
+  encodeFunctionData,
+  erc20Abi,
+  getAddress,
+  http,
+  isAddress,
+  zeroHash,
+} from "viem";
+import { base, baseSepolia } from "viem/chains";
+
+import { parseRewardManifest, REWARD_ABI, REWARD_WEEK, type RewardDeployment } from "../src/lib/rewards";
 
 import {
   calculateEpochRewards,
-  type EpochAccountingInput,
-  type StakingEventRecord,
+  computeStakeWeights,
+  formatUsdc,
   type TradeExecutionRecord,
 } from "./lib/epoch-rewards";
+import { buildRewardManifest, hashLedger, serializeLedger } from "./lib/reward-merkle";
+import {
+  fetchStakingHistory,
+  findDeploymentBlock,
+  findLastBlockBefore,
+  verifyClosingBalances,
+} from "./lib/staking-history";
 
-const STAKING_CONTRACT = "0x055BB4eD8d5464C25D71391E940ce53CA30845fC" as Address;
-const USDC_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as Address;
+interface RewardConfig extends RewardDeployment {
+  stakingContract: Address;
+  stakingDeploymentBlock?: string | null;
+  excludedAccounts?: Array<{ address: string; label: string }>;
+}
 
-function getRpcClient(customRpc?: string) {
-  const keyFile = "server/data/shaggy-daemon.key";
-  const url =
-    customRpc ||
-    (existsSync(keyFile)
-      ? `http://127.0.0.1:8790/v1/base/${readFileSync(keyFile, "utf8").trim()}`
-      : "https://mainnet.base.org");
-  return createPublicClient({ chain: base, transport: http(url, { timeout: 15_000 }) });
+function arg(name: string): string | undefined {
+  const args = process.argv.slice(2);
+  const i = args.indexOf(name);
+  return i >= 0 ? args[i + 1] : undefined;
+}
+
+function fail(message: string): never {
+  throw new Error(message);
+}
+
+function loadConfig(path: string): RewardConfig {
+  const config = JSON.parse(readFileSync(path, "utf8")) as RewardConfig;
+  if (![base.id, baseSepolia.id].includes(config.chainId as 8453 | 84532)) fail(`Unsupported chainId ${config.chainId}.`);
+  if (!config.distributor || !isAddress(config.distributor)) fail(`${path}: distributor is not deployed/configured.`);
+  if (config.epochOrigin === null || !Number.isSafeInteger(config.epochOrigin)) fail(`${path}: epochOrigin is missing.`);
+  if (!isAddress(config.stakingContract ?? "")) fail(`${path}: stakingContract is missing.`);
+  for (const entry of config.excludedAccounts ?? []) {
+    if (!isAddress(entry?.address ?? "") || typeof entry.label !== "string" || !entry.label.trim()) {
+      fail(`${path}: each excludedAccounts entry needs a valid address and a label.`);
+    }
+  }
+  return config;
+}
+
+function loadTrades(path: string | undefined): TradeExecutionRecord[] {
+  if (!path) fail("--trades <file> is required. Use a file containing [] for a week with no trades.");
+  if (!existsSync(path)) fail(`Trade record file not found: ${path}`);
+  const trades: unknown = JSON.parse(readFileSync(path, "utf8"));
+  if (!Array.isArray(trades)) fail("Trade record file must contain a JSON array.");
+  return trades as TradeExecutionRecord[];
 }
 
 async function main() {
-  const args = process.argv.slice(2);
-  const isMock = args.includes("--mock");
-  const epochArg = args.find((_, i) => args[i - 1] === "--epoch");
-  const tradesArg = args.find((_, i) => args[i - 1] === "--trades");
-  const outArg = args.find((_, i) => args[i - 1] === "--out");
-  const rpcArg = args.find((_, i) => args[i - 1] === "--rpc");
+  const epochArg = arg("--epoch");
+  if (!epochArg || !/^[1-9][0-9]*$/.test(epochArg)) fail("--epoch <positive integer> is required.");
+  const epochId = Number(epochArg);
+  const configPath = arg("--config") ?? "config/reward-deployment.json";
+  const config = loadConfig(configPath);
+  const distributor = getAddress(config.distributor!);
+  const origin = config.epochOrigin!;
+  const outDir = join(arg("--out") ?? "reports/rewards", `epoch-${epochId}`);
+  const trades = loadTrades(arg("--trades"));
 
-  const epochId = epochArg ? parseInt(epochArg, 10) : 1;
-  const now = Math.floor(Date.now() / 1000);
-  const endTimestamp = now;
-  const startTimestamp = now - 7 * 86400; // 7 days rolling window
+  const chain = config.chainId === base.id ? base : baseSepolia;
+  const rpc = arg("--rpc") ?? chain.rpcUrls.default.http[0];
+  // No chain formatters: only plain reads are needed, and the chain ID is checked explicitly below.
+  const client = createPublicClient({ transport: http(rpc, { timeout: 30_000, retryCount: 3 }) });
+  if ((await client.getChainId()) !== config.chainId) fail("RPC chain does not match the configuration.");
 
-  console.log("==================================================================");
-  console.log("  🐕 SHAGGY DOGG DEX — EPOCH PROFIT-SHARING LEDGER CALCULATOR");
-  console.log("==================================================================");
-  console.log(`Epoch ID:        ${epochId}`);
-  console.log(`Window:          ${new Date(startTimestamp * 1000).toISOString()} to ${new Date(endTimestamp * 1000).toISOString()}`);
-  console.log(`Reward Asset:    USDC (${USDC_BASE}) on Base Mainnet`);
-  console.log(`Split Policy:    10% (1,000 bps) Stakers / 90% (9,000 bps) Treasury`);
-  console.log("------------------------------------------------------------------");
+  const startTimestamp = origin + (epochId - 1) * REWARD_WEEK;
+  const endTimestamp = startTimestamp + REWARD_WEEK;
+  console.log(`Epoch ${epochId}: ${new Date(startTimestamp * 1000).toISOString()} → ${new Date(endTimestamp * 1000).toISOString()} (end exclusive)`);
+  console.log(`Distributor ${distributor} on chain ${config.chainId}`);
 
-  let trades: TradeExecutionRecord[] = [];
-  let stakingEvents: StakingEventRecord[] = [];
-  let initialStakes: Array<{ user: Address; balance: bigint }> = [];
+  // The distributor must agree with the config and be waiting for exactly this epoch.
+  const [onchainToken, onchainOrigin, lastPublished] = await Promise.all([
+    client.readContract({ address: distributor, abi: REWARD_ABI, functionName: "rewardToken" }),
+    client.readContract({ address: distributor, abi: REWARD_ABI, functionName: "epochOrigin" }),
+    client.readContract({ address: distributor, abi: REWARD_ABI, functionName: "lastPublishedEpoch" }),
+  ]);
+  if (onchainToken.toLowerCase() !== config.rewardToken.toLowerCase()) fail("Distributor reward token differs from config.");
+  if (onchainOrigin !== BigInt(origin)) fail("Distributor epochOrigin differs from config.");
+  if (lastPublished !== BigInt(epochId - 1)) fail(`Distributor expects epoch ${lastPublished + 1n}, not ${epochId}.`);
 
-  if (tradesArg && existsSync(tradesArg)) {
-    trades = JSON.parse(readFileSync(tradesArg, "utf8")) as TradeExecutionRecord[];
-    console.log(`Loaded ${trades.length} trade execution records from ${tradesArg}.`);
-  } else if (isMock || !tradesArg) {
-    console.log("Using representative verified trades (use --trades <path> for custom fills):");
-    trades = [
-      {
-        txHash: "0x7a8b9c...f101",
-        venue: "AaveV3-UniswapV2-Aerodrome",
-        timestamp: startTimestamp + 86400,
-        grossProceedsUsdc: 250_450.0,
-        principalCapitalUsdc: 250_000.0,
-        tradingFeesUsdc: 75.0,
-        flashLoanFeesUsdc: 125.0, // 0.05% on 250k
-        gasCostUsdc: 1.25,
-        status: "filled",
-        hasVerifiedValuation: true,
-      },
-      {
-        txHash: "0x3c4d5e...f202",
-        venue: "Kraken-Base-Hedge",
-        timestamp: startTimestamp + 2 * 86400,
-        grossProceedsUsdc: 50_180.0,
-        principalCapitalUsdc: 50_000.0,
-        tradingFeesUsdc: 30.0,
-        flashLoanFeesUsdc: 0.0,
-        gasCostUsdc: 0.85,
-        status: "filled",
-        hasVerifiedValuation: true,
-      },
-    ];
-  }
-
-  if (isMock || tradesArg) {
-    // Demonstration stakers
-    const alice = getAddress("0x9dc79c7885ddf6c5e5071df91816e87cb58a3e74");
-    const bob = getAddress("0x5466c888d2d64a0f443b2fb501f2f09420658fa5");
-    initialStakes = [
-      { user: alice, balance: 5_000n * 10n ** 18n },
-      { user: bob, balance: 2_500n * 10n ** 18n },
-    ];
-    stakingEvents = [
-      {
-        type: "Staked",
-        user: bob,
-        amount: 2_500n * 10n ** 18n,
-        timestamp: startTimestamp + 3 * 86400,
-        txHash: "0xb0b...stake",
-      },
-    ];
-  } else {
-    // Attempt live chain event query if connected
-    try {
-      const client = getRpcClient(rpcArg);
-      console.log("Querying Base Mainnet staking logs...");
-      const stakedLogs = await client.getLogs({
-        address: STAKING_CONTRACT,
-        event: parseAbiItem("event Staked(address indexed user, uint256 amount)"),
-        fromBlock: "earliest",
-        toBlock: "latest",
-      });
-      console.log(`Found ${stakedLogs.length} on-chain Staked events.`);
-      // Group unique users
-      const users = [...new Set(stakedLogs.map((l) => getAddress(l.args.user!)))];
-      for (const u of users) {
-        const bal = await client.readContract({
-          address: STAKING_CONTRACT,
-          abi: [parseAbiItem("function stakedBalance(address) view returns (uint256)")],
-          functionName: "stakedBalance",
-          args: [u],
-        });
-        if (bal > 0n) initialStakes.push({ user: u, balance: bal });
-      }
-    } catch (err) {
-      console.warn("Could not query live RPC logs (falling back to demonstration stakers):", err instanceof Error ? err.message : err);
-      initialStakes = [
-        { user: getAddress("0x9dc79c7885ddf6c5e5071df91816e87cb58a3e74"), balance: 5_000n * 10n ** 18n },
-      ];
+  // Carry loss and dust forward from the previous ledger, whose hash must match the chain.
+  let carriedLossUnits = 0n;
+  let carriedDustUnits = 0n;
+  if (epochId > 1) {
+    const previousPath = join(arg("--out") ?? "reports/rewards", `epoch-${epochId - 1}`, "ledger.json");
+    if (!existsSync(previousPath)) fail(`Previous ledger ${previousPath} is required for carryforward.`);
+    const previousBytes = readFileSync(previousPath, "utf8");
+    const onchain = await client.readContract({ address: distributor, abi: REWARD_ABI, functionName: "epochs", args: [BigInt(epochId - 1)] });
+    if (hashLedger(previousBytes).toLowerCase() !== onchain[1].toLowerCase()) {
+      fail(`Previous ledger ${previousPath} does not match the ledger hash published on-chain.`);
     }
+    const previous = JSON.parse(previousBytes) as { accounting: { newCarriedLossUnits: string; newCarriedDustUnits: string } };
+    carriedLossUnits = BigInt(previous.accounting.newCarriedLossUnits);
+    carriedDustUnits = BigInt(previous.accounting.newCarriedDustUnits);
   }
 
-  const input: EpochAccountingInput = {
+  // Finalized staking history from contract deployment through the last block before the epoch end.
+  const finalized = await client.getBlock({ blockTag: "finalized" });
+  const endBlock = await findLastBlockBefore(client, endTimestamp, finalized.number);
+  const staking = getAddress(config.stakingContract);
+  const fromBlockArg = arg("--from-block") ?? config.stakingDeploymentBlock ?? undefined;
+  const fromBlock = fromBlockArg ? BigInt(fromBlockArg) : await findDeploymentBlock(client, staking, endBlock);
+  console.log(`Reading staking logs ${staking} blocks ${fromBlock}–${endBlock}…`);
+  const history = await fetchStakingHistory(client, staking, fromBlock, endBlock, BigInt(arg("--chunk") ?? "5000"));
+  console.log(`Found ${history.events.length} Staked/Unstaked events.`);
+  const { closingBalances } = computeStakeWeights(history.events, startTimestamp, endTimestamp);
+  await verifyClosingBalances(client, staking, closingBalances, endBlock);
+  console.log(`Replayed balances match stakedBalance() for ${closingBalances.size} accounts at block ${endBlock}.`);
+
+  const result = calculateEpochRewards({
     epochId,
     startTimestamp,
     endTimestamp,
     trades,
-    initialStakes,
-    stakingEvents,
-    carriedLossUsdc: 0,
-    carriedDustUnits: 0n,
+    stakingEvents: history.events,
+    carriedLossUnits,
+    carriedDustUnits,
+    excludedAccounts: (config.excludedAccounts ?? []).map((e) => getAddress(e.address)),
+  });
+
+  const ledger = {
+    version: 1,
+    chainId: config.chainId,
+    distributor,
+    rewardToken: getAddress(config.rewardToken),
+    stakingContract: staking,
+    excludedAccounts: (config.excludedAccounts ?? []).map((e) => ({ address: getAddress(e.address), label: e.label })),
+    stakingHistory: { fromBlock: history.fromBlock, toBlock: history.toBlock, events: history.events },
+    trades,
+    ...result,
+  };
+  const ledgerBytes = serializeLedger(ledger);
+  const ledgerHash = hashLedger(ledgerBytes);
+  const manifest = buildRewardManifest({ chainId: config.chainId, distributor, rewardToken: config.rewardToken, epochOrigin: origin }, result, ledgerHash);
+  parseRewardManifest(manifest, config); // Same validation the app performs, including every proof.
+
+  const allocation = BigInt(manifest.allocation);
+  const root = allocation === 0n ? zeroHash : manifest.root;
+  const publish = {
+    note: "Unsigned. The distributor owner reviews and sends these from their own wallet, in order.",
+    chainId: config.chainId,
+    from: "<distributor owner>",
+    transactions: [
+      ...(allocation > 0n
+        ? [{
+            description: `Approve ${formatUsdc(allocation)} USDC for the distributor`,
+            to: getAddress(config.rewardToken),
+            data: encodeFunctionData({ abi: erc20Abi, functionName: "approve", args: [distributor, allocation] }),
+          }]
+        : []),
+      {
+        description: `publishEpoch(${epochId}) — pulls ${formatUsdc(allocation)} USDC from the owner`,
+        to: distributor,
+        args: { epochId: String(epochId), root, ledgerHash, allocation: allocation.toString() },
+        data: encodeFunctionData({ abi: REWARD_ABI, functionName: "publishEpoch", args: [BigInt(epochId), root, ledgerHash, allocation] }),
+      },
+    ],
   };
 
-  const ledger = calculateEpochRewards(input);
+  mkdirSync(outDir, { recursive: true });
+  writeFileSync(join(outDir, "ledger.json"), ledgerBytes, "utf8");
+  writeFileSync(join(outDir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+  writeFileSync(join(outDir, "publish.json"), `${JSON.stringify(publish, null, 2)}\n`, "utf8");
 
-  console.log("\n📊 FINANCIAL ACCOUNTING SUMMARY");
-  console.log("------------------------------------------------------------------");
-  console.log(`Gross Trade Proceeds:    $${ledger.accounting.grossProceedsUsdc.toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC`);
-  console.log(`Principal Capital:       $${ledger.accounting.principalCapitalUsdc.toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC`);
-  console.log(`Trading Fees:            -$${ledger.accounting.tradingFeesUsdc.toFixed(2)} USDC`);
-  console.log(`Flash Loan Fees:         -$${ledger.accounting.flashLoanFeesUsdc.toFixed(2)} USDC`);
-  console.log(`Gas Costs:               -$${ledger.accounting.gasCostUsdc.toFixed(2)} USDC`);
-  console.log(`Prior Carried Loss:      -$${ledger.accounting.previousCarriedLossUsdc.toFixed(2)} USDC`);
-  console.log("------------------------------------------------------------------");
-  console.log(`NET REALIZED PROFIT:     +$${ledger.accounting.eligibleNetProfitUsdc.toFixed(2)} USDC`);
-  console.log(`  ↳ Staker Pool (10%):   +$${ledger.accounting.stakerRewardPoolUsdc.toFixed(2)} USDC (${ledger.accounting.stakerPoolUnitsTotal.toString()} micro-USDC units)`);
-  console.log(`  ↳ Protocol Treasury (90%): +$${ledger.accounting.treasuryShareUsdc.toFixed(2)} USDC`);
-  console.log(`Undistributed Dust Carryforward: ${ledger.accounting.newCarriedDustUnits.toString()} micro-USDC`);
-
-  console.log("\n👥 STAKER REWARD ALLOCATIONS");
-  console.log("-----------------------------------------------------------------------------------------");
-  console.log("Staker Address                              Time-Weight    Share    Allocated Reward");
-  console.log("-----------------------------------------------------------------------------------------");
-  for (const d of ledger.stakerMetrics.distributions) {
-    const sharePct = (d.weightBps / 100).toFixed(2);
-    console.log(`${d.address}  ${d.timeWeightedTokenSeconds.toString().slice(0, 8)}...  ${sharePct.padStart(5)}%   ${d.rewardUsdcFormatted} USDC`);
+  const a = result.accounting;
+  console.log("\nAccounting (USDC)");
+  console.log(`  Net trade proceeds      ${formatUsdc(a.netTradeProceedsUnits)}`);
+  console.log(`  Prior carried loss     -${formatUsdc(a.previousCarriedLossUnits)}`);
+  console.log(`  Eligible net profit     ${formatUsdc(a.eligibleNetProfitUnits)}`);
+  console.log(`  Staker pool (10%)       ${formatUsdc(a.stakerPoolUnits)} + carried dust ${formatUsdc(a.previousCarriedDustUnits)}`);
+  console.log(`  Treasury share (90%)    ${formatUsdc(a.treasuryShareUnits)}`);
+  console.log(`  Allocated to claims     ${formatUsdc(a.totalDistributedUnits)} across ${manifest.claims.length} accounts`);
+  console.log(`  Carry forward           loss ${formatUsdc(a.newCarriedLossUnits)}, dust ${formatUsdc(a.newCarriedDustUnits)}`);
+  for (const e of result.stakerMetrics.excluded) {
+    const label = config.excludedAccounts?.find((x) => x.address.toLowerCase() === e.address.toLowerCase())?.label;
+    console.log(`  Excluded ${e.address} (${label}): stake weight ${e.timeWeightedTokenSeconds} receives no allocation`);
   }
-  console.log("-----------------------------------------------------------------------------------------");
-
-  const outputPath =
-    outArg || `reports/epoch-${epochId}-ledger${isMock ? ".MOCK" : ""}.json`;
-  mkdirSync(dirname(outputPath), { recursive: true });
-  // Serialize BigInt safely for JSON output
-  const jsonOutput = JSON.stringify(
-    {
-      dataSource: isMock
-        ? "MOCK DATA: invented trades, not a real record and not a payout instruction"
-        : "trades supplied by the operator; not independently verified on-chain",
-      payoutStatus: "calculation only; no funds were sent and no distributor contract exists",
-      ...ledger,
-    },
-    (_, value) => (typeof value === "bigint" ? value.toString() : value),
-    2
-  );
-  writeFileSync(outputPath, jsonOutput, "utf8");
-  console.log(`\n✅ Epoch ${epochId} ledger saved to: ${outputPath}\n`);
+  console.log(`\nLedger hash ${ledgerHash}`);
+  console.log(`Wrote ${outDir}/{ledger,manifest,publish}.json. Nothing was signed or sent.`);
 }
 
-void main();
+main().catch((error: unknown) => {
+  console.error(`\n✖ ${error instanceof Error ? error.message : String(error)}`);
+  process.exitCode = 1;
+});

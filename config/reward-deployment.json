@@ -1,0 +1,16 @@
+{
+  "chainId": 8453,
+  "distributor": null,
+  "rewardToken": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+  "stakingContract": "0x055BB4eD8d5464C25D71391E940ce53CA30845fC",
+  "stakingDeploymentBlock": "52015576",
+  "deploymentBlock": null,
+  "epochOrigin": null,
+  "indexUrl": "/rewards/index.json",
+  "excludedAccounts": [
+    {
+      "address": "0x88315fb3A3dC6ce4c997caeCdc74637C72857d28",
+      "label": "AMUTT project wallet"
+    }
+  ]
+}
