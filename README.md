@@ -3,6 +3,11 @@
 A multi-chain DEX application under active development. Market swaps and Uniswap V2 liquidity
 flows are implemented; limit orders remain preview-only and must not be presented as executable.
 
+The [technical whitepaper](docs/WHITEPAPER.md) describes implementation scope, AMUTT economics,
+administrative permissions, and recorded deployments. Its public page is generated at
+`public/whitepaper.html` (served as `/whitepaper` with Vercel clean URLs). After editing the
+Markdown source, run `node scripts/build-whitepaper.mjs` to update the page and downloadable copy.
+
 Base Mainnet also supports Uniswap V3 single-pool swaps, full-range NFT minting, and fee
 collection through canonical Uniswap contracts. V3 swaps use deadline-protected SwapRouter02
 multicalls; minting uses atomic initialization with 0.5% minimum consumption protection on
