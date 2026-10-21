@@ -41,6 +41,7 @@ import {
 interface RewardConfig extends RewardDeployment {
   stakingContract: Address;
   stakingDeploymentBlock?: string | null;
+  owner?: string;
   excludedAccounts?: Array<{ address: string; label: string }>;
 }
 
@@ -99,11 +100,15 @@ async function main() {
   console.log(`Distributor ${distributor} on chain ${config.chainId}`);
 
   // The distributor must agree with the config and be waiting for exactly this epoch.
-  const [onchainToken, onchainOrigin, lastPublished] = await Promise.all([
+  const [onchainToken, onchainOrigin, lastPublished, onchainOwner] = await Promise.all([
     client.readContract({ address: distributor, abi: REWARD_ABI, functionName: "rewardToken" }),
     client.readContract({ address: distributor, abi: REWARD_ABI, functionName: "epochOrigin" }),
     client.readContract({ address: distributor, abi: REWARD_ABI, functionName: "lastPublishedEpoch" }),
+    client.readContract({ address: distributor, abi: REWARD_ABI, functionName: "owner" }),
   ]);
+  if (config.owner && onchainOwner.toLowerCase() !== config.owner.toLowerCase()) {
+    fail(`Distributor owner ${onchainOwner} differs from the configured owner ${config.owner}.`);
+  }
   if (onchainToken.toLowerCase() !== config.rewardToken.toLowerCase()) fail("Distributor reward token differs from config.");
   if (onchainOrigin !== BigInt(origin)) fail("Distributor epochOrigin differs from config.");
   if (lastPublished !== BigInt(epochId - 1)) fail(`Distributor expects epoch ${lastPublished + 1n}, not ${epochId}.`);

@@ -1,5 +1,6 @@
 {
   "chainId": 8453,
+  "owner": "0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98",
   "distributor": null,
   "rewardToken": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
   "stakingContract": "0x055BB4eD8d5464C25D71391E940ce53CA30845fC",
@@ -11,6 +12,10 @@
     {
       "address": "0x88315fb3A3dC6ce4c997caeCdc74637C72857d28",
       "label": "AMUTT project wallet"
+    },
+    {
+      "address": "0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98",
+      "label": "ShaggyDogg owner and administrator wallet"
     }
   ]
 }

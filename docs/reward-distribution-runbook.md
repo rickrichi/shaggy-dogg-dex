@@ -28,14 +28,19 @@
 - Project-controlled wallets listed under `excludedAccounts` in `config/reward-deployment.json` may
   stake, but receive no allocation; the rest of the staker pool is shared among outside stakers.
   Each ledger lists the exclusions and the stake weight they would otherwise have had. The AMUTT
-  project wallet `0x88315fb3A3dC6ce4c997caeCdc74637C72857d28` (500,000 AMUTT on 2026-10-21) is
-  excluded. Add any further team, treasury or market-making wallets before they stake.
+  project wallet `0x88315fb3A3dC6ce4c997caeCdc74637C72857d28` (500,000 AMUTT on 2026-10-21) and the
+  owner/administrator wallet `0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98` are excluded;
+  `scripts/lib/reward-config.test.ts` fails if the configured owner is ever not excluded. Add any
+  further team, treasury or market-making wallets before they stake.
 - Ownership transfer is two-step. Use a multisig as owner before funding real allocations.
 
 ## 1. Deploy (owner's wallet signs; no keys in files)
 
 Choose:
-- **Owner**: the controlling wallet (multisig recommended).
+- **Owner**: `0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98` (ShaggyDogg), recorded as `owner` in
+  `config/reward-deployment.json`; the epoch CLI refuses to run if the deployed contract's owner
+  differs. This single-key wallet also holds every AMUTT token and staking admin role, so its key
+  alone controls publication. It must hold the USDC for each week it funds.
 - **Epoch origin**: a Unix timestamp marking the start of week 1, e.g. the next Monday 00:00 UTC.
   Week *N* covers `[origin + (N−1)·7d, origin + N·7d)` and can be published only after it ends.
 
