@@ -78,7 +78,7 @@ import {
 import {
   type BotQuoteVenues,
   fetchLiveBotQuotes,
-  type V3Path,
+  type LiveBotQuotes,
   v3TriangularSwapCall,
 } from "@/lib/amm/bot-market-snapshot";
 import {
@@ -92,6 +92,13 @@ import {
   type SwapStep,
   v3ExactInputStep,
 } from "@/lib/amm/flash-routes";
+import {
+  exactCallFeeWei,
+  GAS_SAFETY_BUFFER,
+  liveEthUsd,
+  MEASURED_GAS_UNITS,
+  screeningGasUsd,
+} from "@/lib/amm/gas-cost";
 import { ShaggyDoggQuantAiEngine } from "@/lib/amm/quant-ai-engine";
 import { routeSwapCall } from "@/lib/amm/smart-routing";
 import { createBaseReadTransport } from "@/lib/base-rpc";
@@ -285,6 +292,10 @@ const BOT_QUOTE_VENUES: BotQuoteVenues = {
 // Base reads (quotes, and simulation when the wallet client is unavailable) independent of the wallet.
 const BASE_QUOTE_CLIENT = createPublicClient({ chain: base, transport: createBaseReadTransport() });
 const BASE_ETH_TOKEN = BASE_MAINNET_TOKENS.find((t) => t.kind === "native");
+// Profit must clear the exact fee by GAS_SAFETY_BUFFER (in percent for bigint maths).
+const GAS_BUFFER_PCT = BigInt(Math.round(GAS_SAFETY_BUFFER * 100));
+const buffered = (feeWei: bigint) => (feeWei * GAS_BUFFER_PCT) / 100n;
+const maxBig = (a: bigint, b: bigint) => (a > b ? a : b);
 const BASE_USDC_TOKEN = BASE_MAINNET_TOKENS.find(
   (t) => t.address.toLowerCase() === BASE_ASSETS.USDC.address.toLowerCase()
 );
@@ -486,6 +497,10 @@ export default function Arbitrage() {
   }, []);
 
   // ──────────────────────────────────────────────────────────────────────────
+  // Minimum profit (USD) every route must clear after pool fees, Aave's fee and gas.
+  const [minNetProfitTarget, setMinNetProfitTarget] = useState<number>(5.0);
+
+  // ──────────────────────────────────────────────────────────────────────────
   // TAB 1: Triangular Arbitrage State & Execution
   // ──────────────────────────────────────────────────────────────────────────
   const [triInitialWeth, setTriInitialWeth] = useState<number>(1.0);
@@ -513,7 +528,7 @@ export default function Arbitrage() {
 
   /** live: the bot's on-chain quote of the full path; the button uses the inputs on this tab. */
   const handleExecuteLiveTriangular = useCallback(
-    async (live?: { terminalWeth: number; path: V3Path }) => {
+    async (live?: LiveBotQuotes) => {
       if (!isConnected || !address) {
         toast.error("Please connect your Web3 wallet to execute live triangular arbitrage.");
         return;
@@ -535,18 +550,15 @@ export default function Arbitrage() {
       try {
         const amountIn = parseEther(triInitialWeth.toString());
         const slippageFactor = 1 - triSlippageBps / 10_000;
-        const expectedOutputWeth =
-          (live?.terminalWeth ?? triangularResult?.terminalCapital ?? triInitialWeth) *
-          slippageFactor;
-        const minAmountOut = parseEther(Math.max(0, expectedOutputWeth).toFixed(18));
         const deadline = BigInt(Math.floor(Date.now() / 1000) + 600);
 
-        // Trade exactly a quoted Uniswap V3 path: the bot's, or the best live one for this size.
-        const route =
-          live?.path ??
-          (await fetchLiveBotQuotes(BASE_QUOTE_CLIENT, BOT_QUOTE_VENUES, triInitialWeth))
-            ?.triangularPath;
-        if (!route) {
+        // Trade exactly a quoted Uniswap V3 path at this size: the bot's quote if it was taken at
+        // this size, otherwise a fresh one.
+        const quote =
+          live && live.tradeWeth === triInitialWeth
+            ? live
+            : await fetchLiveBotQuotes(BASE_QUOTE_CLIENT, BOT_QUOTE_VENUES, triInitialWeth);
+        if (!quote) {
           addTerminalLog(
             "danger",
             "🛡️ [HELD] No live Uniswap V3 route for WETH → USDC → DAI → WETH. Nothing sent."
@@ -557,6 +569,27 @@ export default function Arbitrage() {
           });
           return;
         }
+        const route = quote.triangularPath;
+        const quotedOut = parseEther(quote.triangularTerminalWeth.toFixed(18));
+        const targetWei = parseEther((minNetProfitTarget / quote.wethUsdcPrice).toFixed(18));
+        const gasPriceWei = await BASE_QUOTE_CLIENT.getGasPrice();
+        const screenFeeWei = buffered(MEASURED_GAS_UNITS.triangular * gasPriceWei);
+        // Never accept less than the input + profit target + gas: a slippage-only minimum can sit
+        // below the input and let a thin edge turn into a loss.
+        const floorWei = amountIn + targetWei + screenFeeWei;
+        if (quotedOut < floorWei) {
+          addTerminalLog(
+            "warn",
+            `🛡️ [HELD] Quoted return ${formatUnits(quotedOut, 18)} WETH is below input + $${minNetProfitTarget} target + gas (${formatUnits(floorWei, 18)} WETH). Nothing sent.`
+          );
+          toast.error("Not profitable after target and gas", {
+            id: toastId,
+            description: "Nothing was sent.",
+          });
+          return;
+        }
+        const slippageMin = parseEther((quote.triangularTerminalWeth * slippageFactor).toFixed(18));
+        const minAmountOut = maxBig(slippageMin, floorWei);
         const call = v3TriangularSwapCall(
           BOT_QUOTE_VENUES.uniswapV3Router,
           route,
@@ -585,6 +618,20 @@ export default function Arbitrage() {
           toast.error("Pre-Flight Simulation Reverted", {
             id: toastId,
             description: `On-chain simulation reverted: ${revertReason}. Wallet protected from failed gas fee.`,
+          });
+          return;
+        }
+
+        // Exact fee (L2 execution + L1 data) for this transaction must leave the target intact.
+        const feeWei = await exactCallFeeWei(BASE_QUOTE_CLIENT, address, call).catch(() => null);
+        if (feeWei === null || quotedOut - amountIn - targetWei < buffered(feeWei)) {
+          addTerminalLog(
+            "warn",
+            `🛡️ [HELD] Real network fee ${feeWei === null ? "could not be estimated" : `${formatUnits(feeWei, 18)} ETH`}; quoted profit does not cover the $${minNetProfitTarget} target plus fee. Nothing sent.`
+          );
+          toast.error("Not profitable after real gas", {
+            id: toastId,
+            description: "Nothing was sent.",
           });
           return;
         }
@@ -663,7 +710,7 @@ export default function Arbitrage() {
       isBaseNetwork,
       triInitialWeth,
       triSlippageBps,
-      triangularResult,
+      minNetProfitTarget,
       switchChain,
       writeContractAsync,
       publicClient,
@@ -1107,23 +1154,66 @@ export default function Arbitrage() {
           isAutoDispatchingRef.current = false;
           return;
         }
-        const minNetProfit = ((cycle.amountOut - owed) * 70n) / 100n; // keep 70% of the quoted edge
-        genericArgs = [
-          assetConfig.address as Address,
-          borrowAmountBigInt,
-          minNetProfit,
-          address,
+        const edge = cycle.amountOut - owed;
+        const ethUsd = await liveEthUsd(
+          BASE_QUOTE_CLIENT,
+          BOT_QUOTE_VENUES.uniswapV3Quoter,
+          BOT_QUOTE_VENUES.weth,
+          BOT_QUOTE_VENUES.usdc
+        );
+        // Fees are paid in ETH; express them (and the USD target) in the borrowed asset.
+        const toAsset = (wei: bigint) =>
+          flashBorrowAsset === "WETH"
+            ? wei
+            : (wei * BigInt(Math.round((ethUsd ?? 0) * 1e6))) / 10n ** 18n;
+        const targetAsset =
+          flashBorrowAsset === "WETH"
+            ? parseEther((minNetProfitTarget / (ethUsd ?? Infinity)).toFixed(18))
+            : parseUnits(minNetProfitTarget.toFixed(6), 6);
+        const router = customBorrowerAddress as Address;
+        const argsFor = (minNet: bigint) =>
           [
-            v3ExactInputStep(
-              BOT_QUOTE_VENUES.uniswapV3Router,
-              cycle.tokens,
-              cycle.fees,
-              borrowAmountBigInt,
-              owed + minNetProfit,
-              customBorrowerAddress as Address
-            ),
-          ],
-        ];
+            assetConfig.address as Address,
+            borrowAmountBigInt,
+            minNet,
+            address,
+            [
+              v3ExactInputStep(
+                BOT_QUOTE_VENUES.uniswapV3Router,
+                cycle.tokens,
+                cycle.fees,
+                borrowAmountBigInt,
+                owed + minNet,
+                router
+              ),
+            ],
+          ] as const;
+        const provisional = (edge * 70n) / 100n; // keep at least 70% of the quoted edge
+        const feeWei = ethUsd
+          ? await exactCallFeeWei(BASE_QUOTE_CLIENT, address, {
+              address: router,
+              abi: LAUNCHPAD_ARTIFACTS.AtomicFlashArbitrageRouter.abi,
+              functionName: "executeGenericArbitrage",
+              args: argsFor(provisional),
+            }).catch(() => null)
+          : null;
+        if (feeWei === null || edge < targetAsset + buffered(toAsset(feeWei))) {
+          addTerminalLog(
+            "warn",
+            `🛡️ [HELD] Cycle edge ${fmt(edge)} ${flashBorrowAsset} after Aave's fee does not cover the $${minNetProfitTarget} target plus ${feeWei === null ? "gas (route would revert or no ETH price)" : `gas ${fmt(toAsset(feeWei))} ${flashBorrowAsset}`}. Nothing sent.`
+          );
+          toast.error("Not profitable after target and gas", {
+            id: toastId,
+            description: "Nothing was sent.",
+          });
+          setIsExecutingFlash(false);
+          isAutoDispatchingRef.current = false;
+          return;
+        }
+        // The router itself must refuse anything that would net less than target + gas.
+        genericArgs = argsFor(
+          maxBig(provisional, targetAsset + toAsset(feeWei))
+        ) as unknown as readonly [Address, bigint, bigint, Address, SwapStep[]];
         addTerminalLog(
           "info",
           `📈 [V3 CYCLE] ${cycle.fees.map((f) => `${f / 10_000}%`).join(" / ")} returns ${fmt(cycle.amountOut)} ${flashBorrowAsset} for ${fmt(borrowAmountBigInt)} (Aave fee ${premiumBps} bps).`
@@ -1297,7 +1387,6 @@ export default function Arbitrage() {
       window.location.pathname.includes("autopilot") || window.location.search.includes("autopilot")
     );
   });
-  const [minNetProfitTarget, setMinNetProfitTarget] = useState<number>(5.0);
   const [maxSlippageCap, setMaxSlippageCap] = useState<number>(0.2); // 0.2%
   const [maxGasCeiling, setMaxGasCeiling] = useState<number>(0.01); // 0.01 Gwei
 
@@ -1373,16 +1462,38 @@ export default function Arbitrage() {
           });
           return;
         }
-        const minNetProfit = ((expectedOut - owed) * 70n) / 100n;
+        const edge = expectedOut - owed;
         const deadline = BigInt(Math.floor(Date.now() / 1000) + 600);
         const router = customBorrowerAddress as Address;
-        const args = [
-          BASE_ASSETS.WETH.address as Address,
-          amount,
-          minNetProfit,
-          address,
-          atomicSpreadSteps(BOT_QUOTE_VENUES, quote, amount, owed + minNetProfit, router, deadline),
-        ] as const;
+        const ethUsd = Number(formatUnits(quote.usdcMid, 6)) / units;
+        const targetWei = parseEther((minNetProfitTarget / ethUsd).toFixed(18));
+        const argsFor = (minNet: bigint) =>
+          [
+            BASE_ASSETS.WETH.address as Address,
+            amount,
+            minNet,
+            address,
+            atomicSpreadSteps(BOT_QUOTE_VENUES, quote, amount, owed + minNet, router, deadline),
+          ] as const;
+        const provisional = (edge * 70n) / 100n;
+        const feeWei = await exactCallFeeWei(BASE_QUOTE_CLIENT, address, {
+          address: router,
+          abi: LAUNCHPAD_ARTIFACTS.AtomicFlashArbitrageRouter.abi,
+          functionName: "executeGenericArbitrage",
+          args: argsFor(provisional),
+        }).catch(() => null);
+        if (feeWei === null || edge < targetWei + buffered(feeWei)) {
+          addTerminalLog(
+            "warn",
+            `🛡️ [HELD] Spread edge ${formatUnits(edge, 18)} WETH after Aave's fee does not cover the $${minNetProfitTarget} target plus ${feeWei === null ? "gas (route would revert)" : `gas ${formatUnits(feeWei, 18)} ETH`}. Nothing sent.`
+          );
+          toast.error("Not profitable after target and gas", {
+            id: toastId,
+            description: "Nothing was sent.",
+          });
+          return;
+        }
+        const args = argsFor(maxBig(provisional, targetWei + feeWei));
 
         let request;
         try {
@@ -1444,6 +1555,7 @@ export default function Arbitrage() {
       isBaseNetwork,
       isAtomicRouter,
       customBorrowerAddress,
+      minNetProfitTarget,
       publicClient,
       writeContractAsync,
       addTerminalLog,
@@ -1568,6 +1680,7 @@ export default function Arbitrage() {
           vipTier: params.flashVipTier,
         };
 
+        const gasPriceWei = BigInt(Math.round(params.gasPriceGwei * 1e9));
         const marketSnapshot: MarketSnapshot = {
           wethUsdcPrice: live.wethUsdcPrice,
           usdcDaiRate: live.usdcDaiRate,
@@ -1577,6 +1690,23 @@ export default function Arbitrage() {
           aerodromeFeeRate: live.aerodromeFeeRate,
           uniswapFeeRate: live.uniswapFeeRate,
           triangularFeesIncluded: true,
+          gasCostUsd: {
+            triangular: screeningGasUsd(
+              MEASURED_GAS_UNITS.triangular,
+              gasPriceWei,
+              live.uniswapEthPrice
+            ),
+            crossDex: screeningGasUsd(
+              MEASURED_GAS_UNITS.crossDex,
+              gasPriceWei,
+              live.uniswapEthPrice
+            ),
+            flashLoan: screeningGasUsd(
+              MEASURED_GAS_UNITS.flashLoan,
+              gasPriceWei,
+              live.uniswapEthPrice
+            ),
+          },
           currentGasGwei: params.gasPriceGwei,
           timestamp: Date.now(),
         };
@@ -1659,10 +1789,7 @@ export default function Arbitrage() {
 
             // Trigger execution based on strategy
             if (evalResult.strategy === "TRIANGULAR") {
-              params.handleExecuteLiveTriangular({
-                terminalWeth: live.triangularTerminalWeth,
-                path: live.triangularPath,
-              });
+              params.handleExecuteLiveTriangular(live);
             } else if (evalResult.strategy === "CROSS_DEX") {
               params.handleExecuteAtomicSpread(live.tradeWeth);
             }

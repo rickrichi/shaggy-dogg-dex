@@ -43,6 +43,15 @@ export interface MarketSnapshot {
    * hop has its own fee tier); the engine then adds no fee of its own.
    */
   readonly triangularFeesIncluded?: boolean;
+  /**
+   * Screening gas cost per strategy in USD (live gas price x measured gas units x buffer). Without
+   * it the engine falls back to its fixed placeholders.
+   */
+  readonly gasCostUsd?: {
+    readonly triangular: number;
+    readonly crossDex: number;
+    readonly flashLoan: number;
+  };
   readonly currentGasGwei: number;
   readonly timestamp: number;
 }
@@ -126,7 +135,7 @@ export class AiArbitrageBotEngine {
           usdcDaiRate: market.usdcDaiRate,
           daiWethRate: market.daiWethRate,
           poolFeeBps: market.triangularFeesIncluded ? 0 : 30, // flat 0.30% only for modelled rates
-          gasCostUsd: 0.08,
+          gasCostUsd: market.gasCostUsd?.triangular ?? 0.08,
         });
 
         const netUsd = triResult.netProfit * market.wethUsdcPrice;
@@ -168,7 +177,7 @@ export class AiArbitrageBotEngine {
           amountUnits: config.tradeCapitalEth,
           poolAFeeRate: market.uniswapFeeRate ?? 0.003,
           poolBFeeRate: market.aerodromeFeeRate ?? 0.003,
-          l2GasUsd: 0.08,
+          l2GasUsd: market.gasCostUsd?.crossDex ?? 0.08,
         });
 
         candidates.push({
@@ -207,6 +216,7 @@ export class AiArbitrageBotEngine {
 
     // 4. Evaluate Strategy C: Aave v3 Flash Loan Arbitrage
     if (config.strategies.flashLoan) {
+      const flashGasUsd = market.gasCostUsd?.flashLoan ?? 0.15;
       try {
         const flashResult = ShaggyDoggQuantAiEngine.calculateAaveFlashArbitrage({
           borrowAsset: "USDC",
@@ -219,7 +229,7 @@ export class AiArbitrageBotEngine {
             daiWethRate: market.daiWethRate,
             basePoolFeeBps: market.triangularFeesIncluded ? 0 : 30,
           },
-          gasCostUsd: 0.15,
+          gasCostUsd: flashGasUsd,
         });
 
         const flashLoanFeeUsd = config.flashBorrowUsdc * 0.0005; // Exact 0.05% Aave v3 pool premium
@@ -228,13 +238,13 @@ export class AiArbitrageBotEngine {
           strategy: "FLASH_LOAN",
           netProfitUsd: flashResult.netProfitUsd,
           grossSpreadPct: (flashResult.grossProfit / config.flashBorrowUsdc) * 100,
-          gasUsd: 0.15,
+          gasUsd: flashGasUsd,
           confidence: flashResult.isProfitable ? 99.1 : 20.0,
           summary: `Aave Flash Loan ${config.flashBorrowUsdc.toLocaleString()} USDC uncollateralized`,
           breakdown: {
             grossProfitUsd: flashResult.grossProfit,
             flashLoanFeeUsd,
-            estimatedGasUsd: 0.15,
+            estimatedGasUsd: flashGasUsd,
             netProfitUsd: flashResult.netProfitUsd,
             minProfitFloorUsd: config.minNetProfitUsd,
             returnOnCapitalBps: (flashResult.netProfitUsd / config.flashBorrowUsdc) * 10000,
