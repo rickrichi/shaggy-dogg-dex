@@ -2,7 +2,7 @@
 
 ## Technical whitepaper
 
-**Version 1.2 · 21 October 2026**\
+**Version 1.3 · 21 October 2026**\
 **Multi-chain trading, liquidity infrastructure, and the Astro Mutt ecosystem**
 
 Project website: [dex.lumsian.com](https://dex.lumsian.com/)\
@@ -225,7 +225,7 @@ The allocation formula requires a positive total stake weight. When no eligible 
 
 For example, proceeds of 100 USDC above recovered capital, minus 20 USDC of verified costs and 10 USDC of carried losses, produce 70 USDC eligible profit: 7 USDC for eligible stakers and 63 USDC for treasury. Zero or negative eligible profit produces no distribution and carries the loss forward.
 
-Unresolved exchange fills, missing receipts, or missing valuations block epoch finalization. No reward APR or launch date is promised. Source references: [R10], [R11].
+Unresolved exchange fills, missing receipts, or missing valuations block epoch finalization. No reward APR is promised. The planned first week runs from Monday 30 November 2026, 00:00 UTC, to Monday 7 December 2026; this start is a plan, not a commitment. It becomes fixed only when the distributor is deployed, and it moves to a later Monday if the independent review or test-network rehearsal is incomplete. Source references: [R10], [R11].
 
 ### 8.3 Distribution mechanism (implemented, not deployed)
 
@@ -309,6 +309,8 @@ The system's main risk boundaries are concrete:
 
 The repository contains unit, integration, and fork tests and a documented V3 compatibility review. Those records describe specific scopes and historical runs. Source publication, explorer verification, domain allowlisting, and passing tests do not constitute an independent security audit or a guarantee against loss. This whitepaper does not assert completion of an independent audit across the ecosystem.
 
+The source repository is public, so every pinned reference in §13 can be read without an account. Report suspected vulnerabilities privately, either through the repository's [private vulnerability reporting](https://github.com/rickrichi/shaggy-dogg-dex/security/advisories/new) or by following the [security policy](https://github.com/rickrichi/shaggy-dogg-dex/security/policy); do not open a public issue first. Handling is best effort, and no bug bounty is offered. The repository runs secret scanning with push protection, which blocks commits containing recognized credentials.
+
 Useful deployment evidence includes compiler input, creation transaction, runtime bytecode comparison, role addresses, parameter reads at a stated block, and reproducible test results. For a liquidity-lock claim, add the NFT identity and lock state. For revenue claims, add final transaction receipts, exchange fills where relevant, expenses, and reconciliation. Sources: [R3], [R4], [R10].
 
 ## 12. Development roadmap
@@ -348,4 +350,6 @@ Version 1.0 establishes the technical scope, recorded Base inventory, token mech
 
 Version 1.1 (21 October 2026) describes the implemented but undeployed USDC distributor, its staking-history accounting and trust boundary, and the exclusion of the AMUTT project wallet from staker allocations. The 10% staker and 90% treasury split is unchanged.
 
-Version 1.2 (21 October 2026) names the intended distributor owner, a single-key wallet rather than the multisignature stated in 1.1, and excludes that owner and administrator wallet from staker allocations. At publication it was the only staker. Future editions should identify their source revision and explain material changes to addresses, permissions, fees, and activation status. This document describes the project; it does not offer a guaranteed return or certify the safety of any asset or contract.
+Version 1.2 (21 October 2026) names the intended distributor owner, a single-key wallet rather than the multisignature stated in 1.1, and excludes that owner and administrator wallet from staker allocations. At publication it was the only staker.
+
+Version 1.3 (21 October 2026) states the planned first reward week, which remains conditional on review and rehearsal, notes that the source repository is public, and adds the private vulnerability-reporting channel. Reward terms, addresses, and permissions are unchanged. Future editions should identify their source revision and explain material changes to addresses, permissions, fees, and activation status. This document describes the project; it does not offer a guaranteed return or certify the safety of any asset or contract.

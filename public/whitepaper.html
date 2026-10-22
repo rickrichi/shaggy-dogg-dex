@@ -9,7 +9,7 @@
   <link rel="canonical" href="https://dex.lumsian.com/whitepaper" />
   <link rel="icon" type="image/png" href="/favicon-32x32.png" />
   <meta property="og:title" content="Shaggy Dogg DEX — Technical Whitepaper" />
-  <meta property="og:description" content="Version 1.2 · 21 October 2026. Architecture, token mechanics, implementation status, and deployment evidence." />
+  <meta property="og:description" content="Version 1.3 · 21 October 2026. Architecture, token mechanics, implementation status, and deployment evidence." />
   <meta property="og:type" content="article" />
   <meta property="og:url" content="https://dex.lumsian.com/whitepaper" />
   <style>
@@ -73,7 +73,7 @@
 <li><a href="#13-evidence-and-references">13. Evidence and references</a></li></ol></nav>
     <main id="document"><h1 id="shaggy-dogg-dex">Shaggy Dogg DEX</h1>
 <h2 id="technical-whitepaper">Technical whitepaper</h2>
-<p><strong>Version 1.2 · 21 October 2026</strong><br><strong>Multi-chain trading, liquidity infrastructure, and the Astro Mutt ecosystem</strong></p>
+<p><strong>Version 1.3 · 21 October 2026</strong><br><strong>Multi-chain trading, liquidity infrastructure, and the Astro Mutt ecosystem</strong></p>
 <p>Project website: <a href="https://dex.lumsian.com/">dex.lumsian.com</a><br>Source repository: <a href="https://github.com/rickrichi/shaggy-dogg-dex">rickrichi/shaggy-dogg-dex</a><br>Implementation baseline: <code>b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899</code><br>Reward-distribution revision: <code>56732cfce5dbd24bfbdf0e1fde5ca1eff89997e3</code>; owner and exclusions: <code>fd24c15a9fa487852fb14a8fb16189807a5dc7e5</code></p>
 <h3 id="abstract">Abstract</h3>
 <p>Shaggy Dogg DEX is a wallet-connected application for trading tokens, managing decentralized liquidity, and accessing ecosystem contracts. Its trading interface compares supported on-chain routes and submits user-authorized transactions to the selected exchange router. Base is the home network for the Astro Mutt (AMUTT) ecosystem; the application also configures trading routes on Ethereum, Arbitrum, Optimism, and Polygon.</p>
@@ -307,7 +307,7 @@ allocation(account) = floor(distributable × stakeWeight(account) / totalStakeWe
 </code></pre>
 <p>The allocation formula requires a positive total stake weight. When no eligible stake exists, no account allocations are made and the distributable amount carries forward. Otherwise, allocations are rounded down to USDC base units and residual dust carries forward to the next week. Tokens held outside the staking contract do not qualify.</p>
 <p>For example, proceeds of 100 USDC above recovered capital, minus 20 USDC of verified costs and 10 USDC of carried losses, produce 70 USDC eligible profit: 7 USDC for eligible stakers and 63 USDC for treasury. Zero or negative eligible profit produces no distribution and carries the loss forward.</p>
-<p>Unresolved exchange fills, missing receipts, or missing valuations block epoch finalization. No reward APR or launch date is promised. Source references: [R10], [R11].</p>
+<p>Unresolved exchange fills, missing receipts, or missing valuations block epoch finalization. No reward APR is promised. The planned first week runs from Monday 30 November 2026, 00:00 UTC, to Monday 7 December 2026; this start is a plan, not a commitment. It becomes fixed only when the distributor is deployed, and it moves to a later Monday if the independent review or test-network rehearsal is incomplete. Source references: [R10], [R11].</p>
 <h3 id="8-3-distribution-mechanism-implemented-not-deployed">8.3 Distribution mechanism (implemented, not deployed)</h3>
 <p>The <code>WeeklyUsdcDistributor</code> contract pays allocations; the staking contract is unchanged. Week <em>N</em> covers <code>[origin + (N − 1) × 7 days, origin + N × 7 days)</code> and can be published only after it ends, in strict sequence. Weeks without profit are published with a zero allocation so no period can be skipped or reused.</p>
 <ul>
@@ -481,6 +481,7 @@ allocation(account) = floor(distributable × stakeWeight(account) / totalStakeWe
 <li><strong>Version mismatch:</strong> a locally improved contract does not upgrade an older deployed instance. Changes to deployment addresses or user migrations require separate verification.</li>
 </ul>
 <p>The repository contains unit, integration, and fork tests and a documented V3 compatibility review. Those records describe specific scopes and historical runs. Source publication, explorer verification, domain allowlisting, and passing tests do not constitute an independent security audit or a guarantee against loss. This whitepaper does not assert completion of an independent audit across the ecosystem.</p>
+<p>The source repository is public, so every pinned reference in §13 can be read without an account. Report suspected vulnerabilities privately, either through the repository&#39;s <a href="https://github.com/rickrichi/shaggy-dogg-dex/security/advisories/new">private vulnerability reporting</a> or by following the <a href="https://github.com/rickrichi/shaggy-dogg-dex/security/policy">security policy</a>; do not open a public issue first. Handling is best effort, and no bug bounty is offered. The repository runs secret scanning with push protection, which blocks commits containing recognized credentials.</p>
 <p>Useful deployment evidence includes compiler input, creation transaction, runtime bytecode comparison, role addresses, parameter reads at a stated block, and reproducible test results. For a liquidity-lock claim, add the NFT identity and lock state. For revenue claims, add final transaction receipts, exchange fills where relevant, expenses, and reconciliation. Sources: [R3], [R4], [R10].</p>
 <h2 id="12-development-roadmap">12. Development roadmap</h2>
 <p>Roadmap stages describe acceptance criteria rather than promised dates.</p>
@@ -542,9 +543,10 @@ allocation(account) = floor(distributable × stakeWeight(account) / totalStakeWe
 <h3 id="publication-record">Publication record</h3>
 <p>Version 1.0 establishes the technical scope, recorded Base inventory, token mechanics, approved but inactive economics, and administrative boundaries.</p>
 <p>Version 1.1 (21 October 2026) describes the implemented but undeployed USDC distributor, its staking-history accounting and trust boundary, and the exclusion of the AMUTT project wallet from staker allocations. The 10% staker and 90% treasury split is unchanged.</p>
-<p>Version 1.2 (21 October 2026) names the intended distributor owner, a single-key wallet rather than the multisignature stated in 1.1, and excludes that owner and administrator wallet from staker allocations. At publication it was the only staker. Future editions should identify their source revision and explain material changes to addresses, permissions, fees, and activation status. This document describes the project; it does not offer a guaranteed return or certify the safety of any asset or contract.</p>
+<p>Version 1.2 (21 October 2026) names the intended distributor owner, a single-key wallet rather than the multisignature stated in 1.1, and excludes that owner and administrator wallet from staker allocations. At publication it was the only staker.</p>
+<p>Version 1.3 (21 October 2026) states the planned first reward week, which remains conditional on review and rehearsal, notes that the source repository is public, and adds the private vulnerability-reporting channel. Reward terms, addresses, and permissions are unchanged. Future editions should identify their source revision and explain material changes to addresses, permissions, fees, and activation status. This document describes the project; it does not offer a guaranteed return or certify the safety of any asset or contract.</p>
 </main>
   </div>
-  <footer>Version 1.2 · 21 October 2026 · Use your browser's Print command for a print-formatted copy.</footer>
+  <footer>Version 1.3 · 21 October 2026 · Use your browser's Print command for a print-formatted copy.</footer>
 </body>
 </html>

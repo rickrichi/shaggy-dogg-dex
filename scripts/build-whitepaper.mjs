@@ -28,7 +28,7 @@ const html = `<!DOCTYPE html>
   <link rel="canonical" href="https://dex.lumsian.com/whitepaper" />
   <link rel="icon" type="image/png" href="/favicon-32x32.png" />
   <meta property="og:title" content="Shaggy Dogg DEX — Technical Whitepaper" />
-  <meta property="og:description" content="Version 1.2 · 21 October 2026. Architecture, token mechanics, implementation status, and deployment evidence." />
+  <meta property="og:description" content="Version 1.3 · 21 October 2026. Architecture, token mechanics, implementation status, and deployment evidence." />
   <meta property="og:type" content="article" />
   <meta property="og:url" content="https://dex.lumsian.com/whitepaper" />
   <style>
@@ -80,7 +80,7 @@ const html = `<!DOCTYPE html>
     <nav class="contents" aria-label="Whitepaper contents"><p>In this paper</p><ol>${toc}</ol></nav>
     <main id="document">${article}</main>
   </div>
-  <footer>Version 1.2 · 21 October 2026 · Use your browser's Print command for a print-formatted copy.</footer>
+  <footer>Version 1.3 · 21 October 2026 · Use your browser's Print command for a print-formatted copy.</footer>
 </body>
 </html>
 `;
