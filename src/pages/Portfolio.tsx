@@ -26,7 +26,7 @@ import { type Token, usePortfolio } from "@/hooks/usePortfolio";
 export default function Portfolio() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
-  const { tokens, summary, isLoading, refetch } = usePortfolio();
+  const { tokens, summary, isLoading, pricesUnavailable, refetch } = usePortfolio();
 
   const [hideZeroBalances, setHideZeroBalances] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -196,6 +196,8 @@ export default function Portfolio() {
             <CardTitle className="text-2xl font-bold text-gray-900">
               {isLoading ? (
                 <Skeleton className="h-8 w-28" />
+              ) : pricesUnavailable ? (
+                "Price unavailable"
               ) : (
                 `$${summary.totalValue.toLocaleString(undefined, {
                   minimumFractionDigits: 2,
@@ -205,6 +207,11 @@ export default function Portfolio() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0 text-xs text-gray-500">
+            {pricesUnavailable && (
+              <span className="text-amber-700">
+                The price server did not answer. Balances are live; values will appear on refresh.
+              </span>
+            )}
             {summary.percentChange24h !== 0 && (
               <span
                 className={`font-medium ${

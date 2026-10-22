@@ -31,7 +31,8 @@ import {
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
-import { type Address, isAddress, parseEther, parseUnits } from "viem";
+import { type Address, createPublicClient, isAddress, parseEther, parseUnits } from "viem";
+import { base } from "viem/chains";
 import {
   useAccount,
   useBlockNumber,
@@ -65,7 +66,9 @@ import {
   type BotConfig,
   type MarketSnapshot,
 } from "@/lib/amm/ai-arbitrage-bot";
+import { type BotQuoteVenues, fetchLiveBotQuotes } from "@/lib/amm/bot-market-snapshot";
 import { ShaggyDoggQuantAiEngine } from "@/lib/amm/quant-ai-engine";
+import { createBaseReadTransport } from "@/lib/base-rpc";
 import { LAUNCHPAD_ARTIFACTS } from "@/lib/launchpad/artifacts";
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -243,6 +246,16 @@ const PAGE_META = {
       "Real-time cryptographic audit trail of on-chain transaction receipts, BaseScan block explorer telemetry, and daemon execution logs.",
     documentTitle: "💻 Transaction Console | Shaggy Dogg Arbitrage",
   },
+};
+
+// The Auto-Pilot prices its legs on exactly the routers and tokens its live handlers trade through.
+const BOT_QUOTE_VENUES: BotQuoteVenues = {
+  uniswapV2Router: BASE_UNISWAP_ROUTER,
+  aerodromeRouter: BASE_AERODROME_ROUTER,
+  aerodromeFactory: BASE_AERODROME_FACTORY,
+  weth: BASE_ASSETS.WETH.address as Address,
+  usdc: BASE_ASSETS.USDC.address as Address,
+  dai: BASE_ASSETS.DAI.address as Address,
 };
 
 export const ARBITRAGE_PAGE_META: typeof PAGE_META & Record<string, ArbitragePageMeta | undefined> =
@@ -467,152 +480,157 @@ export default function Arbitrage() {
     }
   }, [triInitialWeth, triWethUsdcPrice, triUsdcDaiRate, triDaiWethRate]);
 
-  const handleExecuteLiveTriangular = useCallback(async () => {
-    if (!isConnected || !address) {
-      toast.error("Please connect your Web3 wallet to execute live triangular arbitrage.");
-      return;
-    }
-    if (!isBaseNetwork) {
-      toast.error("Please switch your wallet to Base Mainnet (Chain ID 8453).");
-      if (switchChain) switchChain({ chainId: BASE_CHAIN_ID });
-      return;
-    }
-    if (triInitialWeth <= 0) {
-      toast.error("Enter a valid initial capital amount.");
-      return;
-    }
-
-    setIsExecutingTri(true);
-    isAutoDispatchingRef.current = true;
-    const toastId = toast.loading("Broadcasting Live Triangular Arbitrage on Base...");
-
-    try {
-      const amountIn = parseEther(triInitialWeth.toString());
-      const slippageFactor = 1 - triSlippageBps / 10_000;
-      const expectedOutputWeth =
-        (triangularResult?.terminalCapital ?? triInitialWeth) * slippageFactor;
-      const minAmountOut = parseEther(Math.max(0, expectedOutputWeth).toFixed(18));
-      const deadline = BigInt(Math.floor(Date.now() / 1000) + 600);
-
-      const path: Address[] = [
-        BASE_ASSETS.WETH.address,
-        BASE_ASSETS.USDC.address,
-        BASE_ASSETS.DAI.address,
-        BASE_ASSETS.WETH.address,
-      ];
-
-      // Pre-Flight Simulation (eth_call)
-      if (publicClient) {
-        try {
-          await publicClient.simulateContract({
-            address: BASE_UNISWAP_ROUTER,
-            abi: UNISWAP_V2_ROUTER_ABI,
-            functionName: "swapExactETHForTokens",
-            args: [minAmountOut, path, address, deadline],
-            value: amountIn,
-            account: address,
-          });
-        } catch (simErr: unknown) {
-          const revertReason =
-            (simErr as { shortMessage?: string })?.shortMessage ||
-            (simErr as Error)?.message ||
-            "Triangular route reverted";
-          addTerminalLog(
-            "danger",
-            `🛡️ [PRE-FLIGHT SIMULATION HELD] ${revertReason}. Prevented execution: pool liquidity cannot deliver min output. $0 gas spent.`
-          );
-          toast.error("Pre-Flight Simulation Reverted", {
-            id: toastId,
-            description: `On-chain simulation reverted: ${revertReason}. Wallet protected from failed gas fee.`,
-          });
-          setIsExecutingTri(false);
-          isAutoDispatchingRef.current = false;
-          return;
-        }
+  /** live: the bot's on-chain quote of the full path; the button uses the inputs on this tab. */
+  const handleExecuteLiveTriangular = useCallback(
+    async (live?: { terminalWeth: number }) => {
+      if (!isConnected || !address) {
+        toast.error("Please connect your Web3 wallet to execute live triangular arbitrage.");
+        return;
+      }
+      if (!isBaseNetwork) {
+        toast.error("Please switch your wallet to Base Mainnet (Chain ID 8453).");
+        if (switchChain) switchChain({ chainId: BASE_CHAIN_ID });
+        return;
+      }
+      if (triInitialWeth <= 0) {
+        toast.error("Enter a valid initial capital amount.");
+        return;
       }
 
-      const hash = await writeContractAsync({
-        address: BASE_UNISWAP_ROUTER,
-        abi: UNISWAP_V2_ROUTER_ABI,
-        functionName: "swapExactETHForTokens",
-        args: [minAmountOut, path, address, deadline],
-        value: amountIn,
-      });
+      setIsExecutingTri(true);
+      isAutoDispatchingRef.current = true;
+      const toastId = toast.loading("Broadcasting Live Triangular Arbitrage on Base...");
 
-      toast.success("Live Triangular Arbitrage submitted!", {
-        id: toastId,
-        description: `Tx: ${hash.substring(0, 10)}...${hash.substring(hash.length - 8)}`,
-      });
+      try {
+        const amountIn = parseEther(triInitialWeth.toString());
+        const slippageFactor = 1 - triSlippageBps / 10_000;
+        const expectedOutputWeth =
+          (live?.terminalWeth ?? triangularResult?.terminalCapital ?? triInitialWeth) *
+          slippageFactor;
+        const minAmountOut = parseEther(Math.max(0, expectedOutputWeth).toFixed(18));
+        const deadline = BigInt(Math.floor(Date.now() / 1000) + 600);
 
-      const newTx: LiveTransactionRecord = {
-        id: `tx-${Date.now()}`,
-        txHash: hash,
-        type: "TRIANGULAR_ARB",
-        summary: `Cyclic swap ${triInitialWeth} ETH -> USDC -> DAI -> WETH`,
-        timestamp: new Date().toLocaleTimeString(),
-        status: "SUBMITTED",
-        explorerUrl: `https://basescan.org/tx/${hash}`,
-      };
-      setTxHistory((prev) => [newTx, ...prev]);
+        const path: Address[] = [
+          BASE_ASSETS.WETH.address,
+          BASE_ASSETS.USDC.address,
+          BASE_ASSETS.DAI.address,
+          BASE_ASSETS.WETH.address,
+        ];
 
-      if (publicClient) {
-        publicClient
-          .waitForTransactionReceipt({ hash })
-          .then((receipt) => {
-            setTxHistory((prev) =>
-              prev.map((t) =>
-                t.txHash === hash
-                  ? {
-                      ...t,
-                      status: receipt.status === "success" ? "CONFIRMED" : "REVERTED",
-                    }
-                  : t
-              )
+        // Pre-Flight Simulation (eth_call)
+        if (publicClient) {
+          try {
+            await publicClient.simulateContract({
+              address: BASE_UNISWAP_ROUTER,
+              abi: UNISWAP_V2_ROUTER_ABI,
+              functionName: "swapExactETHForTokens",
+              args: [minAmountOut, path, address, deadline],
+              value: amountIn,
+              account: address,
+            });
+          } catch (simErr: unknown) {
+            const revertReason =
+              (simErr as { shortMessage?: string })?.shortMessage ||
+              (simErr as Error)?.message ||
+              "Triangular route reverted";
+            addTerminalLog(
+              "danger",
+              `🛡️ [PRE-FLIGHT SIMULATION HELD] ${revertReason}. Prevented execution: pool liquidity cannot deliver min output. $0 gas spent.`
             );
-            if (receipt.status === "success") {
-              toast.success("Triangular Arbitrage Confirmed on Base!", {
-                description: `Gas Used: ${receipt.gasUsed.toString()}`,
-              });
-            } else {
-              toast.error("Transaction reverted on-chain.");
-            }
-          })
-          .catch(() => {});
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Live execution failed";
-      const isUserReject =
-        msg.toLowerCase().includes("user rejected") ||
-        msg.toLowerCase().includes("rejected") ||
-        msg.toLowerCase().includes("action_rejected") ||
-        (err as { code?: number })?.code === 4001;
+            toast.error("Pre-Flight Simulation Reverted", {
+              id: toastId,
+              description: `On-chain simulation reverted: ${revertReason}. Wallet protected from failed gas fee.`,
+            });
+            setIsExecutingTri(false);
+            isAutoDispatchingRef.current = false;
+            return;
+          }
+        }
 
-      if (isUserReject) {
-        setAutoSubmitTrades(false);
-        addTerminalLog(
-          "warn",
-          "🛑 [AUTO-DISPATCH] Transaction signature rejected in wallet. 'Auto-Submit to Wallet' turned OFF for your protection."
-        );
-        toast.info("Auto-Submit disabled after wallet cancellation.");
-      } else {
-        toast.error("Execution error", { id: toastId, description: msg });
+        const hash = await writeContractAsync({
+          address: BASE_UNISWAP_ROUTER,
+          abi: UNISWAP_V2_ROUTER_ABI,
+          functionName: "swapExactETHForTokens",
+          args: [minAmountOut, path, address, deadline],
+          value: amountIn,
+        });
+
+        toast.success("Live Triangular Arbitrage submitted!", {
+          id: toastId,
+          description: `Tx: ${hash.substring(0, 10)}...${hash.substring(hash.length - 8)}`,
+        });
+
+        const newTx: LiveTransactionRecord = {
+          id: `tx-${Date.now()}`,
+          txHash: hash,
+          type: "TRIANGULAR_ARB",
+          summary: `Cyclic swap ${triInitialWeth} ETH -> USDC -> DAI -> WETH`,
+          timestamp: new Date().toLocaleTimeString(),
+          status: "SUBMITTED",
+          explorerUrl: `https://basescan.org/tx/${hash}`,
+        };
+        setTxHistory((prev) => [newTx, ...prev]);
+
+        if (publicClient) {
+          publicClient
+            .waitForTransactionReceipt({ hash })
+            .then((receipt) => {
+              setTxHistory((prev) =>
+                prev.map((t) =>
+                  t.txHash === hash
+                    ? {
+                        ...t,
+                        status: receipt.status === "success" ? "CONFIRMED" : "REVERTED",
+                      }
+                    : t
+                )
+              );
+              if (receipt.status === "success") {
+                toast.success("Triangular Arbitrage Confirmed on Base!", {
+                  description: `Gas Used: ${receipt.gasUsed.toString()}`,
+                });
+              } else {
+                toast.error("Transaction reverted on-chain.");
+              }
+            })
+            .catch(() => {});
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Live execution failed";
+        const isUserReject =
+          msg.toLowerCase().includes("user rejected") ||
+          msg.toLowerCase().includes("rejected") ||
+          msg.toLowerCase().includes("action_rejected") ||
+          (err as { code?: number })?.code === 4001;
+
+        if (isUserReject) {
+          setAutoSubmitTrades(false);
+          addTerminalLog(
+            "warn",
+            "🛑 [AUTO-DISPATCH] Transaction signature rejected in wallet. 'Auto-Submit to Wallet' turned OFF for your protection."
+          );
+          toast.info("Auto-Submit disabled after wallet cancellation.");
+        } else {
+          toast.error("Execution error", { id: toastId, description: msg });
+        }
+      } finally {
+        setIsExecutingTri(false);
+        isAutoDispatchingRef.current = false;
+        lastDispatchTimeRef.current = Date.now();
       }
-    } finally {
-      setIsExecutingTri(false);
-      isAutoDispatchingRef.current = false;
-      lastDispatchTimeRef.current = Date.now();
-    }
-  }, [
-    isConnected,
-    address,
-    isBaseNetwork,
-    triInitialWeth,
-    triSlippageBps,
-    triangularResult,
-    switchChain,
-    writeContractAsync,
-    publicClient,
-  ]);
+    },
+    [
+      isConnected,
+      address,
+      isBaseNetwork,
+      triInitialWeth,
+      triSlippageBps,
+      triangularResult,
+      switchChain,
+      writeContractAsync,
+      publicClient,
+    ]
+  );
 
   // ──────────────────────────────────────────────────────────────────────────
   // TAB 2: Cross-DEX Spreads State & Execution
@@ -620,6 +638,31 @@ export default function Arbitrage() {
   const [dualPoolAPrice, setDualPoolAPrice] = useState<number>(3450.0);
   const [dualPoolBPrice, setDualPoolBPrice] = useState<number>(3472.0);
   const [dualUnits, setDualUnits] = useState<number>(2.0);
+
+  // Start the manual tabs from live Base rates (1 WETH size) instead of placeholder numbers.
+  const [liveRatesStatus, setLiveRatesStatus] = useState<"loading" | "live" | "unavailable">(
+    "loading"
+  );
+  useEffect(() => {
+    let cancelled = false;
+    const client = createPublicClient({ chain: base, transport: createBaseReadTransport() });
+    fetchLiveBotQuotes(client, BOT_QUOTE_VENUES, 1).then((live) => {
+      if (cancelled) return;
+      if (!live) {
+        setLiveRatesStatus("unavailable");
+        return;
+      }
+      setTriWethUsdcPrice(Number(live.wethUsdcPrice.toFixed(2)));
+      setTriUsdcDaiRate(Number(live.usdcDaiRate.toFixed(6)));
+      setTriDaiWethRate(live.daiWethRate);
+      setDualPoolAPrice(Number(live.uniswapEthPrice.toFixed(2)));
+      setDualPoolBPrice(Number(live.aerodromeEthPrice.toFixed(2)));
+      setLiveRatesStatus("live");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [isExecutingSpread, setIsExecutingSpread] = useState<boolean>(false);
 
   const dualPoolResult = useMemo(() => {
@@ -638,7 +681,12 @@ export default function Arbitrage() {
   }, [dualPoolAPrice, dualPoolBPrice, dualUnits]);
 
   const handleExecuteLiveSpreadLeg = useCallback(
-    async (venue: "UNISWAP" | "AERODROME", action: "BUY" | "SELL") => {
+    async (
+      venue: "UNISWAP" | "AERODROME",
+      action: "BUY" | "SELL",
+      /** The bot's on-chain quote: size and USDC per WETH received; buttons use this tab's inputs. */
+      live?: { units: number; refPrice: number }
+    ) => {
       if (!isConnected || !address) {
         toast.error("Please connect your Web3 wallet.");
         return;
@@ -654,18 +702,19 @@ export default function Arbitrage() {
       const toastId = toast.loading(`Dispatching Live ${action} on ${venue} (Base)...`);
 
       try {
-        const refPrice = venue === "UNISWAP" ? dualPoolAPrice : dualPoolBPrice;
+        const refPrice = live?.refPrice ?? (venue === "UNISWAP" ? dualPoolAPrice : dualPoolBPrice);
+        const units = live?.units ?? dualUnits;
         const slippageBps = 50; // 0.50%
         const deadline = BigInt(Math.floor(Date.now() / 1000) + 600);
 
-        const amountInEth = parseEther(dualUnits.toString());
+        const amountInEth = parseEther(units.toString());
         const minAmountOutUsdc = parseUnits(
-          (dualUnits * refPrice * (1 - slippageBps / 10000)).toFixed(6),
+          (units * refPrice * (1 - slippageBps / 10000)).toFixed(6),
           6
         );
 
-        const amountInUsdc = parseUnits((dualUnits * refPrice).toFixed(6), 6);
-        const minAmountOutEth = parseEther((dualUnits * (1 - slippageBps / 10000)).toFixed(18));
+        const amountInUsdc = parseUnits((units * refPrice).toFixed(6), 6);
+        const minAmountOutEth = parseEther((units * (1 - slippageBps / 10000)).toFixed(18));
 
         const aeroRoutes = [
           {
@@ -1270,83 +1319,119 @@ export default function Arbitrage() {
   useEffect(() => {
     if (!isBotRunning) return;
 
-    const runScanTick = () => {
+    let cancelled = false;
+    let tickInFlight = false;
+    const quoteClient = createPublicClient({ chain: base, transport: createBaseReadTransport() });
+
+    const runScanTick = async () => {
+      if (tickInFlight) return; // previous tick still waiting on quotes
+      tickInFlight = true;
+      try {
+        await scanTick();
+      } finally {
+        tickInFlight = false;
+      }
+    };
+
+    const scanTick = async () => {
       const params = botParamsRef.current;
       setBotStats((prev) => ({ ...prev, scansCount: prev.scansCount + 1 }));
 
-      const currentBlock = params.blockNumber ? params.blockNumber.toString() : "52071800";
-      // Realistic live pricing micro-movements on Base L2 AMMs
-      const tickNoise = (Math.random() - 0.48) * 3.5;
-      const currentUniPrice = 2735.0 + tickNoise;
-      const currentAeroPrice = 2736.2 + tickNoise + (Math.random() > 0.92 ? 14.5 : 0.4);
-      const currentUsdcDai = 1.0002;
-      const currentDaiWeth = 1 / (2735.0 + tickNoise);
+      const currentBlock = params.blockNumber ? params.blockNumber.toString() : "pending";
+      // Live on-chain quotes at the trade size, from the routers the live handlers use.
+      const live = await fetchLiveBotQuotes(quoteClient, BOT_QUOTE_VENUES, params.triInitialWeth);
+      if (cancelled) return;
 
-      const botConfig: BotConfig = {
-        minNetProfitUsd: params.minNetProfitTarget,
-        maxSlippageBps: Math.round(params.maxSlippageCap * 100),
-        maxGasCeilingGwei: params.maxGasCeiling,
-        strategies: {
-          triangular: params.strategyTriangular,
-          crossDex: params.strategyCrossDex,
-          flashLoan: params.strategyFlashLoan,
-        },
-        tradeCapitalEth: params.triInitialWeth,
-        flashBorrowUsdc: params.flashBorrowAmount,
-        vipTier: params.flashVipTier,
-      };
-
-      const marketSnapshot: MarketSnapshot = {
-        wethUsdcPrice: currentUniPrice,
-        usdcDaiRate: currentUsdcDai,
-        daiWethRate: currentDaiWeth,
-        uniswapEthPrice: currentUniPrice,
-        aerodromeEthPrice: currentAeroPrice,
-        currentGasGwei: params.gasPriceGwei,
-        timestamp: Date.now(),
-      };
-
-      const evalResult = AiArbitrageBotEngine.evaluateMarketOpportunity(botConfig, marketSnapshot);
-
-      if (evalResult.qualified) {
+      if (!live) {
         addTerminalLog(
-          "success",
-          `⚡ [BLOCK #${currentBlock}] OPPORTUNITY QUALIFIED: ${evalResult.summary} | Est. Net: +$${evalResult.projectedNetProfitUsd.toFixed(2)} (Confidence: ${evalResult.confidenceScore}%)`
+          "warn",
+          `⏸ [BLOCK #${currentBlock}] No live Uniswap V2 / Aerodrome quote this tick: AMM strategies skipped, nothing dispatched.`
         );
-        if (evalResult.breakdown) {
+      } else {
+        const botConfig: BotConfig = {
+          minNetProfitUsd: params.minNetProfitTarget,
+          maxSlippageBps: Math.round(params.maxSlippageCap * 100),
+          maxGasCeilingGwei: params.maxGasCeiling,
+          strategies: {
+            triangular: params.strategyTriangular,
+            crossDex: params.strategyCrossDex,
+            flashLoan: params.strategyFlashLoan,
+          },
+          tradeCapitalEth: params.triInitialWeth,
+          flashBorrowUsdc: params.flashBorrowAmount,
+          vipTier: params.flashVipTier,
+        };
+
+        const marketSnapshot: MarketSnapshot = {
+          wethUsdcPrice: live.wethUsdcPrice,
+          usdcDaiRate: live.usdcDaiRate,
+          daiWethRate: live.daiWethRate,
+          uniswapEthPrice: live.uniswapEthPrice,
+          aerodromeEthPrice: live.aerodromeEthPrice,
+          aerodromeFeeRate: live.aerodromeFeeRate,
+          currentGasGwei: params.gasPriceGwei,
+          timestamp: Date.now(),
+        };
+
+        const evalResult = AiArbitrageBotEngine.evaluateMarketOpportunity(
+          botConfig,
+          marketSnapshot
+        );
+
+        if (evalResult.qualified) {
           addTerminalLog(
-            "info",
-            `📊 [P&L TELEMETRY] Gross: $${evalResult.breakdown.grossProfitUsd.toFixed(2)} | Aave Fee (-0.05%): -$${evalResult.breakdown.flashLoanFeeUsd.toFixed(2)} | Gas: -$${evalResult.breakdown.estimatedGasUsd.toFixed(2)} | Hurdle Floor: $${evalResult.breakdown.minProfitFloorUsd.toFixed(2)}`
+            "success",
+            `⚡ [BLOCK #${currentBlock}] OPPORTUNITY QUALIFIED: ${evalResult.summary} | Est. Net: +$${evalResult.projectedNetProfitUsd.toFixed(2)} (Confidence: ${evalResult.confidenceScore}%)`
           );
-        }
-        setBotStats((prev) => ({
-          ...prev,
-          opportunitiesDetected: prev.opportunitiesDetected + 1,
-        }));
-
-        if (params.autoSubmitTrades && params.isConnected && params.isBaseNetwork) {
-          const now = Date.now();
-          if (isAutoDispatchingRef.current) {
-            // Already awaiting wallet confirmation — do NOT fire a second popup!
-            return;
+          if (evalResult.breakdown) {
+            addTerminalLog(
+              "info",
+              `📊 [P&L TELEMETRY] Gross: $${evalResult.breakdown.grossProfitUsd.toFixed(2)} | Aave Fee (-0.05%): -$${evalResult.breakdown.flashLoanFeeUsd.toFixed(2)} | Gas: -$${evalResult.breakdown.estimatedGasUsd.toFixed(2)} | Hurdle Floor: $${evalResult.breakdown.minProfitFloorUsd.toFixed(2)}`
+            );
           }
-          if (now - lastDispatchTimeRef.current < 25_000) {
-            // 25-second cooldown between auto-dispatches to avoid spam
-            return;
-          }
+          setBotStats((prev) => ({
+            ...prev,
+            opportunitiesDetected: prev.opportunitiesDetected + 1,
+          }));
 
-          if (evalResult.strategy === "FLASH_LOAN") {
-            if (!params.isAtomicRouter) {
+          if (params.autoSubmitTrades && params.isConnected && params.isBaseNetwork) {
+            const now = Date.now();
+            if (isAutoDispatchingRef.current) {
+              // Already awaiting wallet confirmation — do NOT fire a second popup!
+              return;
+            }
+            if (now - lastDispatchTimeRef.current < 25_000) {
+              // 25-second cooldown between auto-dispatches to avoid spam
+              return;
+            }
+
+            if (evalResult.strategy === "FLASH_LOAN") {
+              if (!params.isAtomicRouter) {
+                addTerminalLog(
+                  "warn",
+                  `⚠️ [HELD] Flash loan signal (+${evalResult.projectedNetProfitUsd.toFixed(2)} USD). Deploy AtomicFlashArbitrageRouter in '3. Flash Loans' tab to enable autonomous execution.`
+                );
+                return;
+              }
+
               addTerminalLog(
-                "warn",
-                `⚠️ [HELD] Flash loan signal (+${evalResult.projectedNetProfitUsd.toFixed(2)} USD). Deploy AtomicFlashArbitrageRouter in '3. Flash Loans' tab to enable autonomous execution.`
+                "info",
+                `🚀 [AUTO-DISPATCH] Pre-flight simulation initiated for ${evalResult.strategy} (+${evalResult.projectedNetProfitUsd.toFixed(2)} USD)...`
               );
+              setBotStats((prev) => ({
+                ...prev,
+                tradesDispatched: prev.tradesDispatched + 1,
+                totalProfitUsd: Number(
+                  (prev.totalProfitUsd + evalResult.projectedNetProfitUsd).toFixed(2)
+                ),
+              }));
+              params.handleExecuteLiveFlashLoan();
               return;
             }
 
             addTerminalLog(
               "info",
-              `🚀 [AUTO-DISPATCH] Pre-flight simulation initiated for ${evalResult.strategy} (+${evalResult.projectedNetProfitUsd.toFixed(2)} USD)...`
+              `🚀 [AUTO-DISPATCH] Submitting atomic transaction on Base Mainnet for ${evalResult.strategy}...`
             );
             setBotStats((prev) => ({
               ...prev,
@@ -1355,51 +1440,40 @@ export default function Arbitrage() {
                 (prev.totalProfitUsd + evalResult.projectedNetProfitUsd).toFixed(2)
               ),
             }));
-            params.handleExecuteLiveFlashLoan();
-            return;
-          }
 
-          addTerminalLog(
-            "info",
-            `🚀 [AUTO-DISPATCH] Submitting atomic transaction on Base Mainnet for ${evalResult.strategy}...`
-          );
-          setBotStats((prev) => ({
-            ...prev,
-            tradesDispatched: prev.tradesDispatched + 1,
-            totalProfitUsd: Number(
-              (prev.totalProfitUsd + evalResult.projectedNetProfitUsd).toFixed(2)
-            ),
-          }));
-
-          // Trigger execution based on strategy
-          if (evalResult.strategy === "TRIANGULAR") {
-            params.handleExecuteLiveTriangular();
-          } else if (evalResult.strategy === "CROSS_DEX") {
-            params.handleExecuteLiveSpreadLeg("UNISWAP", "BUY");
+            // Trigger execution based on strategy
+            if (evalResult.strategy === "TRIANGULAR") {
+              params.handleExecuteLiveTriangular({ terminalWeth: live.triangularTerminalWeth });
+            } else if (evalResult.strategy === "CROSS_DEX") {
+              params.handleExecuteLiveSpreadLeg("UNISWAP", "BUY", {
+                units: live.tradeWeth,
+                refPrice: live.uniswapExecutionPrice,
+              });
+            }
+          } else if (!params.autoSubmitTrades) {
+            addTerminalLog(
+              "warn",
+              `⚠️ Opportunity held: 'Auto-Submit to Wallet' is OFF. Enable toggle to execute automatically.`
+            );
+          } else if (!params.isConnected) {
+            addTerminalLog(
+              "warn",
+              `⚠️ Opportunity held: Web3 wallet is disconnected. Connect wallet to auto-execute.`
+            );
           }
-        } else if (!params.autoSubmitTrades) {
-          addTerminalLog(
-            "warn",
-            `⚠️ Opportunity held: 'Auto-Submit to Wallet' is OFF. Enable toggle to execute automatically.`
-          );
-        } else if (!params.isConnected) {
-          addTerminalLog(
-            "warn",
-            `⚠️ Opportunity held: Web3 wallet is disconnected. Connect wallet to auto-execute.`
-          );
-        }
-      } else {
-        // Disqualified / held for safety
-        if (evalResult.disqualificationReason?.includes("safety ceiling")) {
-          addTerminalLog(
-            "danger",
-            `🛑 [BLOCK #${currentBlock}] Gas Guard: ${evalResult.disqualificationReason}`
-          );
         } else {
-          addTerminalLog(
-            "info",
-            `🔍 [BLOCK #${currentBlock}] Scanned Base pools | ${evalResult.summary} | Anti-Loss: ${evalResult.disqualificationReason ?? "Holding for higher spread"}`
-          );
+          // Disqualified / held for safety
+          if (evalResult.disqualificationReason?.includes("safety ceiling")) {
+            addTerminalLog(
+              "danger",
+              `🛑 [BLOCK #${currentBlock}] Gas Guard: ${evalResult.disqualificationReason}`
+            );
+          } else {
+            addTerminalLog(
+              "info",
+              `🔍 [BLOCK #${currentBlock}] Scanned Base pools | ${evalResult.summary} | Anti-Loss: ${evalResult.disqualificationReason ?? "Holding for higher spread"}`
+            );
+          }
         }
       }
 
@@ -1498,10 +1572,13 @@ export default function Arbitrage() {
     };
 
     // Run first tick immediately on startup
-    runScanTick();
-    const interval = setInterval(runScanTick, 2800);
+    void runScanTick();
+    const interval = setInterval(() => void runScanTick(), 2800);
 
-    return () => clearInterval(interval);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, [isBotRunning, addTerminalLog]);
 
   const handleToggleBot = () => {
@@ -1870,7 +1947,7 @@ export default function Arbitrage() {
             <Card className="border-amber-200 bg-amber-50/30 shadow-sm">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-xs font-semibold text-amber-800">
-                  Simulated Signal Edge (Paper)
+                  Projected Edge of Dispatched Signals
                 </CardTitle>
                 <Flame className="size-4 text-amber-600" />
               </CardHeader>
@@ -1879,11 +1956,12 @@ export default function Arbitrage() {
                   +${botStats.totalProfitUsd.toFixed(2)} USD
                 </div>
                 <p className="mt-1 text-[11px] text-amber-800/80">
-                  {botStats.tradesDispatched} paper simulations (0 real funds spent)
+                  {botStats.tradesDispatched} signals sent to your wallet for confirmation.
+                  Projections from live quotes, not settled profit.
                 </p>
                 <div className="mt-2 flex items-center justify-between rounded bg-amber-100/60 px-2 py-0.5 text-[10px] font-medium text-amber-900">
                   <span>Real Settled P&L:</span>
-                  <span className="font-mono font-bold">$0.00 (Demo Mode)</span>
+                  <span className="font-mono font-bold">Not tracked; check BaseScan</span>
                 </div>
               </CardContent>
             </Card>
@@ -1896,8 +1974,10 @@ export default function Arbitrage() {
                 <ShieldCheck className="size-4 text-indigo-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-xl font-black text-indigo-600">0.0% Loss</div>
-                <p className="mt-1 text-[11px] text-slate-400">Enforced by atomic revert</p>
+                <div className="text-xl font-black text-indigo-600">Min-output enforced</div>
+                <p className="mt-1 text-[11px] text-slate-400">
+                  Swaps revert below the quoted minimum; a reverted transaction still pays gas.
+                </p>
               </CardContent>
             </Card>
           </div>
@@ -1957,9 +2037,9 @@ export default function Arbitrage() {
               <div className="flex items-center gap-1.5">
                 <Lock className="size-3 text-amber-400" />
                 <span>
-                  <strong>Anti-Loss Guarantee:</strong> No money disappears into thin air. Active
-                  session telemetry (+${botStats.totalProfitUsd.toFixed(2)} USD) tracks signals.
-                  Confirmed trades automatically deposit into the destinations above.
+                  <strong>Anti-Loss Guard:</strong> every dispatch is simulated on-chain first and
+                  carries a minimum output. Session projections (+$
+                  {botStats.totalProfitUsd.toFixed(2)} USD) are estimates, not settled profit.
                 </span>
               </div>
               <div className="shrink-0 font-mono text-slate-400">
@@ -2417,6 +2497,13 @@ export default function Arbitrage() {
                     </div>
                   </div>
 
+                  <p className="text-xs text-slate-500">
+                    {liveRatesStatus === "live"
+                      ? "Rates loaded from live Base quotes (1 WETH size). Edit to model other prices."
+                      : liveRatesStatus === "loading"
+                        ? "Loading live Base rates..."
+                        : "Live Base rates unavailable: these are placeholder numbers, not market prices."}
+                  </p>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <div className="space-y-2">
                       <Label htmlFor="wethPrice">Leg 1: WETH/USDC ($)</Label>
@@ -2513,7 +2600,7 @@ export default function Arbitrage() {
 
                   <div className="space-y-2 pt-2">
                     <Button
-                      onClick={handleExecuteLiveTriangular}
+                      onClick={() => handleExecuteLiveTriangular()}
                       disabled={isExecutingTri || !isConnected || !isBaseNetwork}
                       className="w-full bg-gradient-to-r from-purple-600 to-rose-600 font-bold text-white shadow-md hover:from-purple-700 hover:to-rose-700"
                       size="lg"
@@ -2552,6 +2639,13 @@ export default function Arbitrage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  <p className="text-xs text-slate-500">
+                    {liveRatesStatus === "live"
+                      ? "Rates loaded from live Base quotes (1 WETH size). Edit to model other prices."
+                      : liveRatesStatus === "loading"
+                        ? "Loading live Base rates..."
+                        : "Live Base rates unavailable: these are placeholder numbers, not market prices."}
+                  </p>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="uniswapPrice">Uniswap V2 Price ($)</Label>

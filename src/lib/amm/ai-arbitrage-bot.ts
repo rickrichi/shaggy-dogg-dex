@@ -31,6 +31,8 @@ export interface MarketSnapshot {
   readonly daiWethRate: number;
   readonly uniswapEthPrice: number;
   readonly aerodromeEthPrice: number;
+  /** Aerodrome pool fee as a fraction; read on-chain by the live snapshot. Defaults to 0.30%. */
+  readonly aerodromeFeeRate?: number;
   readonly currentGasGwei: number;
   readonly timestamp: number;
 }
@@ -155,7 +157,7 @@ export class AiArbitrageBotEngine {
           poolBPrice: market.aerodromeEthPrice,
           amountUnits: config.tradeCapitalEth,
           poolAFeeRate: 0.003,
-          poolBFeeRate: 0.003,
+          poolBFeeRate: market.aerodromeFeeRate ?? 0.003,
           l2GasUsd: 0.08,
         });
 

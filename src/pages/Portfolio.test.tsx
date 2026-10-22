@@ -138,4 +138,36 @@ describe("Portfolio Page - Permanent On-Chain Flow", () => {
     expect(screen.getByText("0.0103")).toBeInTheDocument();
     expect(screen.getByText("500,000")).toBeInTheDocument();
   });
+
+  it("says prices are unavailable instead of showing a made-up value", () => {
+    vi.mocked(wagmi.useAccount).mockReturnValue({
+      address: "0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98",
+      isConnected: true,
+    } as unknown as ReturnType<typeof wagmi.useAccount>);
+    vi.mocked(wagmi.useChainId).mockReturnValue(8453);
+    vi.mocked(usePortfolioModule.usePortfolio).mockReturnValue({
+      tokens: [],
+      summary: {
+        totalValue: 0,
+        totalTokens: 0,
+        topChain: "Base",
+        biggestHolding: null,
+        percentChange24h: 0,
+      },
+      isLoading: false,
+      error: null,
+      pricesUnavailable: true,
+      refetch: vi.fn(),
+    });
+
+    render(
+      <BrowserRouter>
+        <Portfolio />
+      </BrowserRouter>
+    );
+
+    expect(screen.getByText("Price unavailable")).toBeInTheDocument();
+    expect(screen.getByText(/The price server did not answer/)).toBeInTheDocument();
+    expect(screen.queryByText("$0.00")).not.toBeInTheDocument();
+  });
 });
