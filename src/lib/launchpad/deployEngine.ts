@@ -1,7 +1,15 @@
-// src/lib/launchpad/deployEngine.ts
-import { type Address, parseEther, parseUnits, type PublicClient, type WalletClient } from "viem";
+import {
+  type Address,
+  parseAbi,
+  parseEther,
+  parseUnits,
+  type PublicClient,
+  type WalletClient,
+} from "viem";
+import { base } from "viem/chains";
 
 import { ERC20_ABI, UNISWAP_V2_ROUTER_ABI } from "@/config/abis";
+import { buildV3MintCall } from "@/lib/amm/uniswap-v3";
 
 import { LAUNCHPAD_ARTIFACTS } from "./artifacts";
 import { CANONICAL_BASE_CONTRACTS, DEX_VENUES } from "./constants";
@@ -14,8 +22,27 @@ export async function executeLaunchpadDeployment(
   form: LaunchpadFormState,
   userAddress: Address
 ): Promise<DeployedEcosystemResult> {
+  if (publicClient.chain?.id !== 8453 || (await walletClient.getChainId()) !== 8453) {
+    throw new Error("Launchpad deployment requires Base Mainnet");
+  }
+  if (form.decimals !== 18) throw new Error("GovernanceToken uses 18 decimals");
+  if (
+    form.enableDexSeeding &&
+    form.recipientAdminAddress &&
+    form.recipientAdminAddress.toLowerCase() !== userAddress.toLowerCase()
+  ) {
+    throw new Error("Initial liquidity must be seeded by the wallet receiving the token supply");
+  }
+  const adminWallet = CANONICAL_BASE_CONTRACTS.DeployerAdminWallet.toLowerCase();
+  if (userAddress.toLowerCase() !== adminWallet) {
+    throw new Error(
+      `Deployment restricted: Only protocol administrator (${CANONICAL_BASE_CONTRACTS.DeployerAdminWallet}) can launch tokens.`
+    );
+  }
+
   const supplyUnits = parseUnits(form.initialSupply, form.decimals || 18);
   const recipient = (form.recipientAdminAddress?.trim() as Address) || userAddress;
+  const activeChain = base;
 
   // ────────────────────────────────────────────────────────────────────────────
   // Step 1: Deploy Token (GovernanceToken.sol)
@@ -32,7 +59,7 @@ export async function executeLaunchpadDeployment(
       supplyUnits,
     ],
     account: userAddress,
-    chain: null,
+    chain: activeChain,
   });
 
   const tokenReceipt = await publicClient.waitForTransactionReceipt({ hash: tokenTxHash });
@@ -44,7 +71,13 @@ export async function executeLaunchpadDeployment(
   let stakingAddress: Address | undefined;
   let vaultAddress: Address | undefined;
   let borrowerAddress: Address | undefined;
+  let compoundVaultAddress: Address | undefined;
   const pairAddress: Address | undefined = undefined;
+  let liquiditySeedingError: string | undefined;
+  const confirm = async (hash: `0x${string}`) => {
+    const receipt = await publicClient.waitForTransactionReceipt({ hash });
+    if (receipt.status !== "success") throw new Error("Liquidity transaction reverted");
+  };
 
   // ────────────────────────────────────────────────────────────────────────────
   // Step 2: Deploy Staking if Archetype requires it
@@ -64,7 +97,7 @@ export async function executeLaunchpadDeployment(
       bytecode: LAUNCHPAD_ARTIFACTS.FeeDiscountStaking.bytecode,
       args: [tokenAddress, recipient, recipient],
       account: userAddress,
-      chain: null,
+      chain: activeChain,
     });
     const stakingReceipt = await publicClient.waitForTransactionReceipt({ hash: stakingHash });
     stakingAddress = stakingReceipt.contractAddress ?? undefined;
@@ -77,7 +110,8 @@ export async function executeLaunchpadDeployment(
   if (
     form.selectedArchetype === "moonwell_lending" ||
     form.selectedArchetype === "morpho_blue_isolated" ||
-    form.selectedArchetype === "silo_isolated_vault"
+    form.selectedArchetype === "silo_isolated_vault" ||
+    form.selectedArchetype === "fluid_hybrid_amm"
   ) {
     console.log(`[Launchpad] Deploying IsolatedLendingVault (ERC-4626) on Base...`);
     const vaultHash = await walletClient.deployContract({
@@ -92,7 +126,7 @@ export async function executeLaunchpadDeployment(
         recipient,
       ],
       account: userAddress,
-      chain: null,
+      chain: activeChain,
     });
     const vaultReceipt = await publicClient.waitForTransactionReceipt({ hash: vaultHash });
     vaultAddress = vaultReceipt.contractAddress ?? undefined;
@@ -111,7 +145,7 @@ export async function executeLaunchpadDeployment(
         recipient,
       ],
       account: userAddress,
-      chain: null,
+      chain: activeChain,
     });
     const vaultReceipt = await publicClient.waitForTransactionReceipt({ hash: vaultHash });
     vaultAddress = vaultReceipt.contractAddress ?? undefined;
@@ -129,11 +163,29 @@ export async function executeLaunchpadDeployment(
         recipient,
       ],
       account: userAddress,
-      chain: null,
+      chain: activeChain,
     });
     const vaultReceipt = await publicClient.waitForTransactionReceipt({ hash: vaultHash });
     vaultAddress = vaultReceipt.contractAddress ?? undefined;
     console.log(`[Launchpad] Yield Staking Vault deployed at: ${vaultAddress}`);
+
+    console.log(`[Launchpad] Deploying CompoundYieldVault suite component...`);
+    const compHash = await walletClient.deployContract({
+      abi: LAUNCHPAD_ARTIFACTS.CompoundYieldVault.abi,
+      bytecode: LAUNCHPAD_ARTIFACTS.CompoundYieldVault.bytecode,
+      args: [
+        CANONICAL_BASE_CONTRACTS.USDC,
+        CANONICAL_BASE_CONTRACTS.CompoundComet,
+        stakingAddress ?? "0x0000000000000000000000000000000000000000",
+        recipient,
+        recipient,
+      ],
+      account: userAddress,
+      chain: activeChain,
+    });
+    const compReceipt = await publicClient.waitForTransactionReceipt({ hash: compHash });
+    compoundVaultAddress = compReceipt.contractAddress ?? undefined;
+    console.log(`[Launchpad] Compound Yield Vault deployed at: ${compoundVaultAddress}`);
 
     console.log(`[Launchpad] Deploying AaveFlashBorrower suite component...`);
     const borrowerHash = await walletClient.deployContract({
@@ -141,7 +193,7 @@ export async function executeLaunchpadDeployment(
       bytecode: LAUNCHPAD_ARTIFACTS.AaveFlashBorrower.bytecode,
       args: [CANONICAL_BASE_CONTRACTS.AaveV3Pool, recipient],
       account: userAddress,
-      chain: null,
+      chain: activeChain,
     });
     const borrowerReceipt = await publicClient.waitForTransactionReceipt({ hash: borrowerHash });
     borrowerAddress = borrowerReceipt.contractAddress ?? undefined;
@@ -152,45 +204,108 @@ export async function executeLaunchpadDeployment(
   // Step 4: Multi-DEX Liquidity Seeding (Optional)
   // ────────────────────────────────────────────────────────────────────────────
   if (form.enableDexSeeding && form.initialEthLiquidity && Number(form.initialEthLiquidity) > 0) {
-    const venue = DEX_VENUES.find((v) => v.id === form.selectedDex) ?? DEX_VENUES[0]!;
-    const router = venue.routerAddress;
-    const ethAmount = parseEther(form.initialEthLiquidity);
-    const tokenPercent = Math.min(Math.max(form.initialTokenLiquidityPercent || 50, 1), 100);
-    const tokenAmount = (supplyUnits * BigInt(tokenPercent)) / 100n;
+    try {
+      const venue = DEX_VENUES.find((v) => v.id === form.selectedDex) ?? DEX_VENUES[0]!;
+      const router = venue.routerAddress;
+      const ethAmount = parseEther(form.initialEthLiquidity);
+      const tokenPercent = Math.min(Math.max(form.initialTokenLiquidityPercent || 50, 1), 100);
+      const tokenAmount = (supplyUnits * BigInt(tokenPercent)) / 100n;
 
-    console.log(
-      `[Launchpad] Approving ${venue.name} router for ${tokenAmount.toString()} tokens...`
-    );
-    const approveHash = await walletClient.writeContract({
-      address: tokenAddress,
-      abi: ERC20_ABI,
-      functionName: "approve",
-      args: [router, tokenAmount],
-      account: userAddress,
-      chain: null,
-    });
-    await publicClient.waitForTransactionReceipt({ hash: approveHash });
+      if (venue.id === "uniswap_v3") {
+        console.log(`[Launchpad] Initializing & Minting Uniswap V3 Pool...`);
+        const posMgr = CANONICAL_BASE_CONTRACTS.UniswapV3PositionManager;
+        const feeTier = 10000; // 1% for community tokens
 
-    console.log(`[Launchpad] Adding initial liquidity to ${venue.name}...`);
-    const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200); // 20 mins
-    const liqHash = await walletClient.writeContract({
-      address: router,
-      abi: UNISWAP_V2_ROUTER_ABI,
-      functionName: "addLiquidityETH",
-      args: [
-        tokenAddress,
-        tokenAmount,
-        (tokenAmount * 95n) / 100n, // 5% slippage floor for initial seed
-        (ethAmount * 95n) / 100n,
-        recipient,
-        deadline,
-      ],
-      value: ethAmount,
-      account: userAddress,
-      chain: null,
-    });
-    await publicClient.waitForTransactionReceipt({ hash: liqHash });
-    console.log(`[Launchpad] Liquidity added successfully to ${venue.name}!`);
+        // 1. Wrap ETH to WETH
+        const wrapAbi = parseAbi(["function deposit() payable"]);
+        const wrapTx = await walletClient.writeContract({
+          address: CANONICAL_BASE_CONTRACTS.WETH,
+          abi: wrapAbi,
+          functionName: "deposit",
+          value: ethAmount,
+          account: userAddress,
+          chain: activeChain,
+        });
+        await confirm(wrapTx);
+
+        // 3. Approve WETH & Token for Position Manager
+        const approveToken = await walletClient.writeContract({
+          address: tokenAddress,
+          abi: ERC20_ABI,
+          functionName: "approve",
+          args: [posMgr, tokenAmount],
+          account: userAddress,
+          chain: activeChain,
+        });
+        await confirm(approveToken);
+
+        const approveWeth = await walletClient.writeContract({
+          address: CANONICAL_BASE_CONTRACTS.WETH,
+          abi: ERC20_ABI,
+          functionName: "approve",
+          args: [posMgr, ethAmount],
+          account: userAddress,
+          chain: activeChain,
+        });
+        await confirm(approveWeth);
+
+        // 4. Mint Full Range Position
+        const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200);
+        const { request } = await publicClient.simulateContract({
+          ...buildV3MintCall(
+            CANONICAL_BASE_CONTRACTS.WETH,
+            tokenAddress,
+            ethAmount,
+            tokenAmount,
+            feeTier,
+            recipient,
+            deadline
+          ),
+          account: userAddress,
+        });
+        const mintTx = await walletClient.writeContract({ ...request, chain: activeChain });
+        await confirm(mintTx);
+        console.log(`[Launchpad] Uniswap V3 position minted successfully!`);
+      } else {
+        console.log(
+          `[Launchpad] Approving ${venue.name} router for ${tokenAmount.toString()} tokens...`
+        );
+        const approveHash = await walletClient.writeContract({
+          address: tokenAddress,
+          abi: ERC20_ABI,
+          functionName: "approve",
+          args: [router, tokenAmount],
+          account: userAddress,
+          chain: activeChain,
+        });
+        await publicClient.waitForTransactionReceipt({ hash: approveHash });
+
+        console.log(`[Launchpad] Adding initial liquidity to ${venue.name}...`);
+        const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200); // 20 mins
+        const liqHash = await walletClient.writeContract({
+          address: router,
+          abi: UNISWAP_V2_ROUTER_ABI,
+          functionName: "addLiquidityETH",
+          args: [
+            tokenAddress,
+            tokenAmount,
+            (tokenAmount * 95n) / 100n, // 5% slippage floor for initial seed
+            (ethAmount * 95n) / 100n,
+            recipient,
+            deadline,
+          ],
+          value: ethAmount,
+          account: userAddress,
+          chain: activeChain,
+        });
+        await publicClient.waitForTransactionReceipt({ hash: liqHash });
+        console.log(`[Launchpad] Liquidity added successfully to ${venue.name}!`);
+      }
+    } catch (seedErr) {
+      liquiditySeedingError =
+        seedErr instanceof Error ? seedErr.message : "Liquidity seeding failed";
+      console.warn("[Launchpad] Liquidity seeding warning (token is already deployed):", seedErr);
+    }
   }
 
   return {
@@ -198,7 +313,9 @@ export async function executeLaunchpadDeployment(
     stakingAddress,
     vaultAddress,
     borrowerAddress,
+    compoundVaultAddress,
     pairAddress,
+    liquiditySeedingError,
     txHash: tokenTxHash,
     deploymentMode: form.executionMode,
     archetype: form.selectedArchetype,

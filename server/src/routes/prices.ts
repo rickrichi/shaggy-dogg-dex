@@ -6,6 +6,7 @@ import { marketDataNative, marketDataTokens } from '../utils/marketData.js'
 
 import type { Hono as HonoApp } from 'hono'
 import type { PriceRow } from '../schemas/prices.js'
+import type { TokenPrices } from '../utils/marketData.js'
 
 const NATIVE_SYMBOL: Record<number, string> = {
   1: 'ETH',
@@ -26,12 +27,18 @@ async function nativeCached(symbol: string): Promise<PriceRow | undefined> {
   return row
 }
 
-/** Native + ERC-20 rows for one chain; tokens Market-Data cannot price are simply absent. */
-async function chainPrices(chainId: number, addresses: string[]): Promise<{ native?: PriceRow; tokens: PriceRow[] }> {
+const NO_TOKENS: TokenPrices = { rows: [], unpriced: [], failed: [] }
+
+/** Native + ERC-20 rows for one chain, plus which addresses could not be priced and why. */
+async function chainPrices(
+  chainId: number,
+  addresses: string[],
+  includeThin = false,
+): Promise<{ native?: PriceRow; tokens: TokenPrices }> {
   const symbol = NATIVE_SYMBOL[chainId]
   const [native, tokens] = await Promise.all([
     symbol ? nativeCached(symbol) : Promise.resolve(undefined),
-    addresses.length > 0 ? marketDataTokens(chainId, addresses) : Promise.resolve([]),
+    addresses.length > 0 ? marketDataTokens(chainId, addresses, includeThin) : Promise.resolve(NO_TOKENS),
   ])
   return { ...(native ? { native } : {}), tokens }
 }
@@ -61,28 +68,37 @@ export function mountPriceRoutes(app: HonoApp): void {
     return c.json({
       native: { symbol: native.symbol ?? NATIVE_SYMBOL[chainId], usd: native.priceUsd, usd_24h_change: native.change24hPercent },
       tokens: Object.fromEntries(
-        tokens.map((t) => [t.address.toLowerCase(), { usd: t.priceUsd, usd_24h_change: t.change24hPercent }]),
+        tokens.rows.map((t) => [t.address.toLowerCase(), { usd: t.priceUsd, usd_24h_change: t.change24hPercent }]),
       ),
     })
   })
 
-  // POST /api/prices { chainId, addresses } -> { success, data: { prices: PriceRow[] } }
+  // POST /api/prices { chainId, addresses, includeThin? }
+  //   -> { success, data: { prices: PriceRow[], unpriced: address[], failed: address[] } }
+  // unpriced: Market-Data answered it cannot price the token; failed: no answer in time (retry later).
+  // includeThin: also price pools below Market-Data's liquidity floor, flagged `indicative`.
+  // When nothing at all could be priced the upstream is down, so this is a 503, not an empty success.
   app.post('/api/prices', async (c) => {
-    let body: { chainId?: unknown; addresses?: unknown }
+    let body: { chainId?: unknown; addresses?: unknown; includeThin?: unknown }
     try {
       body = await c.req.json()
     } catch {
       return c.json({ success: false, error: 'invalid_json' }, 400)
     }
-    const { chainId, addresses } = body
+    const { chainId, addresses, includeThin } = body
     if (typeof chainId !== 'number' || !Array.isArray(addresses) || addresses.some((a) => typeof a !== 'string' || !ADDRESS.test(a))) {
       return c.json({ success: false, error: 'invalid_body' }, 400)
     }
     if (!NATIVE_SYMBOL[chainId]) return c.json({ success: false, error: 'unsupported_chain', chainId }, 400)
     if (addresses.length > 100) return c.json({ success: false, error: 'too_many_addresses' }, 400)
 
-    const { native, tokens } = await chainPrices(chainId, addresses as string[])
-    return c.json({ success: true, data: { prices: [...(native ? [native] : []), ...tokens] } })
+    if (includeThin !== undefined && typeof includeThin !== 'boolean') {
+      return c.json({ success: false, error: 'invalid_body' }, 400)
+    }
+    const { native, tokens } = await chainPrices(chainId, addresses as string[], includeThin === true)
+    const prices = [...(native ? [native] : []), ...tokens.rows]
+    if (prices.length === 0) return c.json({ success: false, error: 'market_data_unavailable', chainId }, 503)
+    return c.json({ success: true, data: { prices, unpriced: tokens.unpriced, failed: tokens.failed } })
   })
 
   // GET /api/price/:symbol?currency=usd -> { symbol, price, currency, timestamp, change24h, source }

@@ -118,7 +118,7 @@ const ApiDiagnostic = (): JSX.Element | null => {
       <button
         onClick={() => setIsMinimized(false)}
         title="Click to expand API Diagnostics"
-        className="dark:hover:bg-gray-750 fixed bottom-3 right-3 z-50 flex items-center gap-1.5 rounded-full border border-gray-200 bg-white/95 px-3 py-1.5 text-xs font-medium shadow-md backdrop-blur transition-all hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800/95"
+        className="dark:hover:bg-gray-750 flex items-center gap-1.5 rounded-full border border-gray-200 bg-white/95 px-3 py-1.5 text-xs font-medium shadow-md backdrop-blur transition-all hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800/95"
       >
         <span
           className={`size-2 rounded-full ${
@@ -133,7 +133,7 @@ const ApiDiagnostic = (): JSX.Element | null => {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 max-w-sm rounded-xl border border-gray-200 bg-white/95 p-3.5 shadow-xl backdrop-blur transition-all dark:border-gray-700 dark:bg-gray-800/95">
+    <div className="max-w-sm rounded-xl border border-gray-200 bg-white/95 p-3.5 shadow-xl backdrop-blur transition-all dark:border-gray-700 dark:bg-gray-800/95">
       <div className="mb-2 flex items-center justify-between gap-2 border-b border-gray-100 pb-2 dark:border-gray-700/60">
         <div className="flex items-center gap-2">
           <h3 className="text-xs font-semibold text-gray-900 dark:text-gray-100">
@@ -217,12 +217,13 @@ export const AppRoutes = (): JSX.Element => (
         <Route path="/" element={<Home />} />
         <Route path="/classic" element={<Swap />} />
         <Route path="/swap/compare" element={<Swap />} />
-        <Route path="/swap" element={<BaseDex key="swap" />} />
-        <Route path="/liquidity" element={<BaseDex key="liquidity" initialMode="add" />} />
+        <Route path="/swap" element={<Swap />} />
+        <Route path="/liquidity" element={<Liquidity />} />
         <Route path="/dex/setup" element={<DexSetup />} />
         <Route path="/legacy/liquidity" element={<Liquidity />} />
+        <Route path="/own-dex" element={<BaseDex key="swap" />} />
         <Route path="/stake" element={<Stake />} />
-        <Route path="/launchpad" element={<Launchpad />} />
+        <Route path="/launchpad/:step?" element={<Launchpad />} />
         <Route path="/create-token" element={<Launchpad />} />
         <Route path="/launchpad/explore" element={<LaunchpadExplore />} />
         <Route path="/launchpad/my-tokens" element={<LaunchpadExplore defaultTab="my-tokens" />} />
@@ -295,8 +296,12 @@ const App = (): JSX.Element => {
       <BrowserRouter>
         <AppRoutes />
 
-        {/* API Diagnostic Panel - Development Only */}
-        <ApiDiagnostic />
+        {/* Keep diagnostics in page flow so they cannot cover wallet or deployment actions. */}
+        {import.meta.env.DEV && (
+          <aside aria-label="API diagnostics" className="mx-auto max-w-7xl px-4 pb-4 sm:px-6 lg:px-8">
+            <ApiDiagnostic />
+          </aside>
+        )}
       </BrowserRouter>
     </Providers>
   );

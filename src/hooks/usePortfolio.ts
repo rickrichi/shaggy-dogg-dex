@@ -34,6 +34,8 @@ export interface UsePortfolioReturn {
   summary: PortfolioSummary;
   isLoading: boolean;
   error: string | null;
+  /** The price server did not answer: balances are real, but no USD values are shown. */
+  pricesUnavailable?: boolean;
   refetch: () => void;
 }
 
@@ -199,6 +201,7 @@ export function usePortfolio(): UsePortfolioReturn {
   const { data, isLoading, error, refetch } = useQuery<{
     tokens: Token[];
     summary: PortfolioSummary;
+    pricesUnavailable: boolean;
   }>({
     queryKey: ["portfolio", address, chainId],
     enabled: Boolean(isConnected && address && publicClient && Number.isFinite(chainId)),
@@ -213,40 +216,81 @@ export function usePortfolio(): UsePortfolioReturn {
       const watch = coerceWatchlist(chainId);
       const list = watch.tokens;
 
-      // 2) Balances (native + ERC-20 multicall)
+      // 2) Balances (native + ERC-20 multicall with fallback)
       const native = nativeMeta(chainId);
-      const [nativeBal, ercBalances] = await Promise.all([
-        publicClient.getBalance({ address }),
-        (async (): Promise<readonly bigint[]> => {
-          if (list.length === 0) return [] as const;
+      let nativeBal = 0n;
+      try {
+        nativeBal = await publicClient.getBalance({ address });
+      } catch (e) {
+        console.warn("Failed to get native balance via publicClient:", e);
+      }
+
+      let ercBalances: readonly bigint[] = [];
+      if (list.length > 0) {
+        try {
           const calls = list.map((t) => ({
             address: t.address,
             abi: ERC20_BALANCEOF,
             functionName: "balanceOf" as const,
             args: [address],
           }));
-          const out = await publicClient.multicall({ contracts: calls, allowFailure: false });
-          return out as readonly bigint[];
-        })(),
-      ]);
+          const results = await publicClient.multicall({ contracts: calls, allowFailure: true });
+          ercBalances = results.map((r) =>
+            r && typeof r === "object" && "status" in r && r.status === "success"
+              ? (r.result as bigint)
+              : 0n
+          );
+        } catch (e) {
+          console.warn("Multicall failed, falling back to individual calls:", e);
+          const singleCalls = await Promise.all(
+            list.map(async (t) => {
+              try {
+                return (await publicClient.readContract({
+                  address: t.address,
+                  abi: ERC20_BALANCEOF,
+                  functionName: "balanceOf",
+                  args: [address],
+                })) as bigint;
+              } catch {
+                return 0n;
+              }
+            })
+          );
+          ercBalances = singleCalls;
+        }
+      }
 
-      // 3) Prices via the API server (Shaggy Dogg Crypto Market-Data)
-      const contracts = list.map((t) => t.address).join(",");
-      const qs = new URLSearchParams({ chainId: String(chainId) });
-      if (contracts) qs.set("contracts", contracts);
-      const res = await fetch(`/api/prices?${qs.toString()}`, {
-        headers: { accept: "application/json" },
-        cache: "no-store",
-      });
-      if (!res.ok) throw new Error(`prices ${res.status}: ${await res.text()}`);
-      const prices = parseApiPricesResponse(await res.json());
+      // 3) Prices via the API server. If it does not answer, balances still show but no price is
+      //    invented: values stay at 0 and the page says prices are unavailable.
+      let prices: ApiPricesResponse | null = null;
+      try {
+        const contracts = list.map((t) => t.address).join(",");
+        const qs = new URLSearchParams({ chainId: String(chainId) });
+        if (contracts) qs.set("contracts", contracts);
+
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 8000); // the API answers within ~7s
+
+        const res = await fetch(`/api/prices?${qs.toString()}`, {
+          headers: { accept: "application/json" },
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        clearTimeout(timer);
+
+        if (res.ok) {
+          prices = parseApiPricesResponse(await res.json());
+        }
+      } catch (e) {
+        console.info("Price server unavailable; showing balances without USD values:", e);
+      }
 
       // 4) Tokens array
       const rows: Token[] = [];
 
       // Native row
       const natFormatted = formatUnits(nativeBal, native.decimals);
-      const natPrice = prices.native.usd ?? 0;
+      const natPrice = prices?.native.usd ?? 0;
       rows.push({
         key: `native:${chainId}`,
         symbol: native.symbol,
@@ -265,7 +309,7 @@ export function usePortfolio(): UsePortfolioReturn {
         const bal = ercBalances[i] ?? 0n;
         const formatted = formatUnits(bal, t.decimals);
         const tokenKey = (t.address as string).toLowerCase();
-        const quote = prices.tokens[tokenKey];
+        const quote = prices?.tokens[tokenKey];
         const px = quote?.usd ?? 0;
 
         rows.push({
@@ -287,13 +331,13 @@ export function usePortfolio(): UsePortfolioReturn {
       const totalValue = rows.reduce((s, r) => s + r.usdValue, 0);
 
       const nativeDeltaUsd =
-        ((prices.native.usd_24h_change ?? 0) / 100) * natPrice * Number(natFormatted);
+        ((prices?.native.usd_24h_change ?? 0) / 100) * natPrice * Number(natFormatted);
 
       const zero = "0x0000000000000000000000000000000000000000" as const;
       const ercDeltaUsd = rows.reduce((s, r) => {
         if (r.address === zero) return s;
         const key = (r.address as string).toLowerCase();
-        const pct = (prices.tokens[key]?.usd_24h_change ?? 0) / 100;
+        const pct = (prices?.tokens[key]?.usd_24h_change ?? 0) / 100;
         return s + pct * r.usdValue;
       }, 0);
 
@@ -310,6 +354,7 @@ export function usePortfolio(): UsePortfolioReturn {
           biggestHolding: maxBy(rows, (r) => r.usdValue),
           percentChange24h,
         },
+        pricesUnavailable: prices === null,
       };
     },
   });
@@ -330,6 +375,7 @@ export function usePortfolio(): UsePortfolioReturn {
     summary: data?.summary ?? fallbackSummary,
     isLoading,
     error: error ? (error instanceof Error ? error.message : String(error)) : null,
+    pricesUnavailable: data?.pricesUnavailable ?? false,
     refetch,
   };
 }

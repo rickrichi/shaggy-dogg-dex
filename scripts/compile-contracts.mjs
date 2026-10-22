@@ -3,7 +3,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const solc = require("C:/Users/fbada/source/repos/lumioro/node_modules/solc");
+const solc = require("solc");
 
 const root = process.cwd();
 const contractsDir = path.resolve(root, "contracts/src");

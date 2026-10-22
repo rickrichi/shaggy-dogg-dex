@@ -94,5 +94,18 @@
       "scripts/arbitrage-bot-daemon.ts",
       "src/lib/launchpad/constants.ts"
     ]
+  },
+  "0xb8f3D5143ffddB99688BB31E7c2c3894a1E17263": {
+    "ecosystem": "FBA",
+    "role": "GovernanceToken (FBA - Foundational Black American)",
+    "usedBy": [
+      "src/config/tokens.ts",
+      "src/lib/tokens.ts",
+      "src/pages/Portfolio.tsx"
+    ]
+  },
+  "0x916ed75C0636Ddd7404DB79B7dc5CF80e8446c47": {
+    "ecosystem": "FBA",
+    "role": "Uniswap V2 pair FBA/WETH"
   }
 }

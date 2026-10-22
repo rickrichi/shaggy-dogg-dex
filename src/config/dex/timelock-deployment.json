@@ -1,0 +1,10 @@
+{
+  "address": "0xb5c9bedb57f4e348e40a5e6326c90de474072e25",
+  "transactionHash": "0xf9fd35c9c716e32ae22e5ed3844cd173e97faecd4e003d7a547edafd3dd7ec09",
+  "blockNumber": 52527662,
+  "deployedAt": "2026-10-12T22:37:51.572Z",
+  "network": "base",
+  "chainId": 8453,
+  "positionManager": "0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1",
+  "deployer": "0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98"
+}

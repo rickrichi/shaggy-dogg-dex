@@ -14,12 +14,16 @@ const PriceRowSchema = z.object({
   priceUsd: z.number(),
   change24hPercent: z.number(),
   symbol: z.string().optional(),
+  indicative: z.boolean().optional(),
+  liquidityUsd: z.number().optional(),
 });
 
 const PricesOkSchema = z.object({
   success: z.literal(true),
   data: z.object({
     prices: z.array(PriceRowSchema),
+    unpriced: z.array(AddressSchema).default([]),
+    failed: z.array(AddressSchema).default([]),
   }),
 });
 
@@ -37,6 +41,8 @@ export type PricesResponse = PricesOk | PricesFail;
 export interface FetchPricesParams {
   readonly chainId: number;
   readonly addresses: readonly AddressHex[];
+  /** Also price pools below Market-Data's liquidity floor; those rows come back `indicative`. */
+  readonly includeThin?: boolean;
   readonly signal?: AbortSignal;
   readonly timeoutMs?: number;
 }
@@ -48,26 +54,32 @@ export interface FetchPricesParams {
 export async function fetchPrices({
   chainId,
   addresses,
+  includeThin = false,
   signal,
   timeoutMs = 10_000,
 }: FetchPricesParams): Promise<PricesOk> {
+  // The timeout applies even when the caller also passes its own signal.
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  const abortFromCaller = () => ctrl.abort();
+  if (signal?.aborted) ctrl.abort();
+  signal?.addEventListener("abort", abortFromCaller, { once: true });
 
   try {
     const res = await fetch("/api/prices", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ chainId, addresses }),
-      signal: signal ?? ctrl.signal,
+      body: JSON.stringify({ chainId, addresses, ...(includeThin ? { includeThin } : {}) }),
+      signal: ctrl.signal,
     });
 
-    // Network/HTTP error handling
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}`);
-    }
+    const json: unknown = await res.json().catch(() => undefined);
 
-    const json: unknown = await res.json();
+    // Network/HTTP error handling: surface the backend's error code when it sent one
+    if (!res.ok) {
+      const fail = PricesFailSchema.safeParse(json);
+      throw new Error(fail.success ? fail.data.error : `HTTP ${res.status}`);
+    }
 
     // Shape-check against backend contract
     const ok = PricesOkSchema.safeParse(json);
@@ -83,5 +95,6 @@ export async function fetchPrices({
     throw new Error("Malformed response from /api/prices");
   } finally {
     clearTimeout(timer);
+    signal?.removeEventListener("abort", abortFromCaller);
   }
 }

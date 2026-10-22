@@ -1,0 +1,2 @@
+The site only changes when you redeploy:
+npx vercel deploy --prod --yes --scope richardseattle08-9538s-projects

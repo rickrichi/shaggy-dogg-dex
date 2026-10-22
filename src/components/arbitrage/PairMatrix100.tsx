@@ -9,6 +9,7 @@ import { ARB_API_URL } from "@/config/crypto-arb";
 import thresholds from "@/config/market-pair-thresholds.json";
 import MARKET_PAIRS from "@/config/market-pairs.json";
 import { useMatrixDexQuotes } from "@/hooks/useMatrixDexQuotes";
+import { useCeFiMatrixFeeds } from "@/hooks/useCeFiMatrixFeeds";
 import { MATRIX_QUOTE_MAX_AGE_MS, matrixRoute } from "@/lib/amm/matrix-quotes";
 
 import type { Snapshot } from "@/types/crypto-arb";
@@ -45,6 +46,19 @@ export const PAIR_MATRIX_DATA: MatrixPair[] = MARKET_PAIRS.map((symbol, index) =
   };
 });
 
+const NON_BASE_L1_ASSETS = new Set([
+  "ADA", "ALGO", "APT", "AR", "ATOM", "AVAX", "BCH", "BNB", "CELO", "DASH",
+  "DOGE", "DOT", "EGLD", "EOS", "ETC", "FIL", "FLOW", "FTM", "HBAR", "ICP",
+  "INJ", "IOTA", "KAVA", "KDA", "KSM", "LTC", "MINA", "NEAR", "NEO", "ONE",
+  "ONT", "QTUM", "ROSE", "RUNE", "RVN", "SEI", "SOL", "STX", "SUI", "THETA",
+  "TIA", "TON", "TRX", "VET", "WAVES", "XCH", "XEC", "XEM", "XLM", "XMR",
+  "XRP", "XTZ", "ZEC", "ZEN", "ZIL",
+]);
+
+function isNonBaseL1(asset: string): boolean {
+  return NON_BASE_L1_ASSETS.has(asset.toUpperCase());
+}
+
 interface PairMatrix100Props {
   snapshot?: Snapshot | null;
   onSelectPair?: (symbol: string) => void;
@@ -55,6 +69,16 @@ interface PairMatrix100Props {
 
 export function PairMatrix100({ onSelectPair, krakenBalances, snapshot }: PairMatrix100Props) {
   const { quotes, now } = useMatrixDexQuotes(MARKET_PAIRS);
+  const baseMappedCount = useMemo(
+    () => PAIR_MATRIX_DATA.filter((p) => Boolean(matrixRoute(p.symbol))).length,
+    []
+  );
+  const {
+    coinbaseConnected,
+    krakenConnected,
+    getCoinbaseQuote,
+    getKrakenQuote,
+  } = useCeFiMatrixFeeds();
   const [dexOnly, setDexOnly] = useState(false);
   const venueIndex = useMemo(
     () => new Map(snapshot?.venues.map((v) => [`${v.exchange}:${v.symbol}`, v]) ?? []),
@@ -145,6 +169,23 @@ export function PairMatrix100({ onSelectPair, krakenBalances, snapshot }: PairMa
   }, [search, filterFundedOnly, freeAssets, dexOnly]);
 
   const cexQuote = (exchange: string, symbol: string) => {
+    // 1. Direct live Coinbase feed
+    if (exchange === "coinbase") {
+      const live = getCoinbaseQuote(symbol);
+      if (live) {
+        return `Bid ${live.bid.toLocaleString(undefined, { maximumSignificantDigits: 7 })} / Ask ${live.ask.toLocaleString(undefined, { maximumSignificantDigits: 7 })}`;
+      }
+    }
+
+    // 2. Direct live Kraken feed
+    if (exchange === "kraken") {
+      const live = getKrakenQuote(symbol);
+      if (live) {
+        return `Bid ${live.bid.toLocaleString(undefined, { maximumSignificantDigits: 7 })} / Ask ${live.ask.toLocaleString(undefined, { maximumSignificantDigits: 7 })}`;
+      }
+    }
+
+    // 3. Fall back to snapshot venueIndex if present
     const venue = venueIndex.get(`${exchange}:${symbol}`);
     if (!venue) return "Unverified";
     if (venue.status !== "live") return venue.status;
@@ -159,17 +200,45 @@ export function PairMatrix100({ onSelectPair, krakenBalances, snapshot }: PairMa
       <CardHeader className="border-b border-slate-100 bg-slate-50/60 pb-4">
         <div className="flex flex-col items-start justify-between gap-3 md:flex-row md:items-center">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Sparkles className="size-4 text-purple-600" />
               <CardTitle className="text-base font-bold text-slate-900">
                 {PAIR_MATRIX_DATA.length}-Pair Spot Arbitrage Matrix
               </CardTitle>
+              <div className="flex items-center gap-1.5 pl-2">
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                    coinbaseConnected
+                      ? "border border-emerald-200 bg-emerald-50 text-emerald-800"
+                      : "border border-slate-200 bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  <span
+                    className={`size-1.5 rounded-full ${
+                      coinbaseConnected ? "animate-pulse bg-emerald-500" : "bg-slate-400"
+                    }`}
+                  />
+                  Coinbase: {coinbaseConnected ? "Streaming Live" : "Connecting…"}
+                </span>
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                    krakenConnected
+                      ? "border border-purple-200 bg-purple-50 text-purple-800"
+                      : "border border-slate-200 bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  <span
+                    className={`size-1.5 rounded-full ${
+                      krakenConnected ? "animate-pulse bg-purple-500" : "bg-slate-400"
+                    }`}
+                  />
+                  Kraken: {krakenConnected ? "Streaming Live" : "Connecting…"}
+                </span>
+              </div>
             </div>
             <CardDescription className="text-xs">
               CeDeFi comparison: Shaggy-Dogg-Dex routed sell quotes on Base alongside centralized
-              exchange bid/ask prices. Prices use each pair’s quote asset. DEX quotes sell 1 base
-              token, include pool fees and exclude gas; CEX prices are top-of-book before fees. ETH
-              routes use WETH. Kraken capital is separate from your wallet.
+              exchange bid/ask prices streamed directly from Coinbase &amp; Kraken public WebSockets.
             </CardDescription>
           </div>
 
@@ -221,7 +290,7 @@ export function PairMatrix100({ onSelectPair, krakenBalances, snapshot }: PairMa
               }}
               className="h-6 px-2 text-[10px] font-bold"
             >
-              Shaggy-Dogg-Dex · Base mappings
+              Shaggy-Dogg-Dex · Base mappings ({baseMappedCount})
             </Button>
             {[
               { label: "🟢 My Funded Pairs", query: "", fundedOnly: true },
@@ -292,18 +361,58 @@ export function PairMatrix100({ onSelectPair, krakenBalances, snapshot }: PairMa
                     </td>
                     <td className="min-w-48 px-3 py-2 text-purple-700">
                       {!matrixRoute(pair.symbol) ? (
-                        "No Base token mapping"
+                        <span className="font-normal text-slate-400">
+                          {isNonBaseL1(pair.baseAsset)
+                            ? `Non-Base L1 (${pair.baseAsset})`
+                            : "No Base token mapping"}
+                        </span>
                       ) : (
                         <>
-                          <div>
+                          <div className="font-semibold">
                             {(() => {
                               const quote = quotes[pair.symbol];
-                              if (!quote) return "Checking route…";
+                              if (!quote) return <span className="font-normal text-slate-400">Checking route…</span>;
                               if (now - quote.checkedAt > MATRIX_QUOTE_MAX_AGE_MS)
-                                return "Stale quote";
-                              if (quote.status === "rpc-error") return "RPC unavailable";
-                              if (quote.status === "unavailable") return "Quote unavailable";
-                              return `1 ${quote.inputSymbol} → ${quote.output} ${quote.outputSymbol}`;
+                                return <span className="font-normal text-amber-600">Stale quote</span>;
+                              if (quote.status === "rpc-error")
+                                return <span className="font-normal text-rose-500">RPC unavailable</span>;
+                              if (quote.status === "unavailable")
+                                return <span className="font-normal text-slate-400">Pool unquoted</span>;
+
+                              // Illiquidity / Deviation Guard against ghost pools
+                              const cbQuote = getCoinbaseQuote(pair.symbol);
+                              const krQuote = getKrakenQuote(pair.symbol);
+                              const refPrice = cbQuote?.bid ?? krQuote?.bid;
+                              const dexNum = parseFloat(quote.output || "0");
+                              const isUsdQuote = ["USD", "USDC", "USDT"].includes(pair.quoteAsset);
+
+                              if (refPrice && refPrice > 0 && dexNum > 0 && isUsdQuote) {
+                                const deviation = Math.abs(dexNum - refPrice) / refPrice;
+                                if (deviation > 0.15) {
+                                  return (
+                                    <div className="space-y-0.5">
+                                      <div className="flex items-center gap-1 font-semibold text-amber-600">
+                                        <span className="inline-block size-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                        <span>⚠️ Low Depth / Out of Range</span>
+                                      </div>
+                                      <div className="text-[10px] text-slate-400 font-normal">
+                                        1 {quote.inputSymbol} → {quote.output} {quote.outputSymbol} ({(deviation * 100).toFixed(0)}% slippage)
+                                      </div>
+                                    </div>
+                                  );
+                                }
+                              }
+
+                              return (
+                                <div>
+                                  <span>{`1 ${quote.inputSymbol} → ${quote.output} ${quote.outputSymbol}`}</span>
+                                  {quote.feeTier && (
+                                    <span className="ml-1 text-[9px] font-normal text-purple-600">
+                                      ({quote.feeTier})
+                                    </span>
+                                  )}
+                                </div>
+                              );
                             })()}
                           </div>
                           <span className="text-[10px] text-slate-500">
@@ -312,11 +421,28 @@ export function PairMatrix100({ onSelectPair, krakenBalances, snapshot }: PairMa
                         </>
                       )}
                     </td>
-                    {(["binance", "bybit", "okx", "coinbase", "kraken"] as const).map((venue) => (
-                      <td key={venue} className="px-3 py-2 text-center text-slate-600">
-                        {cexQuote(venue, pair.symbol)}
-                      </td>
-                    ))}
+                    {(["binance", "bybit", "okx", "coinbase", "kraken"] as const).map((venue) => {
+                      const quote = cexQuote(venue, pair.symbol);
+                      const isLive =
+                        quote !== "Unverified" &&
+                        quote !== "Stale" &&
+                        quote !== "Awaiting book";
+                      const colorClass = isLive
+                        ? venue === "coinbase"
+                          ? "text-emerald-700 font-semibold bg-emerald-50/30"
+                          : venue === "kraken"
+                            ? "text-purple-700 font-semibold bg-purple-50/30"
+                            : "text-slate-800"
+                        : "text-slate-400";
+                      return (
+                        <td
+                          key={venue}
+                          className={`px-3 py-2 text-center text-xs transition-colors ${colorClass}`}
+                        >
+                          {quote}
+                        </td>
+                      );
+                    })}
                     <td className="px-3 py-2 font-bold text-emerald-600">{pair.minNetEdgePct}</td>
                     <td className="px-3 py-2">
                       <span

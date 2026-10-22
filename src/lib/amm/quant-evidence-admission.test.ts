@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { type Hex } from "viem";
-import { privateKeyToAccount } from "viem/accounts";
+import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -19,8 +19,8 @@ import {
   QuantEvidenceVerifier,
 } from "./quant-evidence-admission";
 
-const TEST_PRIVATE_KEY =
-  "***REMOVED***" as Hex;
+// Fresh throwaway key per run; never commit a literal private key.
+const TEST_PRIVATE_KEY: Hex = generatePrivateKey();
 const TEST_ANCHOR = "0x1111111111111111111111111111111111111111" as const;
 const NOW = 1_800_000_000;
 

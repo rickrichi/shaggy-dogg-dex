@@ -204,12 +204,6 @@ export default function Swap() {
   // Chart Configuration
   // ────────────────────────────────────────────────────────────────────────────
 
-  const chartQuoteSymbol = useMemo<TokenSymbol>(() => {
-    return isStableSymbol(buyToken.symbol as TokenSymbol)
-      ? (buyToken.symbol as TokenSymbol)
-      : "USDT";
-  }, [buyToken.symbol]);
-
   // ────────────────────────────────────────────────────────────────────────────
   // Tab Configuration (DRY - eliminates repetitive TabsContent)
   // ────────────────────────────────────────────────────────────────────────────
@@ -272,12 +266,7 @@ export default function Swap() {
       <div className="mx-auto grid max-w-7xl grid-cols-1 items-start gap-6 lg:grid-cols-3 lg:gap-8">
         {/* Left Column: Chart & Info */}
         <div className="h-full min-h-[400px] lg:col-span-2">
-          <PriceChart
-            baseToken={sellToken}
-            quoteToken={
-              MAINNET_TOKENS.find((token) => token.symbol === chartQuoteSymbol) ?? buyToken
-            }
-          />
+          <PriceChart swap={activeSwap} />
         </div>
 
         {/* Right Column: The Swap Interface */}

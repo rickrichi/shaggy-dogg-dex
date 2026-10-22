@@ -33,6 +33,7 @@
   "include": [
     "vite.config.ts",
     "tailwind.config.ts",
-    "src/lib/base-rpc.ts"
+    "src/lib/base-rpc.ts",
+    "scripts/add-fba-liquidity.ts"
   ]
 }

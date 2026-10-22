@@ -14,7 +14,7 @@ export const CANONICAL_LAUNCHED_TOKENS: LaunchedTokenRecord[] = [
       "Community utility and isolated lending asset for the Shaggy Mutt DeFi ecosystem on Base.",
     archetype: "morpho_blue_isolated",
     stakingAddress: "0x055BB4eD8d5464C25D71391E940ce53CA30845fC",
-    vaultAddress: "0x16a1E9c10B913912b7B7df4649D9596D95ce33E6",
+    vaultAddress: "0x5c98f6bc9d17ba0eb02e1336bdf035938f5859e5",
     pairAddress: "0x581B294FeC1A4332f17cf18B49D68087c09b6784",
     creatorAddress: "0x0000000000000000000000000000000000000000",
     chainId: 8453,

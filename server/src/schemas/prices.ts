@@ -16,12 +16,16 @@ export const PriceRowSchema = z.object({
   priceUsd: z.number().nonnegative(),
   change24hPercent: z.number(), // may be negative or positive
   symbol: z.string().optional(),
+  /** Pool below Market-Data's liquidity floor: cheap to move, shown only when asked for (includeThin). */
+  indicative: z.boolean().optional(),
+  liquidityUsd: z.number().nonnegative().optional(),
 })
 
 /** Request: chain + ERC20 list (native is added server-side). */
 export const PricesRequestSchema = z.object({
   chainId: z.number().int().positive(),
   addresses: z.array(Address).max(100).default([]),
+  includeThin: z.boolean().optional(),
 })
 
 /** Success payload. */
@@ -29,6 +33,10 @@ export const PricesResponseOkSchema = z.object({
   success: z.literal(true),
   data: z.object({
     prices: z.array(PriceRowSchema),
+    /** Market-Data answered that it cannot price these (no contract, or no pool deep enough). */
+    unpriced: z.array(Address).default([]),
+    /** No answer from Market-Data in time; retry later. */
+    failed: z.array(Address).default([]),
   }),
 })
 

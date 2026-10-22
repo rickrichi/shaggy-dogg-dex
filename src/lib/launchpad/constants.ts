@@ -13,11 +13,16 @@ export const CANONICAL_BASE_CONTRACTS = {
   MorphoBlue: "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb" as Address,
   UniswapV2Router: "0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24" as Address,
   UniswapV2Factory: "0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6" as Address,
+  UniswapV3Router: "0x2626664c2603336E57B271c5C0b26F421741e481" as Address,
+  UniswapV3Factory: "0x33128a8fC17869897dcE68Ed026d694621f6FDfD" as Address,
+  UniswapV3PositionManager: "0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1" as Address,
+  UniswapV3QuoterV2: "0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a" as Address,
   PancakeSwapV2Router: "0x8cFe327CEc66d1C090Dd72bd0FF11d690C33a2Eb" as Address,
   PancakeSwapV2Factory: "0x02a84c1b3BBD7401a5f7fa98a384EBC70bB5749E" as Address,
   AerodromeRouter: "0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43" as Address,
   AerodromeFactory: "0x420DD381b31aEf6683db6B902084cB0FFECe40Da" as Address,
   AtomicFlashArbitrageRouter: "0x70315019d12a11556c837970675cdc8fa54d186b" as Address,
+  CompoundComet: "0xb125E6687d4313864e53df431d5425969c15Eb2F" as Address,
   DeployerAdminWallet: "0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98" as Address,
 };
 
@@ -143,6 +148,15 @@ export const LAUNCHPAD_ARCHETYPES: ArchetypeDefinition[] = [
 ];
 
 export const DEX_VENUES: DexVenueDefinition[] = [
+  {
+    id: "uniswap_v3",
+    name: "Uniswap V3 (Base Concentrated)",
+    routerAddress: CANONICAL_BASE_CONTRACTS.UniswapV3Router,
+    factoryAddress: CANONICAL_BASE_CONTRACTS.UniswapV3Factory,
+    network: "Base Mainnet",
+    description:
+      "Capital-efficient concentrated liquidity AMM on Base with flexible fee tiers and NFT positions.",
+  },
   {
     id: "uniswap_v2",
     name: "Uniswap V2 (Base Canonical)",

@@ -2,22 +2,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import { Activity, Fuel, Play, RefreshCw, Square } from "lucide-react";
+import { Activity, Fuel } from "lucide-react";
 import { formatGwei } from "viem";
 import { useAccount, useBlockNumber, useGasPrice, useSwitchChain } from "wagmi";
-import { mainnet } from "wagmi/chains";
 
 import { LimitOrderCard } from "@/components/swap/LimitOrderCard";
+import { MarketScanner } from "@/components/swap/MarketScanner";
 import { PriceChart } from "@/components/swap/PriceChart";
 import { SwapCard } from "@/components/swap/SwapCard";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getTokensForChain, isErc20Token, type Token, type TokenSymbol } from "@/config/tokens";
+import { isSwapChain } from "@/config/contracts";
+import { getSwapDropdownTokens, getTokensForChain, type Token } from "@/config/tokens";
 import { useSwap } from "@/hooks/useSwap";
-import { fetchPrices } from "@/lib/api/prices";
-
-import type { AddressHex } from "@/types/token";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -32,13 +28,6 @@ interface SwapModeConfig {
   readonly label: string;
   readonly sellToken: Token;
   readonly buyToken: Token;
-}
-
-interface ScannerRow {
-  readonly symbol: string;
-  readonly name: string;
-  readonly priceUsd: number;
-  readonly change24hPercent: number;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -74,7 +63,7 @@ function parseTradeMode(param: string | null): TradeMode {
  * Get initial token from URL param or fallback to index
  */
 function getInitialToken(param: string | null, fallbackIndex: number, chainId?: number): Token {
-  const chainTokens = getTokensForChain(chainId);
+  const chainTokens = getSwapDropdownTokens(chainId);
   const fallback = chainTokens[fallbackIndex] ?? chainTokens[0];
   if (!fallback) {
     throw new Error("Tokens list must include at least one token");
@@ -88,9 +77,23 @@ function getInitialToken(param: string | null, fallbackIndex: number, chainId?: 
   }
 
   const normalized = param.toLowerCase();
-  const found = chainTokens.find(
-    (t) => t.address.toLowerCase() === normalized || t.symbol.toLowerCase() === normalized
-  );
+  const aliasedSymbol =
+    {
+      btc: "cbbtc",
+      sol: "usol",
+      xrp: "cbxrp",
+      ada: "cbada",
+      avax: "uavax",
+      near: "unear",
+      atom: "uatom",
+      xtz: "wxtz",
+      zec: "uzec",
+      loop: "lrc",
+    }[normalized] ?? normalized;
+  const found =
+    chainTokens.find(
+      (t) => t.address.toLowerCase() === normalized || t.symbol.toLowerCase() === normalized
+    ) ?? chainTokens.find((t) => t.symbol.toLowerCase() === aliasedSymbol);
   return found ?? fallback;
 }
 
@@ -126,7 +129,6 @@ export default function Swap() {
   const { data: gasPrice } = useGasPrice({ chainId: chain?.id ?? 8453 });
   const { isPending: isSwitchingChain, switchChain } = useSwitchChain();
   const [searchParams, setSearchParams] = useSearchParams();
-  const isCorrectNetwork = !isConnected || chain?.id === mainnet.id || chain?.id === 8453;
 
   // ────────────────────────────────────────────────────────────────────────────
   // URL State Management
@@ -147,11 +149,6 @@ export default function Swap() {
 
   const [showSettings, setShowSettings] = useState(false);
   const [mode, setMode] = useState<TradeMode>(urlParams.mode);
-  const [scannerEnabled, setScannerEnabled] = useState(false);
-  const [scannerRows, setScannerRows] = useState<readonly ScannerRow[]>([]);
-  const [scannerError, setScannerError] = useState<string | null>(null);
-  const [scannerLastRun, setScannerLastRun] = useState<Date | null>(null);
-  const [isScannerLoading, setIsScannerLoading] = useState(false);
 
   // Sync mode with URL on navigation
   useEffect(() => {
@@ -164,7 +161,7 @@ export default function Swap() {
   // Token Selection Logic
   // ────────────────────────────────────────────────────────────────────────────
 
-  const chainTokens = useMemo(() => getTokensForChain(chain?.id ?? 8453), [chain?.id]);
+  const chainTokens = useMemo(() => getSwapDropdownTokens(chain?.id ?? 8453), [chain?.id]);
 
   const baseTokens = useMemo(
     () => ({
@@ -237,30 +234,6 @@ export default function Swap() {
   // Chart Configuration
   // ────────────────────────────────────────────────────────────────────────────
 
-  const chartBaseSymbol = useMemo(() => {
-    // In buy mode, chart the asset being acquired. Otherwise chart the asset being sold.
-    return mode === "buy" ? buyToken.symbol : sellToken.symbol;
-  }, [mode, sellToken.symbol, buyToken.symbol]);
-
-  const chartQuoteSymbol = useMemo<TokenSymbol>(() => {
-    // Prefer a stable quote that is part of the trade, otherwise fall back to deep-liquidity stables.
-    const preferredQuotes: TokenSymbol[] = [];
-
-    [buyToken.symbol, sellToken.symbol].forEach((symbol) => {
-      if (isStableSymbol(symbol) && symbol !== chartBaseSymbol) {
-        preferredQuotes.push(symbol as TokenSymbol);
-      }
-    });
-
-    (["USDT", "USDC", "DAI"] as const).forEach((symbol) => {
-      if (symbol !== chartBaseSymbol) {
-        preferredQuotes.push(symbol);
-      }
-    });
-
-    return preferredQuotes.find((symbol) => symbol !== chartBaseSymbol) ?? "USDT";
-  }, [buyToken.symbol, sellToken.symbol, chartBaseSymbol]);
-
   // ────────────────────────────────────────────────────────────────────────────
   // Tab Configuration (DRY - eliminates repetitive TabsContent)
   // ────────────────────────────────────────────────────────────────────────────
@@ -288,62 +261,6 @@ export default function Swap() {
     setMode(newMode as TradeMode);
   }, []);
 
-  const runScanner = useCallback(async () => {
-    const tokens = chainTokens.filter(isErc20Token);
-    const symbolsByAddress = new Map(
-      tokens.map((token) => [
-        token.address.toLowerCase(),
-        { symbol: token.symbol, name: token.name },
-      ])
-    );
-
-    setIsScannerLoading(true);
-    setScannerError(null);
-
-    try {
-      const result = await fetchPrices({
-        chainId: chain?.id ?? 8453,
-        addresses: tokens.map((token) => token.address as AddressHex),
-      });
-
-      const rows = result.data.prices
-        .map((price): ScannerRow | null => {
-          const token = symbolsByAddress.get(price.address.toLowerCase());
-          if (!token) return null;
-
-          return {
-            symbol: price.symbol ?? token.symbol,
-            name: token.name,
-            priceUsd: price.priceUsd,
-            change24hPercent: price.change24hPercent,
-          };
-        })
-        .filter((row): row is ScannerRow => row !== null)
-        .sort((a, b) => Math.abs(b.change24hPercent) - Math.abs(a.change24hPercent));
-
-      setScannerRows(rows);
-      setScannerLastRun(new Date());
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Scanner request failed";
-      setScannerError(message);
-    } finally {
-      setIsScannerLoading(false);
-    }
-  }, [chainTokens, chain?.id]);
-
-  useEffect(() => {
-    if (!scannerEnabled) return;
-
-    runScanner();
-    const timer = window.setInterval(() => {
-      runScanner();
-    }, 15_000);
-
-    return () => {
-      window.clearInterval(timer);
-    };
-  }, [runScanner, scannerEnabled]);
-
   // ────────────────────────────────────────────────────────────────────────────
   // Render
   // ────────────────────────────────────────────────────────────────────────────
@@ -369,7 +286,7 @@ export default function Swap() {
           {blockNumber && (
             <div className="flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-slate-600">
               <Activity className="size-4" />
-              <span>#{blockNumber.toString().slice(-6)}</span>
+              <span>#{blockNumber.toLocaleString()}</span>
             </div>
           )}
         </div>
@@ -377,92 +294,8 @@ export default function Swap() {
 
       {/* Main Grid Layout */}
       <div className="mx-auto grid max-w-7xl grid-cols-1 items-start gap-6 lg:grid-cols-3 lg:gap-8">
-        {/* Left Column: Chart & Info */}
-        <div className="h-full min-h-[400px] lg:col-span-2">
-          <PriceChart
-            baseToken={chainTokens.find((token) => token.symbol === chartBaseSymbol) ?? sellToken}
-            quoteToken={chainTokens.find((token) => token.symbol === chartQuoteSymbol) ?? buyToken}
-          />
-
-          <Card className="mt-6 border-slate-200/70 bg-white/70 p-4 shadow-sm backdrop-blur-sm">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <Activity className="size-4 text-purple-600" />
-                  <h2 className="text-sm font-semibold text-slate-900">Market Scanner</h2>
-                </div>
-                <p className="mt-1 text-xs text-slate-500">
-                  {scannerEnabled
-                    ? `Live scan${scannerLastRun ? ` - ${scannerLastRun.toLocaleTimeString()}` : ""}`
-                    : "Idle"}
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                {scannerEnabled && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={runScanner}
-                    disabled={isScannerLoading}
-                    className="gap-2"
-                  >
-                    <RefreshCw className={`size-4 ${isScannerLoading ? "animate-spin" : ""}`} />
-                    Sync
-                  </Button>
-                )}
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => setScannerEnabled((enabled) => !enabled)}
-                  className="gap-2 bg-slate-900 text-white hover:bg-slate-800"
-                >
-                  {scannerEnabled ? <Square className="size-4" /> : <Play className="size-4" />}
-                  {scannerEnabled ? "Stop Scanner" : "Start Scanner"}
-                </Button>
-              </div>
-            </div>
-
-            <div className="mt-4 overflow-hidden rounded-md border border-slate-100">
-              {scannerError ? (
-                <div className="bg-red-50 p-3 text-sm text-red-700">{scannerError}</div>
-              ) : scannerRows.length > 0 ? (
-                <div className="divide-y divide-slate-100">
-                  {scannerRows.slice(0, 5).map((row) => (
-                    <div
-                      key={row.symbol}
-                      className="grid grid-cols-[1fr_auto_auto] items-center gap-3 bg-white/60 px-3 py-2 text-sm"
-                    >
-                      <div className="min-w-0">
-                        <p className="font-semibold text-slate-900">{row.symbol}</p>
-                        <p className="truncate text-xs text-slate-500">{row.name}</p>
-                      </div>
-                      <p className="font-mono text-slate-700">${row.priceUsd.toFixed(4)}</p>
-                      <p
-                        className={
-                          row.change24hPercent >= 0
-                            ? "font-mono text-emerald-600"
-                            : "font-mono text-red-600"
-                        }
-                      >
-                        {row.change24hPercent >= 0 ? "+" : ""}
-                        {row.change24hPercent.toFixed(2)}%
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="bg-slate-50 p-3 text-sm text-slate-500">
-                  {isScannerLoading ? "Scanning markets..." : "Scanner results will appear here."}
-                </div>
-              )}
-            </div>
-          </Card>
-        </div>
-
-        {/* Right Column: The Swap Interface */}
-        <div className="lg:col-span-1">
+        {/* Swap comes first in both reading order and mobile layout. */}
+        <div className="order-1 min-w-0 lg:col-span-1">
           <div className="relative space-y-3">
             <Tabs value={mode} onValueChange={handleModeChange}>
               <TabsList className="mb-3 grid w-full grid-cols-4">
@@ -487,9 +320,15 @@ export default function Swap() {
                     <SwapCard
                       swap={swapInstances[tabMode]}
                       tokens={chainTokens}
-                      isCorrectNetwork={isCorrectNetwork}
+                      isCorrectNetwork={
+                        !isConnected ||
+                        (isSwapChain(chain?.id) &&
+                          chain?.id === swapInstances[tabMode].state.sellToken.chainId)
+                      }
                       isSwitchingNetwork={isSwitchingChain}
-                      onSwitchNetwork={() => switchChain({ chainId: 8453 })}
+                      onSwitchNetwork={() =>
+                        switchChain({ chainId: swapInstances[tabMode].state.sellToken.chainId })
+                      }
                       showSettings={showSettings}
                       onSettingsChange={setShowSettings}
                     />
@@ -504,6 +343,12 @@ export default function Swap() {
               </div>
             )}
           </div>
+        </div>
+        {/* Trade comparison and market tools */}
+        <div className="order-2 min-w-0 lg:col-span-2">
+          <PriceChart swap={activeSwap} />
+
+          <MarketScanner />
         </div>
       </div>
     </div>

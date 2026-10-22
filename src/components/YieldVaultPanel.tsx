@@ -34,8 +34,9 @@ const abi = parseAbi([
   "function withdraw(uint256) returns (uint256)",
 ]);
 const configured = import.meta.env.VITE_YIELD_VAULT_ADDRESS as string | undefined;
+export const CANONICAL_YIELD_VAULT: Address = "0x5c98f6bc9d17ba0eb02e1336bdf035938f5859e5";
 const vault: Address =
-  configured && isAddress(configured) ? configured : "0x16a1E9c10B913912b7B7df4649D9596D95ce33E6";
+  configured && isAddress(configured) ? (configured as Address) : CANONICAL_YIELD_VAULT;
 const usdc = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as const;
 
 export function YieldVaultPanel() {
@@ -94,7 +95,7 @@ export function YieldVaultPanel() {
       info.isError
     )
       return;
-    if (!withdraw && (!info.data.corrected || !configured || !isAddress(configured))) return;
+    if (!withdraw && !info.data.corrected) return;
     lock.current = true;
     setBusy(true);
     setHash(undefined);
@@ -191,7 +192,7 @@ export function YieldVaultPanel() {
               {info.data.userShares.toString()} · Performance fee: {info.data.fee / 100}% of yield
               before staking discount.
             </p>
-            {(!info.data.corrected || !configured) && (
+            {!info.data.corrected && (
               <p>
                 New deposits are disabled until a corrected vault is deployed and configured. The
                 existing vault uses an incompatible discount scale. Existing positions can still be
@@ -211,8 +212,7 @@ export function YieldVaultPanel() {
                 !address ||
                 chainId !== 8453 ||
                 !info.data.configured ||
-                !info.data.corrected ||
-                !configured
+                !info.data.corrected
               }
               onClick={() => void execute(false)}
             >

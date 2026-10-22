@@ -6,8 +6,9 @@ import { type Address, erc20Abi, formatUnits, parseUnits } from "viem";
 import { useAccount, useBalance, usePublicClient, useWalletClient } from "wagmi";
 
 import { DEFAULT_SLIPPAGE, SWAP_DEADLINE_BUFFER } from "@/config/contracts";
-import { type Token } from "@/config/tokens";
+import { matchTokenOnChain, type Token } from "@/config/tokens";
 import { positiveAmount } from "@/lib/amm/own-dex";
+import { getRoutePriceImpact, HIGH_PRICE_IMPACT } from "@/lib/amm/price-impact";
 import { quoteSmartRoutes, routeQuoteCall, routeSwapCall } from "@/lib/amm/smart-routing";
 import { calculateMinimumAmountOut } from "@/lib/amm/swap-protection";
 
@@ -42,7 +43,7 @@ export interface UseSwapReturn {
   swap: {
     canSwap: boolean;
     isSwapping: boolean;
-    execute: () => Promise<void>;
+    execute: (confirmedQuoteId?: string) => Promise<void>;
   };
   actions: {
     setSellAmount: (amount: string) => void;
@@ -57,10 +58,14 @@ export interface UseSwapReturn {
     rate: number | null;
     minimumReceived: number | null;
     priceImpact: number | null;
+    id?: string;
+    refresh: () => void;
+    isRefreshing: boolean;
     status: QuoteStatus;
-    bestVenue?: "Uniswap V2" | "Aerodrome";
+    bestVenue?: "Uniswap V3" | "Uniswap V2" | "Aerodrome";
     spreadPercent?: number;
     comparisonText?: string;
+    uniswapV3AmountOut?: string;
     uniswapAmountOut?: string;
     aerodromeAmountOut?: string;
   };
@@ -104,7 +109,7 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
     ? parseUnits(state.sellAmount, state.sellToken.decimals)
     : 0n;
   const key = `${state.sellToken.chainId}:${state.sellToken.address}:${state.buyToken.address}:${amount}`;
-  scope.current = `${address}:${chainId}:${key}`;
+  scope.current = `${address}:${chainId}:${key}:${state.slippage}`;
   const sellBalance = useBalance({
     address,
     chainId: state.sellToken.chainId,
@@ -119,7 +124,20 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
   });
   const quotes = useQuery({
     queryKey: ["smart-routes", key],
-    queryFn: () => quoteSmartRoutes(client!, state.sellToken, state.buyToken, amount),
+    queryFn: async () => {
+      const result = await quoteSmartRoutes(client!, state.sellToken, state.buyToken, amount);
+      const priceImpact = result.best
+        ? await getRoutePriceImpact(
+            client!,
+            state.sellToken.chainId,
+            result.best.route,
+            amount,
+            result.best.output,
+            result.blockNumber
+          )
+        : null;
+      return { ...result, priceImpact };
+    },
     enabled: !!client && amount > 0n,
     refetchInterval: 10_000,
     staleTime: 5_000,
@@ -128,6 +146,12 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
   const best = quotes.data?.best;
   const fresh = !!best && !quotes.isError && now - quotes.data!.observedAt < 30_000;
   const buyAmount = fresh ? formatUnits(best.output, state.buyToken.decimals) : "";
+  const priceImpact = fresh ? (quotes.data?.priceImpact ?? null) : null;
+  // Confirmation survives identical refreshes, but never a changed trade, wallet,
+  // route, output, impact or slippage setting. Expired quotes have no review ID.
+  const quoteId = fresh
+    ? `${scope.current}:${JSON.stringify(best.route)}:${best.output}:${priceImpact}`
+    : undefined;
   const allowance = useQuery({
     queryKey: [
       "route-allowance",
@@ -155,18 +179,20 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
     isConnected &&
     validChain &&
     fresh &&
+    priceImpact !== null &&
     !needed &&
     amount > 0n &&
     sellBalance.data &&
     amount <= sellBalance.data.value &&
     !busy
   );
-  const execute = async (operation: "approve" | "swap") => {
+  const execute = async (operation: "approve" | "swap", confirmedQuoteId?: string) => {
     if (lock.current || !client || !wallet || !address || !best || !fresh || !validChain) return;
     const captured = scope.current;
     const assertWallet = async () => {
       if (
         scope.current !== captured ||
+        Date.now() - quotes.data!.observedAt >= 30_000 ||
         (await wallet.getChainId()) !== state.sellToken.chainId ||
         (await wallet.getAddresses())[0]?.toLowerCase() !== address.toLowerCase()
       )
@@ -193,15 +219,44 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
         await allowance.refetch();
       } else {
         if (!canSwap) throw new Error("Review your allowance, balance, and quote first.");
+        if (priceImpact === null)
+          throw new Error("Price impact is unavailable. Refresh the quote.");
+        if (priceImpact >= HIGH_PRICE_IMPACT && confirmedQuoteId !== quoteId)
+          throw new Error("Review and confirm this high-impact swap first.");
         const minimum = calculateMinimumAmountOut(
           best.output,
           BigInt(Math.round(state.slippage * 100))
         );
-        const current = (await client.readContract(
-          routeQuoteCall(best.route, amount)
-        )) as readonly bigint[];
-        if ((current.at(-1) ?? 0n) < minimum)
+        const blockNumber = await client.getBlockNumber();
+        const current = await client.readContract({
+          ...routeQuoteCall(best.route, amount),
+          blockNumber,
+        });
+        const currentOut =
+          best.route.venue === "Uniswap V3"
+            ? Array.isArray(current)
+              ? (current[0] as bigint)
+              : 0n
+            : ((current as readonly bigint[]).at(-1) ?? 0n);
+        if (currentOut < minimum)
           throw new Error("Price moved beyond your minimum. Review a new quote.");
+        const currentImpact = await getRoutePriceImpact(
+          client,
+          state.sellToken.chainId,
+          best.route,
+          amount,
+          currentOut,
+          blockNumber
+        );
+        if (currentImpact === null)
+          throw new Error("Price impact could not be verified. Refresh the quote.");
+        if (
+          currentImpact >= HIGH_PRICE_IMPACT &&
+          (confirmedQuoteId !== quoteId || currentImpact > priceImpact + 0.01)
+        ) {
+          void quotes.refetch();
+          throw new Error("Price impact increased. Review and confirm the updated quote.");
+        }
         const call = routeSwapCall(
           best.route,
           state.sellToken,
@@ -234,6 +289,7 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
   };
   const normalize = (data: typeof sellBalance.data): BalanceData | undefined =>
     data ? { ...data, formatted: formatUnits(data.value, data.decimals) } : undefined;
+  const uniV3 = quotes.data?.quotes.find((q) => q.route.venue === "Uniswap V3");
   const uni = quotes.data?.quotes.find((q) => q.route.venue === "Uniswap V2");
   const aero = quotes.data?.quotes.find((q) => q.route.venue === "Aerodrome");
   const improvement =
@@ -242,12 +298,34 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
     state: { ...state, buyAmount, isQuoteLoading: quotes.isFetching },
     balances: { sell: normalize(sellBalance.data), buy: normalize(buyBalance.data) },
     approval: { needed, isApproving: busy === "approve", approve: () => execute("approve") },
-    swap: { canSwap, isSwapping: busy === "swap", execute: () => execute("swap") },
+    swap: {
+      canSwap,
+      isSwapping: busy === "swap",
+      execute: (confirmedQuoteId) => execute("swap", confirmedQuoteId),
+    },
     actions: {
       setSellAmount: (sellAmount) => setState((s) => ({ ...s, sellAmount })),
       setBuyAmount: () => {},
-      setSellToken: (sellToken) => setState((s) => ({ ...s, sellToken, sellAmount: "" })),
-      setBuyToken: (buyToken) => setState((s) => ({ ...s, buyToken })),
+      setSellToken: (sellToken) =>
+        setState((s) => ({
+          ...s,
+          sellToken,
+          buyToken:
+            s.buyToken.chainId === sellToken.chainId && s.buyToken.symbol !== sellToken.symbol
+              ? s.buyToken
+              : matchTokenOnChain(s.buyToken, sellToken),
+          sellAmount: "",
+          buyAmount: "",
+        })),
+      setBuyToken: (buyToken) =>
+        setState((s) => ({
+          ...s,
+          sellToken:
+            s.sellToken.chainId === buyToken.chainId && s.sellToken.symbol !== buyToken.symbol
+              ? s.sellToken
+              : matchTokenOnChain(s.sellToken, buyToken),
+          buyToken,
+        })),
       setSlippage: (slippage) => {
         if (Number.isFinite(slippage) && slippage >= 0 && slippage <= 10)
           setState((s) => ({ ...s, slippage }));
@@ -275,15 +353,29 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
                 : "NO_ROUTE",
       rate: buyAmount ? Number(buyAmount) / Number(state.sellAmount) : null,
       minimumReceived: buyAmount ? Number(buyAmount) * (1 - state.slippage / 100) : null,
-      priceImpact: null,
+      priceImpact,
+      ...(quoteId ? { id: quoteId } : {}),
+      refresh: () => {
+        void quotes.refetch();
+      },
+      isRefreshing: quotes.isFetching,
       ...(fresh
         ? {
             bestVenue: best.route.venue,
             spreadPercent: improvement,
             comparisonText:
-              uni && best.route.venue === "Aerodrome"
-                ? `Routed via Aerodrome for +${improvement.toFixed(2)}% more tokens than Uniswap V2 (before gas).`
-                : `Best quoted output via ${best.route.venue} (before gas).`,
+              best.route.venue === "Uniswap V3"
+                ? `Routed via Uniswap V3 (${best.route.fee ? `${best.route.fee / 10000}%` : "concentrated"})${
+                    uni && improvement > 0
+                      ? ` for +${improvement.toFixed(2)}% more tokens than V2`
+                      : ""
+                  } (before gas).`
+                : uni && best.route.venue === "Aerodrome"
+                  ? `Routed via Aerodrome for +${improvement.toFixed(2)}% more tokens than Uniswap V2 (before gas).`
+                  : `Best quoted output via ${best.route.venue} (before gas).`,
+            ...(uniV3
+              ? { uniswapV3AmountOut: formatUnits(uniV3.output, state.buyToken.decimals) }
+              : {}),
             ...(uni ? { uniswapAmountOut: formatUnits(uni.output, state.buyToken.decimals) } : {}),
             ...(aero
               ? { aerodromeAmountOut: formatUnits(aero.output, state.buyToken.decimals) }
