@@ -10,12 +10,21 @@ export interface PriceRow {
   readonly priceUsd: number;
   readonly change24hPercent: number;
   readonly symbol?: string;
+  /** Pool below Market-Data's liquidity floor: cheap to move, returned only when asked for. */
+  readonly indicative?: boolean;
+  readonly liquidityUsd?: number;
 }
 
 /** Successful response shape from /api/prices */
 export interface PricesResponseOk {
   readonly success: true;
-  readonly data: { readonly prices: readonly PriceRow[] };
+  readonly data: {
+    readonly prices: readonly PriceRow[];
+    /** Market-Data answered that it cannot price these (no contract, or no pool deep enough). */
+    readonly unpriced?: readonly AddressHex[];
+    /** No answer from Market-Data in time; retry later. */
+    readonly failed?: readonly AddressHex[];
+  };
 }
 
 /** Failure response shape from /api/prices */
