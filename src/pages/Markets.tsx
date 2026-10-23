@@ -131,8 +131,6 @@ const TRACKED_PRODUCTS = [
 const SD_PER_ETH = 988_132_706.168;
 const SD_POOL_ADDRESS = "0xC3D1e0b1CD05081bD7Af4cf87f681512E3E90917";
 const SD_TOKEN_ADDRESS = "0x051c758521971f5c5a84edaf18eea12854375469";
-const AMUTT_TOKEN_ADDRESS = "0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7";
-const AMUTT_POOL_ADDRESS = "0x581B294FeC1A4332f17cf18B49D68087c09b6784";
 
 // ───────────────────────────── Formatting helpers ─────────────────────────────
 
@@ -297,7 +295,7 @@ function useCoinbaseLiveMarkets() {
 
             const updated = { ...prev, [productId]: nextRow };
 
-            // When ETH updates, also compute live SD/USD and AMUTT/USD Base pool pricing
+            // When ETH updates, also compute SD/USD
             if (productId === "ETH-USD") {
               const sdPriceUsd = (priceNum / SD_PER_ETH).toFixed(8);
               const sdExisting = prev["SD-USD"];
@@ -334,42 +332,6 @@ function useCoinbaseLiveMarkets() {
                 high_52w: null,
                 low_52w: null,
                 sparkline: sdSparkline,
-              };
-
-              const amuttPriceUsd = (
-                (priceNum / SD_PER_ETH) *
-                1.05
-              ).toFixed(8);
-              const amuttExisting = prev["AMUTT-USD"];
-              const amuttSparkline =
-                !amuttExisting ||
-                amuttExisting.sparkline.at(-1) !== amuttPriceUsd
-                  ? [...(amuttExisting?.sparkline ?? []), amuttPriceUsd].slice(
-                      -14
-                    )
-                  : amuttExisting.sparkline;
-
-              updated["AMUTT-USD"] = {
-                symbol: "AMUTT/USD",
-                streamed_as: "AMUTT-USD",
-                base: "AMUTT",
-                quote: "USD",
-                price: amuttPriceUsd,
-                price_usd: amuttPriceUsd,
-                venue: "Base (Uniswap V2)",
-                age_ms: 0,
-                stale: false,
-                bid: null,
-                ask: null,
-                spread_bps: "15.0",
-                change_24h_pct: chg ?? "0.00",
-                high_24h: amuttPriceUsd,
-                low_24h: amuttPriceUsd,
-                volume_24h: "250000",
-                volume_24h_usd: (250000 * Number(amuttPriceUsd)).toFixed(2),
-                high_52w: null,
-                low_52w: null,
-                sparkline: amuttSparkline,
               };
             }
 
@@ -416,11 +378,11 @@ function useCoinbaseLiveMarkets() {
 // ───────────────────────────── Coinbase REST Trades Fetcher ─────────────────────────────
 
 async function fetchCoinbaseTrades(productId: string): Promise<TradeRow[]> {
-  if (productId === "SD-USD" || productId === "AMUTT-USD") {
+  if (productId === "SD-USD") {
     return [
       {
         venue: "Base Uniswap V2",
-        price: productId === "SD-USD" ? "0.00000253" : "0.00000266",
+        price: "0.00000253",
         size: "98813.00",
         side: "buy",
         trade_id: "0xade88f38806d2f7be1c295eba954568b9ae7334352186316733fc9a7f0316533",
@@ -468,11 +430,9 @@ export default function Markets() {
   // Sort by 24h USD volume descending
   const sortedRows = useMemo(() => {
     return [...marketList].sort((a, b) => {
-      // Prioritize SD and AMUTT at the top
+      // Prioritize SD at the top
       if (a.base === "SD") return -1;
       if (b.base === "SD") return 1;
-      if (a.base === "AMUTT") return -1;
-      if (b.base === "AMUTT") return 1;
 
       const va = Number(a.volume_24h_usd || 0);
       const vb = Number(b.volume_24h_usd || 0);
@@ -632,7 +592,7 @@ export default function Markets() {
                         </td>
                         <td className="py-2 pr-3">
                           <span className="font-semibold">{r.streamed_as}</span>
-                          {r.base === "SD" || r.base === "AMUTT" ? (
+                          {r.base === "SD" ? (
                             <Badge
                               variant="outline"
                               className="ml-2 border-purple-300 bg-purple-50 text-[10px] text-purple-700"
@@ -787,7 +747,7 @@ function PairDetail({
   row: MarketRow;
   livePrice: string | null;
 }) {
-  const isBaseToken = row.base === "SD" || row.base === "AMUTT";
+  const isBaseToken = row.base === "SD";
 
   const trades = useQuery({
     queryKey: ["trades", row.streamed_as],
@@ -851,7 +811,7 @@ function PairDetail({
               <dt className="text-gray-500">Token Explorer</dt>
               <dd>
                 <a
-                  href={`https://basescan.org/address/${row.base === "SD" ? SD_TOKEN_ADDRESS : AMUTT_TOKEN_ADDRESS}`}
+                  href={`https://basescan.org/address/${SD_TOKEN_ADDRESS}`}
                   target="_blank"
                   rel="noreferrer"
                   className="flex items-center gap-1 text-purple-600 hover:underline"
@@ -862,7 +822,7 @@ function PairDetail({
               <dt className="text-gray-500">Liquidity Pool</dt>
               <dd>
                 <a
-                  href={`https://basescan.org/address/${row.base === "SD" ? SD_POOL_ADDRESS : AMUTT_POOL_ADDRESS}`}
+                  href={`https://basescan.org/address/${SD_POOL_ADDRESS}`}
                   target="_blank"
                   rel="noreferrer"
                   className="flex items-center gap-1 text-purple-600 hover:underline"

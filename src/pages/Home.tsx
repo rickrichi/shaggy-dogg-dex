@@ -1,13 +1,11 @@
 // src/pages/Home.tsx
 import { Link } from "react-router-dom";
 
-import { ArrowLeftRight, ArrowRight, Layers, ShieldCheck, Trophy, Wallet } from "lucide-react";
+import { ArrowLeftRight, Layers, ShieldCheck, Trophy, Wallet } from "lucide-react";
 import { useAccount } from "wagmi";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { useUserActivity } from "@/hooks/useUserActivity";
-
-const AMUTT_ADDRESS = "0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7";
 
 // The networks the swap screen supports, each with its own verified Uniswap V2 router.
 const NETWORKS = ["Base", "Ethereum", "Arbitrum", "Optimism", "Polygon", "Sepolia (test)"];
@@ -70,13 +68,6 @@ export default function Home() {
               <ArrowLeftRight className="size-5" />
               Start swapping
             </Link>
-            <a
-              href="/amutt"
-              className="inline-flex items-center gap-2 rounded-xl border border-purple-200 bg-white/90 px-6 py-3 font-semibold text-purple-700 shadow-sm transition hover:-translate-y-0.5 hover:border-purple-300"
-            >
-              Meet AMUTT
-              <ArrowRight className="size-4" />
-            </a>
           </div>
           <div className="flex flex-wrap justify-center gap-2 lg:justify-start">
             {NETWORKS.map((n) => (
@@ -94,47 +85,42 @@ export default function Home() {
           </div>
         </div>
 
-        {/* AMUTT card */}
+        {/* DEX card */}
         <div className="relative mx-auto w-full max-w-md">
           <div className="absolute -inset-4 rounded-[2rem] bg-gradient-to-br from-purple-400/30 via-pink-400/25 to-orange-300/30 blur-2xl" />
           <div className="relative rounded-3xl border border-white/60 bg-white/85 p-7 text-center shadow-2xl shadow-purple-500/10 backdrop-blur">
             <img
               src="/amutt-logo-256.png"
-              alt="Astro Mutt logo: a happy dog with its tongue out"
+              alt="Shaggy Mutt logo: a happy dog with its tongue out"
               width={128}
               height={128}
               className="mx-auto size-32 rounded-full shadow-lg ring-4 ring-white"
             />
-            <h2 className="mt-5 text-2xl font-extrabold text-gray-900">Astro Mutt</h2>
-            <p className="text-sm font-semibold tracking-wide text-purple-600">AMUTT · on Base</p>
+            <h2 className="mt-5 text-2xl font-extrabold text-gray-900">Shaggy Mutt DEX</h2>
+            <p className="text-sm font-semibold tracking-wide text-purple-600">Non-custodial · Base</p>
             <dl className="mt-5 grid grid-cols-2 gap-3 text-left">
               <div className="rounded-xl bg-purple-50 p-3">
-                <dt className="text-xs text-gray-500">Total supply</dt>
-                <dd className="font-bold text-gray-900">100,000,000</dd>
+                <dt className="text-xs text-gray-500">Base venues compared</dt>
+                <dd className="font-bold text-gray-900">Uniswap V3, V2, Aerodrome</dd>
               </div>
               <div className="rounded-xl bg-pink-50 p-3">
-                <dt className="text-xs text-gray-500">Network</dt>
-                <dd className="font-bold text-gray-900">Base</dd>
+                <dt className="text-xs text-gray-500">Networks</dt>
+                <dd className="font-bold text-gray-900">{NETWORKS.length}</dd>
               </div>
             </dl>
-            <p className="mt-4 break-all rounded-lg bg-gray-50 px-3 py-2 font-mono text-[11px] text-gray-500">
-              {AMUTT_ADDRESS}
-            </p>
             <div className="mt-5 flex gap-2">
               <Link
-                to="/swap?output=AMUTT"
+                to="/swap"
                 className="flex-1 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md transition hover:opacity-95"
               >
-                Trade AMUTT
+                Swap
               </Link>
-              <a
-                href={`https://basescan.org/token/${AMUTT_ADDRESS}`}
-                target="_blank"
-                rel="noreferrer"
+              <Link
+                to="/markets"
                 className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:border-purple-300 hover:text-purple-700"
               >
-                View on BaseScan
-              </a>
+                Markets
+              </Link>
             </div>
           </div>
         </div>

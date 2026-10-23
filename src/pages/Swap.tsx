@@ -38,6 +38,9 @@ const STABLE_SYMBOLS: ReadonlySet<StableSymbol> = new Set(["USDC", "USDT", "DAI"
 
 const TRADE_MODES: readonly TradeMode[] = ["swap", "buy", "limit", "sell"] as const;
 
+// Swap and Limit open on ETH -> USDC (never a project token); a URL ?output= still picks another.
+const DEFAULT_BUY_SYMBOL = "USDC";
+
 // ══════════════════════════════════════════════════════════════════════════════
 // HELPER FUNCTIONS (Pure, no side effects)
 // ══════════════════════════════════════════════════════════════════════════════
@@ -60,11 +63,19 @@ function parseTradeMode(param: string | null): TradeMode {
 }
 
 /**
- * Get initial token from URL param or fallback to index
+ * Get initial token from URL param or fall back to a symbol (or list position when the chain lacks it)
  */
-function getInitialToken(param: string | null, fallbackIndex: number, chainId?: number): Token {
+function getInitialToken(
+  param: string | null,
+  fallbackIndex: number,
+  chainId?: number,
+  fallbackSymbol?: string
+): Token {
   const chainTokens = getSwapDropdownTokens(chainId);
-  const fallback = chainTokens[fallbackIndex] ?? chainTokens[0];
+  const fallback =
+    (fallbackSymbol ? chainTokens.find((t) => t.symbol === fallbackSymbol) : undefined) ??
+    chainTokens[fallbackIndex] ??
+    chainTokens[0];
   if (!fallback) {
     throw new Error("Tokens list must include at least one token");
   }
@@ -166,7 +177,7 @@ export default function Swap() {
   const baseTokens = useMemo(
     () => ({
       initialSell: getInitialToken(urlParams.input, 0, chain?.id ?? 8453),
-      initialBuy: getInitialToken(urlParams.output, 1, chain?.id ?? 8453),
+      initialBuy: getInitialToken(urlParams.output, 1, chain?.id ?? 8453, DEFAULT_BUY_SYMBOL),
     }),
     [urlParams.input, urlParams.output, chain?.id]
   );

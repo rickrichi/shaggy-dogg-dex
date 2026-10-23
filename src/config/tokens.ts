@@ -970,7 +970,6 @@ export function getTokensForChain(chainId?: number): readonly [Token, Token, ...
 
 const DROPDOWN_SYMBOL_ORDER: readonly string[] = [
   "ETH",
-  "AMUTT",
   "SD",
   "FBA",
   "USDC",
