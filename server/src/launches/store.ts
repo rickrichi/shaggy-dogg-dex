@@ -1,6 +1,7 @@
 // server/src/launches/store.ts
-// Launchpad launches verified on Base, in a local SQLite file. This is the launch count that tests
-// MCHOW model v0.4's launchpad assumption, so only verified rows are ever written.
+// Launchpad launches verified on Base. This is the launch count that tests the economic model's
+// launchpad assumption, so only verified rows are ever written. LaunchStore keeps them in a local
+// SQLite file (development and tests); SupabaseLaunchStore keeps them in Postgres (production).
 
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
@@ -29,6 +30,17 @@ export interface MonthlyLaunches {
   seeded: number
 }
 
+type Awaitable<T> = T | Promise<T>
+
+/** What the launch routes need from a store; SQLite answers synchronously, Supabase asynchronously. */
+export interface LaunchRepository {
+  get(txHash: string): Awaitable<LaunchRow | undefined>
+  /** Idempotent: recording the same transaction twice keeps the first row. */
+  record(launch: VerifiedLaunch): Awaitable<LaunchRow>
+  list(limit: number): Awaitable<LaunchRow[]>
+  monthly(): Awaitable<MonthlyLaunches[]>
+}
+
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS launches (
   tx_hash TEXT PRIMARY KEY,
@@ -47,9 +59,9 @@ CREATE INDEX IF NOT EXISTS launches_launched_at ON launches (launched_at);
 `
 
 /** Token names and symbols are creator-chosen; store a bounded copy. */
-const clip = (value: string, max: number) => value.slice(0, max)
+export const clip = (value: string, max: number) => value.slice(0, max)
 
-export class LaunchStore {
+export class LaunchStore implements LaunchRepository {
   readonly db: DatabaseSync
 
   constructor(file: string) {

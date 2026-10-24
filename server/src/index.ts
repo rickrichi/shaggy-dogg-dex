@@ -12,6 +12,7 @@ import { rateLimit } from './middleware/rateLimit.js'
 import { withSecurityHeaders } from './middleware/security.js'
 import { AdminStore } from './admin/store.js'
 import { LaunchStore } from './launches/store.js'
+import { SupabaseLaunchStore } from './launches/supabaseStore.js'
 import { mountAdminRoutes } from './routes/admin.js'
 import { mountCeDeFiRoutes } from './routes/cedefi.js'
 // routes
@@ -87,9 +88,17 @@ if (env.ADMIN_WALLETS.length === 0) {
   console.warn('Admin sign-in disabled: set ADMIN_WALLETS in server/.env')
 }
 
-// ----- Launchpad launch tracking (verified on Base, local SQLite) -----
+// ----- Launchpad launch tracking (verified on Base; Supabase when configured, else local SQLite) -----
+if (Boolean(env.SUPABASE_URL) !== Boolean(env.SUPABASE_SERVICE_ROLE_KEY)) {
+  throw new Error('Set both SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY, or neither')
+}
+const launchStore =
+  env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY
+    ? new SupabaseLaunchStore({ url: env.SUPABASE_URL, serviceKey: env.SUPABASE_SERVICE_ROLE_KEY })
+    : new LaunchStore(env.LAUNCH_DB_PATH)
+console.log(`Launch records: ${launchStore instanceof LaunchStore ? `SQLite ${env.LAUNCH_DB_PATH}` : 'Supabase'}`)
 mountLaunchRoutes(app, {
-  store: new LaunchStore(env.LAUNCH_DB_PATH),
+  store: launchStore,
   client: createPublicClient({ chain: base, transport: http(env.BASE_RPC_URL) }),
 })
 

@@ -10,11 +10,11 @@ import { LaunchVerificationError, type LaunchChainReader, verifyLaunch } from '.
 import { rateLimit } from '../middleware/rateLimit.js'
 import { normalizeIp } from '../utils/ip.js'
 
-import type { Hono } from 'hono'
-import type { LaunchStore } from '../launches/store.js'
+import type { Context, Hono } from 'hono'
+import type { LaunchRepository } from '../launches/store.js'
 
 export interface LaunchRouteOptions {
-  store: LaunchStore
+  store: LaunchRepository
   client: LaunchChainReader
   /** Reports per IP per minute. */
   reportRateLimitPerMinute?: number
@@ -22,6 +22,12 @@ export interface LaunchRouteOptions {
 
 const ReportInput = z.object({ txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/, 'Invalid transaction hash') })
 const ListQuery = z.object({ limit: z.coerce.number().int().min(1).max(500).default(100) })
+
+/** The store (e.g. a paused Supabase project) is down: say so instead of failing as a 500. */
+function storeUnavailable(c: Context, error: unknown) {
+  console.error('Launch store unavailable:', error)
+  return c.json({ ok: false, reason: 'store_unavailable' }, 503)
+}
 
 export function mountLaunchRoutes(app: Hono, options: LaunchRouteOptions) {
   const { store, client } = options
@@ -36,11 +42,16 @@ export function mountLaunchRoutes(app: Hono, options: LaunchRouteOptions) {
     zValidator('json', ReportInput),
     async (c) => {
       const txHash = c.req.valid('json').txHash.toLowerCase() as Hash
-      const existing = store.get(txHash)
-      if (existing) return c.json({ ok: true, launch: existing })
+      let existing
       try {
-        const launch = store.record(await verifyLaunch(client, txHash))
-        return c.json({ ok: true, launch }, 201)
+        existing = await store.get(txHash)
+      } catch (error) {
+        return storeUnavailable(c, error)
+      }
+      if (existing) return c.json({ ok: true, launch: existing })
+      let verified
+      try {
+        verified = await verifyLaunch(client, txHash)
       } catch (error) {
         if (error instanceof LaunchVerificationError) {
           return c.json({ ok: false, reason: error.reason }, 422)
@@ -51,15 +62,29 @@ export function mountLaunchRoutes(app: Hono, options: LaunchRouteOptions) {
         console.error('Launch verification failed:', error)
         return c.json({ ok: false, reason: 'chain_unavailable' }, 502)
       }
+      try {
+        return c.json({ ok: true, launch: await store.record(verified) }, 201)
+      } catch (error) {
+        return storeUnavailable(c, error)
+      }
     },
   )
 
-  app.get('/api/launches', zValidator('query', ListQuery), (c) =>
-    c.json({ ok: true, launches: store.list(c.req.valid('query').limit) }),
-  )
+  app.get('/api/launches', zValidator('query', ListQuery), async (c) => {
+    try {
+      return c.json({ ok: true, launches: await store.list(c.req.valid('query').limit) })
+    } catch (error) {
+      return storeUnavailable(c, error)
+    }
+  })
 
-  app.get('/api/launches/stats', (c) => {
-    const months = store.monthly()
+  app.get('/api/launches/stats', async (c) => {
+    let months
+    try {
+      months = await store.monthly()
+    } catch (error) {
+      return storeUnavailable(c, error)
+    }
     return c.json({
       ok: true,
       total: months.reduce((sum, m) => sum + m.launches, 0),

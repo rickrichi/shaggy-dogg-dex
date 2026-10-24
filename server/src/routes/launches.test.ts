@@ -61,6 +61,30 @@ describe('launch tracking routes', () => {
     expect((await appWith(down).report(HASH)).status).toBe(502)
   })
 
+  it('reports an unavailable store as 503 without touching the chain', async () => {
+    const { client } = chain()
+    const failing = {
+      get: vi.fn().mockRejectedValue(new Error('project paused')),
+      record: vi.fn(),
+      list: vi.fn().mockRejectedValue(new Error('project paused')),
+      monthly: vi.fn().mockRejectedValue(new Error('project paused')),
+    }
+    const app = new Hono()
+    mountLaunchRoutes(app, { store: failing, client, reportRateLimitPerMinute: 1000 })
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const report = await app.request('/api/launches', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ txHash: HASH }),
+    })
+    expect(report.status).toBe(503)
+    await expect(report.json()).resolves.toEqual({ ok: false, reason: 'store_unavailable' })
+    expect(client.getTransaction).not.toHaveBeenCalled()
+    expect((await app.request('/api/launches/stats')).status).toBe(503)
+    expect((await app.request('/api/launches')).status).toBe(503)
+  })
+
   it('validates the hash before touching the chain', async () => {
     const { client } = chain()
     const response = await appWith(client).report('0x1234')
