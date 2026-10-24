@@ -10,7 +10,6 @@ import {
   ExternalLink,
   Layers,
   Loader2,
-  Lock,
   RefreshCw,
   Rocket,
   ShieldCheck,
@@ -31,16 +30,15 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { WalletConnect } from "@/components/WalletConnect";
-import {
-  CANONICAL_BASE_CONTRACTS,
-  DEX_VENUES,
-  LAUNCHPAD_ARCHETYPES,
-} from "@/lib/launchpad/constants";
+import { DEX_VENUES, LAUNCHPAD_ARCHETYPES } from "@/lib/launchpad/constants";
 import { executeLaunchpadDeployment } from "@/lib/launchpad/deployEngine";
+import { reportLaunch } from "@/lib/launchpad/reportLaunch";
+import { impliedLaunchPricing, MIN_SEED_ETH, seedingProblem } from "@/lib/launchpad/seeding";
 import { saveLaunchedToken } from "@/lib/launchpad/storage";
 
 import NotFound from "./NotFound";
 
+import type { Hash } from "viem";
 import type { DeployedEcosystemResult, LaunchpadFormState } from "@/lib/launchpad/types";
 
 const stepTabs: Record<string, string> = {
@@ -55,9 +53,6 @@ export default function Launchpad() {
   const { data: walletClient } = useWalletClient();
   const publicClient = usePublicClient();
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
-
-  const adminAddress = CANONICAL_BASE_CONTRACTS.DeployerAdminWallet;
-  const isAdmin = Boolean(address && address.toLowerCase() === adminAddress.toLowerCase());
 
   const { step } = useParams<{ step?: string }>();
   const navigate = useNavigate();
@@ -92,7 +87,7 @@ export default function Launchpad() {
     enableDexSeeding: true,
     selectedDex: "uniswap_v3",
     pairAsset: "ETH",
-    initialEthLiquidity: "0.0005",
+    initialEthLiquidity: MIN_SEED_ETH,
     initialTokenLiquidityPercent: 50,
     executionMode: "metamask",
     recipientAdminAddress: "",
@@ -105,12 +100,6 @@ export default function Launchpad() {
   const handleLaunch = async () => {
     if (!isConnected || !address) {
       toast.error("Please connect your wallet first.");
-      return;
-    }
-    if (!isAdmin) {
-      toast.error(
-        `Deployment restricted: Only the protocol administrator (${adminAddress.slice(0, 6)}...${adminAddress.slice(-4)}) can deploy tokens.`
-      );
       return;
     }
     if (chainId !== 8453) {
@@ -135,6 +124,12 @@ export default function Launchpad() {
     if (!form.initialSupply.trim() || Number(form.initialSupply) <= 0) {
       toast.error("Please enter a valid Total Supply in Step 1 (Token Identity).");
       setActiveTab("identity");
+      return;
+    }
+    const seedProblem = seedingProblem(form);
+    if (seedProblem) {
+      toast.error(seedProblem);
+      setActiveTab("liquidity");
       return;
     }
     if (!walletClient || !publicClient) {
@@ -174,7 +169,8 @@ export default function Launchpad() {
         addLog(`Compound v3 vault deployed at ${result.compoundVaultAddress}`);
       if (result.borrowerAddress)
         addLog(`Flash Loan borrower deployed at ${result.borrowerAddress}`);
-      if (form.enableDexSeeding) addLog(`Liquidity seeded on ${selectedDexDef.name}!`);
+      if (form.enableDexSeeding && !result.liquiditySeedingError)
+        addLog(`Liquidity seeded on ${selectedDexDef.name}.`);
 
       setDeployedResult(result);
       saveLaunchedToken({
@@ -195,6 +191,13 @@ export default function Launchpad() {
         deployedAt: Date.now(),
         txHash: result.txHash,
       });
+      void reportLaunch(result.txHash as Hash).then((report) =>
+        addLog(
+          report.recorded
+            ? "Launch verified on Base and counted in launchpad statistics."
+            : `Launch not counted in launchpad statistics (${report.reason}); your token is unaffected.`
+        )
+      );
       if (result.liquiditySeedingError) {
         setDeploymentLog((prev) => [...prev, `[LIQUIDITY FAILED] ${result.liquiditySeedingError}`]);
         toast.warning(
@@ -228,17 +231,10 @@ export default function Launchpad() {
               <Sparkles className="mr-1 size-3 text-purple-300" />
               Base Mainnet Protocol Studio
             </Badge>
-            {isAdmin ? (
-              <Badge className="border-emerald-400/40 bg-emerald-500/30 font-mono text-emerald-200">
-                <ShieldCheck className="mr-1 size-3 text-emerald-300" />
-                Verified Admin: ShaggyDogg (0x9dC0...7C98)
-              </Badge>
-            ) : (
-              <Badge className="border-amber-400/40 bg-amber-500/30 font-mono text-amber-200">
-                <Lock className="mr-1 size-3 text-amber-300" />
-                Operator Restricted (0x9dC0...7C98)
-              </Badge>
-            )}
+            <Badge className="border-emerald-400/40 bg-emerald-500/30 text-emerald-200">
+              <ShieldCheck className="mr-1 size-3 text-emerald-300" />
+              Open to any wallet · you sign, pay gas, and own what you deploy
+            </Badge>
             <Badge className="border-blue-400/40 bg-blue-500/30 text-blue-200">
               ERC-4626 & Isolated Risk Ready
             </Badge>
@@ -612,11 +608,13 @@ export default function Launchpad() {
                       <Label htmlFor="ethLiquidity">Initial ETH Deposit</Label>
                       <Input
                         id="ethLiquidity"
-                        placeholder="e.g. 0.0005"
+                        placeholder={`at least ${MIN_SEED_ETH}`}
                         value={form.initialEthLiquidity}
                         onChange={(e) => setForm({ ...form, initialEthLiquidity: e.target.value })}
                       />
-                      <p className="text-xs text-gray-500">Amount of ETH to seed into the pool.</p>
+                      <p className="text-xs text-gray-500">
+                        Amount of ETH to seed into the pool (minimum {MIN_SEED_ETH} ETH).
+                      </p>
                     </div>
 
                     <div className="space-y-2">
@@ -641,6 +639,8 @@ export default function Launchpad() {
                       </p>
                     </div>
                   </div>
+
+                  <SeedSummary form={form} />
                 </div>
               )}
 
@@ -818,22 +818,6 @@ export default function Launchpad() {
                     </p>
                     <WalletConnect />
                   </div>
-                ) : !isAdmin ? (
-                  <div className="flex w-full flex-col items-center gap-1.5 sm:w-auto sm:items-end">
-                    <Button
-                      disabled
-                      className="w-full cursor-not-allowed bg-slate-200 font-semibold text-slate-500 shadow-none hover:bg-slate-200 sm:w-auto"
-                    >
-                      <Lock className="mr-2 size-4 text-slate-500" />
-                      Deployment Restricted (Admin Only)
-                    </Button>
-                    <span className="text-[11px] text-slate-500">
-                      Studio restricted to Admin:{" "}
-                      <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[10px] font-bold text-slate-700">
-                        {adminAddress.slice(0, 6)}...{adminAddress.slice(-4)}
-                      </code>
-                    </span>
-                  </div>
                 ) : chainId !== 8453 ? (
                   <Button
                     onClick={() => switchChain({ chainId: 8453 })}
@@ -983,6 +967,30 @@ export default function Launchpad() {
           </Card>
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+/** What the seed implies, so creators see the starting price they are setting. */
+function SeedSummary({ form }: { form: LaunchpadFormState }) {
+  const problem = seedingProblem(form);
+  const pricing = impliedLaunchPricing(form);
+  const symbol = form.tokenSymbol || "token";
+  return (
+    <div
+      className={`rounded-lg border p-3 text-xs ${problem ? "border-amber-300 bg-amber-50 text-amber-800" : "border-gray-200 bg-gray-50 text-gray-600"}`}
+    >
+      {pricing ? (
+        <p>
+          Starting price {pricing.pricePerToken.toPrecision(3)} ETH per {symbol}. Whole supply
+          valued at {pricing.supplyValueEth.toPrecision(3)} ETH. Pool holds about{" "}
+          {pricing.poolEth.toPrecision(3)} ETH of value. Valuation is not depth: selling {symbol}{" "}
+          worth 10% of the seeded ETH returns about 9% less than its spot value, before fees.
+        </p>
+      ) : (
+        <p>Enter a supply and an ETH amount to see the starting price this seed sets.</p>
+      )}
+      {problem && <p className="mt-1 font-semibold">{problem}</p>}
     </div>
   );
 }
