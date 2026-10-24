@@ -21,3 +21,9 @@ services:
       # Empty = wallet admin sign-in disabled on the public API.
       - key: ADMIN_WALLETS
         value: ""
+      # Launch records in Supabase, so they survive restarts of this free instance. Set both in the
+      # dashboard; with neither, the API falls back to a local SQLite file that each restart erases.
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false

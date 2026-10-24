@@ -45,6 +45,10 @@ const EnvSchema = z.object({
   // Launchpad launch tracking: Base RPC used to verify reported launches, and its SQLite file.
   BASE_RPC_URL: z.url().default('https://mainnet.base.org'),
   LAUNCH_DB_PATH: z.string().default('data/launches.sqlite'),
+  // Set both to keep launch records in Supabase instead (survives restarts of ephemeral hosts).
+  // The service key is server-only; never expose it through a VITE_ variable.
+  SUPABASE_URL: z.url().optional(),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(20).optional(),
 
   // SSR client entry (used by server-side renderer)
   SSR_CLIENT_ENTRY: z.string().default('/src/main.tsx'),
