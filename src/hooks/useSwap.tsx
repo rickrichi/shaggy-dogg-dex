@@ -9,7 +9,12 @@ import { DEFAULT_SLIPPAGE, SWAP_DEADLINE_BUFFER } from "@/config/contracts";
 import { matchTokenOnChain, type Token } from "@/config/tokens";
 import { positiveAmount } from "@/lib/amm/own-dex";
 import { getRoutePriceImpact, HIGH_PRICE_IMPACT } from "@/lib/amm/price-impact";
-import { quoteSmartRoutes, routeQuoteCall, routeSwapCall } from "@/lib/amm/smart-routing";
+import {
+  quoteSmartRoutes,
+  routeQuoteCall,
+  routeSwapCall,
+  v3RouteFees,
+} from "@/lib/amm/smart-routing";
 import { calculateMinimumAmountOut } from "@/lib/amm/swap-protection";
 
 type QuoteStatus = "IDLE" | "LOADING" | "SUCCESS" | "NO_ROUTE" | "ERROR";
@@ -365,7 +370,11 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
             spreadPercent: improvement,
             comparisonText:
               best.route.venue === "Uniswap V3"
-                ? `Routed via Uniswap V3 (${best.route.fee ? `${best.route.fee / 10000}%` : "concentrated"})${
+                ? `Routed via Uniswap V3 (${v3RouteFees(best.route)
+                    .map((fee) => `${fee / 10000}%`)
+                    .join(
+                      " → "
+                    )}${best.route.path.length > 2 ? `, ${best.route.path.length - 1} hops` : ""})${
                     uni && improvement > 0
                       ? ` for +${improvement.toFixed(2)}% more tokens than V2`
                       : ""

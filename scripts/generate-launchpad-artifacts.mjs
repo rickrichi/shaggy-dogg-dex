@@ -10,7 +10,7 @@ if (!fs.existsSync(targetDir)) {
 }
 
 const contracts = [
-  "GovernanceToken",
+  "FixedSupplyToken",
   "FeeDiscountStaking",
   "YieldStakingVault",
   "CompoundYieldVault",
@@ -47,9 +47,9 @@ export interface ContractArtifact {
 }
 
 export const LAUNCHPAD_ARTIFACTS = {
-  GovernanceToken: {
-    abi: ${JSON.stringify(contractData.GovernanceToken.abi)} as unknown as Abi,
-    bytecode: "${contractData.GovernanceToken.bytecode}" as Hex,
+  FixedSupplyToken: {
+    abi: ${JSON.stringify(contractData.FixedSupplyToken.abi)} as unknown as Abi,
+    bytecode: "${contractData.FixedSupplyToken.bytecode}" as Hex,
   },
   FeeDiscountStaking: {
     abi: ${JSON.stringify(contractData.FeeDiscountStaking.abi)} as unknown as Abi,

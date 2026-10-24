@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { NONFUNGIBLE_POSITION_MANAGER_ABI } from "@/lib/amm/uniswap-v3";
 
+import { LAUNCHPAD_ARTIFACTS } from "./artifacts";
 import { CANONICAL_BASE_CONTRACTS } from "./constants";
 import { executeLaunchpadDeployment } from "./deployEngine";
 
@@ -23,7 +24,7 @@ const form: LaunchpadFormState = {
   enableDexSeeding: true,
   selectedDex: "uniswap_v3",
   pairAsset: "ETH",
-  initialEthLiquidity: "0.01",
+  initialEthLiquidity: "0.05",
   initialTokenLiquidityPercent: 50,
   executionMode: "metamask",
   recipientAdminAddress: "",
@@ -42,12 +43,12 @@ function clients(revertWrap = false) {
     ),
     simulateContract: vi.fn().mockImplementation((request) => Promise.resolve({ request })),
   };
-  const run = (input = form) =>
+  const run = (input = form, user: `0x${string}` = admin) =>
     executeLaunchpadDeployment(
       wallet as unknown as WalletClient,
       publicClient as unknown as PublicClient,
       input,
-      admin
+      user
     );
   return { wallet, publicClient, run };
 }
@@ -58,6 +59,33 @@ describe("V3 launchpad safety", () => {
     await expect(run()).rejects.toThrow("Base Mainnet");
     await expect(run({ ...form, decimals: 6 })).rejects.toThrow("18 decimals");
     expect(wallet.deployContract).not.toHaveBeenCalled();
+  });
+  it("deploys the fixed-supply token template with the whole supply to the recipient", async () => {
+    const { wallet, run } = clients();
+    await run({ ...form, enableDexSeeding: false });
+    const token = wallet.deployContract.mock.calls[0]![0];
+    expect(token.bytecode).toBe(LAUNCHPAD_ARTIFACTS.FixedSupplyToken.bytecode);
+    expect(token.args).toEqual(["Audit", "AUD", admin, 1_000_000n * 10n ** 18n]);
+    const names = LAUNCHPAD_ARTIFACTS.FixedSupplyToken.abi.map((item) =>
+      "name" in item ? item.name : item.type
+    );
+    expect(names).not.toContain("mint");
+    expect(names).not.toContain("admin");
+  });
+  it("refuses a below-minimum seed before deploying anything", async () => {
+    const { wallet, run } = clients();
+    await expect(run({ ...form, initialEthLiquidity: "0.0005" })).rejects.toThrow(
+      "at least 0.05 ETH"
+    );
+    expect(wallet.deployContract).not.toHaveBeenCalled();
+  });
+  it("lets any wallet launch, not only the protocol administrator", async () => {
+    const { wallet, run } = clients();
+    const creator = "0x00000000000000000000000000000000000C0FFE";
+    await run({ ...form, enableDexSeeding: false, recipientAdminAddress: "" }, creator);
+    expect(wallet.deployContract).toHaveBeenCalledTimes(1);
+    expect(wallet.deployContract.mock.calls[0]![0].args[2]).toBe(creator);
+    expect(wallet.deployContract.mock.calls[0]![0].account).toBe(creator);
   });
   it("rejects seeding tokens allocated to a different wallet before deployment", async () => {
     const { wallet, run } = clients();

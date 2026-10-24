@@ -16,7 +16,7 @@ const pool = "0x0000000000000000000000000000000000000003";
 const route: SmartRoute = { venue: "Uniswap V2", router: pool, path: [token0, token1], stable: [] };
 
 describe("route price impact", () => {
-  it("detects the verified AMUTT trade's extreme impact with exact raw amounts", () => {
+  it("detects a verified thin-pool trade's extreme impact with exact raw amounts", () => {
     const price = reserveSpotPrice(
       parseEther("0.000550000002522434"),
       parseEther("45466945.322702333156909734")
@@ -116,5 +116,37 @@ describe("route price impact", () => {
     const client = { multicall } as unknown as Pick<PublicClient, "multicall">;
     expect(await getRoutePriceImpact(client, 8453, route, 100n, 90n, 123n)).toBeNull();
     expect(await getRoutePriceImpact(client, 8453, route, 100n, 90n, 123n)).toBeNull();
+  });
+
+  it("looks up each V3 hop's pool with that hop's own fee tier", async () => {
+    const mid = "0x0000000000000000000000000000000000000004";
+    const sqrt = 2n ** 96n;
+    const calls: unknown[][] = [];
+    const multicall = vi.fn(
+      async ({ contracts }: { contracts: Array<{ functionName: string; args?: unknown[] }> }) => {
+        if (contracts[0]!.functionName === "getPool") {
+          calls.push(...contracts.map((c) => c.args!));
+          return contracts.map(() => pool);
+        }
+        return [[sqrt, 0, 0, 0, 0, 0, true], token0];
+      }
+    );
+    const v3: SmartRoute = {
+      venue: "Uniswap V3",
+      router: pool,
+      path: [token0, mid, token1],
+      stable: [],
+      fees: [500, 10000],
+    };
+    const impact = await getRoutePriceImpact(
+      { multicall } as unknown as Pick<PublicClient, "multicall">,
+      8453,
+      v3,
+      1000n,
+      990n,
+      1n
+    );
+    expect(calls.map((args) => args[2])).toEqual([500, 10000]);
+    expect(impact).toBe(1);
   });
 });

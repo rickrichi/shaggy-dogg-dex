@@ -6,7 +6,7 @@ import { usePublicClient } from "wagmi";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BASE_MAINNET_TOKENS } from "@/config/tokens";
-import { quoteSmartRoutes } from "@/lib/amm/smart-routing";
+import { quoteSmartRoutes, v3RouteFees } from "@/lib/amm/smart-routing";
 
 const usdc = BASE_MAINNET_TOKENS.find((t) => t.symbol === "USDC")!;
 const weth = BASE_MAINNET_TOKENS.find((t) => t.symbol === "WETH")!;
@@ -46,10 +46,16 @@ export function BaseExecutionComparison({ notional }: { notional: number }) {
             </p>
             {(["Uniswap V3", "Uniswap V2", "Aerodrome"] as const).map((venue) => {
               const route = quote.data.quotes.find((q) => q.route.venue === venue);
-              const extraLabel = route?.route.fee ? ` (${route.route.fee / 10000}%)` : "";
+              const extraLabel =
+                route?.route.venue === "Uniswap V3"
+                  ? ` (${v3RouteFees(route.route)
+                      .map((fee) => `${fee / 10000}%`)
+                      .join(" → ")})`
+                  : "";
               return (
                 <p key={venue}>
-                  {venue}{extraLabel}:{" "}
+                  {venue}
+                  {extraLabel}:{" "}
                   {route ? `${formatUnits(route.output, 18)} WETH` : "No executable pool route"}
                 </p>
               );

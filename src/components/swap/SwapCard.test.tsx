@@ -12,7 +12,7 @@ function makeSwap(): UseSwapReturn {
   return {
     state: {
       sellToken: BASE_MAINNET_TOKENS.find((t) => t.address === "native")!,
-      buyToken: BASE_MAINNET_TOKENS.find((t) => t.symbol === "AMUTT")!,
+      buyToken: BASE_MAINNET_TOKENS.find((t) => t.symbol === "SD")!,
       sellAmount: "0.01",
       buyAmount: "43089871.174776702040638151",
       slippage: 0.5,
@@ -98,10 +98,10 @@ describe("Swap impact review", () => {
   it("uses the actual trade, includes V3 and highlights the selected venue", () => {
     const swap = makeSwap();
     const { rerender } = render(<PriceChart swap={swap} />);
-    expect(screen.getByText("0.01 ETH → AMUTT")).toBeInTheDocument();
+    expect(screen.getByText("0.01 ETH → SD")).toBeInTheDocument();
     expect(screen.getByText("Uniswap V3")).toBeInTheDocument();
     expect(screen.getByText("Best quoted output").parentElement).toHaveTextContent("Uniswap V2");
-    expect(screen.getByText("43,089,871.17 AMUTT")).toBeInTheDocument();
+    expect(screen.getByText("43,089,871.17 SD")).toBeInTheDocument();
     expect(screen.queryByText(/USDT/)).not.toBeInTheDocument();
     rerender(
       <PriceChart
@@ -118,6 +118,6 @@ describe("Swap impact review", () => {
     );
     expect(screen.getByText("2 ETH → USDC")).toBeInTheDocument();
     expect(screen.queryByText("Best quoted output")).not.toBeInTheDocument();
-    expect(screen.queryByText("43,089,871.17 AMUTT")).not.toBeInTheDocument();
+    expect(screen.queryByText("43,089,871.17 SD")).not.toBeInTheDocument();
   });
 });

@@ -7,6 +7,8 @@ import { marked } from "marked";
 
 const root = new URL("../", import.meta.url);
 const markdown = await readFile(new URL("docs/WHITEPAPER.md", root), "utf8");
+// The edition line, e.g. "Version 1.3 · 21 October 2026", read from the source so it cannot go stale.
+const edition = markdown.match(/\*\*(Version [^*]+?)\*\*/)?.[1] ?? "Technical whitepaper";
 const escapeHtml = (value) => value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 const contents = [];
 const renderer = new marked.Renderer();
@@ -24,11 +26,11 @@ const html = `<!DOCTYPE html>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Shaggy Dogg DEX — Technical Whitepaper</title>
-  <meta name="description" content="Shaggy Dogg DEX technical whitepaper: multi-chain routing, AMUTT token mechanics, staking, vaults, liquidity locks, governance, and contract references." />
+  <meta name="description" content="Shaggy Dogg DEX technical whitepaper: multi-chain routing, liquidity, vaults, position locks, administrative authority, and contract references." />
   <link rel="canonical" href="https://dex.lumsian.com/whitepaper" />
   <link rel="icon" type="image/png" href="/favicon-32x32.png" />
   <meta property="og:title" content="Shaggy Dogg DEX — Technical Whitepaper" />
-  <meta property="og:description" content="Version 1.3 · 21 October 2026. Architecture, token mechanics, implementation status, and deployment evidence." />
+  <meta property="og:description" content="${escapeHtml(edition)}. Architecture, implementation status, and deployment evidence." />
   <meta property="og:type" content="article" />
   <meta property="og:url" content="https://dex.lumsian.com/whitepaper" />
   <style>
@@ -74,13 +76,13 @@ const html = `<!DOCTYPE html>
   <a class="skip" href="#document">Skip to whitepaper</a>
   <header class="masthead">
     <a class="brand" href="/">SHAGGY DOGG DEX</a>
-    <nav class="links" aria-label="Project links"><a href="/amutt">AMUTT</a><a href="/whitepaper.md" download="Shaggy-Dogg-DEX-Whitepaper.md">Download Markdown</a><a href="https://github.com/rickrichi/shaggy-dogg-dex">Source code</a></nav>
+    <nav class="links" aria-label="Project links"><a href="/whitepaper.md" download="Shaggy-Dogg-DEX-Whitepaper.md">Download Markdown</a><a href="https://github.com/rickrichi/shaggy-dogg-dex">Source code</a></nav>
   </header>
   <div class="layout">
     <nav class="contents" aria-label="Whitepaper contents"><p>In this paper</p><ol>${toc}</ol></nav>
     <main id="document">${article}</main>
   </div>
-  <footer>Version 1.3 · 21 October 2026 · Use your browser's Print command for a print-formatted copy.</footer>
+  <footer>${escapeHtml(edition)} · Use your browser's Print command for a print-formatted copy.</footer>
 </body>
 </html>
 `;

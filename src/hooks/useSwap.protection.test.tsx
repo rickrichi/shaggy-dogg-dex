@@ -30,9 +30,9 @@ vi.mock("@/lib/amm/smart-routing", async (original) => ({
 }));
 
 const eth = BASE_MAINNET_TOKENS.find((t) => t.address === "native")!;
-const amutt = BASE_MAINNET_TOKENS.find((t) => t.symbol === "AMUTT")!;
+const sd = BASE_MAINNET_TOKENS.find((t) => t.symbol === "SD")!;
 const account = "0x0000000000000000000000000000000000000001";
-const route = routeCandidates(eth, amutt).find((r) => r.venue === "Uniswap V2")!;
+const route = routeCandidates(eth, sd).find((r) => r.venue === "Uniswap V2")!;
 const output = parseEther("100");
 const wallet = {
   getChainId: vi.fn(),
@@ -52,7 +52,7 @@ function setup() {
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={cache}>{children}</QueryClientProvider>
   );
-  const hook = renderHook(() => useSwap(eth, amutt), { wrapper });
+  const hook = renderHook(() => useSwap(eth, sd), { wrapper });
   act(() => hook.result.current.actions.setSellAmount("0.01"));
   return hook;
 }

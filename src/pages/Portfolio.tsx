@@ -53,7 +53,7 @@ export default function Portfolio() {
   // Helper for token avatar badge
   const getTokenIcon = (symbol: string) => {
     const upper = symbol.toUpperCase();
-    if (upper === "SD" || upper === "AMUTT" || upper === "FBA") return "🐕";
+    if (upper === "SD" || upper === "FBA") return "🐕";
     if (upper === "ETH" || upper === "WETH") return "⟠";
     if (upper === "USDC" || upper === "USDT") return "💵";
     return "🪙";
@@ -70,7 +70,7 @@ export default function Portfolio() {
             Connect Your Wallet to View Portfolio
           </h1>
           <p className="mx-auto mt-3 max-w-xl text-base text-gray-600 dark:text-gray-300">
-            Track your real-time multi-chain holdings, token balances (SD, AMUTT, ETH, USDC), and
+            Track your real-time multi-chain holdings, token balances (ETH, USDC, SD and more), and
             portfolio valuation across all supported EVM networks.
           </p>
           <div className="mt-6 flex justify-center gap-4">
@@ -103,7 +103,7 @@ export default function Portfolio() {
             </CardHeader>
             <CardContent>
               <CardDescription>
-                Native support for Shaggy Dogg (SD), Alpha Mutt (AMUTT), FBA, and native ETH.
+                Native support for ETH, stablecoins, Shaggy Dogg (SD), FBA and the Base token list.
               </CardDescription>
             </CardContent>
           </Card>

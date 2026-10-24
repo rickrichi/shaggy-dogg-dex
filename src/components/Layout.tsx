@@ -247,15 +247,6 @@ export const Layout = ({ children }: LayoutProps) => {
               </a>
               <span>·</span>
               <a
-                href="https://base.blockscout.com/token/0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7"
-                target="_blank"
-                rel="noreferrer"
-                className="hover:text-purple-600 hover:underline"
-              >
-                AMUTT Contract
-              </a>
-              <span>·</span>
-              <a
                 href="https://basescan.org"
                 target="_blank"
                 rel="noreferrer"

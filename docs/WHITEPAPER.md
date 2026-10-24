@@ -2,21 +2,27 @@
 
 ## Technical whitepaper
 
-**Version 1.3 · 21 October 2026**\
-**Multi-chain trading, liquidity infrastructure, and the Astro Mutt ecosystem**
+**Version 1.4 · 24 October 2026**\
+**Multi-chain trading and liquidity infrastructure**
 
 Project website: [dex.lumsian.com](https://dex.lumsian.com/)\
 Source repository: [rickrichi/shaggy-dogg-dex](https://github.com/rickrichi/shaggy-dogg-dex)\
-Implementation baseline: `b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899`\
-Reward-distribution revision: `56732cfce5dbd24bfbdf0e1fde5ca1eff89997e3`; owner and exclusions: `fd24c15a9fa487852fb14a8fb16189807a5dc7e5`
+Implementation baseline: `b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899`; routing and launchpad as revised in `cfe2bb0`
+
+> **What changed in Version 1.4.** Astro Mutt (AMUTT) is discontinued and has no role in the project.
+> The AMUTT USDC staker-reward policy and its distributor, described in Versions 1.1–1.3, are
+> cancelled and will not be deployed, funded, or enabled. The advisory AMUTT governance terms are
+> cancelled. Swap routing now includes two-hop Uniswap V3 routes, and the token launchpad is open to
+> any wallet with a fixed-supply token template. A new edition will describe any future token only
+> after its design is complete and reviewed.
 
 ### Abstract
 
-Shaggy Dogg DEX is a wallet-connected application for trading tokens, managing decentralized liquidity, and accessing ecosystem contracts. Its trading interface compares supported on-chain routes and submits user-authorized transactions to the selected exchange router. Base is the home network for the Astro Mutt (AMUTT) ecosystem; the application also configures trading routes on Ethereum, Arbitrum, Optimism, and Polygon.
+Shaggy Dogg DEX is a wallet-connected application for trading tokens, managing decentralized liquidity, and accessing ecosystem contracts. Its trading interface compares supported on-chain routes and submits user-authorized transactions to the selected exchange router. Base is the home network; the application also configures trading routes on Ethereum, Arbitrum, Optimism, and Polygon.
 
 The project combines market swaps, Uniswap-compatible liquidity tools, token deployment tooling, fee-discount staking, lending-vault implementations, and operator tools for arbitrage research and execution. These components have different maturity levels and trust assumptions. A deployed token, an implemented contract, and an enabled financial product are separate milestones.
 
-This paper describes the implementation and published deployment records available at the baseline above. It explains token mechanics, fee flows, administrative powers, and development priorities. AMUTT profit-sharing terms are approved but not yet active. Version 1.1 adds a USDC distributor contract, staking-history accounting, and a claim interface; these are implemented and tested but not deployed, funded, or enabled. The 10% staker share is reserved for stakers outside the project: project wallets, including the owner and administrator wallet, receive no staker allocation. Governance policy is advisory and does not give token holders automatic control over contracts or treasury assets.
+This paper describes the implementation and published deployment records available at the baseline above. It explains fee flows, administrative powers, and development priorities. No profit-sharing, reward, or governance program is active or planned in this edition: the AMUTT terms of earlier editions are cancelled (§8.2), and no token gives holders control over contracts or treasury assets.
 
 ### Reading this paper
 
@@ -34,13 +40,12 @@ The application does not introduce a new consensus network. It relies on existin
 | --- | --- |
 | Market swaps | Implemented route quotation, approval, simulation, submission, and receipt handling |
 | Liquidity tools | V2 liquidity flows and Base V3 position workflows; availability depends on pool and deployment configuration |
-| AMUTT staking | Base staking address configured; contract interface exposes deposits, withdrawals, lock terms, and discount tiers |
 | Aave and Compound vaults | Contract implementations and deployment records; each deployment requires its own configuration and bytecode checks |
 | V3 position timelock | Source and Base deployment record available |
-| Token launchpad | Deployment tooling and token templates; a generated token has its own configuration and permissions |
+| Token launchpad | Open to any wallet; launched tokens use a fixed-supply template with no mint, owner, or admin; no platform fee |
 | Arbitrage tooling | Research, quoting, and operator execution components; neither a quote nor a displayed spread proves realized profit |
-| AMUTT USDC rewards | Approved policy; distributor, accounting, and claim interface implemented and tested; not deployed, funded, or enabled |
-| Governance | Advisory policy; no automatic treasury access or binding contract execution |
+| AMUTT USDC rewards | Cancelled in Version 1.4; will not be deployed, funded, or enabled |
+| Governance | None in this edition |
 | Limit orders | Preview-only according to the repository's documented product scope |
 
 ## 2. System architecture
@@ -78,8 +83,8 @@ A frontend or API outage can prevent convenient access without changing blockcha
 
 | Network | Chain ID | Routes configured in the reviewed trading code |
 | --- | --- | --- |
-| Ethereum | 1 | Uniswap V2; direct Uniswap V3 pools |
-| Base | 8453 | Uniswap V2; direct Uniswap V3 pools; Aerodrome stable and volatile routes |
+| Ethereum | 1 | Uniswap V2; Uniswap V3 direct and two-hop |
+| Base | 8453 | Uniswap V2; Uniswap V3 direct and two-hop; Aerodrome stable and volatile routes |
 | Arbitrum One | 42161 | Uniswap V2 |
 | Optimism | 10 | Uniswap V2 |
 | Polygon | 137 | Uniswap V2 |
@@ -89,9 +94,9 @@ Configuration does not guarantee liquidity for every pair. RPC availability, poo
 
 ### 3.2 Candidate selection
 
-The route engine considers a direct token pair and, where applicable, a two-hop path through the chain's wrapped native asset or USDC. V3 candidates are direct single-pool routes across configured fee tiers. On Base, Aerodrome candidates consider stable and volatile settings for each hop.
+The route engine considers a direct token pair and, where applicable, a two-hop path through the chain's wrapped native asset or USDC. V3 candidates are direct pools across configured fee tiers and, for a two-hop path, every pair of fee tiers, executed with the router's multi-hop `exactInput`. On Base, Aerodrome candidates consider stable and volatile settings for each hop.
 
-Candidate quotations are collected at a shared observed block. Failed or zero-output quotes are excluded; remaining quotes are ranked by output amount. The selected route is therefore the highest quoted output **among the candidates actually checked**. The algorithm does not search every exchange, split an order across pools, or optimize the ranking for gas-adjusted proceeds. Its V3 path generation does not implement multi-hop V3 routing. Source references: [R1], [R2].
+Candidate quotations are collected at a shared observed block. Failed or zero-output quotes are excluded; remaining quotes are ranked by output amount. The selected route is therefore the highest quoted output **among the candidates actually checked**. The algorithm does not search every exchange, split an order across pools, or optimize the ranking for gas-adjusted proceeds. V3 routes are limited to at most two hops. Source references: [R1], [R2].
 
 ### 3.3 Transaction protection
 
@@ -129,33 +134,17 @@ Positions should enter through `lockPosition`, which creates the ownership recor
 
 ## 5. Tokens and supply mechanics
 
-### 5.1 Astro Mutt (AMUTT)
+### 5.1 Discontinued: AMUTT
 
-| Property | Recorded value |
-| --- | --- |
-| Name / symbol | Astro Mutt / AMUTT |
-| Network | Base, chain ID 8453 |
-| Contract | `0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7` |
-| Decimals | 18 |
-| Initial supply and cap | 100,000,000 AMUTT |
-| Initial recipient | Constructor administrator; the supplied verification record identifies `0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98` |
-| Configured staking contract | `0x055BB4eD8d5464C25D71391E940ce53CA30845fC` |
-
-The `GovernanceToken` design sets `MAX_SUPPLY` equal to `initialMint` and mints that amount to the administrator at construction. Although it exposes a minter role and a `mint` function, the entire cap is consumed initially. The reviewed implementation has no burn function to reopen supply capacity and no setter to raise the cap. It has no transfer tax, rebase, blacklist, or token-holder voting implementation.
-
-The administrator can change the administrator and minter addresses. These role changes do not expand the immutable cap. This paper does not claim that administration has been renounced.
-
-**Initial allocation:** the constructor assigns 100% of the initial mint to its administrator. Subsequent transfers can distribute tokens or seed liquidity, but are separate from the initial allocation. The reviewed records do not establish an enforceable team vesting schedule, a current circulating-supply figure, or fixed community and treasury allocation percentages. This paper therefore does not invent an allocation chart. Explorer transfers and balances are the evidence for subsequent distribution.
-
-The supplied AMUTT BaseScan result reports successful source verification with Solidity `0.8.36` and 200 optimizer runs. The current repository contract declares Solidity `0.8.28`; later local revisions must not be presumed byte-for-byte identical to the deployed contract. Deployment-specific verified source and creation data remain the reference for that address. Sources: [R5] and the [AMUTT contract page](https://basescan.org/address/0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7#code).
+AMUTT (`0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7` on Base) is discontinued. It has no role in the project's trading features, staking, rewards, or governance, and there is no conversion or transition arrangement. The application no longer features it. The contracts tied to it are retired and listed in §10 only so they can be identified. Source: [R5].
 
 ### 5.2 SD, FBA, and other listed assets
 
-SD is a separate Base ecosystem token recorded at `0x051c758521971f5c5a84edaf18eea12854375469`. Historical deployment documentation records a supply of 1,000,000 SD and separate staking and vault addresses. Those records do not establish today's holder balances or prove that the AMUTT staking contract accepts SD.
+SD is a separate Base ecosystem token recorded at `0x051c758521971f5c5a84edaf18eea12854375469`. Historical deployment documentation records a supply of 1,000,000 SD and separate staking and vault addresses. Those records do not establish today's holder balances.
 
 FBA is included in the Base token registry at `0xb8f3d5143ffddb99688bb31e7c2c3894a1e17263`, with 18 decimals. Registry inclusion alone does not establish its supply schedule, allocation, governance authority, or entitlement to project revenue. No FBA reward or governance entitlement is asserted in this paper.
 
-AMUTT, SD, FBA, and third-party trading assets are distinct contracts. Holding one does not create ownership of the others, a claim on LP positions, or an automatic right to treasury funds. The approved reward policy specifically names eligible AMUTT stake. Sources: [R5], [R6].
+SD, FBA, and third-party trading assets are distinct contracts. Holding one does not create ownership of the others, a claim on LP positions, or a right to treasury funds. Sources: [R5], [R6].
 
 ## 6. Fee-discount staking
 
@@ -168,9 +157,9 @@ The reviewed implementation has several material properties:
 - The administrator can change the minimum period and set a withdrawal fee up to 5,000 basis points, or 50%. Those mutable values are read when withdrawing.
 - A separate tier administrator can replace the tier list. The administrator can replace that role.
 - Withheld withdrawal fees remain in the staking contract under the reviewed implementation; the withdrawal function does not route them to the treasury.
-- The contract contains no built-in interest accrual or USDC reward claim function. Approved rewards would be paid by the separate distributor described in §8.3, using this contract's recorded stake history.
+- The contract contains no built-in interest accrual or reward claim function.
 
-Discounts apply only where another contract explicitly reads the staking tier and uses it in fee calculation. The reviewed Aave and Compound vault implementations do so when configured with a discount-staking contract. Direct swaps through external routers do not automatically reduce an external pool's fee because the wallet holds or stakes AMUTT. Sources: [R7], [R8].
+Discounts apply only where another contract explicitly reads the staking tier and uses it in fee calculation. The reviewed Aave and Compound vault implementations do so when configured with a discount-staking contract. Direct swaps through external routers do not reduce an external pool's fee because a wallet holds or stakes a token. Sources: [R7], [R8].
 
 ## 7. Lending vaults and fee accounting
 
@@ -196,7 +185,7 @@ The helper clamps discounts of 10,000 basis points or more to a zero fee. For il
 
 Administrators can change the treasury, performance fee, and external lending configuration. Withdrawal availability depends on contract solvency and the external market's liquidity. Incorrect configuration, lending-market losses, or unsupported token behavior can impair deposits and withdrawals. Source reference: [R8].
 
-## 8. Arbitrage and approved reward economics
+## 8. Arbitrage and cancelled reward policy
 
 ### 8.1 Execution boundaries
 
@@ -206,58 +195,13 @@ The basic `AaveFlashBorrower` source verifies its callback origin and repayment 
 
 An on-chain flash-loan transaction must satisfy its repayment checks within the transaction or revert. A centralized-exchange trade cannot participate in the same atomic rollback. Cross-venue hedging therefore introduces partial-fill, custody, timing, and inventory risks. Neither flash lending nor strategy automation establishes risk-free profit.
 
-### 8.2 Approved policy, not yet active
+### 8.2 Cancelled: AMUTT USDC staker rewards
 
-The machine-readable policy is `approved-not-live` with `enabled: false`. It specifies weekly settlement in native Base USDC, allocating 10% of eligible realized net arbitrage profit to eligible AMUTT stakers and 90% to treasury. This is a share of eligible profit, not a promised percentage return on deposits.
-
-An epoch's eligible profit is calculated after recovering deployed capital, execution and funding costs, and carried losses. All amounts are integer USDC base units (six decimals):
-
-```text
-eligibleProfit = max(0, settledProceeds − deployedCapital − verifiedCosts − carriedLosses)
-stakerPool = floor(10% × eligibleProfit)
-treasuryShare = eligibleProfit − stakerPool
-distributable = stakerPool + carriedDust
-stakeWeight(account) = sum(stakedAMUTT × secondsStakedDuringEpoch)   (excluded wallets omitted)
-allocation(account) = floor(distributable × stakeWeight(account) / totalStakeWeight)
-```
-
-The allocation formula requires a positive total stake weight. When no eligible stake exists, no account allocations are made and the distributable amount carries forward. Otherwise, allocations are rounded down to USDC base units and residual dust carries forward to the next week. Tokens held outside the staking contract do not qualify.
-
-For example, proceeds of 100 USDC above recovered capital, minus 20 USDC of verified costs and 10 USDC of carried losses, produce 70 USDC eligible profit: 7 USDC for eligible stakers and 63 USDC for treasury. Zero or negative eligible profit produces no distribution and carries the loss forward.
-
-Unresolved exchange fills, missing receipts, or missing valuations block epoch finalization. No reward APR is promised. The planned first week runs from Monday 30 November 2026, 00:00 UTC, to Monday 7 December 2026; this start is a plan, not a commitment. It becomes fixed only when the distributor is deployed, and it moves to a later Monday if the independent review or test-network rehearsal is incomplete. Source references: [R10], [R11].
-
-### 8.3 Distribution mechanism (implemented, not deployed)
-
-The `WeeklyUsdcDistributor` contract pays allocations; the staking contract is unchanged. Week *N* covers `[origin + (N − 1) × 7 days, origin + N × 7 days)` and can be published only after it ends, in strict sequence. Weeks without profit are published with a zero allocation so no period can be skipped or reused.
-
-- **Publication.** The distributor owner publishes a week's Merkle root, the hash of the week's full ledger, and its total allocation. The same transaction pulls exactly that amount of USDC from the owner, so a published week is always fully funded.
-- **Claims.** Each allocation is proven against the root. A proof is bound to the chain, the distributor, the week, the account, and the amount. Each account can claim a week once; anyone may submit a claim, but payment always goes to the proven account. Earlier allocations remain claimable after unstaking.
-- **No discretionary withdrawal.** The contract has no clawback, expiry, pause, upgrade path, or owner withdrawal. Unclaimed USDC remains claimable indefinitely. USDC sent to the contract outside publication cannot be recovered.
-- **Ownership.** Ownership transfers in two steps. The intended owner is the single-key ShaggyDogg wallet `0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98`, which also holds the token and staking administrator roles; its key alone would control publication. No distributor has been deployed in this edition.
-
-Off-chain accounting reads finalized `Staked` and `Unstaked` events from the staking contract's deployment onward and replays every balance. If any replayed balance differs from the contract's `stakedBalance`, or if any RPC request fails, the week is not calculated; no substitute data is used. Each week produces a public ledger whose hash is the one committed on-chain, the claim manifest the app verifies, and unsigned transactions for the owner's wallet.
-
-**Trust boundary:** the contract enforces funding, sequencing, and single claims, but it cannot verify that a ledger's profit is real. The owner attests to the ledger; the committed hash lets anyone confirm that the published ledger is the one the owner funded. Source reference: [R11].
-
-### 8.4 Project wallets do not share the staker pool
-
-The 10% staker share is reserved for stakers outside the project. Wallets controlled by the project may stake, but their stake is omitted from the weight calculation, and the full staker pool is divided among the remaining stakers. Each weekly ledger lists every excluded wallet and the stake weight it would otherwise have had.
-
-| Excluded wallet | Role | Recorded holding |
-| --- | --- | --- |
-| [0x88315fb3A3dC6ce4c997caeCdc74637C72857d28](https://basescan.org/address/0x88315fb3A3dC6ce4c997caeCdc74637C72857d28) | AMUTT project wallet | 500,000 AMUTT (0.5% of supply), none staked, at Base block 52,893,733 |
-| [0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98](https://basescan.org/address/0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98) | ShaggyDogg owner and administrator: intended distributor owner; AMUTT token admin and minter; staking admin and tier admin | 54,028,054 AMUTT in wallet (about 54% of supply) and 5,000 AMUTT staked, at Base block 52,895,655 |
-
-The reason is proportion. At those blocks the staking contract held 5,000 AMUTT, all of it staked by the owner wallet. Without exclusion, the owner wallet would have received the entire staker pool, and the project wallet, had it staked its balance, about 99% of it. Per 100 USDC of eligible profit, the exclusion produces 90 USDC to treasury, 10 USDC to outside stakers, and nothing to project wallets through the staker pool. If no outside stake exists in a week, the staker pool carries forward rather than paying a project wallet.
-
-The exclusion applies only to listed wallets. Further team, treasury, or market-making wallets are to be listed before they stake, and every list change appears in the following week's ledger. Source reference: [R11].
+Versions 1.0–1.3 described an approved but inactive policy to share 10% of eligible realized arbitrage profit, in USDC, with AMUTT stakers outside the project, paid by an implemented but undeployed `WeeklyUsdcDistributor`. Version 1.4 cancels that policy. The distributor will not be deployed, funded, or enabled; no reward week will run; and no staker has any claim under the cancelled terms. Nothing was ever distributed. Sources: [R10], [R11] (historical).
 
 ## 9. Governance and administrative authority
 
-Approved governance terms use staked AMUTT at a finalized snapshot block as advisory voting power. The policy specifies seven-day votes, 5% quorum of snapshot staked supply, and an approval threshold encoded as 5,001 basis points. Votes do not execute transactions and do not grant direct treasury access.
-
-Current contract roles continue to govern administration. An accepted advisory proposal still requires an authorized administrator to review and sign any resulting transaction. Binding governance would require a separately reviewed governor, execution timelock, and explicit transfer of administrative authority.
+The advisory AMUTT governance terms of earlier editions are cancelled. This edition has no governance: contract roles alone govern administration, and any change requires an authorized administrator to review and sign the transaction. Binding governance would require a separately reviewed governor, execution timelock, and explicit transfer of administrative authority.
 
 | Component | Authority in reviewed source |
 | --- | --- |
@@ -266,21 +210,20 @@ Current contract roles continue to govern administration. An accepted advisory p
 | Lending vaults | Admin changes treasury, fee within its cap, and lending configuration |
 | Flash-loan tooling | Admin and, in the atomic router, authorized operators control execution |
 | V3PositionTimelock | Recorded owner collects, extends, and withdraws after expiry; no admin override in source |
-| WeeklyUsdcDistributor (not deployed) | Owner publishes funded weekly roots in sequence and transfers ownership in two steps; no withdrawal, clawback, or pause |
 
 A contract name containing “governance,” “sovereign,” or “decentralized” does not remove these powers. This edition does not claim that existing roles are held by a multisignature or transferred to a DAO. Sources: [R4], [R7]–[R11].
 
 ## 10. Base contract inventory
 
-All addresses below refer to **Base mainnet, chain ID 8453**. They are identified in repository configuration or deployment records; they are not a recommendation to deposit. Historical SD deployments and AMUTT deployments must be evaluated separately. Before use, compare verified bytecode and read the deployment's token, asset, role, fee, and external-market parameters.
+All addresses below refer to **Base mainnet, chain ID 8453**. They are identified in repository configuration or deployment records; they are not a recommendation to deposit. Historical SD deployments must be evaluated separately; AMUTT contracts are retired (§5.1). Before use, compare verified bytecode and read the deployment's token, asset, role, fee, and external-market parameters.
 
 | Contract or asset | Address | Record |
 | --- | --- | --- |
-| AMUTT token | [0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7](https://basescan.org/address/0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7) | AMUTT metadata and current staking configuration |
-| AMUTT fee-discount staking | [0x055BB4eD8d5464C25D71391E940ce53CA30845fC](https://basescan.org/address/0x055BB4eD8d5464C25D71391E940ce53CA30845fC) | Current staking configuration |
-| AMUTT yield vault | [0x16a1E9c10B913912b7B7df4649D9596D95ce33E6](https://basescan.org/address/0x16a1E9c10B913912b7B7df4649D9596D95ce33E6) | AMUTT deployment record |
-| AMUTT flash borrower | [0x936a3D52c3037848879F3641dfBc9132aAe51bDF](https://basescan.org/address/0x936a3D52c3037848879F3641dfBc9132aAe51bDF) | AMUTT deployment record |
-| AMUTT/WETH V2 pair | [0x581B294FeC1A4332f17cf18B49D68087c09b6784](https://basescan.org/address/0x581B294FeC1A4332f17cf18B49D68087c09b6784) | AMUTT token page and deployment record |
+| AMUTT token | [0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7](https://basescan.org/address/0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7) | Retired (§5.1) |
+| AMUTT fee-discount staking | [0x055BB4eD8d5464C25D71391E940ce53CA30845fC](https://basescan.org/address/0x055BB4eD8d5464C25D71391E940ce53CA30845fC) | Retired (§5.1) |
+| AMUTT yield vault | [0x16a1E9c10B913912b7B7df4649D9596D95ce33E6](https://basescan.org/address/0x16a1E9c10B913912b7B7df4649D9596D95ce33E6) | Retired (§5.1) |
+| AMUTT flash borrower | [0x936a3D52c3037848879F3641dfBc9132aAe51bDF](https://basescan.org/address/0x936a3D52c3037848879F3641dfBc9132aAe51bDF) | Recorded with the AMUTT deployment |
+| AMUTT/WETH V2 pair | [0x581B294FeC1A4332f17cf18B49D68087c09b6784](https://basescan.org/address/0x581B294FeC1A4332f17cf18B49D68087c09b6784) | Retired (§5.1) |
 | SD token | [0x051c758521971f5c5a84edaf18eea12854375469](https://basescan.org/address/0x051c758521971f5c5a84edaf18eea12854375469) | Historical SD deployment |
 | SD fee-discount staking | [0x42134ccc6c41149cf71c7b4994e33ee66758af20](https://basescan.org/address/0x42134ccc6c41149cf71c7b4994e33ee66758af20) | Historical SD deployment |
 | SD yield vault | [0x8531807ef36560cd7db230c95db85791aa586dda](https://basescan.org/address/0x8531807ef36560cd7db230c95db85791aa586dda) | Historical SD deployment |
@@ -289,11 +232,9 @@ All addresses below refer to **Base mainnet, chain ID 8453**. They are identifie
 | FBA token | [0xb8f3d5143ffddb99688bb31e7c2c3894a1e17263](https://basescan.org/address/0xb8f3d5143ffddb99688bb31e7c2c3894a1e17263) | Token registry |
 | V3 position timelock | [0xb5c9bedb57f4e348e40a5e6326c90de474072e25](https://basescan.org/address/0xb5c9bedb57f4e348e40a5e6326c90de474072e25) | Deployment recorded at block 52,527,662 |
 | V3 position manager used by timelock | [0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1](https://basescan.org/address/0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1) | Timelock deployment configuration |
-| USDC designated for future rewards | [0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913](https://basescan.org/address/0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913) | Approved economics policy; distributor reward asset |
-| AMUTT project wallet | [0x88315fb3A3dC6ce4c997caeCdc74637C72857d28](https://basescan.org/address/0x88315fb3A3dC6ce4c997caeCdc74637C72857d28) | Excluded from staker allocations (§8.4) |
-| Owner and administrator wallet | [0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98](https://basescan.org/address/0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98) | Token and staking admin; intended distributor owner; excluded from staker allocations (§8.4) |
+| Owner and administrator wallet | [0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98](https://basescan.org/address/0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98) | Single key; administrator of the project's recorded contracts |
 
-The timelock deployment record identifies transaction [0xf9fd35c9c716e32ae22e5ed3844cd173e97faecd4e003d7a547edafd3dd7ec09](https://basescan.org/tx/0xf9fd35c9c716e32ae22e5ed3844cd173e97faecd4e003d7a547edafd3dd7ec09). An NFT lock requires a separate position-specific transaction and cannot be inferred from deployment alone. `WeeklyUsdcDistributor` has no deployment in this edition; its address will be added only after deployment and source verification. Sources: [R4]–[R7], [R10], [R11].
+The timelock deployment record identifies transaction [0xf9fd35c9c716e32ae22e5ed3844cd173e97faecd4e003d7a547edafd3dd7ec09](https://basescan.org/tx/0xf9fd35c9c716e32ae22e5ed3844cd173e97faecd4e003d7a547edafd3dd7ec09). An NFT lock requires a separate position-specific transaction and cannot be inferred from deployment alone. Sources: [R4]–[R7].
 
 ## 11. Security model and limitations
 
@@ -304,7 +245,6 @@ The system's main risk boundaries are concrete:
 - **Administration:** compromised keys or adverse parameter changes can affect withdrawal conditions, fees, and lending destinations. The staking source does not cap the minimum stake duration.
 - **Dependencies:** RPC services, wallet connections, external lending markets, centralized venues, and market feeds can fail or report incomplete data.
 - **Supply concentration:** constructor allocation to one administrator creates initial concentration. Subsequent distribution and lock claims require on-chain evidence.
-- **Reward attestation:** distributor payouts rely on the owner's profit ledger. The contract guarantees funding and single claims, not the economic accuracy of the ledger.
 - **Version mismatch:** a locally improved contract does not upgrade an older deployed instance. Changes to deployment addresses or user migrations require separate verification.
 
 The repository contains unit, integration, and fork tests and a documented V3 compatibility review. Those records describe specific scopes and historical runs. Source publication, explorer verification, domain allowlisting, and passing tests do not constitute an independent security audit or a guarantee against loss. This whitepaper does not assert completion of an independent audit across the ecosystem.
@@ -321,19 +261,17 @@ Roadmap stages describe acceptance criteria rather than promised dates.
 | --- | --- | --- |
 | Deployment transparency | Versioned inventory for each supported token and contract | Chain, address, creation transaction, verified source, compiler settings, and block-pinned roles and parameters |
 | Execution reliability | Broader route coverage and clearer cost comparison | Reproducible quote and execution checks; gas-aware comparison; chain-specific integration tests |
-| Contract assurance | Review staking, vaults, timelock, reward distributor, and operator execution contracts | Independent findings, fixes, retests, and a deployment-specific release decision |
-| Reward activation | Deploy and fund the implemented USDC distributor | Independent review; multi-week Base Sepolia rehearsal; verified mainnet deployment by the designated owner; first ledger reconciled from settled profit; claim confirmed from the app; explicit activation |
-| Governance operations | Traceable advisory proposals and administrator responses | Snapshot rules, published votes, decisions, and resulting transaction records |
+| Contract assurance | Review staking, vaults, timelock, and operator execution contracts | Independent findings, fixes, retests, and a deployment-specific release decision |
 | Further decentralization | Evaluate multisignature administration and binding governance | Reviewed governance contracts, migration plan, and explicit authority transfers |
 
 Features that depend on these stages remain conditional. In particular, a website description or configuration flag cannot add reward claims to a contract that lacks them.
 
 ## 13. Evidence and references
 
-Repository references [R1]–[R10] are pinned to the implementation baseline; [R11] code links are pinned to the reward-distribution revision, and its configuration and runbook links to the owner-and-exclusions revision. They document code and recorded configuration; explorer links identify deployments. External protocol documentation explains mechanisms of the underlying protocols and does not endorse this project.
+Repository references [R1]–[R10] are pinned to the implementation baseline, with [R2] also pinned to the routing revision; [R11] code links are pinned to the reward-distribution revision, and its configuration and runbook links to the owner-and-exclusions revision. They document code and recorded configuration; explorer links identify deployments. External protocol documentation explains mechanisms of the underlying protocols and does not endorse this project.
 
 - **[R1] Network and venue configuration:** [contracts.ts](https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/src/config/contracts.ts), [chain configuration](https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/src/config/chains/config.ts).
-- **[R2] Routing and transaction workflow:** [smart-routing.ts](https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/src/lib/amm/smart-routing.ts), [useSwap.tsx](https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/src/hooks/useSwap.tsx).
+- **[R2] Routing and transaction workflow:** [smart-routing.ts](https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/src/lib/amm/smart-routing.ts), [useSwap.tsx](https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/src/hooks/useSwap.tsx); two-hop V3 routing and the open launchpad: [smart-routing.ts](https://github.com/rickrichi/shaggy-dogg-dex/blob/cfe2bb0/src/lib/amm/smart-routing.ts), [deployEngine.ts](https://github.com/rickrichi/shaggy-dogg-dex/blob/cfe2bb0/src/lib/launchpad/deployEngine.ts), [FixedSupplyToken.sol](https://github.com/rickrichi/shaggy-dogg-dex/blob/cfe2bb0/contracts/src/FixedSupplyToken.sol).
 - **[R3] Liquidity integration evidence:** [Uniswap V3 compatibility review](https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/audit/UNISWAP-V3-COMPATIBILITY.md).
 - **[R4] Liquidity locking:** [V3PositionTimelock.sol](https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/contracts/src/V3PositionTimelock.sol), [deployment record](https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/src/config/dex/timelock-deployment.json).
 - **[R5] AMUTT token and supply:** [GovernanceToken.sol](https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/contracts/src/GovernanceToken.sol), [AMUTT metadata](https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/public/amutt.html), [AMUTT deployment record](https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/docs/AMUTT_LAUNCH/AMUTT_CONTRACT_ADDRESS.txt).
@@ -341,8 +279,8 @@ Repository references [R1]–[R10] are pinned to the implementation baseline; [R
 - **[R7] Staking implementation and selected deployment:** [FeeDiscountStaking.sol](https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/contracts/src/FeeDiscountStaking.sol), [staking configuration](https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/src/lib/staking.ts).
 - **[R8] Vault accounting:** [YieldStakingVault.sol](https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/contracts/src/YieldStakingVault.sol), [CompoundYieldVault.sol](https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/contracts/src/CompoundYieldVault.sol), [FeeDiscountMath.sol](https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/contracts/src/FeeDiscountMath.sol).
 - **[R9] Flash-loan implementations:** [AaveFlashBorrower.sol](https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/contracts/src/AaveFlashBorrower.sol), [AtomicFlashArbitrageRouter.sol](https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/contracts/src/AtomicFlashArbitrageRouter.sol).
-- **[R10] Approved economics and activation requirements:** [policy JSON](https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/config/protocol-economics.json), [decision record](https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/docs/protocol-economics-decision.md), [epoch calculation script](https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/scripts/calculate-epoch-rewards.ts), [allocation library](https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/scripts/lib/epoch-rewards.ts).
-- **[R11] Reward distribution:** [WeeklyUsdcDistributor.sol](https://github.com/rickrichi/shaggy-dogg-dex/blob/56732cfce5dbd24bfbdf0e1fde5ca1eff89997e3/contracts/src/WeeklyUsdcDistributor.sol), [distributor tests](https://github.com/rickrichi/shaggy-dogg-dex/blob/56732cfce5dbd24bfbdf0e1fde5ca1eff89997e3/contracts/test/WeeklyUsdcDistributor.t.sol), [accounting](https://github.com/rickrichi/shaggy-dogg-dex/blob/56732cfce5dbd24bfbdf0e1fde5ca1eff89997e3/scripts/lib/epoch-rewards.ts), [staking history](https://github.com/rickrichi/shaggy-dogg-dex/blob/56732cfce5dbd24bfbdf0e1fde5ca1eff89997e3/scripts/lib/staking-history.ts), [claim tree](https://github.com/rickrichi/shaggy-dogg-dex/blob/56732cfce5dbd24bfbdf0e1fde5ca1eff89997e3/scripts/lib/reward-merkle.ts), [deployment and exclusion configuration](https://github.com/rickrichi/shaggy-dogg-dex/blob/fd24c15a9fa487852fb14a8fb16189807a5dc7e5/config/reward-deployment.json), [operator runbook](https://github.com/rickrichi/shaggy-dogg-dex/blob/fd24c15a9fa487852fb14a8fb16189807a5dc7e5/docs/reward-distribution-runbook.md).
+- **[R10] Cancelled economics policy (historical):** [policy JSON](https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/config/protocol-economics.json), [decision record](https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/docs/protocol-economics-decision.md), [epoch calculation script](https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/scripts/calculate-epoch-rewards.ts), [allocation library](https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/scripts/lib/epoch-rewards.ts).
+- **[R11] Cancelled reward distributor (historical, never deployed):** [WeeklyUsdcDistributor.sol](https://github.com/rickrichi/shaggy-dogg-dex/blob/56732cfce5dbd24bfbdf0e1fde5ca1eff89997e3/contracts/src/WeeklyUsdcDistributor.sol), [distributor tests](https://github.com/rickrichi/shaggy-dogg-dex/blob/56732cfce5dbd24bfbdf0e1fde5ca1eff89997e3/contracts/test/WeeklyUsdcDistributor.t.sol), [accounting](https://github.com/rickrichi/shaggy-dogg-dex/blob/56732cfce5dbd24bfbdf0e1fde5ca1eff89997e3/scripts/lib/epoch-rewards.ts), [staking history](https://github.com/rickrichi/shaggy-dogg-dex/blob/56732cfce5dbd24bfbdf0e1fde5ca1eff89997e3/scripts/lib/staking-history.ts), [claim tree](https://github.com/rickrichi/shaggy-dogg-dex/blob/56732cfce5dbd24bfbdf0e1fde5ca1eff89997e3/scripts/lib/reward-merkle.ts), [deployment and exclusion configuration](https://github.com/rickrichi/shaggy-dogg-dex/blob/fd24c15a9fa487852fb14a8fb16189807a5dc7e5/config/reward-deployment.json), [operator runbook](https://github.com/rickrichi/shaggy-dogg-dex/blob/fd24c15a9fa487852fb14a8fb16189807a5dc7e5/docs/reward-distribution-runbook.md).
 
 ### Publication record
 
@@ -352,4 +290,6 @@ Version 1.1 (21 October 2026) describes the implemented but undeployed USDC dist
 
 Version 1.2 (21 October 2026) names the intended distributor owner, a single-key wallet rather than the multisignature stated in 1.1, and excludes that owner and administrator wallet from staker allocations. At publication it was the only staker.
 
-Version 1.3 (21 October 2026) states the planned first reward week, which remains conditional on review and rehearsal, notes that the source repository is public, and adds the private vulnerability-reporting channel. Reward terms, addresses, and permissions are unchanged. Future editions should identify their source revision and explain material changes to addresses, permissions, fees, and activation status. This document describes the project; it does not offer a guaranteed return or certify the safety of any asset or contract.
+Version 1.3 (21 October 2026) states the planned first reward week, which remains conditional on review and rehearsal, notes that the source repository is public, and adds the private vulnerability-reporting channel. Reward terms, addresses, and permissions are unchanged.
+
+Version 1.4 (24 October 2026) discontinues AMUTT, cancels the AMUTT USDC staker-reward policy and its undeployed distributor, and cancels the advisory AMUTT governance terms; nothing was ever distributed under them. It also records two-hop Uniswap V3 routing and the open launchpad with its fixed-supply token template. Future editions should identify their source revision and explain material changes to addresses, permissions, fees, and activation status. This document describes the project; it does not offer a guaranteed return or certify the safety of any asset or contract.

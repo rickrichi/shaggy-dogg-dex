@@ -75,14 +75,6 @@ const KNOWN_PAIRS: readonly KnownMigrationPair[] = [
     v2PairAddress: "0xC3D1e0b1CD05081bD7Af4cf87f681512E3E90917",
     decimals: 18,
   },
-  {
-    id: "amutt-weth",
-    name: "AMUTT / WETH",
-    tokenSymbol: "AMUTT",
-    tokenAddress: "0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7",
-    v2PairAddress: "0x581B294FeC1A4332f17cf18B49D68087c09b6784",
-    decimals: 18,
-  },
 ];
 
 export function V2ToV3MigrationWizard() {

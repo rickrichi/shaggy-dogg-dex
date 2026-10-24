@@ -1,6 +1,8 @@
 // server/src/index.ts
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
+import { createPublicClient, http } from 'viem'
+import { base } from 'viem/chains'
 
 import { corsActual } from './cors/actual.js'
 // CORS
@@ -9,10 +11,12 @@ import { logRequests } from './middleware/log.js'
 import { rateLimit } from './middleware/rateLimit.js'
 import { withSecurityHeaders } from './middleware/security.js'
 import { AdminStore } from './admin/store.js'
+import { LaunchStore } from './launches/store.js'
 import { mountAdminRoutes } from './routes/admin.js'
 import { mountCeDeFiRoutes } from './routes/cedefi.js'
 // routes
 import { mountHealth } from './routes/health.js'
+import { mountLaunchRoutes } from './routes/launches.js'
 import { mountPriceRoutes } from './routes/prices.js'
 import { mountQuoteRoutes } from './routes/quotes.js'
 import { mountSsr } from './routes/ssr.js'
@@ -82,6 +86,12 @@ mountAdminRoutes(app, {
 if (env.ADMIN_WALLETS.length === 0) {
   console.warn('Admin sign-in disabled: set ADMIN_WALLETS in server/.env')
 }
+
+// ----- Launchpad launch tracking (verified on Base, local SQLite) -----
+mountLaunchRoutes(app, {
+  store: new LaunchStore(env.LAUNCH_DB_PATH),
+  client: createPublicClient({ chain: base, transport: http(env.BASE_RPC_URL) }),
+})
 
 // ----- Webhooks -----
 mountSupabaseDbWebhook(app)

@@ -113,14 +113,6 @@ export const MAINNET_TOKENS = [
   },
   {
     kind: "erc20",
-    address: "0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7" as Address,
-    symbol: "AMUTT",
-    name: "Astro Mutt",
-    decimals: 18,
-    chainId: 8453,
-  },
-  {
-    kind: "erc20",
     address: "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf" as Address,
     symbol: "cbBTC",
     name: "Coinbase Wrapped BTC",
@@ -635,14 +627,6 @@ export const BASE_MAINNET_TOKENS = [
   },
   {
     kind: "erc20",
-    address: "0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7" as Address,
-    symbol: "AMUTT",
-    name: "Astro Mutt",
-    decimals: 18,
-    chainId: 8453,
-  },
-  {
-    kind: "erc20",
     address: "0x051c758521971f5c5a84edaf18eea12854375469" as Address,
     symbol: "SD",
     name: "Shaggy Dogg",
@@ -970,7 +954,6 @@ export function getTokensForChain(chainId?: number): readonly [Token, Token, ...
 
 const DROPDOWN_SYMBOL_ORDER: readonly string[] = [
   "ETH",
-  "AMUTT",
   "SD",
   "FBA",
   "USDC",
@@ -1163,7 +1146,6 @@ export const DEFAULT_TOKEN_PAIRS: ReadonlyArray<{
   { from: "WBTC", to: "ETH" },
   { from: "ETH", to: "LUMIORO" },
   { from: "ETH", to: "SD" },
-  { from: "ETH", to: "AMUTT" },
 ] as const;
 
 /** ————— Canonical wrapped native (WETH) ————— */

@@ -2,7 +2,7 @@ import { type Address, parseAbi, type PublicClient, zeroAddress } from "viem";
 
 import { getUniswapV2Factory, getUniswapV3Deployment } from "@/config/contracts";
 
-import { AERODROME_FACTORY, type SmartRoute } from "./smart-routing";
+import { AERODROME_FACTORY, type SmartRoute, v3RouteFees } from "./smart-routing";
 import { UNISWAP_V3_FACTORY_ABI, UNISWAP_V3_FACTORY_BASE, UNISWAP_V3_POOL_ABI } from "./uniswap-v3";
 
 export const HIGH_PRICE_IMPACT = 5;
@@ -89,13 +89,13 @@ export async function getRoutePriceImpact(
     const pools = await client.multicall({
       blockNumber,
       allowFailure: false,
-      contracts: hops.map(({ from, to, stable }) =>
+      contracts: hops.map(({ from, to, stable }, i) =>
         route.venue === "Uniswap V3"
           ? {
               address: getUniswapV3Deployment(chainId)?.factory ?? UNISWAP_V3_FACTORY_BASE,
               abi: UNISWAP_V3_FACTORY_ABI,
               functionName: "getPool",
-              args: [from, to, route.fee!],
+              args: [from, to, v3RouteFees(route)[i]!],
             }
           : route.venue === "Aerodrome"
             ? {

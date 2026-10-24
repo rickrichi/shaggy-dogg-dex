@@ -42,6 +42,10 @@ const EnvSchema = z.object({
   ADMIN_DB_PATH: z.string().default('data/admin.sqlite'),
   ADMIN_SESSION_HOURS: z.coerce.number().positive().max(72).default(8),
 
+  // Launchpad launch tracking: Base RPC used to verify reported launches, and its SQLite file.
+  BASE_RPC_URL: z.url().default('https://mainnet.base.org'),
+  LAUNCH_DB_PATH: z.string().default('data/launches.sqlite'),
+
   // SSR client entry (used by server-side renderer)
   SSR_CLIENT_ENTRY: z.string().default('/src/main.tsx'),
 });

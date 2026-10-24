@@ -11,6 +11,9 @@
 
 import { ShaggyDoggQuantAiEngine } from "./quant-ai-engine";
 
+// Uniswap V3 SwapRouter02 on Base: the router the live triangular and Uniswap spread handlers use.
+const UNISWAP_V3_SWAP_ROUTER_02 = "0x2626664c2603336E57B271c5C0b26F421741e481";
+
 export interface BotConfig {
   readonly minNetProfitUsd: number;
   readonly maxSlippageBps: number;
@@ -33,6 +36,22 @@ export interface MarketSnapshot {
   readonly aerodromeEthPrice: number;
   /** Aerodrome pool fee as a fraction; read on-chain by the live snapshot. Defaults to 0.30%. */
   readonly aerodromeFeeRate?: number;
+  /** Uniswap pool fee as a fraction (the quoted V3 tier). Defaults to 0.30%. */
+  readonly uniswapFeeRate?: number;
+  /**
+   * True when the triangular rates already include each pool's fee (live V3 quotes, where every
+   * hop has its own fee tier); the engine then adds no fee of its own.
+   */
+  readonly triangularFeesIncluded?: boolean;
+  /**
+   * Screening gas cost per strategy in USD (live gas price x measured gas units x buffer). Without
+   * it the engine falls back to its fixed placeholders.
+   */
+  readonly gasCostUsd?: {
+    readonly triangular: number;
+    readonly crossDex: number;
+    readonly flashLoan: number;
+  };
   readonly currentGasGwei: number;
   readonly timestamp: number;
 }
@@ -115,8 +134,8 @@ export class AiArbitrageBotEngine {
           wethUsdcPrice: market.wethUsdcPrice,
           usdcDaiRate: market.usdcDaiRate,
           daiWethRate: market.daiWethRate,
-          poolFeeBps: 30, // 0.30%
-          gasCostUsd: 0.08,
+          poolFeeBps: market.triangularFeesIncluded ? 0 : 30, // flat 0.30% only for modelled rates
+          gasCostUsd: market.gasCostUsd?.triangular ?? 0.08,
         });
 
         const netUsd = triResult.netProfit * market.wethUsdcPrice;
@@ -137,8 +156,8 @@ export class AiArbitrageBotEngine {
             returnOnCapitalBps: triResult.roiBps,
           },
           plan: {
-            targetRouter: "0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24",
-            action: "swapExactETHForTokens",
+            targetRouter: UNISWAP_V3_SWAP_ROUTER_02,
+            action: "exactInput",
             inputAsset: "WETH",
             inputAmount: `${config.tradeCapitalEth} ETH`,
             minExpectedOut: `${(triResult.terminalCapital * (1 - config.maxSlippageBps / 10_000)).toFixed(5)} WETH`,
@@ -156,9 +175,9 @@ export class AiArbitrageBotEngine {
           poolAPrice: market.uniswapEthPrice,
           poolBPrice: market.aerodromeEthPrice,
           amountUnits: config.tradeCapitalEth,
-          poolAFeeRate: 0.003,
+          poolAFeeRate: market.uniswapFeeRate ?? 0.003,
           poolBFeeRate: market.aerodromeFeeRate ?? 0.003,
-          l2GasUsd: 0.08,
+          l2GasUsd: market.gasCostUsd?.crossDex ?? 0.08,
         });
 
         candidates.push({
@@ -179,9 +198,12 @@ export class AiArbitrageBotEngine {
           plan: {
             targetRouter:
               dualResult.optimalRoute === "BUY_POOL_A_SELL_POOL_B"
-                ? "0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24"
+                ? UNISWAP_V3_SWAP_ROUTER_02
                 : "0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43",
-            action: "swapExactETHForTokens",
+            action:
+              dualResult.optimalRoute === "BUY_POOL_A_SELL_POOL_B"
+                ? "exactInputSingle"
+                : "swapExactETHForTokens",
             inputAsset: "ETH",
             inputAmount: `${config.tradeCapitalEth} ETH`,
             minExpectedOut: `$${(config.tradeCapitalEth * market.uniswapEthPrice * (1 - config.maxSlippageBps / 10_000)).toFixed(2)} USDC`,
@@ -194,6 +216,7 @@ export class AiArbitrageBotEngine {
 
     // 4. Evaluate Strategy C: Aave v3 Flash Loan Arbitrage
     if (config.strategies.flashLoan) {
+      const flashGasUsd = market.gasCostUsd?.flashLoan ?? 0.15;
       try {
         const flashResult = ShaggyDoggQuantAiEngine.calculateAaveFlashArbitrage({
           borrowAsset: "USDC",
@@ -204,9 +227,9 @@ export class AiArbitrageBotEngine {
             wethUsdcPrice: market.wethUsdcPrice,
             usdcDaiRate: market.usdcDaiRate,
             daiWethRate: market.daiWethRate,
-            basePoolFeeBps: 30,
+            basePoolFeeBps: market.triangularFeesIncluded ? 0 : 30,
           },
-          gasCostUsd: 0.15,
+          gasCostUsd: flashGasUsd,
         });
 
         const flashLoanFeeUsd = config.flashBorrowUsdc * 0.0005; // Exact 0.05% Aave v3 pool premium
@@ -215,13 +238,13 @@ export class AiArbitrageBotEngine {
           strategy: "FLASH_LOAN",
           netProfitUsd: flashResult.netProfitUsd,
           grossSpreadPct: (flashResult.grossProfit / config.flashBorrowUsdc) * 100,
-          gasUsd: 0.15,
+          gasUsd: flashGasUsd,
           confidence: flashResult.isProfitable ? 99.1 : 20.0,
           summary: `Aave Flash Loan ${config.flashBorrowUsdc.toLocaleString()} USDC uncollateralized`,
           breakdown: {
             grossProfitUsd: flashResult.grossProfit,
             flashLoanFeeUsd,
-            estimatedGasUsd: 0.15,
+            estimatedGasUsd: flashGasUsd,
             netProfitUsd: flashResult.netProfitUsd,
             minProfitFloorUsd: config.minNetProfitUsd,
             returnOnCapitalBps: (flashResult.netProfitUsd / config.flashBorrowUsdc) * 10000,

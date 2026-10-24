@@ -13,6 +13,7 @@ import { buildV3MintCall } from "@/lib/amm/uniswap-v3";
 
 import { LAUNCHPAD_ARTIFACTS } from "./artifacts";
 import { CANONICAL_BASE_CONTRACTS, DEX_VENUES } from "./constants";
+import { seedingProblem } from "./seeding";
 
 import type { DeployedEcosystemResult, LaunchpadFormState } from "./types";
 
@@ -25,7 +26,7 @@ export async function executeLaunchpadDeployment(
   if (publicClient.chain?.id !== 8453 || (await walletClient.getChainId()) !== 8453) {
     throw new Error("Launchpad deployment requires Base Mainnet");
   }
-  if (form.decimals !== 18) throw new Error("GovernanceToken uses 18 decimals");
+  if (form.decimals !== 18) throw new Error("Launchpad tokens use 18 decimals");
   if (
     form.enableDexSeeding &&
     form.recipientAdminAddress &&
@@ -33,31 +34,21 @@ export async function executeLaunchpadDeployment(
   ) {
     throw new Error("Initial liquidity must be seeded by the wallet receiving the token supply");
   }
-  const adminWallet = CANONICAL_BASE_CONTRACTS.DeployerAdminWallet.toLowerCase();
-  if (userAddress.toLowerCase() !== adminWallet) {
-    throw new Error(
-      `Deployment restricted: Only protocol administrator (${CANONICAL_BASE_CONTRACTS.DeployerAdminWallet}) can launch tokens.`
-    );
-  }
+  const seedProblem = seedingProblem(form);
+  if (seedProblem) throw new Error(seedProblem);
 
   const supplyUnits = parseUnits(form.initialSupply, form.decimals || 18);
   const recipient = (form.recipientAdminAddress?.trim() as Address) || userAddress;
   const activeChain = base;
 
   // ────────────────────────────────────────────────────────────────────────────
-  // Step 1: Deploy Token (GovernanceToken.sol)
+  // Step 1: Deploy Token (FixedSupplyToken.sol: whole supply minted once, no mint or admin)
   // ────────────────────────────────────────────────────────────────────────────
   console.log(`[Launchpad] Deploying token ${form.tokenName} (${form.tokenSymbol})...`);
   const tokenTxHash = await walletClient.deployContract({
-    abi: LAUNCHPAD_ARTIFACTS.GovernanceToken.abi,
-    bytecode: LAUNCHPAD_ARTIFACTS.GovernanceToken.bytecode,
-    args: [
-      form.tokenName,
-      form.tokenSymbol,
-      recipient, // Admin gets 100% supply
-      recipient, // Minter
-      supplyUnits,
-    ],
+    abi: LAUNCHPAD_ARTIFACTS.FixedSupplyToken.abi,
+    bytecode: LAUNCHPAD_ARTIFACTS.FixedSupplyToken.bytecode,
+    args: [form.tokenName, form.tokenSymbol, recipient, supplyUnits], // Recipient gets 100% supply
     account: userAddress,
     chain: activeChain,
   });

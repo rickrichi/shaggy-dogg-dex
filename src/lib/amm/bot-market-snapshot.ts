@@ -1,15 +1,29 @@
 // src/lib/amm/bot-market-snapshot.ts
-// Live Base quotes for the Auto-Pilot bot, read from the same routers its live handlers trade on:
-//   triangular  - Uniswap V2 router, path WETH -> USDC -> DAI -> WETH (handleExecuteLiveTriangular)
-//   cross-DEX   - Uniswap V2 and Aerodrome volatile WETH -> USDC (handleExecuteLiveSpreadLeg)
-// Quotes include each pool's fee; the bot engine applies fees itself, so the fee is divided back out
-// (Uniswap V2 charges exactly 0.30%; Aerodrome's fee is read from its factory for the pool in use).
+// Live Base quotes for the Auto-Pilot bot, read from the venues its live handlers trade on:
+//   triangular  - Uniswap V3, WETH -> USDC -> DAI -> WETH, best of every fee-tier combination
+//                 (executed with SwapRouter02.exactInput on exactly the quoted path)
+//   cross-DEX   - Uniswap V3 (best WETH/USDC tier) and Aerodrome volatile WETH -> USDC
+// Triangular rates are returned fee-inclusive (each V3 pool has its own fee), so the engine must not
+// add a fee of its own. Cross-DEX prices are returned fee-free with each venue's real fee rate.
 
-import { type Address, formatUnits, parseEther, type PublicClient } from "viem";
+import {
+  type Abi,
+  type Address,
+  encodeFunctionData,
+  encodePacked,
+  formatUnits,
+  type Hex,
+  parseEther,
+  type PublicClient,
+} from "viem";
 
-import { AERODROME_ROUTER_ABI, UNISWAP_V2_ROUTER_ABI } from "@/config/abis";
+import {
+  AERODROME_ROUTER_ABI,
+  UNISWAP_V3_QUOTER_V2_ABI,
+  UNISWAP_V3_SWAP_ROUTER_02_ABI,
+} from "@/config/abis";
 
-export const UNISWAP_V2_FEE_RATE = 0.003;
+import { V3_FEE_TIERS } from "./uniswap-v3";
 
 const AERODROME_FACTORY_ABI = [
   {
@@ -36,9 +50,13 @@ const AERODROME_FACTORY_ABI = [
 ] as const;
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+const ALL_TIERS = V3_FEE_TIERS.map((tier) => tier.fee);
+// USDC/DAI is a pegged pair: only the stable tiers are worth quoting.
+const STABLE_TIERS = [100, 500] as const;
 
 export interface BotQuoteVenues {
-  readonly uniswapV2Router: Address;
+  readonly uniswapV3Quoter: Address;
+  readonly uniswapV3Router: Address;
   readonly aerodromeRouter: Address;
   readonly aerodromeFactory: Address;
   readonly weth: Address;
@@ -46,23 +64,58 @@ export interface BotQuoteVenues {
   readonly dai: Address;
 }
 
-/** Fee-free rates and prices, plus the fee-inclusive outputs the live handlers will enforce. */
+/** A Uniswap V3 multi-hop path: tokens[i] -> tokens[i + 1] through the pool with fees[i]. */
+export interface V3Path {
+  readonly tokens: readonly [Address, Address, Address, Address];
+  readonly fees: readonly [number, number, number];
+}
+
 export interface LiveBotQuotes {
+  /** Fee-inclusive rates along `triangularPath`; their product is the path's real output. */
   readonly wethUsdcPrice: number;
   readonly usdcDaiRate: number;
   readonly daiWethRate: number;
-  readonly uniswapEthPrice: number;
-  readonly aerodromeEthPrice: number;
-  readonly aerodromeFeeRate: number;
+  readonly triangularPath: V3Path;
   /** WETH out of the full triangular path for `tradeWeth` WETH in, after pool fees. */
   readonly triangularTerminalWeth: number;
+  /** Fee-free prices and each venue's fee rate, for the cross-DEX comparison. */
+  readonly uniswapEthPrice: number;
+  readonly uniswapFeeTier: number;
+  readonly uniswapFeeRate: number;
+  readonly aerodromeEthPrice: number;
+  readonly aerodromeFeeRate: number;
   /** USDC per WETH actually received on each venue for `tradeWeth`, after pool fees. */
   readonly uniswapExecutionPrice: number;
   readonly aerodromeExecutionPrice: number;
   readonly tradeWeth: number;
 }
 
+export function encodeV3Path(tokens: readonly Address[], fees: readonly number[]): Hex {
+  if (tokens.length !== fees.length + 1) throw new Error("A V3 path needs one fee per hop");
+  const types: Array<"address" | "uint24"> = [];
+  const values: Array<Address | number> = [];
+  tokens.forEach((token, i) => {
+    types.push("address");
+    values.push(token);
+    const fee = fees[i];
+    if (fee !== undefined) {
+      types.push("uint24");
+      values.push(fee);
+    }
+  });
+  return encodePacked(types, values);
+}
+
 const positive = (value: bigint | undefined): value is bigint => value !== undefined && value > 0n;
+
+/** QuoterV2 returns (amountOut, ...); anything else is not a quote. */
+function quotedAmount(
+  result: { status: string; result?: unknown } | undefined
+): bigint | undefined {
+  if (result?.status !== "success" || !Array.isArray(result.result)) return undefined;
+  const amount = result.result[0];
+  return typeof amount === "bigint" ? amount : undefined;
+}
 
 /**
  * Quote the bot's legs at its trade size. Returns null when any leg cannot be quoted (RPC failure,
@@ -76,27 +129,32 @@ export async function fetchLiveBotQuotes(
   if (!(tradeWeth > 0)) return null;
   const amountIn = parseEther(tradeWeth.toString());
   const { weth, usdc, dai } = venues;
+  const quoter = { address: venues.uniswapV3Quoter, abi: UNISWAP_V3_QUOTER_V2_ABI as Abi };
+
+  const paths: V3Path[] = ALL_TIERS.flatMap((f1) =>
+    STABLE_TIERS.flatMap((f2) =>
+      ALL_TIERS.map((f3): V3Path => ({ tokens: [weth, usdc, dai, weth], fees: [f1, f2, f3] }))
+    )
+  );
 
   let results;
   try {
     results = await client.multicall({
       allowFailure: true,
       contracts: [
-        {
-          address: venues.uniswapV2Router,
-          abi: UNISWAP_V2_ROUTER_ABI,
-          functionName: "getAmountsOut",
-          args: [amountIn, [weth, usdc, dai, weth]],
-        },
-        {
-          address: venues.uniswapV2Router,
-          abi: UNISWAP_V2_ROUTER_ABI,
-          functionName: "getAmountsOut",
-          args: [amountIn, [weth, usdc]],
-        },
+        ...paths.map((path) => ({
+          ...quoter,
+          functionName: "quoteExactInput",
+          args: [encodeV3Path(path.tokens, path.fees), amountIn],
+        })),
+        ...ALL_TIERS.map((fee) => ({
+          ...quoter,
+          functionName: "quoteExactInputSingle",
+          args: [{ tokenIn: weth, tokenOut: usdc, amountIn, fee, sqrtPriceLimitX96: 0n }],
+        })),
         {
           address: venues.aerodromeRouter,
-          abi: AERODROME_ROUTER_ABI,
+          abi: AERODROME_ROUTER_ABI as Abi,
           functionName: "getAmountsOut",
           args: [
             amountIn,
@@ -105,7 +163,7 @@ export async function fetchLiveBotQuotes(
         },
         {
           address: venues.aerodromeFactory,
-          abi: AERODROME_FACTORY_ABI,
+          abi: AERODROME_FACTORY_ABI as Abi,
           functionName: "getPool",
           args: [weth, usdc, false],
         },
@@ -115,59 +173,123 @@ export async function fetchLiveBotQuotes(
     return null;
   }
 
-  const [triangular, uniswap, aerodrome, aeroPool] = results;
-  const tri =
-    triangular?.status === "success" ? (triangular.result as readonly bigint[]) : undefined;
-  const uniOut =
-    uniswap?.status === "success" ? (uniswap.result as readonly bigint[]).at(-1) : undefined;
-  const aeroOut =
-    aerodrome?.status === "success" ? (aerodrome.result as readonly bigint[]).at(-1) : undefined;
-  const pool = aeroPool?.status === "success" ? (aeroPool.result as Address) : undefined;
-  if (!tri || tri.length !== 4 || !tri.every(positive) || !positive(uniOut) || !positive(aeroOut)) {
-    return null;
-  }
-  if (!pool || pool === ZERO_ADDRESS) return null;
+  let best: { path: V3Path; out: bigint } | null = null;
+  paths.forEach((path, i) => {
+    const out = quotedAmount(results[i]);
+    if (positive(out) && (!best || out > best.out)) best = { path, out };
+  });
 
-  let aerodromeFeeRate: number;
+  let uniswap: { fee: number; out: bigint } | null = null;
+  ALL_TIERS.forEach((fee, i) => {
+    const out = quotedAmount(results[paths.length + i]);
+    if (positive(out) && (!uniswap || out > uniswap.out)) uniswap = { fee, out };
+  });
+
+  const aeroResult = results[paths.length + ALL_TIERS.length];
+  const aeroOut =
+    aeroResult?.status === "success" ? (aeroResult.result as readonly bigint[]).at(-1) : undefined;
+  const poolResult = results[paths.length + ALL_TIERS.length + 1];
+  const aeroPool = poolResult?.status === "success" ? (poolResult.result as Address) : undefined;
+
+  const chosen = best as { path: V3Path; out: bigint } | null;
+  const uni = uniswap as { fee: number; out: bigint } | null;
+  if (!chosen || !uni || !positive(aeroOut) || !aeroPool || aeroPool === ZERO_ADDRESS) return null;
+
+  // Intermediate amounts along the chosen path, and Aerodrome's fee for the pool it routes through.
+  const [f1, f2] = chosen.path.fees;
+  let second;
   try {
-    const [fee] = await client.multicall({
-      allowFailure: false,
+    second = await client.multicall({
+      allowFailure: true,
       contracts: [
         {
+          ...quoter,
+          functionName: "quoteExactInput",
+          args: [encodeV3Path([weth, usdc], [f1]), amountIn],
+        },
+        {
+          ...quoter,
+          functionName: "quoteExactInput",
+          args: [encodeV3Path([weth, usdc, dai], [f1, f2]), amountIn],
+        },
+        {
           address: venues.aerodromeFactory,
-          abi: AERODROME_FACTORY_ABI,
+          abi: AERODROME_FACTORY_ABI as Abi,
           functionName: "getFee",
-          args: [pool, false],
+          args: [aeroPool, false],
         },
       ],
     });
-    aerodromeFeeRate = Number(fee) / 10_000; // Aerodrome fees are in basis points
   } catch {
     return null;
   }
-  if (!(aerodromeFeeRate >= 0 && aerodromeFeeRate < 0.1)) return null;
+  const usdcMid = quotedAmount(second[0]);
+  const daiMid = quotedAmount(second[1]);
+  const feeResult = second[2];
+  const aeroFeeBps = feeResult?.status === "success" ? (feeResult.result as bigint) : undefined;
+  if (!positive(usdcMid) || !positive(daiMid) || aeroFeeBps === undefined) return null;
 
-  const [wethIn, usdcMid, daiMid, wethOut] = tri as readonly [bigint, bigint, bigint, bigint];
-  const weth1 = Number(formatUnits(wethIn, 18));
+  const aerodromeFeeRate = Number(aeroFeeBps) / 10_000; // Aerodrome fees are in basis points
+  if (!(aerodromeFeeRate >= 0 && aerodromeFeeRate < 0.1)) return null;
+  const uniswapFeeRate = uni.fee / 1_000_000; // V3 fees are in hundredths of a basis point
+
   const usdc1 = Number(formatUnits(usdcMid, 6));
   const dai1 = Number(formatUnits(daiMid, 18));
-  const weth2 = Number(formatUnits(wethOut, 18));
-  const deFee = (rate: number, feeRate: number) => rate / (1 - feeRate);
-
-  const uniswapExecutionPrice = Number(formatUnits(uniOut, 6)) / tradeWeth;
+  const weth2 = Number(formatUnits(chosen.out, 18));
+  const uniswapExecutionPrice = Number(formatUnits(uni.out, 6)) / tradeWeth;
   const aerodromeExecutionPrice = Number(formatUnits(aeroOut, 6)) / tradeWeth;
-  const uniswapEthPrice = deFee(uniswapExecutionPrice, UNISWAP_V2_FEE_RATE);
 
   return {
-    wethUsdcPrice: deFee(usdc1 / weth1, UNISWAP_V2_FEE_RATE),
-    usdcDaiRate: deFee(dai1 / usdc1, UNISWAP_V2_FEE_RATE),
-    daiWethRate: deFee(weth2 / dai1, UNISWAP_V2_FEE_RATE),
-    uniswapEthPrice,
-    aerodromeEthPrice: deFee(aerodromeExecutionPrice, aerodromeFeeRate),
-    aerodromeFeeRate,
+    wethUsdcPrice: usdc1 / tradeWeth,
+    usdcDaiRate: dai1 / usdc1,
+    daiWethRate: weth2 / dai1,
+    triangularPath: chosen.path,
     triangularTerminalWeth: weth2,
+    uniswapEthPrice: uniswapExecutionPrice / (1 - uniswapFeeRate),
+    uniswapFeeTier: uni.fee,
+    uniswapFeeRate,
+    aerodromeEthPrice: aerodromeExecutionPrice / (1 - aerodromeFeeRate),
+    aerodromeFeeRate,
     uniswapExecutionPrice,
     aerodromeExecutionPrice,
     tradeWeth,
+  };
+}
+
+/**
+ * SwapRouter02 call for the triangular path: native ETH in (wrapped by the router), WETH out to
+ * `recipient`, reverting below `minimumOut`; any unspent ETH is refunded.
+ */
+export function v3TriangularSwapCall(
+  router: Address,
+  path: V3Path,
+  amountIn: bigint,
+  minimumOut: bigint,
+  recipient: Address,
+  deadline: bigint
+) {
+  if (amountIn <= 0n || minimumOut <= 0n) throw new Error("Invalid triangular swap amounts");
+  const swap = encodeFunctionData({
+    abi: UNISWAP_V3_SWAP_ROUTER_02_ABI,
+    functionName: "exactInput",
+    args: [
+      {
+        path: encodeV3Path(path.tokens, path.fees),
+        recipient,
+        amountIn,
+        amountOutMinimum: minimumOut,
+      },
+    ],
+  });
+  const refund = encodeFunctionData({
+    abi: UNISWAP_V3_SWAP_ROUTER_02_ABI,
+    functionName: "refundETH",
+  });
+  return {
+    address: router,
+    abi: UNISWAP_V3_SWAP_ROUTER_02_ABI,
+    functionName: "multicall" as const,
+    args: [deadline, [swap, refund]] as const,
+    value: amountIn,
   };
 }

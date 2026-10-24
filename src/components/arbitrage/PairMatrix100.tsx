@@ -8,8 +8,8 @@ import { Input } from "@/components/ui/input";
 import { ARB_API_URL } from "@/config/crypto-arb";
 import thresholds from "@/config/market-pair-thresholds.json";
 import MARKET_PAIRS from "@/config/market-pairs.json";
-import { useMatrixDexQuotes } from "@/hooks/useMatrixDexQuotes";
 import { useCeFiMatrixFeeds } from "@/hooks/useCeFiMatrixFeeds";
+import { useMatrixDexQuotes } from "@/hooks/useMatrixDexQuotes";
 import { MATRIX_QUOTE_MAX_AGE_MS, matrixRoute } from "@/lib/amm/matrix-quotes";
 
 import type { Snapshot } from "@/types/crypto-arb";

@@ -15,7 +15,7 @@ vi.mock("wagmi", async () => {
 vi.mock("@/lib/api/prices", () => ({ fetchPrices: vi.fn() }));
 
 const WALLET = "0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98";
-const AMUTT = "0x41f40bae5318f2c67a4d04d1dc7a42d53a346ae7";
+const SD = "0x051c758521971f5c5a84edaf18eea12854375469";
 const USDC = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
 const ZERO = "0x0000000000000000000000000000000000000000";
 
@@ -26,10 +26,10 @@ const PRICES = {
       { address: ZERO, priceUsd: 2400, change24hPercent: -3.3, symbol: "ETH" },
       { address: USDC, priceUsd: 1, change24hPercent: 0.01, symbol: "USDC" },
       {
-        address: AMUTT,
+        address: SD,
         priceUsd: 2.9e-8,
         change24hPercent: 0,
-        symbol: "AMUTT",
+        symbol: "SD",
         indicative: true,
         liquidityUsd: 3,
       },
@@ -82,21 +82,21 @@ describe("MarketScanner", () => {
       `2 of ${baseErc20.length + 1} tokens priced, 1 indicative`
     );
     expect(screen.getByText("Ether")).toBeInTheDocument();
-    expect(screen.queryByText("Astro Mutt")).not.toBeInTheDocument();
-    expect(screen.getByText(/Indicative only .*: AMUTT/)).toBeInTheDocument();
+    expect(screen.queryByText("Shaggy Dogg")).not.toBeInTheDocument();
+    expect(screen.getByText(/Indicative only .*: SD/)).toBeInTheDocument();
   });
 
   it("shows wallet holdings with firm and indicative values kept apart", async () => {
     connect(WALLET);
     walletBalances(
-      { [AMUTT]: 54_000_000n * 10n ** 18n, [USDC]: 9_750_000n },
+      { [SD]: 54_000_000n * 10n ** 18n, [USDC]: 9_750_000n },
       4_600_000_000_000_000n
     );
     vi.mocked(pricesApi.fetchPrices).mockResolvedValue(PRICES);
     start();
     fireEvent.click(screen.getByRole("button", { name: "My holdings" }));
 
-    expect(await screen.findByText("54,000,000 AMUTT")).toBeInTheDocument();
+    expect(await screen.findByText("54,000,000 SD")).toBeInTheDocument();
     expect(screen.getByText("0.0046 ETH")).toBeInTheDocument();
     expect(screen.getByText("9.75 USDC")).toBeInTheDocument();
     expect(screen.getByText(/indicative · \$3\.00 pool/)).toBeInTheDocument();

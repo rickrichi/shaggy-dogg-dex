@@ -130,12 +130,6 @@ const tokenWatchlist: Record<number, ChainConfig> = {
         decimals: 6,
       },
       {
-        address: "0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7",
-        name: "Alpha Mutt",
-        symbol: "AMUTT",
-        decimals: 18,
-      },
-      {
         address: "0xb8f3d5143ffddb99688bb31e7c2c3894a1e17263",
         name: "FBA Token",
         symbol: "FBA",
@@ -145,12 +139,6 @@ const tokenWatchlist: Record<number, ChainConfig> = {
         address: "0xc3d1e0b1cd05081bd7af4cf87f681512e3e90917",
         name: "Shaggy Dogg LP (SD/WETH)",
         symbol: "SD-LP",
-        decimals: 18,
-      },
-      {
-        address: "0x581b294fec1a4332f17cf18b49d68087c09b6784",
-        name: "Astro Mutt LP (AMUTT/WETH)",
-        symbol: "AMUTT-LP",
         decimals: 18,
       },
     ],
