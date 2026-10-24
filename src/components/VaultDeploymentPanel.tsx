@@ -1,12 +1,11 @@
 import { useRef, useState } from "react";
 
-import { type Address, encodeDeployData, formatEther, type Hash, parseAbi } from "viem";
+import { type Address, encodeDeployData, formatEther, type Hash, parseAbi, zeroAddress } from "viem";
 import { base } from "viem/chains";
 import { useAccount, usePublicClient, useWalletClient } from "wagmi";
 
 import { Button } from "@/components/ui/button";
 import { LAUNCHPAD_ARTIFACTS } from "@/lib/launchpad/artifacts";
-import { BASE_STAKING } from "@/lib/staking";
 
 const legacy = "0x16a1E9c10B913912b7B7df4649D9596D95ce33E6";
 const usdc = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
@@ -49,7 +48,8 @@ export function VaultDeploymentPanel() {
   const dataFor = (admin: Address, treasury: Address) =>
     encodeDeployData({
       ...artifact,
-      args: [usdc, pool, aToken, BASE_STAKING.stakingAddress, admin, treasury],
+      // No discount staking until MuttChow staking exists; the vault supports address(0).
+      args: [usdc, pool, aToken, zeroAddress, admin, treasury],
     });
   const run = async (action: () => Promise<void>) => {
     if (lock.current) return;

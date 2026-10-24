@@ -98,10 +98,10 @@ describe("Portfolio Page - Permanent On-Chain Flow", () => {
           priceUsd: 0,
         },
         {
-          key: "AMUTT:0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7:8453",
-          symbol: "AMUTT",
-          name: "Alpha Mutt",
-          address: "0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7",
+          key: "FBA:0xb8f3d5143ffddb99688bb31e7c2c3894a1e17263:8453",
+          symbol: "FBA",
+          name: "FBA Token",
+          address: "0xb8f3d5143ffddb99688bb31e7c2c3894a1e17263",
           decimals: 18,
           chainId: 8453,
           balance: "54528054677297666843090266",
@@ -134,7 +134,7 @@ describe("Portfolio Page - Permanent On-Chain Flow", () => {
 
     // Verify token rows exist
     expect(screen.getByText("Shaggy Dogg")).toBeInTheDocument();
-    expect(screen.getByText("Alpha Mutt")).toBeInTheDocument();
+    expect(screen.getByText("FBA Token")).toBeInTheDocument();
     expect(screen.getByText("0.0103")).toBeInTheDocument();
     expect(screen.getByText("500,000")).toBeInTheDocument();
   });

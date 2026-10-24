@@ -3269,29 +3269,6 @@ export default function Arbitrage() {
                           +${flashArbResult.netProfitUsd.toFixed(2)} USD
                         </span>
                       </div>
-
-                      {flashArbResult.isProfitable && (
-                        <div className="mt-2 space-y-1.5 rounded-lg border border-purple-100 bg-purple-50/50 p-2.5 text-[11px]">
-                          <div className="flex items-center justify-between font-bold text-purple-900">
-                            <span>Proposed profit sharing (not live):</span>
-                            <span className="font-mono text-xs text-purple-700">
-                              10% / 90% Split
-                            </span>
-                          </div>
-                          <div className="flex justify-between text-gray-600">
-                            <span>↳ AMUTT stakers (10%, no payouts yet):</span>
-                            <span className="font-mono font-semibold text-emerald-600">
-                              +${(flashArbResult.netProfitUsd * 0.1).toFixed(2)} USDC
-                            </span>
-                          </div>
-                          <div className="flex justify-between text-gray-600">
-                            <span>↳ Protocol treasury (90%, illustrative):</span>
-                            <span className="font-mono font-semibold text-indigo-600">
-                              +${(flashArbResult.netProfitUsd * 0.9).toFixed(2)} USDC
-                            </span>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   )}
 
@@ -3318,12 +3295,6 @@ export default function Arbitrage() {
                       Atomically executed: If net profit doesn&apos;t cover the 0.05% fee, the EVM
                       reverts with $0 capital loss.
                     </p>
-
-                    <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 p-2 text-center text-[11px] text-emerald-900">
-                      <span className="font-semibold">Proposed economics policy (not live):</span>{" "}
-                      10% of net realized flash loan yield would go to weekly AMUTT staker
-                      distributions on Base. No distributor exists yet, so nothing is paid today.
-                    </div>
                   </div>
                 </CardContent>
               </Card>

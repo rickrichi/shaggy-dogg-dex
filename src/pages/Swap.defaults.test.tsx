@@ -52,18 +52,18 @@ describe("Swap page defaults", () => {
   });
 
   it.each([8453, 1])(
-    "never opens on AMUTT on chain %i: Swap and Limit start ETH -> USDC",
+    "opens on ETH and stablecoins only on chain %i: Swap and Limit start ETH -> USDC",
     (chainId) => {
       const pairs = openSwap(chainId);
 
-      expect(pairs.flat()).not.toContain("AMUTT");
+      expect(pairs.flat().every((symbol) => ["ETH", "USDC"].includes(symbol))).toBe(true);
       expect(pairs[0]).toEqual(["ETH", "USDC"]); // Swap
       expect(pairs[2]).toEqual(["ETH", "USDC"]); // Limit
     }
   );
 
   it("still honours an explicit ?output= link", () => {
-    const pairs = openSwap(8453, "/swap?output=0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7");
-    expect(pairs[0]).toEqual(["ETH", "AMUTT"]);
+    const pairs = openSwap(8453, "/swap?output=0x051c758521971f5c5a84edaf18eea12854375469");
+    expect(pairs[0]).toEqual(["ETH", "SD"]);
   });
 });

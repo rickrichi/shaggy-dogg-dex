@@ -1,7 +1,26 @@
 import json
+import os
+import sys
 import urllib.request
 
-alchemy_url = 'https://base-mainnet.g.alchemy.com/v2/***REMOVED***'
+
+def read_env_local(name):
+    # Falls back to the git-ignored .env.local so the key never lives in this file.
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.env.local')
+    if not os.path.exists(path):
+        return None
+    with open(path, encoding='utf-8') as f:
+        for line in f:
+            key, sep, value = line.strip().partition('=')
+            if sep and key == name:
+                return value.strip().strip('"\'')
+    return None
+
+
+# Needs a server-side Alchemy Base URL (no domain allowlist) with the Transfers API enabled.
+alchemy_url = os.environ.get('REWARDS_RPC_URL') or read_env_local('REWARDS_RPC_URL')
+if not alchemy_url:
+    sys.exit('Set REWARDS_RPC_URL in the environment or in .env.local.')
 wallet = '0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98'
 
 def get_transfers(direction):

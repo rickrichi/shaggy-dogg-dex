@@ -53,7 +53,7 @@ export default function Portfolio() {
   // Helper for token avatar badge
   const getTokenIcon = (symbol: string) => {
     const upper = symbol.toUpperCase();
-    if (upper === "SD" || upper === "AMUTT" || upper === "FBA") return "🐕";
+    if (upper === "SD" || upper === "FBA") return "🐕";
     if (upper === "ETH" || upper === "WETH") return "⟠";
     if (upper === "USDC" || upper === "USDT") return "💵";
     return "🪙";

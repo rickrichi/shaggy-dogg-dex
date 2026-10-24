@@ -1,11 +1,11 @@
 // src/pages/ProtocolOps.tsx
 import { Link } from "react-router-dom";
 
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ShieldCheck } from "lucide-react";
 
-import { ActiveProtocolManager } from "@/components/launchpad/ActiveProtocolManager";
 import { LaunchpadNav } from "@/components/launchpad/LaunchpadNav";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function ProtocolOps() {
   return (
@@ -42,7 +42,25 @@ export default function ProtocolOps() {
       </div>
 
       {/* Main Operations Console */}
-      <ActiveProtocolManager />
+      <Card className="border-indigo-100 bg-white shadow-sm">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg text-gray-900">
+            <ShieldCheck className="size-5 text-indigo-600" />
+            No protocol contracts to manage yet
+          </CardTitle>
+          <CardDescription>
+            MuttChow&apos;s token, incentive scheduler, and liquidity lock will appear here once
+            they are deployed, reviewed, and verified on Base Mainnet.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Link to="/launchpad">
+            <Button size="sm" className="bg-indigo-600 font-semibold text-white hover:bg-indigo-700">
+              Open Token Studio
+            </Button>
+          </Link>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -19,7 +19,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { VaultDeploymentPanel } from "@/components/VaultDeploymentPanel";
 import { positiveAmount } from "@/lib/amm/own-dex";
-import { BASE_STAKING } from "@/lib/staking";
 
 const abi = parseAbi([
   "function underlyingAsset() view returns (address)",
@@ -35,6 +34,8 @@ const abi = parseAbi([
 ]);
 const configured = import.meta.env.VITE_YIELD_VAULT_ADDRESS as string | undefined;
 export const CANONICAL_YIELD_VAULT: Address = "0x5c98f6bc9d17ba0eb02e1336bdf035938f5859e5";
+// The discount-staking contract this vault was deployed with (fixed at construction).
+const VAULT_DISCOUNT_STAKING: Address = "0x055BB4eD8d5464C25D71391E940ce53CA30845fC";
 const vault: Address =
   configured && isAddress(configured) ? (configured as Address) : CANONICAL_YIELD_VAULT;
 const usdc = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as const;
@@ -80,7 +81,7 @@ export function YieldVaultPanel() {
         configured:
           asset.toLowerCase() === usdc.toLowerCase() &&
           pool.toLowerCase() === "0xa238dd80c259a72e81d7e4664a9801593f98d1c5" &&
-          staking.toLowerCase() === BASE_STAKING.stakingAddress.toLowerCase(),
+          staking.toLowerCase() === VAULT_DISCOUNT_STAKING.toLowerCase(),
       };
     },
   });
