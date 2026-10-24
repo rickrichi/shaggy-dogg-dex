@@ -2,6 +2,7 @@
 // Dry run by default (simulates only). Pass --send to broadcast.
 // Key is read from env PRIVATE_KEY (put it in .env, which is gitignored). Never hardcode it.
 import "dotenv/config";
+
 import {
   type Address,
   createPublicClient,
