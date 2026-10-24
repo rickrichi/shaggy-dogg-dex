@@ -674,15 +674,16 @@ waived to meet a date.
 12. **The launchpad demand test has passed** (§17.1), and the §16 model has been rerun with the
     measured launch rate and trading per launch in place of the hypothetical ones.
 
-### 17.1 Launchpad demand test (proposed thresholds)
+### 17.1 Launchpad demand test
 
 The deciding unknown in the v0.4 model is how many tokens are actually launched and how much they
 trade. It is measured on the open launchpad, with WETH pairs, before any MRWD contract, WETH
-commitment, or reward reserve exists. The thresholds below are proposals; they are fixed and
-published **before** the measurement window opens and are not adjusted to fit the result.
+commitment, or reward reserve exists. The thresholds below were adopted on 24 October 2026, before
+any launch was counted, and are not adjusted to fit the result.
 
 - **Window.** Three consecutive full calendar months (UTC), starting with the first full month in
-  which the launchpad and the launch counter are both publicly live.
+  which the launchpad is publicly live **and** the launch counter's records persist across server
+  restarts. Counts kept before that are best-effort and are not used for the thresholds.
 - **Launch count.** Launches recorded by the server (`/api/launches/stats`). A launch is counted only
   after its deployment transaction is read from Base and its creation code matches the
   `FixedSupplyToken` template. Only **seeded** launches (at least 0.05 ETH of initial liquidity)
@@ -716,8 +717,8 @@ later from Base, because counting depends only on the deployment transaction.
    if the model shows continuous locked liquidity is essential (§13.2).
 7. **Fee discounts and governance:** not purposes of the token in this edition. Governance, if ever
    wanted, would come through a separate system (§12) described in a new edition.
-8. **Demand-test thresholds and window** (§17.1): adopt or change the proposed values, then publish
-   them before the window opens.
+8. **Persistent storage for the launch counter** (§17.1): the API runs on a free instance whose files
+   are lost on every restart, so the measurement window cannot open until launch records persist.
 
 ## 19. Legal and regulatory review
 
