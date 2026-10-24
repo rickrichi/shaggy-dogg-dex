@@ -3,7 +3,7 @@
 ## Technical whitepaper — DRAFT
 
 **Version 2.0 draft · 23 October 2026 · not approved, not published**\
-**Multi-chain trading, liquidity infrastructure, and MuttChow ($MCHOW), a liquidity-rewards token**
+**Multi-chain trading, liquidity infrastructure, and Mutt Rewards ($MRWD), a liquidity-rewards token**
 
 Project website: [dex.lumsian.com](https://dex.lumsian.com/)\
 Source repository: [rickrichi/shaggy-dogg-dex](https://github.com/rickrichi/shaggy-dogg-dex)\
@@ -11,7 +11,7 @@ Implementation baseline: `cfe2bb0` (shaggy-dogg-dex), `e29afd2` (shaggy-dogg-mar
 Superseded edition: [Version 1.3](./WHITEPAPER.md), the published edition until this draft is approved.
 
 > **Draft status.** Parts I and II describe what is implemented and recorded at the baseline.
-> Part III describes MuttChow ($MCHOW), a **proposed** token that does not exist yet: it has no
+> Part III describes Mutt Rewards ($MRWD), a **proposed** token that does not exist yet: it has no
 > contract, address, or deployment. Every Part III parameter is a modeling assumption until §17 is satisfied.
 > Nothing in this draft is an offer of tokens, a promised return, or a commitment to launch.
 
@@ -22,7 +22,7 @@ liquidity, and accessing ecosystem contracts. Its trading interface compares sup
 routes and submits user-authorized transactions to the selected exchange router. Base is the home
 network; the application also configures routes on Ethereum, Arbitrum, Optimism, and Polygon.
 
-This edition proposes **MuttChow ($MCHOW)**, a token whose single purpose is to **reward liquidity provision**. Its design
+This edition proposes **Mutt Rewards ($MRWD)**, a token whose single purpose is to **reward liquidity provision**. Its design
 objective is to establish deep, persistent, and decentralized liquidity while preserving the token's
 economic integrity — not to maximize the number of rewarded wallets or advertise high yields. Part III
 therefore separates three kinds of claims, because only the first can be guaranteed:
@@ -60,7 +60,7 @@ bridge assets between chains; a token on Base is distinct from a similarly named
 | Lending vaults | Implementations and recorded deployments (§7) |
 | V3 position timelock | Source and Base deployment record |
 | Arbitrage tooling | Operator tool using live Base quotes; atomic flash-loan routes through a deployed router (§5) |
-| MuttChow (liquidity-rewards token) | **Proposed** (Part III); not implemented |
+| Mutt Rewards (liquidity-rewards token) | **Proposed** (Part III); not implemented |
 | Governance | None in this edition |
 | Limit orders | Preview-only |
 
@@ -217,7 +217,7 @@ Administrators can change the treasury, fee within its cap, and lending configur
 | Lending vaults | Admin changes treasury, fee within cap, lending configuration |
 | AtomicFlashArbitrageRouter | Admin and authorized operators execute; contract reverts below required profit |
 | V3PositionTimelock | Lock owner collects, extends, withdraws after expiry; no admin override |
-| MuttChow (Part III) | **None by design** (§12) |
+| Mutt Rewards (Part III) | **None by design** (§12) |
 
 At the baseline these roles are held by the single-key wallet
 `0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98`. This edition does not claim any role is held by a
@@ -254,13 +254,13 @@ AMUTT FeeDiscountStaking `0x055BB4eD8d5464C25D71391E940ce53CA30845fC`, and the y
 
 ---
 
-## Part III — MuttChow, the proposed liquidity-rewards token
+## Part III — Mutt Rewards, the proposed liquidity-rewards token
 
 ## 11. Purpose and design principle
 
-MuttChow's distribution purpose is to **reward people who provide liquidity to its canonical pool.**
-Its demand is meant to come from use: MCHOW as a **quote asset for tokens launched on the project's
-launchpad** (primary), and holding or staking MCHOW for **premium DEX features** (secondary), as set
+Mutt Rewards' distribution purpose is to **reward people who provide liquidity to its canonical pool.**
+Its demand is meant to come from use: MRWD as a **quote asset for tokens launched on the project's
+launchpad** (primary), and holding or staking MRWD for **premium DEX features** (secondary), as set
 out in §11.1. It is not a claim on revenue, profit, treasury assets, or governance in this edition.
 
 The design starts from a harder question than which risk flags to avoid: **why would anyone hold or
@@ -276,26 +276,26 @@ coherent role in its incentive economy beyond its own future emissions.
 
 ### 11.1 Demand architecture (proposed)
 
-**Primary: MCHOW-quoted launches.** The launchpad gains an option to launch a token against MCHOW
-instead of WETH, creating a `PROJECT/MCHOW` pool. A creator choosing it must hold MCHOW to seed that
-pool, and the MCHOW then sits in the project's pool as reserves; this is the one mechanism in the
-design that creates sustained net demand for MCHOW. Buyers coming from WETH reach the project through
-`WETH → MCHOW → PROJECT`, so routed trades pass through the canonical MCHOW/WETH pool and pay its
+**Primary: MRWD-quoted launches.** The launchpad gains an option to launch a token against MRWD
+instead of WETH, creating a `PROJECT/MRWD` pool. A creator choosing it must hold MRWD to seed that
+pool, and the MRWD then sits in the project's pool as reserves; this is the one mechanism in the
+design that creates sustained net demand for MRWD. Buyers coming from WETH reach the project through
+`WETH → MRWD → PROJECT`, so routed trades pass through the canonical MRWD/WETH pool and pay its
 fees, but routed trading is two-sided and nets out over time.
 
-**Secondary: utility staking.** Holding or staking MCHOW unlocks premium tools — advanced Auto-Pilot
+**Secondary: utility staking.** Holding or staking MRWD unlocks premium tools — advanced Auto-Pilot
 strategies, launch analytics, liquidity monitoring, alerts, and launchpad dashboards — in a contract
-separate from the token. Ordinary swapping and basic features never require MCHOW. Staking creates
+separate from the token. Ordinary swapping and basic features never require MRWD. Staking creates
 holding demand; it does not by itself create pool volume.
 
 **Rules.**
 
 1. Volume targets count only genuine, transactional activity: no wash trading, self-routing, or
    incentivized circular trades. Distinct users, net fees, and repeat activity are reported.
-2. MCHOW routes are not forced where they are uneconomic. A two-hop route pays two pool fees and two
+2. MRWD routes are not forced where they are uneconomic. A two-hop route pays two pool fees and two
    price impacts and must stay competitive with WETH and USDC alternatives.
-3. Launchpad volume is not counted one-for-one as MCHOW/WETH volume; only the routed share is.
-4. The DEX, its LPs, and MCHOW holders are evaluated separately: the platform can do well while MCHOW
+3. Launchpad volume is not counted one-for-one as MRWD/WETH volume; only the routed share is.
+4. The DEX, its LPs, and MRWD holders are evaluated separately: the platform can do well while MRWD
    liquidity does not.
 
 **What is built and what remains.** At the baseline the launchpad is open to any wallet, charges no
@@ -303,15 +303,15 @@ platform fee, and launches tokens with `FixedSupplyToken`: the whole supply is m
 constructor, with no mint, owner, or admin, so launched tokens do not carry a "Mintable" flag. DEX
 seeding requires at least 0.05 ETH and pairs every new token against WETH. The swap router quotes and
 executes two-hop Uniswap V3 routes across fee-tier pairs, not only single pools. What remains for
-MCHOW-quoted launches is a MCHOW pairing option in the launchpad and MCHOW as a configured
+MRWD-quoted launches is a MRWD pairing option in the launchpad and MRWD as a configured
 intermediate hop; both wait for the token.
 
 **Target.** The v0.3 model put the volume at which outside LPs stay without rewards at roughly
-$150,000–$220,000 a month through MCHOW/WETH; $220,000 a month (about $7,300 a day) is the
+$150,000–$220,000 a month through MRWD/WETH; $220,000 a month (about $7,300 a day) is the
 conservative planning target. At a 0.30% tier that is about $660 a month of gross fees before the
 protocol fee, so the KPI is net fee income relative to outside LPs' capital and risk, not volume
-alone. With organic MCHOW trading at $32,500 a month, reaching that target needs about $375,000 a
-month of launched-token trading if half of it routes through MCHOW, or $750,000 at a quarter.
+alone. With organic MRWD trading at $32,500 a month, reaching that target needs about $375,000 a
+month of launched-token trading if half of it routes through MRWD, or $750,000 at a quarter.
 
 **What the v0.4 model found.** Allocation R3 is viable with about $9,500 of launch WETH only if the
 launchpad is busy: about 15 launches a month, each trading about $40,000 in its first month, which
@@ -319,7 +319,7 @@ passes every criterion in all three organic scenarios. A steady launchpad (5 a m
 each) passes in the base scenario but fails LP retention in the conservative one. Two launches a
 month is not enough. Seed buying by creators is what supports the price in those results, so they
 are only as good as the launch-count and seed-size assumptions. Those assumptions are tested before
-MCHOW exists (§17.1).
+MRWD exists (§17.1).
 
 ## 12. Token contract (technical baseline)
 
@@ -329,11 +329,11 @@ treasury contracts, not in the token.
 
 | Parameter | Baseline | Status |
 | --- | --- | --- |
-| Name | **MuttChow** | Chosen. A first-pass search (23 October 2026) found no existing MuttChow token; formal trademark screening is still required, because the name resembles established pet-food marks such as Dog Chow and a separate “Mutt”-named token already trades on Base |
-| Ticker | **MCHOW** | Proposed. First-pass searches (23 October 2026) found no existing MCHOW token; “MUTT” and “CHOW” were avoided because other tokens already use them, including a “Mutt”-named token on Base and several CHOW tokens. Exclusivity, registry, and on-chain collision checks are still required |
+| Name | **Mutt Rewards** | Chosen (24 October 2026). A USPTO knockout search the same day found no record for MUTT REWARDS, its variants, or near spellings, and a web search found no token by that name. Formal trademark screening is still required: "Rewards" is descriptive, so protection rests mainly on "Mutt", and several tokens already use "Mutt" names, including one trading on Base. The name describes how the token is distributed, not a return; it must not be marketed as one (§19) |
+| Ticker | **MRWD** | Chosen (24 October 2026). A web search found no existing MRWD token. "MUTT" was avoided because at least four tokens already use it, including one on Base. Exclusivity, registry, and on-chain collision checks are still required |
 | Network | Base mainnet (8453) | Decided |
 | Standard and library | ERC-20, OpenZeppelin Contracts 5.x (`ERC20`, `ERC20Permit`) | Decided |
-| Total supply | **1,000,000,000,000** (one trillion) MuttChow | Chosen. 10³⁰ base units: within ERC-20's 256-bit balances and Uniswap V2's 112-bit reserves (max ≈ 5.19 × 10³³). Nominal supply does not set valuation (§13.3) |
+| Total supply | **1,000,000,000,000** (one trillion) MRWD | Chosen. 10³⁰ base units: within ERC-20's 256-bit balances and Uniswap V2's 112-bit reserves (max ≈ 5.19 × 10³³). Nominal supply does not set valuation (§13.3) |
 | Decimals | 18 | Decided |
 | Supply creation | Entire supply issued once by the constructor through the library's internal `_mint` | Decided |
 | Further issuance | No externally callable path that can mint after deployment | Decided |
@@ -376,7 +376,7 @@ treasury controls, and the liquidity lock are reviewed independently (§17, cond
 
 ### 13.1 Canonical pool and version
 
-One canonical **MCHOW/WETH Uniswap V3 pool on Base**, created through Uniswap's canonical Base V3
+One canonical **MRWD/WETH Uniswap V3 pool on Base**, created through Uniswap's canonical Base V3
 factory (`0x33128a8fC17869897dcE68Ed026d694621f6FDfD`) and position manager
 (`0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1`). A V3 pool has a single fee tier. **0.30% is the provisional
 baseline**; 1.00% is adopted only if the model shows the better LP economics outweigh the volume lost
@@ -395,7 +395,7 @@ position manager.
 
 | Kind | What it is | Mechanism |
 | --- | --- | --- |
-| **Protocol-owned launch liquidity** | One V3 position covering **¼× to 4×** the launch price: MCHOW from the 20% allocation plus funded WETH | The position NFT is locked for **24 months**, with chain, locker, position ID, and unlock date published. Preferred locker: the **UNCX Uniswap V3 locker on Base**, subject to verifying its deployment, fee option, NFT custody, fee-collection permissions, lock immutability, and withdrawal restrictions. Reviewed alternative: the project's `V3PositionTimelock` (`0xb5c9bedb57f4e348e40a5e6326c90de474072e25`, no administrator override in source) |
+| **Protocol-owned launch liquidity** | One V3 position covering **¼× to 4×** the launch price: MRWD from the 20% allocation plus funded WETH | The position NFT is locked for **24 months**, with chain, locker, position ID, and unlock date published. Preferred locker: the **UNCX Uniswap V3 locker on Base**, subject to verifying its deployment, fee option, NFT custody, fee-collection permissions, lock immutability, and withdrawal restrictions. Reviewed alternative: the project's `V3PositionTimelock` (`0xb5c9bedb57f4e348e40a5e6326c90de474072e25`, no administrator override in source) |
 | **Community-provided liquidity** | V3 positions created by independent providers, in ranges they choose | Eligible for rewards when staked in the Uniswap V3 Staker (§14); **not** locked by the protocol lock |
 | **Liquidity depth** | What a trader can actually execute | Measured by price impact and slippage at stated trade sizes and by in-range liquidity (§16), not by advertised TVL |
 
@@ -404,7 +404,7 @@ withdraw their own positions.
 
 A ¼×–4× launch position gives about twice the depth of a full-range position per dollar while the
 price stays inside it, so the same depth needs about half the WETH. Outside the range it adds no depth:
-below ¼× of the launch price (a 75% fall) it holds only MCHOW, above 4× only WETH. A locked position
+below ¼× of the launch price (a 75% fall) it holds only MRWD, above 4× only WETH. A locked position
 cannot be repositioned to restore depth, so range-boundary stress is part of the model (§16).
 Concentrated community positions add more depth near the current price but can leave their range and
 stop contributing.
@@ -423,15 +423,15 @@ at launch instead.
 The launch deposit, not the supply, sets the starting price. For a symmetric range position (and for
 full range), the starting
 price is the ratio of the deposited amounts, so if the full 20% launch allocation (200 billion
-MuttChow) is paired with WETH worth `E`:
+MRWD) is paired with WETH worth `E`:
 
 ```text
-launch price per MuttChow = E / 200,000,000,000
+launch price per MRWD      = E / 200,000,000,000
 whole-supply value         = 1,000,000,000,000 × E / 200,000,000,000 = 5 × E
 pool liquidity             = 2 × E
 ```
 
-| WETH paired (`E`) | Pool liquidity | Price per MuttChow | Whole-supply value |
+| WETH paired (`E`) | Pool liquidity | Price per MRWD | Whole-supply value |
 | --- | --- | --- | --- |
 | $500 | $1,000 | $0.0000000025 | $2,500 |
 | $2,000 | $4,000 | $0.00000001 | $10,000 |
@@ -442,7 +442,7 @@ value. Pairing fewer than 200 billion tokens raises the starting price for the s
 amount and the number of tokens paired are outputs of the §16 model, fixed before launch (§17).
 
 **Valuation is not depth.** Implied whole-supply value is not capital available to absorb selling. In
-a constant-product (full-range) position holding $2,000 of WETH and $2,000 of MCHOW, selling $200 of MCHOW at the spot
+a constant-product (full-range) position holding $2,000 of WETH and $2,000 of MRWD, selling $200 of MRWD at the spot
 price returns about $181.82 of WETH before a 0.30% swap fee and about $181.32 after it — 9.34% below
 the spot value, assuming no other liquidity and no other trades. A $10,000 implied valuation therefore
 does not mean the pool can absorb $10,000 of selling; that is a question of depth (§16.1), not supply.
@@ -481,10 +481,10 @@ overstated (§16.3).
 ### 14.2 Emissions
 
 - **60% of supply is a maximum reserve, not a commitment** to distribute all of it on a fixed timetable.
-  It includes the former 15% community allocation, so MCHOW reaches the community only by providing
+  It includes the former 15% community allocation, so MRWD reaches the community only by providing
   liquidity.
 - Proposed duration **36–48 months**: a uniform 36-month schedule releases about 1.67% of supply
-  (16.7 billion MuttChow) per month; 48 months, about 1.25% (12.5 billion). The curve, for example
+  (16.7 billion MRWD) per month; 48 months, about 1.25% (12.5 billion). The curve, for example
   front-weighted steps, is chosen by the §16 model.
 - Because one incentive lasts at most two years, the program runs as **consecutive funded periods**
   (for example two 24-month or four 12-month incentives). Each period's amount, start, and end are
@@ -492,7 +492,7 @@ overstated (§16.3).
 - **Unused rewards: irreversible dead-address allocation.** The reserve is a maximum; it need not
   all be emitted. Each incentive's refundee is `0x000000000000000000000000000000000000dEaD`, an address
   no one controls, so unclaimed rewards are permanently removed from circulation instead of returning
-  to a treasury. This is **not** an ERC-20 burn: MuttChow has no burn function, and the tokens remain
+  to a treasury. This is **not** an ERC-20 burn: Mutt Rewards has no burn function, and the tokens remain
   counted in `totalSupply()`.
 - **Finalization is a transaction, not automatic.** `endIncentive` succeeds only after the period's end
   time, when no positions remain staked and a refund is due. After the end time **anyone** may unstake
@@ -510,7 +510,7 @@ then. Proposed: a small **incentive scheduler** contract, written for this progr
   burn-address refundee — and cannot change it;
 - exposes one permissionless function that, inside each period's 30-day window, creates exactly that
   period's incentive on the staker and nothing else;
-- has **no owner, no withdrawal function, and no way to send MCHOW anywhere except into its scheduled
+- has **no owner, no withdrawal function, and no way to send MRWD anywhere except into its scheduled
   incentives**.
 
 With this, the emission schedule and the destination of unused rewards are cryptographically enforced;
@@ -560,7 +560,7 @@ The staker pays by in-range liquidity-seconds, which has consequences the design
 
 ## 15. Allocation (provisional, design R3)
 
-| Allocation | Share | MuttChow | Conditions |
+| Allocation | Share | MRWD | Conditions |
 | --- | --- | --- | --- |
 | LP rewards | 60% | 600,000,000,000 | Maximum reserve held by the incentive scheduler, including the former community allocation; 36–48 months of scheduled V3 Staker incentives (§14) |
 | Launch liquidity | 20% | 200,000,000,000 | ¼×–4× V3 position with **funded** WETH at launch; position NFT locked 24 months |
@@ -606,7 +606,7 @@ The model must determine:
 
 1. the minimum WETH launch commitment, from benchmark trade sizes and a maximum permissible price
    impact;
-2. the number of MCHOW paired at launch, the starting price, and the implied valuation (§13.3);
+2. the number of MRWD paired at launch, the starting price, and the implied valuation (§13.3);
 3. sustainable emission schedules over 36 and 48 months under each demand and liquidity scenario,
    including reward yields, selling pressure, and remaining reserve;
 4. protections against excessive reward extraction, farming, and concentration among providers;
@@ -652,7 +652,7 @@ presented and reviewed **before** any launch budget is recommended.
 The token launches only when **every** condition holds. A missed condition delays launch; it is not
 waived to meet a date.
 
-1. Name (MuttChow) and ticker (MCHOW) formally screened for trademark, registry, and on-chain collisions (§12).
+1. Name (Mutt Rewards) and ticker (MRWD) formally screened for trademark, registry, and on-chain collisions (§12).
 2. The §16 model is complete, and its minimum launch WETH and depth thresholds are adopted.
 3. **Funded WETH for launch liquidity is held and verified on-chain**, at or above the model's minimum.
 4. Token, incentive scheduler, vesting, and treasury contracts and the liquidity lock implemented,
@@ -666,7 +666,7 @@ waived to meet a date.
 7. Treasury multisignature and timelock deployed and tested (§15).
 8. Legal and regulatory review complete (§19).
 9. All contracts verified on the explorer at publication, with addresses added to this paper.
-10. The price service reads the MCHOW/WETH V3 pool, so the application can show a real MCHOW price
+10. The price service reads the MRWD/WETH V3 pool, so the application can show a real MRWD price
     from launch (§4).
 11. **Durable demand and reward sustainability** are documented: the model's answer to §11 is
     adopted and published, showing what supports demand for the token beyond future emissions in
@@ -677,7 +677,7 @@ waived to meet a date.
 ### 17.1 Launchpad demand test (proposed thresholds)
 
 The deciding unknown in the v0.4 model is how many tokens are actually launched and how much they
-trade. It is measured on the open launchpad, with WETH pairs, before any MCHOW contract, WETH
+trade. It is measured on the open launchpad, with WETH pairs, before any MRWD contract, WETH
 commitment, or reward reserve exists. The thresholds below are proposals; they are fixed and
 published **before** the measurement window opens and are not adjusted to fit the result.
 
@@ -697,16 +697,16 @@ published **before** the measurement window opens and are not adjusted to fit th
 | --- | --- | --- | --- |
 | **Proceed** | 15 or more | $40,000 or more | Finish the §16 model with measured inputs; continue toward §17 |
 | **Re-model** | 5 to 14 | $25,000 or more | Rerun the §16 model with measured inputs; proceed only if the conservative scenario passes every criterion |
-| **Stop** | fewer than 5 | or below $25,000 | Do not launch MCHOW as designed; restructure the demand architecture or end the program |
+| **Stop** | fewer than 5 | or below $25,000 | Do not launch MRWD as designed; restructure the demand architecture or end the program |
 
 Limits of the test: WETH-paired launches show whether people launch and trade, not whether creators
-would buy MCHOW to seed a MCHOW pair. The test is therefore an upper bound on MCHOW-quoted demand, and
+would buy MRWD to seed a MRWD pair. The test is therefore an upper bound on MRWD-quoted demand, and
 passing it is necessary, not sufficient. Launches made while the counter is offline can be counted
 later from Base, because counting depends only on the deployment transaction.
 
 ## 18. Open decisions
 
-1. **Formal screening** of the name MuttChow and ticker MCHOW (§12). Supply is set at one trillion.
+1. **Formal screening** of the name Mutt Rewards and ticker MRWD (§12). Supply is set at one trillion.
 2. **Allocation and emission curve** (§14, §15), after the model.
 3. **Minimum launch WETH, the number of tokens paired at launch, and depth thresholds**, from the
    model (§13.3, §16).
@@ -736,7 +736,7 @@ investment returns, and no APY is promised. A legal and regulatory review is a l
 | Launch | Canonical pool, lock, rewards | §17 satisfied; verified addresses published |
 | Operations | Metric reporting | §16.1 metrics published on a fixed schedule |
 | Execution | Server-side operator with private RPC and event subscriptions | Reproducible tests; no keys in the browser |
-| Price coverage | Uniswap V3 pools in the price service (required for MCHOW, §17) and Aerodrome CL | Coverage and accuracy tests |
+| Price coverage | Uniswap V3 pools in the price service (required for MRWD, §17) and Aerodrome CL | Coverage and accuracy tests |
 
 ## 21. Base contract inventory
 
@@ -752,7 +752,7 @@ contracts are listed only in §10.
 | Owner and administrator wallet | `0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98` | Single key |
 | Uniswap V3 factory / position manager (external) | `0x33128a8fC17869897dcE68Ed026d694621f6FDfD` / `0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1` | Canonical Uniswap; §13 |
 | UniswapV3Staker (external) | `0x42bE4D6527829FeFA1493e1fb9F3676d2425C3C1` | Uniswap's staker; wiring read on-chain at this edition; §14 |
-| MuttChow token, incentive scheduler, vesting, treasury | — | Not deployed; added only after verification |
+| Mutt Rewards token, incentive scheduler, vesting, treasury | — | Not deployed; added only after verification |
 
 ## 22. Evidence and references
 
@@ -768,7 +768,7 @@ New references are pinned to the baseline commits.
 
 Version 2.0 (draft, 23 October 2026) discontinues AMUTT and cancels its USDC staker-reward policy;
 describes the live-quote Auto-Pilot, on-chain gas accounting, and the price service's liquidity floor;
-and proposes MuttChow, a fixed-supply liquidity-rewards token on a Uniswap V3 pool with rewards
+and proposes Mutt Rewards, a fixed-supply liquidity-rewards token on a Uniswap V3 pool with rewards
 through Uniswap's V3 Staker and an ownerless incentive scheduler — a standard OpenZeppelin ERC-20 with Permit,
 without burn or voting extensions, and with no owner — with enforceable, incentivized, and
 market-dependent properties stated separately, durable demand as a design requirement, explicit
