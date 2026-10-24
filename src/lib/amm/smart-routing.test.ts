@@ -9,10 +9,18 @@ import {
 import { UNISWAP_V3_ROUTER_BASE } from "@/config/contracts";
 import { BASE_MAINNET_TOKENS } from "@/config/tokens";
 
-import { AERODROME_ROUTER, routeCandidates, routeSwapCall } from "./smart-routing";
+import { encodeV3Path } from "./bot-market-snapshot";
+import {
+  AERODROME_ROUTER,
+  routeCandidates,
+  routeQuoteCall,
+  routeSwapCall,
+  v3RouteFees,
+} from "./smart-routing";
 
 const weth = BASE_MAINNET_TOKENS.find((t) => t.symbol === "WETH")!;
 const usdc = BASE_MAINNET_TOKENS.find((t) => t.symbol === "USDC")!;
+const cbbtc = BASE_MAINNET_TOKENS.find((t) => t.symbol === "cbBTC")!;
 
 describe("Executable router plans", () => {
   it("compares Uniswap V3 fee tiers, Uniswap V2, and Aerodrome pools without degenerate wrapped routes", () => {
@@ -152,6 +160,70 @@ describe("Executable router plans", () => {
     expect(() => routeSwapCall(route, weth, usdc, 1n, 1n, AERODROME_ROUTER, 1n)).toThrow();
     expect(() =>
       routeSwapCall(route, { ...usdc, chainId: 1 }, weth, 1n, 1n, AERODROME_ROUTER, 1n)
+    ).toThrow();
+  });
+
+  it("quotes two-hop Uniswap V3 paths through WETH and USDC across every fee-tier pair", () => {
+    const multi = routeCandidates(usdc, cbbtc).filter(
+      (r) => r.venue === "Uniswap V3" && r.path.length === 3
+    );
+    expect(multi).toHaveLength(16);
+    expect(multi.every((r) => r.fee === undefined && r.fees?.length === 2)).toBe(true);
+    expect(new Set(multi.map((r) => r.fees!.join("-"))).size).toBe(16);
+    expect(multi.every((r) => r.path[1] === weth.address)).toBe(true);
+
+    const route = multi.find((r) => r.fees![0] === 500 && r.fees![1] === 3000)!;
+    expect(v3RouteFees(route)).toEqual([500, 3000]);
+    const quote = routeQuoteCall(route, 1_000_000n);
+    expect(quote.functionName).toBe("quoteExactInput");
+    expect(quote.args).toEqual([encodeV3Path(route.path, [500, 3000]), 1_000_000n]);
+  });
+
+  it("executes a two-hop V3 route with exactInput on the quoted path and minimum", () => {
+    const route = routeCandidates(usdc, cbbtc).find(
+      (r) => r.venue === "Uniswap V3" && r.fees?.join() === "500,3000"
+    )!;
+    const call = routeSwapCall(route, usdc, cbbtc, 1_000_000n, 900n, AERODROME_ROUTER, 7n);
+    const decoded = decodeFunctionData({
+      abi: UNISWAP_V3_SWAP_ROUTER_02_ABI,
+      data: encodeFunctionData(call),
+    });
+    if (decoded.functionName !== "multicall") throw new Error("Expected deadline multicall");
+    expect(decoded.args[0]).toBe(7n);
+    expect(decoded.args[1]).toHaveLength(1);
+    const swap = decodeFunctionData({
+      abi: UNISWAP_V3_SWAP_ROUTER_02_ABI,
+      data: decoded.args[1][0]!,
+    });
+    if (swap.functionName !== "exactInput") throw new Error("Expected exactInput");
+    expect(swap.args[0]).toEqual({
+      path: encodeV3Path(
+        [usdc.address, weth.address, cbbtc.address] as Array<`0x${string}`>,
+        [500, 3000]
+      ).toLowerCase(),
+      recipient: AERODROME_ROUTER,
+      amountIn: 1_000_000n,
+      amountOutMinimum: 900n,
+    });
+  });
+
+  it("rejects malformed multi-hop V3 routes", () => {
+    const route = routeCandidates(usdc, cbbtc).find(
+      (r) => r.venue === "Uniswap V3" && r.path.length === 3
+    )!;
+    const call = (r: typeof route) => routeSwapCall(r, usdc, cbbtc, 1n, 1n, AERODROME_ROUTER, 1n);
+    expect(() => call({ ...route, fees: [500] })).toThrow();
+    expect(() => call({ ...route, fees: [500, 2500] })).toThrow();
+    expect(() => call({ ...route, fee: 500 })).toThrow();
+    expect(() =>
+      call({ ...route, path: [route.path[0]!, route.path[1]!, weth.address as `0x${string}`] })
+    ).toThrow();
+    expect(() =>
+      call({
+        ...route,
+        path: [...route.path, usdc.address as `0x${string}`],
+        fees: [500, 500, 500],
+      })
     ).toThrow();
   });
 });

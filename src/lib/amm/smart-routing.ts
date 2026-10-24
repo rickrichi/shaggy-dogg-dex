@@ -15,6 +15,7 @@ import {
 } from "@/config/contracts";
 import { getWrappedNativeAddress, type Token } from "@/config/tokens";
 
+import { encodeV3Path } from "./bot-market-snapshot";
 import { V3_FEE_TIERS } from "./uniswap-v3";
 
 export const AERODROME_ROUTER: Address = "0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43";
@@ -24,8 +25,14 @@ export interface SmartRoute {
   router: Address;
   path: Address[];
   stable: boolean[];
+  /** Fee of a single-hop V3 route. */
   fee?: number;
+  /** One fee per hop of a multi-hop V3 route. */
+  fees?: number[];
 }
+/** Per-hop V3 fees, whether the route is single- or multi-hop. */
+export const v3RouteFees = (route: SmartRoute): number[] => route.fees ?? [route.fee ?? 3000];
+const isV3Fee = (fee: number) => V3_FEE_TIERS.some((tier) => tier.fee === fee);
 export const aeroRoutes = (route: SmartRoute) =>
   route.path.slice(0, -1).map((from, i) => ({
     from,
@@ -54,8 +61,9 @@ export function routeCandidates(sell: Token, buy: Token): SmartRoute[] {
       path,
       stable: [],
     };
-    const uniV3: SmartRoute[] =
-      v3 && path.length === 2
+    const uniV3: SmartRoute[] = !v3
+      ? []
+      : path.length === 2
         ? V3_FEE_TIERS.map(({ fee }) => ({
             venue: "Uniswap V3" as const,
             router: v3.router,
@@ -63,7 +71,15 @@ export function routeCandidates(sell: Token, buy: Token): SmartRoute[] {
             stable: [],
             fee,
           }))
-        : [];
+        : V3_FEE_TIERS.flatMap(({ fee: first }) =>
+            V3_FEE_TIERS.map(({ fee: second }) => ({
+              venue: "Uniswap V3" as const,
+              router: v3.router,
+              path,
+              stable: [],
+              fees: [first, second],
+            }))
+          );
     const aero: SmartRoute[] =
       sell.chainId === 8453
         ? Array.from(
@@ -82,9 +98,15 @@ export function routeCandidates(sell: Token, buy: Token): SmartRoute[] {
 export function routeQuoteCall(route: SmartRoute, amount: bigint) {
   if (route.venue === "Uniswap V3") {
     const v3Quoter =
-      Object.values(UNISWAP_V3).find(
-        (d) => d.router.toLowerCase() === route.router.toLowerCase()
-      )?.quoter ?? UNISWAP_V3_QUOTER_V2_BASE;
+      Object.values(UNISWAP_V3).find((d) => d.router.toLowerCase() === route.router.toLowerCase())
+        ?.quoter ?? UNISWAP_V3_QUOTER_V2_BASE;
+    if (route.fees)
+      return {
+        address: v3Quoter,
+        abi: UNISWAP_V3_QUOTER_V2_ABI as Abi,
+        functionName: "quoteExactInput",
+        args: [encodeV3Path(route.path, route.fees), amount],
+      };
     return {
       address: v3Quoter,
       abi: UNISWAP_V3_QUOTER_V2_ABI as Abi,
@@ -118,13 +140,17 @@ export function routeSwapCall(
 ) {
   if (route.venue === "Uniswap V3") {
     const v3 = getUniswapV3Deployment(sell.chainId);
+    const fees = v3RouteFees(route);
     if (
       !v3 ||
       sell.chainId !== buy.chainId ||
-      route.path.length !== 2 ||
+      route.path.length < 2 ||
+      route.path.length > 3 ||
+      fees.length !== route.path.length - 1 ||
+      (route.fees !== undefined && route.fee !== undefined) ||
       amount <= 0n ||
       minimum <= 0n ||
-      !V3_FEE_TIERS.some((tier) => tier.fee === route.fee)
+      !fees.every(isV3Fee)
     ) {
       throw new Error("Invalid V3 swap parameters");
     }
@@ -134,26 +160,40 @@ export function routeSwapCall(
     if (
       route.router.toLowerCase() !== v3.router.toLowerCase() ||
       route.path[0]?.toLowerCase() !== from.toLowerCase() ||
-      route.path[1]?.toLowerCase() !== to.toLowerCase()
+      route.path.at(-1)?.toLowerCase() !== to.toLowerCase()
     ) {
       throw new Error("V3 route does not match the selected tokens and router");
     }
-    const swapData = encodeFunctionData({
-      abi: UNISWAP_V3_SWAP_ROUTER_02_ABI,
-      functionName: "exactInputSingle",
-      args: [
-        {
-          tokenIn: route.path[0]!,
-          tokenOut: route.path[1]!,
-          fee: route.fee ?? 3000,
-          recipient:
-            buy.address === "native" ? "0x0000000000000000000000000000000000000002" : recipient,
-          amountIn: amount,
-          amountOutMinimum: minimum,
-          sqrtPriceLimitX96: 0n,
-        },
-      ],
-    });
+    const swapRecipient =
+      buy.address === "native" ? "0x0000000000000000000000000000000000000002" : recipient;
+    const swapData = route.fees
+      ? encodeFunctionData({
+          abi: UNISWAP_V3_SWAP_ROUTER_02_ABI,
+          functionName: "exactInput",
+          args: [
+            {
+              path: encodeV3Path(route.path, route.fees),
+              recipient: swapRecipient,
+              amountIn: amount,
+              amountOutMinimum: minimum,
+            },
+          ],
+        })
+      : encodeFunctionData({
+          abi: UNISWAP_V3_SWAP_ROUTER_02_ABI,
+          functionName: "exactInputSingle",
+          args: [
+            {
+              tokenIn: route.path[0]!,
+              tokenOut: route.path[1]!,
+              fee: route.fee ?? 3000,
+              recipient: swapRecipient,
+              amountIn: amount,
+              amountOutMinimum: minimum,
+              sqrtPriceLimitX96: 0n,
+            },
+          ],
+        });
     const calls = [swapData];
     if (buy.address === "native")
       calls.push(
