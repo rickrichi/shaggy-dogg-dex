@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 import { MuttRewards } from "../src/MuttRewards.sol";
-import { MuttTeamVesting } from "../src/MuttTeamVesting.sol";
+import { MuttVesting } from "../src/MuttVesting.sol";
 
 interface VestVm {
     function prank(address) external;
     function warp(uint256) external;
 }
 
-contract MuttTeamVestingTest {
+contract MuttVestingTest {
     VestVm constant vm = VestVm(address(uint160(uint256(keccak256("hevm cheat code")))));
     MuttRewards token;
-    MuttTeamVesting vesting;
+    MuttVesting vesting;
     address constant TEAM = address(0x7EA);
     address constant EVE = address(0xE7E);
     uint64 constant LAUNCH = 1_800_000_000;
@@ -20,7 +20,7 @@ contract MuttTeamVestingTest {
     function setUp() public {
         vm.warp(LAUNCH);
         token = new MuttRewards(address(this));
-        vesting = new MuttTeamVesting(TEAM, LAUNCH);
+        vesting = new MuttVesting(TEAM, LAUNCH);
         require(token.transfer(address(vesting), TEAM_SHARE), "fund");
     }
 

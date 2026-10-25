@@ -221,7 +221,7 @@ Administrators can change the treasury, fee within its cap, and lending configur
 
 At the baseline these roles are held by the single-key wallet
 `0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98`. This edition does not claim any role is held by a
-multisignature or a DAO. Part III requires multisignature control of the treasury before launch (§15).
+multisignature or a DAO. Part III places the MRWD treasury in a vesting contract (§15).
 
 ## 9. Security model and limitations
 
@@ -502,12 +502,17 @@ overstated (§16.3).
 - **60% of supply is a maximum reserve, not a commitment** to distribute all of it on a fixed timetable.
   It includes the former 15% community allocation, so MRWD reaches the community only by providing
   liquidity.
-- Proposed duration **36–48 months**: a uniform 36-month schedule releases about 1.67% of supply
-  (16.7 billion MRWD) per month; 48 months, about 1.25% (12.5 billion). The curve, for example
-  front-weighted steps, is chosen by the §16 model.
-- Because one incentive lasts at most two years, the program runs as **consecutive funded periods**
-  (for example two 24-month or four 12-month incentives). Each period's amount, start, and end are
-  fixed and published before launch.
+- **Curve (decided 24 October 2026): 48 months, declining in a straight line.** This is the curve
+  the v0.4 model tested: monthly emissions start at 1.5× the average (18.75 billion MRWD) and fall to
+  0.5× (6.25 billion) in month 48.
+- The staker pays a flat rate within an incentive, so the program runs as **16 back-to-back
+  quarterly periods** of 91.25 days, each holding the model's emissions for its three months. Every
+  month stays within about 4.3% of the curve (six-month periods would stray 10.6%, yearly 23%).
+  Quarter 1 holds about 55.45 billion MRWD and quarter 16 about 19.55 billion; quarter *k* (from 0)
+  holds 600 billion × (417 − 18*k*) / 4,512, and the 16 quarters total exactly 600 billion
+  (`MuttEmissionSchedule`). Each period's amount, start, and end are fixed in the scheduler at
+  deployment. Each quarter must be created in the 30 days before it starts; anyone can do it, and
+  an automated job will.
 - **Unused rewards: irreversible dead-address allocation.** The reserve is a maximum; it need not
   all be emitted. Each incentive's refundee is `0x000000000000000000000000000000000000dEaD`, an address
   no one controls, so unclaimed rewards are permanently removed from circulation instead of returning
@@ -593,18 +598,21 @@ The staker pays by in-range liquidity-seconds, which has consequences the design
 | --- | --- | --- | --- |
 | LP rewards | 60% | 600,000,000,000 | Maximum reserve held by the incentive scheduler, including the former community allocation; 36–48 months of scheduled V3 Staker incentives (§14) |
 | Launch liquidity | 20% | 200,000,000,000 | ¼×–4× V3 position with **funded** WETH at launch; position NFT locked 24 months |
-| Treasury | 15% | 150,000,000,000 | Multisignature wallet, timelock on transfers, public periodic reporting |
+| Treasury | 15% | 150,000,000,000 | `MuttVesting`: nothing for 12 months, then linear over 36 months to the treasury wallet; public periodic reporting |
 | Team | 5% | 50,000,000,000 | 12-month cliff, then 36-month linear vesting in a public vesting contract |
 
 This is a starting hypothesis, not a validated optimum. Until the reward reserve is paid out, it is
 itself a concentrated balance in one contract; scanners and readers should see it labelled as such.
-The team allocation uses a public vesting contract, `MuttTeamVesting` (written and tested, not
-deployed): OpenZeppelin `VestingWallet` starting at the end of a 12-month cliff and releasing
-linearly over the next 36 months. Anyone can trigger a release, which always pays the beneficiary;
-the beneficiary is fixed, because ownership can be neither transferred (which would let unvested
-tokens be sold) nor renounced (which would strand them). The treasury requires
-a multisignature (for example a Safe) **before launch**; today's single-key administration is not
-acceptable for these funds.
+The team and treasury allocations each use their own instance of a public vesting contract,
+`MuttVesting` (written and tested, not deployed): OpenZeppelin `VestingWallet` starting at the end
+of a 12-month cliff and releasing linearly over the next 36 months. Anyone can trigger a release,
+which always pays the beneficiary; the beneficiary is fixed, because ownership can be neither
+transferred (which would let unvested tokens be sold) nor renounced (which would strand them).
+
+**Treasury (decided 24 October 2026): vesting, not a multisignature.** The treasury's 150 billion
+MRWD is not held by a wallet at launch. It sits in its own `MuttVesting` contract, so none of it can
+move for a year and at most 1/36 of it a month after that, which anyone can verify on-chain. What
+the treasury wallet receives as it vests is reported publicly.
 
 ## 16. Measurement and economic model
 
@@ -695,7 +703,7 @@ waived to meet a date.
    to the burn refundee.
 6. The chosen V3 locker verified on Base for the launch position NFT (deployment, fees, permissions,
    lock and unlock behavior), with the lock transaction prepared.
-7. Treasury multisignature and timelock deployed and tested (§15).
+7. Team and treasury vesting contracts deployed and verified (§15).
 8. Legal and regulatory review complete (§19).
 9. All contracts verified on the explorer at publication, with addresses added to this paper.
 10. The price service reads the MRWD/WETH V3 pool, so the application can show a real MRWD price
@@ -747,7 +755,8 @@ later from Base, because counting depends only on the deployment transaction.
 ## 18. Open decisions
 
 1. **Formal screening** of the name Mutt Rewards and ticker MRWD (§12). Supply is set at one trillion.
-2. **Allocation and emission curve** (§14, §15), after the model.
+2. ~~**Allocation and emission curve**~~ (§14, §15): the emission curve and the treasury's vesting
+   were decided 24 October 2026; the allocation shares stay as in §15.
 3. **Minimum launch WETH, the number of tokens paired at launch, and depth thresholds**, from the
    model (§13.3, §16).
 4. **Final fee tier**, after the model's 0.30% versus 1.00% comparison (§13.1).
