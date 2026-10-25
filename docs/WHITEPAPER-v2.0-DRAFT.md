@@ -688,9 +688,16 @@ any launch was counted, and are not adjusted to fit the result.
   after its deployment transaction is read from Base and its creation code matches the
   `FixedSupplyToken` template. Only **seeded** launches (at least 0.05 ETH of initial liquidity)
   count toward the thresholds.
-- **Trading per launch.** First-month swap volume in each seeded launch's pool, read on-chain.
-  Swaps by the creator's own wallets and circular trades are excluded where they can be identified.
-  *This measurement is not built yet; it is required before the window opens.*
+- **Seeded.** At least 0.05 WETH added to the launch's Uniswap V3 1% WETH pool (the pool the
+  launchpad seeds) within 24 hours of deployment, read from the pool's `Mint` events.
+- **Trading per launch.** WETH swap volume in that pool over the 30 days after deployment, read from
+  its `Swap` events and valued in dollars at each day's noon (UTC) WETH/USDC price from the Uniswap
+  V3 0.05% pool. Swaps sent by the creator's wallet or the supply recipient are excluded. Circular
+  trades between other wallets are not identified, so the figure is an upper bound in that respect.
+  Launches seeded on another exchange count as launches but not as seeded.
+- **Reproducible.** The measurement (`npm --prefix server run launches:measure -- --window YYYY-MM`)
+  reads only the public launch list and public Base data, never signs anything, and anyone can rerun
+  it to check the published numbers.
 - **Reported alongside:** distinct creator wallets (wallets, not people), the share of seeded
   launches, and the median as well as the mean trading per launch.
 
@@ -717,8 +724,9 @@ later from Base, because counting depends only on the deployment transaction.
    if the model shows continuous locked liquidity is essential (§13.2).
 7. **Fee discounts and governance:** not purposes of the token in this edition. Governance, if ever
    wanted, would come through a separate system (§12) described in a new edition.
-8. **Persistent storage for the launch counter** (§17.1): the API runs on a free instance whose files
-   are lost on every restart, so the measurement window cannot open until launch records persist.
+8. ~~**Persistent storage for the launch counter**~~ (§17.1): resolved 24 October 2026. Launch
+   records are kept in Postgres (Supabase) and survive restarts of the API's free instance, so the
+   window opens with the first full month after that: **November 2026**.
 
 ## 19. Legal and regulatory review
 
