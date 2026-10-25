@@ -260,7 +260,7 @@ AMUTT FeeDiscountStaking `0x055BB4eD8d5464C25D71391E940ce53CA30845fC`, and the y
 
 Mutt Rewards' distribution purpose is to **reward people who provide liquidity to its canonical pool.**
 Its demand is meant to come from use: MRWD as a **quote asset for tokens launched on the project's
-launchpad** (primary), and holding or staking MRWD for **premium DEX features** (secondary), as set
+launchpad** (primary), and holding or staking MRWD for **premium tools such as Equilnyxs Pro** (secondary), as set
 out in §11.1. It is not a claim on revenue, profit, treasury assets, or governance in this edition.
 
 The design starts from a harder question than which risk flags to avoid: **why would anyone hold or
@@ -287,6 +287,21 @@ fees, but routed trading is two-sided and nets out over time.
 strategies, launch analytics, liquidity monitoring, alerts, and launchpad dashboards — in a contract
 separate from the token. Ordinary swapping and basic features never require MRWD. Staking creates
 holding demand; it does not by itself create pool volume.
+
+**First premium product: Equilnyxs Pro (proposed).** Equilnyxs, the project's language and toolchain
+for strategy code and Base DEX execution, already sells Pro passes ($12 for 30 days, $99 for a year,
+paid in USDC on Base through Lumioro's store). Proposed: staking MRWD becomes a second way to get Pro.
+
+- **Staking contract.** Separate from the token, non-upgradeable, with no owner: each deposit has its
+  own lock, there is no exit fee, withdrawals are never paused, and no function can move staked MRWD
+  except back to its depositor. It records stakes and nothing else; it pays **no yield**.
+- **Access.** The holder signs a message with the staking wallet; the store reads that wallet's stake
+  on Base and issues a Pro license that stays valid while the stake remains, renewed periodically.
+  The stake needed for Pro is set by the store, not by the contract, so the contract needs no admin.
+- **Free features stay free.** The compiler, checker, REPL, dry runs, and test-network trading never
+  require MRWD, and USDC passes remain available.
+- **Equilnyxs' own token.** A separate Equilnyxs token (EQX) is planned for later. How MRWD staking
+  and EQX relate to each other for Equilnyxs access will be set in a later edition.
 
 **Rules.**
 
@@ -727,6 +742,8 @@ later from Base, because counting depends only on the deployment transaction.
 8. ~~**Persistent storage for the launch counter**~~ (§17.1): resolved 24 October 2026. Launch
    records are kept in Postgres (Supabase) and survive restarts of the API's free instance, so the
    window opens with the first full month after that: **November 2026**.
+9. **Equilnyxs Pro by staking** (§11.1): the MRWD stake that unlocks Pro, how often a license is
+   renewed, and how MRWD staking and a future EQX token relate for Equilnyxs access.
 
 ## 19. Legal and regulatory review
 
