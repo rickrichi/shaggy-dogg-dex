@@ -1,0 +1,42 @@
+# Creates each Mutt Rewards quarter's incentive inside its 30-day window, skips a missed quarter,
+# and finalizes ended quarters with nothing staked (server/src/mrwd/run-keeper.ts). Every call is
+# permissionless. With the MRWD_KEEPER_PRIVATE_KEY secret set it submits them from that wallet,
+# which only pays gas; without it the job prints the plan and sends nothing.
+name: MRWD keeper
+
+on:
+  schedule:
+    - cron: '41 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mrwd-keeper
+  cancel-in-progress: false
+
+jobs:
+  keep:
+    name: Run scheduler keeper
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci --prefix server
+      - name: Plan and submit due calls
+        env:
+          MRWD_KEEPER_PRIVATE_KEY: ${{ secrets.MRWD_KEEPER_PRIVATE_KEY }}
+          BASE_RPC_URL: ${{ secrets.BASE_RPC_URL }}
+        run: |
+          if [ -n "$MRWD_KEEPER_PRIVATE_KEY" ]; then
+            npm --prefix server run mrwd:keeper -- --send
+          else
+            echo "MRWD_KEEPER_PRIVATE_KEY is not set: plan only."
+            npm --prefix server run mrwd:keeper
+          fi
