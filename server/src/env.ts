@@ -49,9 +49,6 @@ const EnvSchema = z.object({
   // The service key is server-only; never expose it through a VITE_ variable.
   SUPABASE_URL: z.url().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(20).optional(),
-
-  // SSR client entry (used by server-side renderer)
-  SSR_CLIENT_ENTRY: z.string().default('/src/main.tsx'),
 });
 
 export type Env = z.infer<typeof EnvSchema>;
