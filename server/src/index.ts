@@ -16,11 +16,11 @@ import { SupabaseLaunchStore } from './launches/supabaseStore.js'
 import { mountAdminRoutes } from './routes/admin.js'
 import { mountCeDeFiRoutes } from './routes/cedefi.js'
 // routes
+import { mountFallback } from './routes/fallback.js'
 import { mountHealth } from './routes/health.js'
 import { mountLaunchRoutes } from './routes/launches.js'
 import { mountPriceRoutes } from './routes/prices.js'
 import { mountQuoteRoutes } from './routes/quotes.js'
-import { mountSsr } from './routes/ssr.js'
 import { mountSupabaseDbWebhook } from './routes/webhooks/supabase_db.js'
 import { normalizeIp } from './utils/ip.js'
 // env & middleware
@@ -105,8 +105,8 @@ mountLaunchRoutes(app, {
 // ----- Webhooks -----
 mountSupabaseDbWebhook(app)
 
-// ----- SSR catch-all (after API routes) -----
-mountSsr(app)
+// ----- Fallback for non-API paths (after API routes) -----
+mountFallback(app, { production: env.NODE_ENV === 'production', origin: env.ORIGIN })
 
 // ----- Dev route listing (optional) -----
 if (env.NODE_ENV !== 'production') {
