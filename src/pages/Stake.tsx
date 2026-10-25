@@ -1,16 +1,19 @@
 // src/pages/Stake.tsx
 import { Link } from "react-router-dom";
 
-import { ArrowRight, Award, Clock, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, Award, Sparkles } from "lucide-react";
 
 import { LaunchpadNav } from "@/components/launchpad/LaunchpadNav";
+import { MrwdProStakingPanel } from "@/components/MrwdProStakingPanel";
 import { RouterOperatorPanel } from "@/components/RouterOperatorPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { YieldVaultPanel } from "@/components/YieldVaultPanel";
 
-// MuttChow ($MCHOW) utility staking is planned (whitepaper v2.0 draft §11.1) and not deployed.
+// Mutt Rewards (MRWD) staking for Equilnyxs Pro is live (whitepaper v2.0 draft §11.1); the DEX tools
+// below are still planned.
+const PRO_FEATURES = ["Live trading on Base", "Full bar history", "Token tools"];
 const PLANNED_FEATURES = [
   "Advanced Auto-Pilot strategies",
   "Launch analytics and launchpad dashboards",
@@ -33,7 +36,7 @@ export default function Stake() {
             <Badge className="border-purple-200 bg-purple-100 text-purple-800">Base Mainnet</Badge>
           </div>
           <p className="mt-1 text-sm text-slate-500">
-            MuttChow ($MCHOW) staking for premium DEX tools is planned and not live yet.
+            Stake Mutt Rewards (MRWD) for Equilnyxs Pro. Premium DEX tools are planned.
           </p>
         </div>
       </div>
@@ -71,32 +74,10 @@ export default function Stake() {
       <YieldVaultPanel />
       <RouterOperatorPanel />
 
-      {/* MuttChow staking (planned) */}
+      {/* MRWD staking for Equilnyxs Pro */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         <div className="lg:col-span-7">
-          <Card className="border-purple-100 shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl text-gray-900">
-                <ShieldCheck className="size-5 text-purple-600" />
-                MuttChow Staking
-                <Badge className="border-amber-200 bg-amber-50 text-amber-800">
-                  <Clock className="mr-1 size-3" /> Not live
-                </Badge>
-              </CardTitle>
-              <CardDescription>
-                Staking MCHOW will unlock premium tools on this DEX. Swapping and basic features
-                will never require it. Nothing can be staked until the MuttChow contracts are
-                deployed, reviewed, and verified.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
-                💡 <span className="font-semibold text-slate-700">Design status:</span> staking runs
-                in its own contract, separate from the token, with no minting, transfer
-                restrictions, or hidden admin powers. It does not promise yield or revenue.
-              </div>
-            </CardContent>
-          </Card>
+          <MrwdProStakingPanel />
         </div>
 
         <div className="space-y-4 lg:col-span-5">
@@ -104,11 +85,20 @@ export default function Stake() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg text-gray-900">
                 <Award className="size-5 text-amber-500" />
-                Planned Premium Tools
+                What Staking Unlocks
               </CardTitle>
-              <CardDescription>What MCHOW staking is designed to unlock.</CardDescription>
+              <CardDescription>Equilnyxs Pro now; DEX tools later.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
+              {PRO_FEATURES.map((feature) => (
+                <div
+                  key={feature}
+                  className="flex items-center justify-between rounded-xl border border-emerald-100 bg-white p-3.5"
+                >
+                  <p className="font-bold text-gray-900">{feature}</p>
+                  <p className="text-[10px] font-semibold text-emerald-600">EQUILNYXS PRO</p>
+                </div>
+              ))}
               {PLANNED_FEATURES.map((feature) => (
                 <div
                   key={feature}

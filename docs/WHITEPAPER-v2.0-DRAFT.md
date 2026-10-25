@@ -288,9 +288,11 @@ strategies, launch analytics, liquidity monitoring, alerts, and launchpad dashbo
 separate from the token. Ordinary swapping and basic features never require MRWD. Staking creates
 holding demand; it does not by itself create pool volume.
 
-**First premium product: Equilnyxs Pro (proposed).** Equilnyxs, the project's language and toolchain
+**First premium product: Equilnyxs Pro.** Equilnyxs, the project's language and toolchain
 for strategy code and Base DEX execution, already sells Pro passes ($12 for 30 days, $99 for a year,
-paid in USDC on Base through Lumioro's store). Proposed: staking MRWD becomes a second way to get Pro.
+paid in USDC on Base through Lumioro's store). Staking MRWD is a second way to get Pro: keeping
+**1 billion MRWD** locked (decided 25 October 2026) gets a free Pro key at
+`https://www.lumsian.com/pro/stake.php`; staking is on the DEX at `https://dex.lumsian.com/stake`.
 
 - **Staking contract** (`MuttProStaking`, deployed 25 October 2026 at
   `0x67dBC193bF510225EBf189ab25dC3b34a32c1766` with a 30-day lock). Separate from the token,
@@ -788,9 +790,9 @@ later from Base, because counting depends only on the deployment transaction.
 8. ~~**Persistent storage for the launch counter**~~ (§17.1): resolved 24 October 2026. Launch
    records are kept in Postgres (Supabase) and survive restarts of the API's free instance, so the
    window opens with the first full month after that: **November 2026**.
-9. **Equilnyxs Pro by staking** (§11.1): the MRWD stake that unlocks Pro, the deposit lock length
-   (30 days, matching the 30-day pass, is the working assumption), and how MRWD staking and a
-   future EQX token relate for Equilnyxs access.
+9. **Equilnyxs Pro by staking** (§11.1): the stake (1 billion MRWD) and the 30-day deposit lock
+   were set 25 October 2026. Still open: how MRWD staking and a future EQX token relate for
+   Equilnyxs access.
 
 ## 19. Legal and regulatory review
 

@@ -635,6 +635,14 @@ export const BASE_MAINNET_TOKENS = [
   },
   {
     kind: "erc20",
+    address: "0xC17227AAa33C54634B6cE7AD0bf33A156563c179" as Address, // deployments/mrwd-base-mainnet.json
+    symbol: "MRWD",
+    name: "Mutt Rewards",
+    decimals: 18,
+    chainId: 8453,
+  },
+  {
+    kind: "erc20",
     address: "0x4200000000000000000000000000000000000006" as Address,
     symbol: "WETH",
     name: "Wrapped Ether",
@@ -954,6 +962,7 @@ export function getTokensForChain(chainId?: number): readonly [Token, Token, ...
 
 const DROPDOWN_SYMBOL_ORDER: readonly string[] = [
   "ETH",
+  "MRWD",
   "SD",
   "FBA",
   "USDC",
