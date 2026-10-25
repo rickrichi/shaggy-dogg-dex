@@ -551,7 +551,17 @@ The scheduler must also:
 
 Its tests must cover missed windows, overlapping periods, exhausted incentives, unclaimed rewards,
 finalization, and stranded balances, using real consecutive V3 stake transitions on a fork or test
-network, not only simulated time. The scheduler is not deployed, and no reward reserve is committed
+network, not only simulated time.
+
+**Status.** `MuttIncentiveScheduler` is written and tested, not deployed. It takes the staker, MRWD,
+the pool, and the full period list in its constructor, rejects overlapping, past, empty, or
+over-long periods, and reads the staker's limits at deployment. Anyone can create a period inside
+its window, send a missed period to `0x…dEaD`, finalize a finished period (unstaking remaining
+positions, then `endIncentive`), and, once every period is settled, send any leftover to `0x…dEaD`.
+Unit tests cover each rule against a mock with the staker's checks; a Base fork test runs a period
+through the real staker, including a missed period and a real `endIncentive` refund. Still to do:
+fork tests with real staked positions across consecutive periods, the emission curve itself (§18),
+and independent review. The scheduler is not deployed, and no reward reserve is committed
 to it, until its code and economic behavior pass independent security review.
 
 ### 14.4 Farming, concentration, and Sybil resistance
@@ -588,8 +598,11 @@ The staker pays by in-range liquidity-seconds, which has consequences the design
 
 This is a starting hypothesis, not a validated optimum. Until the reward reserve is paid out, it is
 itself a concentrated balance in one contract; scanners and readers should see it labelled as such.
-The team allocation uses a public vesting contract (for example OpenZeppelin `VestingWallet` with a
-cliff), whose beneficiary and ownership semantics must be specified explicitly. The treasury requires
+The team allocation uses a public vesting contract, `MuttTeamVesting` (written and tested, not
+deployed): OpenZeppelin `VestingWallet` starting at the end of a 12-month cliff and releasing
+linearly over the next 36 months. Anyone can trigger a release, which always pays the beneficiary;
+the beneficiary is fixed, because ownership can be neither transferred (which would let unvested
+tokens be sold) nor renounced (which would strand them). The treasury requires
 a multisignature (for example a Safe) **before launch**; today's single-key administration is not
 acceptable for these funds.
 
