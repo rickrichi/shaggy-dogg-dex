@@ -292,11 +292,15 @@ holding demand; it does not by itself create pool volume.
 for strategy code and Base DEX execution, already sells Pro passes ($12 for 30 days, $99 for a year,
 paid in USDC on Base through Lumioro's store). Proposed: staking MRWD becomes a second way to get Pro.
 
-- **Staking contract.** Separate from the token, non-upgradeable, with no owner: each deposit has its
-  own lock, there is no exit fee, withdrawals are never paused, and no function can move staked MRWD
-  except back to its depositor. It records stakes and nothing else; it pays **no yield**.
-- **Access.** The holder signs a message with the staking wallet; the store reads that wallet's stake
-  on Base and issues a Pro license that stays valid while the stake remains, renewed periodically.
+- **Staking contract** (`MuttProStaking`, written and tested, not deployed). Separate from the token,
+  non-upgradeable, with no owner and no pause: each deposit has its own lock, fixed at deployment
+  (between 1 and 365 days), there is no exit fee, matured deposits can always be withdrawn, and no
+  function can move staked MRWD except back to its depositor. A wallet holds at most 32 open
+  deposits. It records stakes and nothing else; it pays **no yield**.
+- **Access.** The holder signs a message with the staking wallet. To issue a Pro license that
+  expires at time T, the store checks `lockedUntil(wallet, T)`, the MRWD that cannot be withdrawn
+  before T, against the stake it requires. A license therefore never outlives the stake behind it.
+  To keep Pro, the holder calls `relockAll`, which locks every deposit again for the full period.
   The stake needed for Pro is set by the store, not by the contract, so the contract needs no admin.
 - **Free features stay free.** The compiler, checker, REPL, dry runs, and test-network trading never
   require MRWD, and USDC passes remain available.
@@ -742,8 +746,9 @@ later from Base, because counting depends only on the deployment transaction.
 8. ~~**Persistent storage for the launch counter**~~ (§17.1): resolved 24 October 2026. Launch
    records are kept in Postgres (Supabase) and survive restarts of the API's free instance, so the
    window opens with the first full month after that: **November 2026**.
-9. **Equilnyxs Pro by staking** (§11.1): the MRWD stake that unlocks Pro, how often a license is
-   renewed, and how MRWD staking and a future EQX token relate for Equilnyxs access.
+9. **Equilnyxs Pro by staking** (§11.1): the MRWD stake that unlocks Pro, the deposit lock length
+   (30 days, matching the 30-day pass, is the working assumption), and how MRWD staking and a
+   future EQX token relate for Equilnyxs access.
 
 ## 19. Legal and regulatory review
 
