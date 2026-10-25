@@ -126,6 +126,16 @@ jobs:
       - name: Setup Foundry
         uses: foundry-rs/foundry-toolchain@v1
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # Contracts import OpenZeppelin from node_modules (contracts/foundry.toml remappings).
+      - name: Install dependencies
+        run: npm ci
+
       - name: Verify canonical Solidity sources
         run: node scripts/verify-contract-sources.mjs
 

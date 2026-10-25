@@ -121,6 +121,7 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@openzeppelin/contracts": "5.7.0",
     "@tailwindcss/typography": "^0.5.19",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
