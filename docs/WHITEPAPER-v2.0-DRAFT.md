@@ -2,7 +2,7 @@
 
 ## Technical whitepaper — DRAFT
 
-**Version 2.0 draft · 23 October 2026 · not approved, not published**\
+**Version 2.0 draft · 25 October 2026 · not approved, not published**\
 **Multi-chain trading, liquidity infrastructure, and Mutt Rewards ($MRWD), a liquidity-rewards token**
 
 Project website: [dex.lumsian.com](https://dex.lumsian.com/)\
@@ -292,7 +292,8 @@ holding demand; it does not by itself create pool volume.
 for strategy code and Base DEX execution, already sells Pro passes ($12 for 30 days, $99 for a year,
 paid in USDC on Base through Lumioro's store). Proposed: staking MRWD becomes a second way to get Pro.
 
-- **Staking contract** (`MuttProStaking`, written and tested, not deployed). Separate from the token,
+- **Staking contract** (`MuttProStaking`, deployed 25 October 2026 at
+  `0x67dBC193bF510225EBf189ab25dC3b34a32c1766` with a 30-day lock). Separate from the token,
   non-upgradeable, with no owner and no pause: each deposit has its own lock, fixed at deployment
   (between 1 and 365 days), there is no exit fee, matured deposits can always be withdrawn, and no
   function can move staked MRWD except back to its depositor. A wallet holds at most 32 open
@@ -558,8 +559,12 @@ Its tests must cover missed windows, overlapping periods, exhausted incentives, 
 finalization, and stranded balances, using real consecutive V3 stake transitions on a fork or test
 network, not only simulated time.
 
-**Status.** `MuttIncentiveScheduler` is written and tested, not deployed. It takes the staker, MRWD,
-the pool, and the full period list in its constructor, rejects overlapping, past, empty, or
+**Status.** `MuttIncentiveScheduler` is deployed on Base mainnet at
+`0xCAbf284806b800d9A771B55857B9fCF735ea7109` (25 October 2026), holding the 600 billion MRWD reserve
+under the 16-quarter curve; quarter 1 (26 October 2026 to 25 January 2027) was created at launch.
+Each later quarter is created by an automated daily job inside its 30-day window (§14.2).
+
+It takes the staker, MRWD, the pool, and the full period list in its constructor, rejects overlapping, past, empty, or
 over-long periods, and reads the staker's limits at deployment. Anyone can create a period inside
 its window, send a missed period to `0x…dEaD`, finalize a finished period (unstaking remaining
 positions, then `endIncentive`), and, once every period is settled, send any leftover to `0x…dEaD`.
@@ -569,11 +574,11 @@ Base Sepolia rehearsal (`contracts/script/RehearseMrwd.s.sol`) deploys Uniswap's
 build (identical to Base's apart from its four constructor settings), the token, pool, scheduler,
 Pro staking, both vesting contracts, and a locked ¼×–4× launch position, then stakes, accrues,
 claims, unstakes, withdraws, skips a missed period, and finalizes to `0x…dEaD`. A dry run on a local
-fork of Base Sepolia completed every phase; a community position as large as the locked launch
-position earned about 49% of its period, matching the dilution described in §14.1. Still to do:
-fork tests with real staked positions across consecutive periods, the emission curve itself (§18),
-and independent review. The scheduler is not deployed, and no reward reserve is committed
-to it, until its code and economic behavior pass independent security review.
+fork of Base Sepolia completed every phase, and the real rehearsal on Base Sepolia completed all four
+phases on 25 October 2026 with on-chain balances matching exactly; a community position as large as
+the locked launch position earned about 49% of its period, matching the dilution described in §14.1.
+Still to do: fork tests with real staked positions across consecutive periods, and independent
+review.
 
 ### 14.4 Farming, concentration, and Sybil resistance
 
@@ -610,7 +615,8 @@ The staker pays by in-range liquidity-seconds, which has consequences the design
 This is a starting hypothesis, not a validated optimum. Until the reward reserve is paid out, it is
 itself a concentrated balance in one contract; scanners and readers should see it labelled as such.
 The team and treasury allocations each use their own instance of a public vesting contract,
-`MuttVesting` (written and tested, not deployed): OpenZeppelin `VestingWallet` starting at the end
+`MuttVesting` (deployed 25 October 2026: treasury `0x7bC37041E1205841a83413625650EC12DA119697`, team
+`0x6be3920f45Fe0836A3a29F40d8AA3f324E0610a1`): OpenZeppelin `VestingWallet` starting at the end
 of a 12-month cliff and releasing linearly over the next 36 months. Anyone can trigger a release,
 which always pays the beneficiary; the beneficiary is fixed, because ownership can be neither
 transferred (which would let unvested tokens be sold) nor renounced (which would strand them).
@@ -695,6 +701,13 @@ presented and reviewed **before** any launch budget is recommended.
 
 ## 17. Launch and no-launch criteria
 
+**Launched 25 October 2026.** The owner launched Mutt Rewards on Base mainnet on this date; the
+addresses are in §21 and `deployments/mrwd-base-mainnet.json`. The launch paired 0.00306 WETH with
+200 billion MRWD. At launch, conditions 5 (Base Sepolia rehearsal, completed the same day), 6 (the
+project's V3 position timelock, verified on-chain and holding the launch position) and 7 (vesting
+deployed) held. The others below remain open as post-launch work and are reported here as they
+close; this edition does not describe them as met.
+
 The token launches only when **every** condition holds. A missed condition delays launch; it is not
 waived to meet a date.
 
@@ -763,12 +776,13 @@ later from Base, because counting depends only on the deployment transaction.
 1. **Formal screening** of the name Mutt Rewards and ticker MRWD (§12). Supply is set at one trillion.
 2. ~~**Allocation and emission curve**~~ (§14, §15): the emission curve and the treasury's vesting
    were decided 24 October 2026; the allocation shares stay as in §15.
-3. **Minimum launch WETH, the number of tokens paired at launch, and depth thresholds**, from the
-   model (§13.3, §16).
-4. **Final fee tier**, after the model's 0.30% versus 1.00% comparison (§13.1).
-5. **Locker confirmation:** UNCX V3 preferred, subject to verification (§13.2).
-6. **Lock length:** 24 months enforced with a declared retain-or-extend policy, or 48 months at launch
-   if the model shows continuous locked liquidity is essential (§13.2).
+3. ~~**Launch WETH and tokens paired**~~ (§13.3): set at launch, 25 October 2026: 0.00306 WETH with
+   200 billion MRWD. Depth thresholds from the §16 model remain open.
+4. ~~**Final fee tier**~~ (§13.1): the canonical pool was created at 0.30% on 25 October 2026.
+5. ~~**Locker confirmation**~~ (§13.2): the launch position is locked in the project's
+   `V3PositionTimelock`, not UNCX.
+6. ~~**Lock length**~~ (§13.2): 24 months enforced (until 24 October 2028), with the declared
+   retain-or-extend policy.
 7. **Fee discounts and governance:** not purposes of the token in this edition. Governance, if ever
    wanted, would come through a separate system (§12) described in a new edition.
 8. ~~**Persistent storage for the launch counter**~~ (§17.1): resolved 24 October 2026. Launch
@@ -811,7 +825,12 @@ contracts are listed only in §10.
 | Owner and administrator wallet | `0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98` | Single key |
 | Uniswap V3 factory / position manager (external) | `0x33128a8fC17869897dcE68Ed026d694621f6FDfD` / `0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1` | Canonical Uniswap; §13 |
 | UniswapV3Staker (external) | `0x42bE4D6527829FeFA1493e1fb9F3676d2425C3C1` | Uniswap's staker; wiring read on-chain at this edition; §14 |
-| Mutt Rewards token, incentive scheduler, vesting, treasury | — | Not deployed; added only after verification |
+| Mutt Rewards (MRWD) token | `0xC17227AAa33C54634B6cE7AD0bf33A156563c179` | Launched 25 October 2026; §12 |
+| MRWD/WETH 0.30% V3 pool | `0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5` | Canonical pool; §13 |
+| Launch position NFT | #6351512 in the V3 position timelock | Locked until 24 October 2028; §13.2 |
+| Incentive scheduler | `0xCAbf284806b800d9A771B55857B9fCF735ea7109` | 600 billion reserve, 16 quarters; §14.3 |
+| Treasury vesting / team vesting | `0x7bC37041E1205841a83413625650EC12DA119697` / `0x6be3920f45Fe0836A3a29F40d8AA3f324E0610a1` | 150 / 50 billion; cliff to 25 October 2027; §15 |
+| Pro staking | `0x67dBC193bF510225EBf189ab25dC3b34a32c1766` | 30-day lock; §11.1 |
 
 ## 22. Evidence and references
 
