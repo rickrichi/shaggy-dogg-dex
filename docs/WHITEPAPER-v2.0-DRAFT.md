@@ -564,7 +564,13 @@ over-long periods, and reads the staker's limits at deployment. Anyone can creat
 its window, send a missed period to `0x…dEaD`, finalize a finished period (unstaking remaining
 positions, then `endIncentive`), and, once every period is settled, send any leftover to `0x…dEaD`.
 Unit tests cover each rule against a mock with the staker's checks; a Base fork test runs a period
-through the real staker, including a missed period and a real `endIncentive` refund. Still to do:
+through the real staker, including a missed period and a real `endIncentive` refund. A four-phase
+Base Sepolia rehearsal (`contracts/script/RehearseMrwd.s.sol`) deploys Uniswap's own v1.0.2 staker
+build (identical to Base's apart from its four constructor settings), the token, pool, scheduler,
+Pro staking, both vesting contracts, and a locked ¼×–4× launch position, then stakes, accrues,
+claims, unstakes, withdraws, skips a missed period, and finalizes to `0x…dEaD`. A dry run on a local
+fork of Base Sepolia completed every phase; a community position as large as the locked launch
+position earned about 49% of its period, matching the dilution described in §14.1. Still to do:
 fork tests with real staked positions across consecutive periods, the emission curve itself (§18),
 and independent review. The scheduler is not deployed, and no reward reserve is committed
 to it, until its code and economic behavior pass independent security review.
