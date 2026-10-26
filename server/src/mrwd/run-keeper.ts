@@ -6,12 +6,13 @@
 //
 //   npm --prefix server run mrwd:keeper -- [--rpc URL] [--send]
 //
-// Without --send it only prints the plan. With --send it signs with MRWD_KEEPER_PRIVATE_KEY.
-// Exits non-zero if a transaction fails or due work needs a person.
+// Without --send it only prints the plan. With --send it signs with MRWD_KEEPER_PRIVATE_KEY and
+// prints that wallet's address and gas balance on every run, so a wrong key shows up immediately.
+// Exits non-zero if a transaction fails, due work needs a person, or the keeper's gas is low.
 
 import { parseArgs } from 'node:util'
 
-import { createPublicClient, createWalletClient, http, parseAbi } from 'viem'
+import { createPublicClient, createWalletClient, formatEther, http, parseAbi, parseEther } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { base } from 'viem/chains'
 
@@ -20,6 +21,8 @@ import { type KeeperAction, type PeriodState, type PeriodStatus, planKeeper } fr
 /** deployments/mrwd-base-mainnet.json */
 const SCHEDULER = '0xCAbf284806b800d9A771B55857B9fCF735ea7109'
 const STAKER = '0x42bE4D6527829FeFA1493e1fb9F3676d2425C3C1'
+/** Below this the keeper flags itself so its gas is topped up before a window opens. */
+const LOW_GAS = parseEther('0.0002')
 
 const schedulerAbi = parseAbi([
   'function periodCount() view returns (uint256)',
@@ -78,11 +81,20 @@ for (const n of plan.notes) console.log(`Needs a person: ${n}`)
 if (plan.actions.length === 0) console.log('Nothing due.')
 
 let failed = false
-let wallet: ReturnType<typeof createWalletClient<ReturnType<typeof http>, typeof base, ReturnType<typeof privateKeyToAccount>>>
-if (values.send && plan.actions.length > 0) {
+let account: ReturnType<typeof privateKeyToAccount> | undefined
+if (values.send) {
   const key = process.env.MRWD_KEEPER_PRIVATE_KEY
   if (!key) throw new Error('--send needs MRWD_KEEPER_PRIVATE_KEY')
-  const account = privateKeyToAccount(key as `0x${string}`)
+  account = privateKeyToAccount(key as `0x${string}`)
+  const gas = await client.getBalance({ address: account.address })
+  console.log(`Keeper ${account.address} has ${formatEther(gas)} ETH for gas.`)
+  if (gas < LOW_GAS) {
+    console.log(`Needs a person: keeper gas is below ${formatEther(LOW_GAS)} ETH; send it more ETH on Base.`)
+    failed = true
+  }
+}
+let wallet: ReturnType<typeof createWalletClient<ReturnType<typeof http>, typeof base, ReturnType<typeof privateKeyToAccount>>>
+if (account && plan.actions.length > 0) {
   wallet = createWalletClient({ account, chain: base, transport: http(values.rpc, { retryCount: 3 }) })
   for (const a of plan.actions) {
     try {
