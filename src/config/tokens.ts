@@ -643,6 +643,15 @@ export const BASE_MAINNET_TOKENS = [
   },
   {
     kind: "erc20",
+    // Equilnyxs shares; only wallets verified in its IdentityRegistry can hold or receive it.
+    address: "0x1aEB45Fd7B6C59B52da3e41558410F306CBaa56C" as Address, // equilnyxs-site contracts/deployments/eqx-base-mainnet.json
+    symbol: "EQX",
+    name: "Equilnyxs",
+    decimals: 18,
+    chainId: 8453,
+  },
+  {
+    kind: "erc20",
     address: "0x4200000000000000000000000000000000000006" as Address,
     symbol: "WETH",
     name: "Wrapped Ether",
@@ -963,6 +972,7 @@ export function getTokensForChain(chainId?: number): readonly [Token, Token, ...
 const DROPDOWN_SYMBOL_ORDER: readonly string[] = [
   "ETH",
   "MRWD",
+  "EQX",
   "SD",
   "FBA",
   "USDC",
