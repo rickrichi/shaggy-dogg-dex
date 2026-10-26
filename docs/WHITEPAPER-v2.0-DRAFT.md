@@ -144,9 +144,10 @@ used.
   value. When the service's own feeds are still connecting after a restart, it withholds a verdict
   rather than misjudging a pool.
 
-The service reads Uniswap V2 and Aerodrome volatile pools; it does not yet read Uniswap V3 or
-Aerodrome concentrated-liquidity pools, so some assets with deep V3 liquidity appear unpriced or
-indicative. Sources: [R12], [R13].
+The service reads Uniswap V2, Uniswap V3 (0.05%, 0.30% and 1% tiers, priced from the pool's current
+price and measured, like a V2 pair, as twice its WETH or USDC balance) and Aerodrome volatile pools;
+it does not yet read Aerodrome concentrated-liquidity pools. MRWD is priced from its V3 pool; while
+that pool holds less than the floor, its price is shown flagged indicative. Sources: [R12], [R13].
 
 ## 5. Arbitrage tooling
 
