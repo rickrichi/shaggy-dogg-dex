@@ -58,6 +58,10 @@
   ],
   "rewrites": [
     {
+      "source": "/api/market-data",
+      "destination": "https://34-9-52-175.sslip.io/api/market-data"
+    },
+    {
       "source": "/api/market-data/:path*",
       "destination": "https://34-9-52-175.sslip.io/api/market-data/:path*"
     },
