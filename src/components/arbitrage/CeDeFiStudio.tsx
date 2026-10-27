@@ -26,7 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { UNISWAP_V2_ROUTER_ABI, UNISWAP_V3_QUOTER_V2_ABI } from "@/config/abis";
 import { UNISWAP_V3_QUOTER_V2_BASE } from "@/config/contracts";
-import { ARB_API_URL } from "@/config/crypto-arb";
+import { ARB_API_URL, ARB_PRIVATE_API } from "@/config/crypto-arb";
 import { useCeFiArbStream } from "@/hooks/useCeFiArbStream";
 import { useLiveAccounts } from "@/hooks/useLiveAccounts";
 
@@ -234,6 +234,8 @@ export function CeDeFiStudio({
   ]);
 
   useEffect(() => {
+    // Kraken permissions and scans come from the local crypto-arb backend only.
+    if (!ARB_PRIVATE_API) return;
     fetchTradingPermissions();
     scanKrakenTriangular();
   }, [fetchTradingPermissions, scanKrakenTriangular]);

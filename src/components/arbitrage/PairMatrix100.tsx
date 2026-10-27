@@ -5,7 +5,7 @@ import { ArrowUpRight, Coins, Search, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { ARB_API_URL } from "@/config/crypto-arb";
+import { ARB_API_URL, ARB_PRIVATE_API } from "@/config/crypto-arb";
 import thresholds from "@/config/market-pair-thresholds.json";
 import MARKET_PAIRS from "@/config/market-pairs.json";
 import { useCeFiMatrixFeeds } from "@/hooks/useCeFiMatrixFeeds";
@@ -90,7 +90,7 @@ export function PairMatrix100({ onSelectPair, krakenBalances, snapshot }: PairMa
 
   useEffect(() => {
     let active = true;
-    if (!krakenBalances?.free) {
+    if (ARB_PRIVATE_API && !krakenBalances?.free) {
       const load = async () => {
         try {
           if (typeof fetch === "function") {

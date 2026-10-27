@@ -66,6 +66,10 @@
       "destination": "https://34-9-52-175.sslip.io/api/market-data/:path*"
     },
     {
+      "source": "/api/arbitrage/:path*",
+      "destination": "https://34-9-52-175.sslip.io/api/arbitrage/:path*"
+    },
+    {
       "source": "/api/price/:symbol",
       "destination": "https://shaggy-dogg-api.onrender.com/api/price/:symbol"
     },

@@ -1,7 +1,7 @@
 // src/hooks/useCeFiArbStream.ts
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { ARB_API_URL, ARB_WS_URL } from "@/config/crypto-arb";
+import { ARB_SNAPSHOT_URL, ARB_WS_URL } from "@/config/crypto-arb";
 import {
   type ConnState,
   isSnapshot,
@@ -12,7 +12,7 @@ import {
 } from "@/types/crypto-arb";
 
 const DEFAULT_WS_URL = ARB_WS_URL;
-const DEFAULT_API_URL = `${ARB_API_URL}/api/snapshot`;
+const DEFAULT_API_URL = ARB_SNAPSHOT_URL;
 const MAX_HISTORY = 120;
 
 export interface CeFiArbStreamResult {
@@ -51,7 +51,7 @@ export function useCeFiArbStream(
     const subscription = JSON.stringify(subRef.current);
     const timeout = setTimeout(() => controller.abort(), 3000);
     try {
-      const url = new URL(DEFAULT_API_URL);
+      const url = new URL(DEFAULT_API_URL, window.location.origin);
       url.searchParams.set("notional", String(subRef.current.notional));
       url.searchParams.set("minNetBps", String(subRef.current.minNetBps));
 
@@ -98,6 +98,11 @@ export function useCeFiArbStream(
 
     const connect = () => {
       if (disposed) return;
+      if (!DEFAULT_WS_URL) {
+        // No stream on the public site: the fallback ticker below polls the snapshot instead.
+        setConn("closed");
+        return;
+      }
       try {
         const ws = new WebSocket(DEFAULT_WS_URL);
         wsRef.current = ws;

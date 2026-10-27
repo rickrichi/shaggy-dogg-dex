@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ARB_API_URL } from "@/config/crypto-arb";
+import { ARB_API_URL, ARB_PRIVATE_API } from "@/config/crypto-arb";
 
 interface Quote {
   id?: string;
@@ -100,15 +100,31 @@ async function request<T>(path: string, body?: unknown): Promise<T> {
   return data as T;
 }
 
-export function LiveVenueComparison({
-  symbol,
-  notional,
-  onExecuted,
-}: {
+interface LiveVenueComparisonProps {
   symbol: string;
   notional: number;
   onExecuted: () => Promise<void>;
-}) {
+}
+
+export function LiveVenueComparison(props: LiveVenueComparisonProps) {
+  // Quotes and execution use exchange accounts, which exist only in the local crypto-arb backend.
+  if (!ARB_PRIVATE_API) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Live execution</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground">
+          Live quotes and trading run in the Shaggy Dogg desktop app with your own exchange
+          accounts. The spreads on this page are live and read-only.
+        </CardContent>
+      </Card>
+    );
+  }
+  return <LiveVenueComparisonPanel {...props} />;
+}
+
+function LiveVenueComparisonPanel({ symbol, notional, onExecuted }: LiveVenueComparisonProps) {
   const [routes, setRoutes] = useState<Quote[]>([]);
   const [preview, setPreview] = useState<Quote | null>(null);
   const [executions, setExecutions] = useState<Execution[]>([]);
