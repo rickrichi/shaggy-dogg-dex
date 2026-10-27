@@ -59,7 +59,7 @@
   "rewrites": [
     {
       "source": "/api/market-data/:path*",
-      "destination": "https://shaggy-dogg-market-data.onrender.com/api/market-data/:path*"
+      "destination": "https://34-9-52-175.sslip.io/api/market-data/:path*"
     },
     {
       "source": "/api/price/:symbol",

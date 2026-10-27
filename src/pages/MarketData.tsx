@@ -77,7 +77,9 @@ async function getJson<T>(path: string): Promise<T> {
   try {
     response = await fetch(`${MARKET_DATA_URL}${path}`, { signal: AbortSignal.timeout(15_000) });
   } catch {
-    throw new MarketDataError(`Market-Data service unreachable at ${MARKET_DATA_URL}`);
+    throw new MarketDataError(
+      `Market-Data service unreachable at ${MARKET_DATA_URL || window.location.origin}`
+    );
   }
   const body: unknown = await response.json().catch(() => null);
   if (!response.ok) {
@@ -273,7 +275,7 @@ export default function MarketData() {
         Price = median of fresh venue mid prices (books &lt; 10 s old, spread &lt; 2%), outliers
         beyond 1.5% rejected, USDT/USDC quotes converted at the live stablecoin rate. 24h change
         uses Market-Data&apos;s own history once it covers 24 hours, otherwise exchange 24h tickers.
-        Service: {MARKET_DATA_URL}
+        Service: {MARKET_DATA_URL || window.location.origin}
       </p>
     </div>
   );
