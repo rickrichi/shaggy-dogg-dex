@@ -2,7 +2,7 @@
 
 ## Technical whitepaper — DRAFT
 
-**Version 2.0 draft · 23 October 2026 · not approved, not published**\
+**Version 2.0 draft · 25 October 2026 · not approved, not published**\
 **Multi-chain trading, liquidity infrastructure, and Mutt Rewards ($MRWD), a liquidity-rewards token**
 
 Project website: [dex.lumsian.com](https://dex.lumsian.com/)\
@@ -144,9 +144,10 @@ used.
   value. When the service's own feeds are still connecting after a restart, it withholds a verdict
   rather than misjudging a pool.
 
-The service reads Uniswap V2 and Aerodrome volatile pools; it does not yet read Uniswap V3 or
-Aerodrome concentrated-liquidity pools, so some assets with deep V3 liquidity appear unpriced or
-indicative. Sources: [R12], [R13].
+The service reads Uniswap V2, Uniswap V3 (0.05%, 0.30% and 1% tiers, priced from the pool's current
+price and measured, like a V2 pair, as twice its WETH or USDC balance) and Aerodrome volatile pools;
+it does not yet read Aerodrome concentrated-liquidity pools. MRWD is priced from its V3 pool; while
+that pool holds less than the floor, its price is shown flagged indicative. Sources: [R12], [R13].
 
 ## 5. Arbitrage tooling
 
@@ -221,7 +222,7 @@ Administrators can change the treasury, fee within its cap, and lending configur
 
 At the baseline these roles are held by the single-key wallet
 `0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98`. This edition does not claim any role is held by a
-multisignature or a DAO. Part III requires multisignature control of the treasury before launch (§15).
+multisignature or a DAO. Part III places the MRWD treasury in a vesting contract (§15).
 
 ## 9. Security model and limitations
 
@@ -260,7 +261,7 @@ AMUTT FeeDiscountStaking `0x055BB4eD8d5464C25D71391E940ce53CA30845fC`, and the y
 
 Mutt Rewards' distribution purpose is to **reward people who provide liquidity to its canonical pool.**
 Its demand is meant to come from use: MRWD as a **quote asset for tokens launched on the project's
-launchpad** (primary), and holding or staking MRWD for **premium DEX features** (secondary), as set
+launchpad** (primary), and holding or staking MRWD for **premium tools such as Equilnyxs Pro** (secondary), as set
 out in §11.1. It is not a claim on revenue, profit, treasury assets, or governance in this edition.
 
 The design starts from a harder question than which risk flags to avoid: **why would anyone hold or
@@ -287,6 +288,28 @@ fees, but routed trading is two-sided and nets out over time.
 strategies, launch analytics, liquidity monitoring, alerts, and launchpad dashboards — in a contract
 separate from the token. Ordinary swapping and basic features never require MRWD. Staking creates
 holding demand; it does not by itself create pool volume.
+
+**First premium product: Equilnyxs Pro.** Equilnyxs, the project's language and toolchain
+for strategy code and Base DEX execution, already sells Pro passes ($12 for 30 days, $99 for a year,
+paid in USDC on Base through Lumioro's store). Staking MRWD is a second way to get Pro: keeping
+**1 billion MRWD** locked (decided 25 October 2026) gets a free Pro key at
+`https://www.lumsian.com/pro/stake.php`; staking is on the DEX at `https://dex.lumsian.com/stake`.
+
+- **Staking contract** (`MuttProStaking`, deployed 25 October 2026 at
+  `0x67dBC193bF510225EBf189ab25dC3b34a32c1766` with a 30-day lock). Separate from the token,
+  non-upgradeable, with no owner and no pause: each deposit has its own lock, fixed at deployment
+  (between 1 and 365 days), there is no exit fee, matured deposits can always be withdrawn, and no
+  function can move staked MRWD except back to its depositor. A wallet holds at most 32 open
+  deposits. It records stakes and nothing else; it pays **no yield**.
+- **Access.** The holder signs a message with the staking wallet. To issue a Pro license that
+  expires at time T, the store checks `lockedUntil(wallet, T)`, the MRWD that cannot be withdrawn
+  before T, against the stake it requires. A license therefore never outlives the stake behind it.
+  To keep Pro, the holder calls `relockAll`, which locks every deposit again for the full period.
+  The stake needed for Pro is set by the store, not by the contract, so the contract needs no admin.
+- **Free features stay free.** The compiler, checker, REPL, dry runs, and test-network trading never
+  require MRWD, and USDC passes remain available.
+- **Equilnyxs' own token.** A separate Equilnyxs token (EQX) is planned for later. How MRWD staking
+  and EQX relate to each other for Equilnyxs access will be set in a later edition.
 
 **Rules.**
 
@@ -483,12 +506,17 @@ overstated (§16.3).
 - **60% of supply is a maximum reserve, not a commitment** to distribute all of it on a fixed timetable.
   It includes the former 15% community allocation, so MRWD reaches the community only by providing
   liquidity.
-- Proposed duration **36–48 months**: a uniform 36-month schedule releases about 1.67% of supply
-  (16.7 billion MRWD) per month; 48 months, about 1.25% (12.5 billion). The curve, for example
-  front-weighted steps, is chosen by the §16 model.
-- Because one incentive lasts at most two years, the program runs as **consecutive funded periods**
-  (for example two 24-month or four 12-month incentives). Each period's amount, start, and end are
-  fixed and published before launch.
+- **Curve (decided 24 October 2026): 48 months, declining in a straight line.** This is the curve
+  the v0.4 model tested: monthly emissions start at 1.5× the average (18.75 billion MRWD) and fall to
+  0.5× (6.25 billion) in month 48.
+- The staker pays a flat rate within an incentive, so the program runs as **16 back-to-back
+  quarterly periods** of 91.25 days, each holding the model's emissions for its three months. Every
+  month stays within about 4.3% of the curve (six-month periods would stray 10.6%, yearly 23%).
+  Quarter 1 holds about 55.45 billion MRWD and quarter 16 about 19.55 billion; quarter *k* (from 0)
+  holds 600 billion × (417 − 18*k*) / 4,512, and the 16 quarters total exactly 600 billion
+  (`MuttEmissionSchedule`). Each period's amount, start, and end are fixed in the scheduler at
+  deployment. Each quarter must be created in the 30 days before it starts; anyone can do it, and
+  an automated job will.
 - **Unused rewards: irreversible dead-address allocation.** The reserve is a maximum; it need not
   all be emitted. Each incentive's refundee is `0x000000000000000000000000000000000000dEaD`, an address
   no one controls, so unclaimed rewards are permanently removed from circulation instead of returning
@@ -532,8 +560,28 @@ The scheduler must also:
 
 Its tests must cover missed windows, overlapping periods, exhausted incentives, unclaimed rewards,
 finalization, and stranded balances, using real consecutive V3 stake transitions on a fork or test
-network, not only simulated time. The scheduler is not deployed, and no reward reserve is committed
-to it, until its code and economic behavior pass independent security review.
+network, not only simulated time.
+
+**Status.** `MuttIncentiveScheduler` is deployed on Base mainnet at
+`0xCAbf284806b800d9A771B55857B9fCF735ea7109` (25 October 2026), holding the 600 billion MRWD reserve
+under the 16-quarter curve; quarter 1 (26 October 2026 to 25 January 2027) was created at launch.
+Each later quarter is created by an automated daily job inside its 30-day window (§14.2).
+
+It takes the staker, MRWD, the pool, and the full period list in its constructor, rejects overlapping, past, empty, or
+over-long periods, and reads the staker's limits at deployment. Anyone can create a period inside
+its window, send a missed period to `0x…dEaD`, finalize a finished period (unstaking remaining
+positions, then `endIncentive`), and, once every period is settled, send any leftover to `0x…dEaD`.
+Unit tests cover each rule against a mock with the staker's checks; a Base fork test runs a period
+through the real staker, including a missed period and a real `endIncentive` refund. A four-phase
+Base Sepolia rehearsal (`contracts/script/RehearseMrwd.s.sol`) deploys Uniswap's own v1.0.2 staker
+build (identical to Base's apart from its four constructor settings), the token, pool, scheduler,
+Pro staking, both vesting contracts, and a locked ¼×–4× launch position, then stakes, accrues,
+claims, unstakes, withdraws, skips a missed period, and finalizes to `0x…dEaD`. A dry run on a local
+fork of Base Sepolia completed every phase, and the real rehearsal on Base Sepolia completed all four
+phases on 25 October 2026 with on-chain balances matching exactly; a community position as large as
+the locked launch position earned about 49% of its period, matching the dilution described in §14.1.
+Still to do: fork tests with real staked positions across consecutive periods, and independent
+review.
 
 ### 14.4 Farming, concentration, and Sybil resistance
 
@@ -564,15 +612,22 @@ The staker pays by in-range liquidity-seconds, which has consequences the design
 | --- | --- | --- | --- |
 | LP rewards | 60% | 600,000,000,000 | Maximum reserve held by the incentive scheduler, including the former community allocation; 36–48 months of scheduled V3 Staker incentives (§14) |
 | Launch liquidity | 20% | 200,000,000,000 | ¼×–4× V3 position with **funded** WETH at launch; position NFT locked 24 months |
-| Treasury | 15% | 150,000,000,000 | Multisignature wallet, timelock on transfers, public periodic reporting |
+| Treasury | 15% | 150,000,000,000 | `MuttVesting`: nothing for 12 months, then linear over 36 months to the treasury wallet; public periodic reporting |
 | Team | 5% | 50,000,000,000 | 12-month cliff, then 36-month linear vesting in a public vesting contract |
 
 This is a starting hypothesis, not a validated optimum. Until the reward reserve is paid out, it is
 itself a concentrated balance in one contract; scanners and readers should see it labelled as such.
-The team allocation uses a public vesting contract (for example OpenZeppelin `VestingWallet` with a
-cliff), whose beneficiary and ownership semantics must be specified explicitly. The treasury requires
-a multisignature (for example a Safe) **before launch**; today's single-key administration is not
-acceptable for these funds.
+The team and treasury allocations each use their own instance of a public vesting contract,
+`MuttVesting` (deployed 25 October 2026: treasury `0x7bC37041E1205841a83413625650EC12DA119697`, team
+`0x6be3920f45Fe0836A3a29F40d8AA3f324E0610a1`): OpenZeppelin `VestingWallet` starting at the end
+of a 12-month cliff and releasing linearly over the next 36 months. Anyone can trigger a release,
+which always pays the beneficiary; the beneficiary is fixed, because ownership can be neither
+transferred (which would let unvested tokens be sold) nor renounced (which would strand them).
+
+**Treasury (decided 24 October 2026): vesting, not a multisignature.** The treasury's 150 billion
+MRWD is not held by a wallet at launch. It sits in its own `MuttVesting` contract, so none of it can
+move for a year and at most 1/36 of it a month after that, which anyone can verify on-chain. What
+the treasury wallet receives as it vests is reported publicly.
 
 ## 16. Measurement and economic model
 
@@ -649,6 +704,13 @@ presented and reviewed **before** any launch budget is recommended.
 
 ## 17. Launch and no-launch criteria
 
+**Launched 25 October 2026.** The owner launched Mutt Rewards on Base mainnet on this date; the
+addresses are in §21 and `deployments/mrwd-base-mainnet.json`. The launch paired 0.00306 WETH with
+200 billion MRWD. At launch, conditions 5 (Base Sepolia rehearsal, completed the same day), 6 (the
+project's V3 position timelock, verified on-chain and holding the launch position) and 7 (vesting
+deployed) held. The others below remain open as post-launch work and are reported here as they
+close; this edition does not describe them as met.
+
 The token launches only when **every** condition holds. A missed condition delays launch; it is not
 waived to meet a date.
 
@@ -663,7 +725,7 @@ waived to meet a date.
    to the burn refundee.
 6. The chosen V3 locker verified on Base for the launch position NFT (deployment, fees, permissions,
    lock and unlock behavior), with the lock transaction prepared.
-7. Treasury multisignature and timelock deployed and tested (§15).
+7. Team and treasury vesting contracts deployed and verified (§15).
 8. Legal and regulatory review complete (§19).
 9. All contracts verified on the explorer at publication, with addresses added to this paper.
 10. The price service reads the MRWD/WETH V3 pool, so the application can show a real MRWD price
@@ -688,9 +750,16 @@ any launch was counted, and are not adjusted to fit the result.
   after its deployment transaction is read from Base and its creation code matches the
   `FixedSupplyToken` template. Only **seeded** launches (at least 0.05 ETH of initial liquidity)
   count toward the thresholds.
-- **Trading per launch.** First-month swap volume in each seeded launch's pool, read on-chain.
-  Swaps by the creator's own wallets and circular trades are excluded where they can be identified.
-  *This measurement is not built yet; it is required before the window opens.*
+- **Seeded.** At least 0.05 WETH added to the launch's Uniswap V3 1% WETH pool (the pool the
+  launchpad seeds) within 24 hours of deployment, read from the pool's `Mint` events.
+- **Trading per launch.** WETH swap volume in that pool over the 30 days after deployment, read from
+  its `Swap` events and valued in dollars at each day's noon (UTC) WETH/USDC price from the Uniswap
+  V3 0.05% pool. Swaps sent by the creator's wallet or the supply recipient are excluded. Circular
+  trades between other wallets are not identified, so the figure is an upper bound in that respect.
+  Launches seeded on another exchange count as launches but not as seeded.
+- **Reproducible.** The measurement (`npm --prefix server run launches:measure -- --window YYYY-MM`)
+  reads only the public launch list and public Base data, never signs anything, and anyone can rerun
+  it to check the published numbers.
 - **Reported alongside:** distinct creator wallets (wallets, not people), the share of seeded
   launches, and the median as well as the mean trading per launch.
 
@@ -708,17 +777,23 @@ later from Base, because counting depends only on the deployment transaction.
 ## 18. Open decisions
 
 1. **Formal screening** of the name Mutt Rewards and ticker MRWD (§12). Supply is set at one trillion.
-2. **Allocation and emission curve** (§14, §15), after the model.
-3. **Minimum launch WETH, the number of tokens paired at launch, and depth thresholds**, from the
-   model (§13.3, §16).
-4. **Final fee tier**, after the model's 0.30% versus 1.00% comparison (§13.1).
-5. **Locker confirmation:** UNCX V3 preferred, subject to verification (§13.2).
-6. **Lock length:** 24 months enforced with a declared retain-or-extend policy, or 48 months at launch
-   if the model shows continuous locked liquidity is essential (§13.2).
+2. ~~**Allocation and emission curve**~~ (§14, §15): the emission curve and the treasury's vesting
+   were decided 24 October 2026; the allocation shares stay as in §15.
+3. ~~**Launch WETH and tokens paired**~~ (§13.3): set at launch, 25 October 2026: 0.00306 WETH with
+   200 billion MRWD. Depth thresholds from the §16 model remain open.
+4. ~~**Final fee tier**~~ (§13.1): the canonical pool was created at 0.30% on 25 October 2026.
+5. ~~**Locker confirmation**~~ (§13.2): the launch position is locked in the project's
+   `V3PositionTimelock`, not UNCX.
+6. ~~**Lock length**~~ (§13.2): 24 months enforced (until 24 October 2028), with the declared
+   retain-or-extend policy.
 7. **Fee discounts and governance:** not purposes of the token in this edition. Governance, if ever
    wanted, would come through a separate system (§12) described in a new edition.
-8. **Persistent storage for the launch counter** (§17.1): the API runs on a free instance whose files
-   are lost on every restart, so the measurement window cannot open until launch records persist.
+8. ~~**Persistent storage for the launch counter**~~ (§17.1): resolved 24 October 2026. Launch
+   records are kept in Postgres (Supabase) and survive restarts of the API's free instance, so the
+   window opens with the first full month after that: **November 2026**.
+9. **Equilnyxs Pro by staking** (§11.1): the stake (1 billion MRWD) and the 30-day deposit lock
+   were set 25 October 2026. Still open: how MRWD staking and a future EQX token relate for
+   Equilnyxs access.
 
 ## 19. Legal and regulatory review
 
@@ -753,7 +828,12 @@ contracts are listed only in §10.
 | Owner and administrator wallet | `0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98` | Single key |
 | Uniswap V3 factory / position manager (external) | `0x33128a8fC17869897dcE68Ed026d694621f6FDfD` / `0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1` | Canonical Uniswap; §13 |
 | UniswapV3Staker (external) | `0x42bE4D6527829FeFA1493e1fb9F3676d2425C3C1` | Uniswap's staker; wiring read on-chain at this edition; §14 |
-| Mutt Rewards token, incentive scheduler, vesting, treasury | — | Not deployed; added only after verification |
+| Mutt Rewards (MRWD) token | `0xC17227AAa33C54634B6cE7AD0bf33A156563c179` | Launched 25 October 2026; §12 |
+| MRWD/WETH 0.30% V3 pool | `0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5` | Canonical pool; §13 |
+| Launch position NFT | #6351512 in the V3 position timelock | Locked until 24 October 2028; §13.2 |
+| Incentive scheduler | `0xCAbf284806b800d9A771B55857B9fCF735ea7109` | 600 billion reserve, 16 quarters; §14.3 |
+| Treasury vesting / team vesting | `0x7bC37041E1205841a83413625650EC12DA119697` / `0x6be3920f45Fe0836A3a29F40d8AA3f324E0610a1` | 150 / 50 billion; cliff to 25 October 2027; §15 |
+| Pro staking | `0x67dBC193bF510225EBf189ab25dC3b34a32c1766` | 30-day lock; §11.1 |
 
 ## 22. Evidence and references
 

@@ -1,0 +1,80 @@
+{
+  "chainId": 8453,
+  "network": "base-mainnet",
+  "token": "Mutt Rewards (MRWD)",
+  "launchedAt": "2026-10-25",
+  "signer": "0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98",
+  "sources": {
+    "contracts": "contracts/src/MuttRewards.sol, MuttIncentiveScheduler.sol, MuttEmissionSchedule.sol, MuttVesting.sol, MuttProStaking.sol",
+    "scripts": "contracts/script/LaunchMrwd.s.sol (stopped at the locker approval), contracts/script/FinishMrwdLaunch.s.sol (completed it)",
+    "compiler": "solc 0.8.28 via Foundry (contracts/foundry.toml)"
+  },
+  "contracts": {
+    "MuttRewards": "0xC17227AAa33C54634B6cE7AD0bf33A156563c179",
+    "UniswapV3Pool_MRWD_WETH_3000": "0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5",
+    "MuttIncentiveScheduler": "0xCAbf284806b800d9A771B55857B9fCF735ea7109",
+    "MuttVesting_Treasury": "0x7bC37041E1205841a83413625650EC12DA119697",
+    "MuttVesting_Team": "0x6be3920f45Fe0836A3a29F40d8AA3f324E0610a1",
+    "MuttProStaking": "0x67dBC193bF510225EBf189ab25dC3b34a32c1766"
+  },
+  "external": {
+    "UniswapV3Staker": "0x42bE4D6527829FeFA1493e1fb9F3676d2425C3C1",
+    "NonfungiblePositionManager": "0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1",
+    "V3PositionTimelock": "0xB5C9BeDb57f4E348e40A5E6326c90dE474072E25",
+    "WETH": "0x4200000000000000000000000000000000000006"
+  },
+  "launchPosition": {
+    "tokenId": 6351512,
+    "range": "¼×–4× around the starting tick 318126 (ticks 304260–331980, spacing 60)",
+    "paired": { "WETH": "3059671793548375", "MRWD": "200000000000000000000000000000" },
+    "lockedIn": "V3PositionTimelock",
+    "lockOwner": "0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98",
+    "unlockTimestamp": 1856041899,
+    "unlockDate": "2028-10-24T23:11:39Z"
+  },
+  "vesting": {
+    "treasury": { "contract": "0x7bC37041E1205841a83413625650EC12DA119697", "beneficiary": "0xB04A0b807BCD463351F90133242F0AcA15C2280f", "amount": "150000000000000000000000000000" },
+    "team": { "contract": "0x6be3920f45Fe0836A3a29F40d8AA3f324E0610a1", "beneficiary": "0x88D67A5fEAafd4501B0E3510ebb3533b7d8245f2", "amount": "50000000000000000000000000000" },
+    "start": 1824505899,
+    "startDate": "2027-10-25T23:11:39Z",
+    "durationSeconds": 94608000
+  },
+  "proStaking": { "lockSeconds": 2592000 },
+  "rewards": {
+    "reserve": "600000000000000000000000000000",
+    "periods": 16,
+    "periodSeconds": 7884000,
+    "firstStart": 1792973235,
+    "firstStartDate": "2026-10-26T00:07:15Z",
+    "refundee": "0x000000000000000000000000000000000000dEaD",
+    "quarter1Created": "0x49668c86abe3d7c800850e96d49389e987e17c9d59f41725b96e67fbe6de53a2"
+  },
+  "transactions": {
+    "launchRun": {
+      "MuttRewards": "0x4a252383ae2b39b96dc0be150642fd4a55be4d6fcc42da867d0f52316f77c649",
+      "createPool": "0x39f73ed9fc96b879b9d525099c4f7af1cbe40e9de4af16620fe8921036377b34",
+      "initialize": "0x2401b98713a6440f2d8d44b2cd4c6fd78195dee9f6246909f333a615d55529ae",
+      "MuttIncentiveScheduler": "0x5bbafe6c722aaa0aed2cbeee2c6c9af056c46d8242bbe5df666c3964d32e239b",
+      "fundScheduler": "0x1ceb44d5edef7c5acba4a7389242e101c7baf0bccbf35da55d807bdda5ea272e",
+      "wrapEth": "0x963ef22abcc2de5f7fad15b887bccccb987a3cb5b4d0f160dda903edbd46fd3f",
+      "approveWeth": "0x4b4ab4f774a53ef32f35277323482794a5f657ac72abe82f6907f82dc3fa5689",
+      "approveMrwd": "0x07b158f07d57600ff16211efaedb34ebe7cfb9d0a3b8de3e140bb605b711df10",
+      "mintLaunchPosition": "0xa8a93e837cef4f3135f7d1e1a6b45fdd643991e6d7956325eead172dfe3b379d",
+      "resetWethApproval": "0x77ba8793b18903a58093365276b5ecac518e57af35a12b1d157d1e1c5b30189c",
+      "resetMrwdApproval": "0x6820f353baed932036cd865092a61213f2e84244059e81067558e62c0aaa03ba",
+      "failedLockerApproval": "0xd30fa83d1aad89cab4801fccbdedd2df3fed4e2298669be15c5ade77f2f49570"
+    },
+    "finishRun": {
+      "createIncentive0": "0x49668c86abe3d7c800850e96d49389e987e17c9d59f41725b96e67fbe6de53a2",
+      "approveLocker": "0xbe07200837f9f8e984725db38394c9f8a891ff7dfe371bcc465335c842741f5d",
+      "lockPosition": "0x77931f2bf3e0d39d86bbe0f74e0e082d16d260f0d6474dab9f9bc74208086375",
+      "MuttVesting_Treasury": "0x7f5757001e366abe72dc06263a8ff66c93de4a1293153c7d95f87764e2477bab",
+      "MuttVesting_Team": "0x2038d29a465bebb31f9adc94c473f081696dfce132cd40eb96eae2635538d0bf",
+      "fundTreasuryVesting": "0xc96197c55bbd0caa332c006b6e22888ab6946295a02707410de2545a138feaf2",
+      "fundTeamVesting": "0x55821408b09c66b1541a614b7f972ebea533af9a29447a17a3887a033813a552",
+      "MuttProStaking": "0x18bafd9c4f6d5c42b2f674f9914447fd00c66c9271a13dffab2d6d3f1db4aa2e",
+      "unusedToDead": "0x70d0241f6765bbddb93977406bd743a0987e77fcf6eece1f4e26860afbad12f0"
+    }
+  },
+  "_note": "The launch run stopped because forge pre-computes calldata from its simulation: the simulated mint returned position 6351507, but other mints landed first, the real position was 6351512, and the locker approval for 6351507 reverted. FinishMrwdLaunch.s.sol read the real position and completed the launch. Balances verified on chain after the finish run: signer 0 MRWD, scheduler 544.55B, staker 55.45B (quarter 1), treasury vesting 150B, team vesting 50B."
+}

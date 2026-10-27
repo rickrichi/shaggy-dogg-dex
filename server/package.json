@@ -17,6 +17,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "clean": "rm -rf dist",
+    "launches:measure": "tsx src/launches/measure.ts",
+    "mrwd:keeper": "tsx src/mrwd/run-keeper.ts",
     "rpc:dev": "tsx src/rpc/main.ts",
     "rpc:keys": "tsx src/rpc/keys.ts",
     "rpc:build": "tsup --config tsup.rpc.config.ts",

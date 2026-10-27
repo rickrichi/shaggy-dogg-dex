@@ -58,8 +58,12 @@
   ],
   "rewrites": [
     {
+      "source": "/api/market-data",
+      "destination": "https://34-9-52-175.sslip.io/api/market-data"
+    },
+    {
       "source": "/api/market-data/:path*",
-      "destination": "https://shaggy-dogg-market-data.onrender.com/api/market-data/:path*"
+      "destination": "https://34-9-52-175.sslip.io/api/market-data/:path*"
     },
     {
       "source": "/api/price/:symbol",
@@ -68,6 +72,10 @@
     {
       "source": "/api/block",
       "destination": "https://shaggy-dogg-api.onrender.com/api/block"
+    },
+    {
+      "source": "/api/admin/:path*",
+      "destination": "https://shaggy-dogg-api.onrender.com/api/admin/:path*"
     },
     {
       "source": "/api/cedefi/:path*",

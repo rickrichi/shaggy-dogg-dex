@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { MARKET_DATA_URL } from "@/config/market-data";
+import { MRWD } from "@/lib/mrwd-pro";
 
 // ───────────────────────────── wire types (shaggy-dogg-market-data/app/market_data.py) ─────────────────
 
@@ -59,6 +60,8 @@ interface TokenPrice {
   change24hPercent: number | null;
   fdvUsd?: number | null;
   method: string;
+  /** Priced from a pool below the service's liquidity floor: cheap to move, never recorded in history. */
+  indicative?: boolean;
   pool?: { dex: string; pool: string; quoteToken: string; liquidityUsd: number };
 }
 
@@ -74,7 +77,9 @@ async function getJson<T>(path: string): Promise<T> {
   try {
     response = await fetch(`${MARKET_DATA_URL}${path}`, { signal: AbortSignal.timeout(15_000) });
   } catch {
-    throw new MarketDataError(`Market-Data service unreachable at ${MARKET_DATA_URL}`);
+    throw new MarketDataError(
+      `Market-Data service unreachable at ${MARKET_DATA_URL || window.location.origin}`
+    );
   }
   const body: unknown = await response.json().catch(() => null);
   if (!response.ok) {
@@ -87,7 +92,9 @@ async function getJson<T>(path: string): Promise<T> {
 // ───────────────────────────── formatting ─────────────────────────────
 
 const usd = (v: number) => {
-  const digits = v >= 1_000 ? 2 : v >= 1 ? 4 : v >= 0.01 ? 5 : 8;
+  // Sub-cent prices (e.g. a trillion-supply token) keep four significant digits instead of rounding to $0.
+  if (v > 0 && v < 0.01) return `$${v.toLocaleString("en-US", { maximumSignificantDigits: 4 })}`;
+  const digits = v >= 1_000 ? 2 : v >= 1 ? 4 : 5;
   return `$${v.toLocaleString("en-US", { minimumFractionDigits: Math.min(digits, 2), maximumFractionDigits: digits })}`;
 };
 const compactUsd = (v: number | null | undefined) =>
@@ -268,7 +275,7 @@ export default function MarketData() {
         Price = median of fresh venue mid prices (books &lt; 10 s old, spread &lt; 2%), outliers
         beyond 1.5% rejected, USDT/USDC quotes converted at the live stablecoin rate. 24h change
         uses Market-Data&apos;s own history once it covers 24 hours, otherwise exchange 24h tickers.
-        Service: {MARKET_DATA_URL}
+        Service: {MARKET_DATA_URL || window.location.origin}
       </p>
     </div>
   );
@@ -488,7 +495,7 @@ function TokenLookup() {
   const valid = /^0x[0-9a-fA-F]{40}$/.test(input.trim());
   const token = useQuery({
     queryKey: ["md-token", address],
-    queryFn: () => getJson<TokenPrice>(`/api/market-data/tokens/base/${address}`),
+    queryFn: () => getJson<TokenPrice>(`/api/market-data/tokens/base/${address}?allowThin=true`),
     enabled: address !== null,
     refetchInterval: 30_000,
     retry: false,
@@ -521,7 +528,18 @@ function TokenLookup() {
           </Button>
         </form>
         <p className="text-xs text-gray-500">
-          Example prefilled: AERO. Priced from the deepest Uniswap V2 / Aerodrome pool.
+          Example prefilled: AERO. Priced from the deepest Uniswap V2, Uniswap V3, or Aerodrome
+          pool.{" "}
+          <button
+            type="button"
+            className="underline"
+            onClick={() => {
+              setInput(MRWD);
+              setAddress(MRWD.toLowerCase());
+            }}
+          >
+            Price MRWD
+          </button>
         </p>
         {token.error && <p className="text-sm text-rose-600">{(token.error as Error).message}</p>}
         {token.data && (
@@ -529,7 +547,14 @@ function TokenLookup() {
             <dt className="text-gray-500">Token</dt>
             <dd className="font-semibold">{token.data.symbol ?? "—"}</dd>
             <dt className="text-gray-500">Price</dt>
-            <dd className="font-mono">{usd(token.data.priceUsd)}</dd>
+            <dd className="font-mono">
+              {usd(token.data.priceUsd)}
+              {token.data.indicative && (
+                <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 font-sans text-[11px] text-amber-800">
+                  indicative · thin pool
+                </span>
+              )}
+            </dd>
             <dt className="text-gray-500">24h</dt>
             <dd className={`font-mono ${pctTone(token.data.change24hPercent)}`}>
               {token.data.change24hPercent == null

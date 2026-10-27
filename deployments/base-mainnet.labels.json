@@ -107,5 +107,47 @@
   "0x916ed75C0636Ddd7404DB79B7dc5CF80e8446c47": {
     "ecosystem": "FBA",
     "role": "Uniswap V2 pair FBA/WETH"
+  },
+  "0xC17227AAa33C54634B6cE7AD0bf33A156563c179": {
+    "ecosystem": "MRWD",
+    "role": "MuttRewards (MRWD) token",
+    "usedBy": [
+      "deployments/mrwd-base-mainnet.json"
+    ]
+  },
+  "0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5": {
+    "ecosystem": "MRWD",
+    "role": "Uniswap V3 MRWD/WETH 0.30% pool",
+    "usedBy": [
+      "deployments/mrwd-base-mainnet.json"
+    ]
+  },
+  "0xCAbf284806b800d9A771B55857B9fCF735ea7109": {
+    "ecosystem": "MRWD",
+    "role": "MuttIncentiveScheduler (600B rewards reserve)",
+    "usedBy": [
+      "deployments/mrwd-base-mainnet.json"
+    ]
+  },
+  "0x7bC37041E1205841a83413625650EC12DA119697": {
+    "ecosystem": "MRWD",
+    "role": "MuttVesting (treasury, 150B)",
+    "usedBy": [
+      "deployments/mrwd-base-mainnet.json"
+    ]
+  },
+  "0x6be3920f45Fe0836A3a29F40d8AA3f324E0610a1": {
+    "ecosystem": "MRWD",
+    "role": "MuttVesting (team, 50B)",
+    "usedBy": [
+      "deployments/mrwd-base-mainnet.json"
+    ]
+  },
+  "0x67dBC193bF510225EBf189ab25dC3b34a32c1766": {
+    "ecosystem": "MRWD",
+    "role": "MuttProStaking (Equilnyxs Pro)",
+    "usedBy": [
+      "deployments/mrwd-base-mainnet.json"
+    ]
   }
 }
