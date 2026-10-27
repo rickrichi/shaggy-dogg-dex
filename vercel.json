@@ -74,6 +74,10 @@
       "destination": "https://shaggy-dogg-api.onrender.com/api/block"
     },
     {
+      "source": "/api/admin/:path*",
+      "destination": "https://shaggy-dogg-api.onrender.com/api/admin/:path*"
+    },
+    {
       "source": "/api/cedefi/:path*",
       "destination": "https://shaggy-dogg-api.onrender.com/api/cedefi/:path*"
     },
