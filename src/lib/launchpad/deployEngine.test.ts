@@ -29,12 +29,15 @@ const form: LaunchpadFormState = {
   executionMode: "metamask",
   recipientAdminAddress: "",
 };
-function clients(revertWrap = false) {
+function clients(revertWrap = false, launchFee = 0n) {
   const deployContract = vi.fn().mockResolvedValue("0x01");
   const writeContract = vi.fn().mockResolvedValue("0x02");
   const wallet = { getChainId: vi.fn().mockResolvedValue(8453), deployContract, writeContract };
   const publicClient = {
     chain: base,
+    // Defaults to 0 so existing tests below never trigger the launch-fee step at all
+    // (executeLaunchpadDeployment skips it entirely when feeAmount() reads as 0).
+    readContract: vi.fn().mockResolvedValue(launchFee),
     waitForTransactionReceipt: vi.fn().mockImplementation(({ hash }) =>
       Promise.resolve({
         status: revertWrap && hash === "0x02" ? "reverted" : "success",
@@ -116,5 +119,32 @@ describe("V3 launchpad safety", () => {
     expect(mint.args[0].amount0Min).toBeGreaterThan(0n);
     expect(mint.args[0].amount1Min).toBeGreaterThan(0n);
     expect(wallet.writeContract.mock.calls.at(-1)![0].chain.id).toBe(8453);
+  });
+});
+
+describe("launchpad fee", () => {
+  it("skips the fee step entirely when feeAmount() reads as 0", async () => {
+    const { wallet, run, publicClient } = clients(false, 0n);
+    await run({ ...form, enableDexSeeding: false });
+    expect(publicClient.readContract).toHaveBeenCalledWith(
+      expect.objectContaining({ functionName: "feeAmount" })
+    );
+    expect(wallet.writeContract).not.toHaveBeenCalled();
+  });
+
+  it("approves and pays the live launch fee, tagging the deployed token", async () => {
+    const { wallet, run } = clients(false, 500_000_000n);
+    await run({ ...form, enableDexSeeding: false });
+    expect(wallet.writeContract).toHaveBeenCalledTimes(2);
+
+    const approveCall = wallet.writeContract.mock.calls[0]![0];
+    expect(approveCall.functionName).toBe("approve");
+    expect(approveCall.address).toBe(CANONICAL_BASE_CONTRACTS.USDC);
+    expect(approveCall.args).toEqual([CANONICAL_BASE_CONTRACTS.LaunchpadFees, 500_000_000n]);
+
+    const payCall = wallet.writeContract.mock.calls[1]![0];
+    expect(payCall.functionName).toBe("payLaunchFee");
+    expect(payCall.address).toBe(CANONICAL_BASE_CONTRACTS.LaunchpadFees);
+    expect(payCall.args).toEqual(["0xb8f3D5143ffddB99688BB31E7c2c3894a1E17263"]);
   });
 });

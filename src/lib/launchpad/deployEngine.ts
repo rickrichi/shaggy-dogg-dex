@@ -71,6 +71,45 @@ export async function executeLaunchpadDeployment(
   };
 
   // ────────────────────────────────────────────────────────────────────────────
+  // Step 1.5: Pay the launchpad fee (LaunchpadFees.sol)
+  // Reads the live fee rather than hardcoding it, so changing LaunchpadFees.setFee()
+  // on-chain never requires a frontend redeploy. Skips entirely if the fee is 0.
+  // ────────────────────────────────────────────────────────────────────────────
+  const launchpadFeesAbi = parseAbi([
+    "function feeAmount() view returns (uint256)",
+    "function payLaunchFee(address project) external",
+  ]);
+  const currentLaunchFee = await publicClient.readContract({
+    address: CANONICAL_BASE_CONTRACTS.LaunchpadFees,
+    abi: launchpadFeesAbi,
+    functionName: "feeAmount",
+  });
+  if (currentLaunchFee > 0n) {
+    console.log(`[Launchpad] Approving USDC for the launch fee...`);
+    const approveFeeHash = await walletClient.writeContract({
+      address: CANONICAL_BASE_CONTRACTS.USDC,
+      abi: ERC20_ABI,
+      functionName: "approve",
+      args: [CANONICAL_BASE_CONTRACTS.LaunchpadFees, currentLaunchFee],
+      account: userAddress,
+      chain: activeChain,
+    });
+    await confirm(approveFeeHash);
+
+    console.log(`[Launchpad] Paying launch fee...`);
+    const feeTxHash = await walletClient.writeContract({
+      address: CANONICAL_BASE_CONTRACTS.LaunchpadFees,
+      abi: launchpadFeesAbi,
+      functionName: "payLaunchFee",
+      args: [tokenAddress],
+      account: userAddress,
+      chain: activeChain,
+    });
+    await confirm(feeTxHash);
+    console.log(`[Launchpad] Launch fee paid.`);
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
   // Step 2: Deploy Staking if Archetype requires it
   // ────────────────────────────────────────────────────────────────────────────
   const needsStaking = [

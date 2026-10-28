@@ -24,6 +24,7 @@ export const CANONICAL_BASE_CONTRACTS = {
   AtomicFlashArbitrageRouter: "0x70315019d12a11556c837970675cdc8fa54d186b" as Address,
   CompoundComet: "0xb125E6687d4313864e53df431d5425969c15Eb2F" as Address,
   DeployerAdminWallet: "0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98" as Address,
+  LaunchpadFees: "0x2443C90eB4eA63b74383a5f0dB36c95A1091b68b" as Address,
 };
 
 export const LAUNCHPAD_ARCHETYPES: ArchetypeDefinition[] = [
