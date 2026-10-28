@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { ARB_API_URL, ARB_PRIVATE_API } from "@/config/crypto-arb";
 import thresholds from "@/config/market-pair-thresholds.json";
 import MARKET_PAIRS from "@/config/market-pairs.json";
-import { useCeFiMatrixFeeds } from "@/hooks/useCeFiMatrixFeeds";
+import { type MatrixCexPrice, useCeFiMatrixFeeds } from "@/hooks/useCeFiMatrixFeeds";
 import { useMatrixDexQuotes } from "@/hooks/useMatrixDexQuotes";
 import { MATRIX_QUOTE_MAX_AGE_MS, matrixRoute } from "@/lib/amm/matrix-quotes";
 
@@ -76,8 +76,14 @@ export function PairMatrix100({ onSelectPair, krakenBalances, snapshot }: PairMa
   const {
     coinbaseConnected,
     krakenConnected,
+    binanceConnected,
+    bybitConnected,
+    okxConnected,
     getCoinbaseQuote,
     getKrakenQuote,
+    getBinanceQuote,
+    getBybitQuote,
+    getOkxQuote,
   } = useCeFiMatrixFeeds();
   const [dexOnly, setDexOnly] = useState(false);
   const venueIndex = useMemo(
@@ -169,23 +175,23 @@ export function PairMatrix100({ onSelectPair, krakenBalances, snapshot }: PairMa
   }, [search, filterFundedOnly, freeAssets, dexOnly]);
 
   const cexQuote = (exchange: string, symbol: string) => {
-    // 1. Direct live Coinbase feed
-    if (exchange === "coinbase") {
-      const live = getCoinbaseQuote(symbol);
-      if (live) {
-        return `Bid ${live.bid.toLocaleString(undefined, { maximumSignificantDigits: 7 })} / Ask ${live.ask.toLocaleString(undefined, { maximumSignificantDigits: 7 })}`;
-      }
+    const fmt = (live: MatrixCexPrice) =>
+      `Bid ${live.bid.toLocaleString(undefined, { maximumSignificantDigits: 7 })} / Ask ${live.ask.toLocaleString(undefined, { maximumSignificantDigits: 7 })}`;
+
+    // 1. Direct live feed, one per venue
+    const liveGetter = {
+      coinbase: getCoinbaseQuote,
+      kraken: getKrakenQuote,
+      binance: getBinanceQuote,
+      bybit: getBybitQuote,
+      okx: getOkxQuote,
+    }[exchange];
+    if (liveGetter) {
+      const live = liveGetter(symbol);
+      if (live) return fmt(live);
     }
 
-    // 2. Direct live Kraken feed
-    if (exchange === "kraken") {
-      const live = getKrakenQuote(symbol);
-      if (live) {
-        return `Bid ${live.bid.toLocaleString(undefined, { maximumSignificantDigits: 7 })} / Ask ${live.ask.toLocaleString(undefined, { maximumSignificantDigits: 7 })}`;
-      }
-    }
-
-    // 3. Fall back to snapshot venueIndex if present
+    // 2. Fall back to snapshot venueIndex if present
     const venue = venueIndex.get(`${exchange}:${symbol}`);
     if (!venue) return "Unverified";
     if (venue.status !== "live") return venue.status;
@@ -205,40 +211,59 @@ export function PairMatrix100({ onSelectPair, krakenBalances, snapshot }: PairMa
               <CardTitle className="text-base font-bold text-slate-900">
                 {PAIR_MATRIX_DATA.length}-Pair Spot Arbitrage Matrix
               </CardTitle>
-              <div className="flex items-center gap-1.5 pl-2">
-                <span
-                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                    coinbaseConnected
-                      ? "border border-emerald-200 bg-emerald-50 text-emerald-800"
-                      : "border border-slate-200 bg-slate-100 text-slate-600"
-                  }`}
-                >
+              <div className="flex flex-wrap items-center gap-1.5 pl-2">
+                {(
+                  [
+                    {
+                      label: "Coinbase",
+                      connected: coinbaseConnected,
+                      pill: "border-emerald-200 bg-emerald-50 text-emerald-800",
+                      dotColor: "bg-emerald-500",
+                    },
+                    {
+                      label: "Kraken",
+                      connected: krakenConnected,
+                      pill: "border-purple-200 bg-purple-50 text-purple-800",
+                      dotColor: "bg-purple-500",
+                    },
+                    {
+                      label: "Binance",
+                      connected: binanceConnected,
+                      pill: "border-amber-200 bg-amber-50 text-amber-800",
+                      dotColor: "bg-amber-500",
+                    },
+                    {
+                      label: "Bybit",
+                      connected: bybitConnected,
+                      pill: "border-orange-200 bg-orange-50 text-orange-800",
+                      dotColor: "bg-orange-500",
+                    },
+                    {
+                      label: "OKX",
+                      connected: okxConnected,
+                      pill: "border-sky-200 bg-sky-50 text-sky-800",
+                      dotColor: "bg-sky-500",
+                    },
+                  ] as const
+                ).map(({ label, connected, pill, dotColor }) => (
                   <span
-                    className={`size-1.5 rounded-full ${
-                      coinbaseConnected ? "animate-pulse bg-emerald-500" : "bg-slate-400"
+                    key={label}
+                    className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                      connected ? pill : "border-slate-200 bg-slate-100 text-slate-600"
                     }`}
-                  />
-                  Coinbase: {coinbaseConnected ? "Streaming Live" : "Connecting…"}
-                </span>
-                <span
-                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                    krakenConnected
-                      ? "border border-purple-200 bg-purple-50 text-purple-800"
-                      : "border border-slate-200 bg-slate-100 text-slate-600"
-                  }`}
-                >
-                  <span
-                    className={`size-1.5 rounded-full ${
-                      krakenConnected ? "animate-pulse bg-purple-500" : "bg-slate-400"
-                    }`}
-                  />
-                  Kraken: {krakenConnected ? "Streaming Live" : "Connecting…"}
-                </span>
+                  >
+                    <span
+                      className={`size-1.5 rounded-full ${connected ? `animate-pulse ${dotColor}` : "bg-slate-400"}`}
+                    />
+                    {label}: {connected ? "Streaming Live" : "Connecting…"}
+                  </span>
+                ))}
               </div>
             </div>
             <CardDescription className="text-xs">
               CeDeFi comparison: Shaggy-Dogg-Dex routed sell quotes on Base alongside centralized
-              exchange bid/ask prices streamed directly from Coinbase &amp; Kraken public WebSockets.
+              exchange bid/ask prices streamed directly from Coinbase, Kraken, Binance, Bybit &amp;
+              OKX public WebSockets.
             </CardDescription>
           </div>
 
