@@ -512,7 +512,11 @@ export default function Arbitrage() {
   const [triWethUsdcPrice, setTriWethUsdcPrice] = useState<number>(3450.0);
   const [triUsdcCbbtcRate, setTriUsdcCbbtcRate] = useState<number>(1.002);
   const [triCbbtcWethRate, setTriCbbtcWethRate] = useState<number>(1 / 3445.0);
-  const triFeeBps = 30; // 0.30%
+  // True while the three rates above are exactly what the live quote returned (already
+  // fee-inclusive); flips false the moment any of them is hand-edited, so the modeled estimate
+  // below applies an assumed pool fee only to rates that don't already have one baked in.
+  const [triRatesAreLive, setTriRatesAreLive] = useState<boolean>(false);
+  const triFeeBps = 30; // 0.30%, assumed per hop only when modeling rates you typed in yourself
   const [triSlippageBps, setTriSlippageBps] = useState<number>(50); // 0.50%
   const [isExecutingTri, setIsExecutingTri] = useState<boolean>(false);
 
@@ -523,13 +527,13 @@ export default function Arbitrage() {
         wethUsdcPrice: triWethUsdcPrice,
         usdcCbbtcRate: triUsdcCbbtcRate,
         cbbtcWethRate: triCbbtcWethRate,
-        poolFeeBps: triFeeBps,
+        poolFeeBps: triRatesAreLive ? 0 : triFeeBps,
         gasCostUsd: 0.08,
       });
     } catch {
       return null;
     }
-  }, [triInitialWeth, triWethUsdcPrice, triUsdcCbbtcRate, triCbbtcWethRate]);
+  }, [triInitialWeth, triWethUsdcPrice, triUsdcCbbtcRate, triCbbtcWethRate, triRatesAreLive]);
 
   /** live: the bot's on-chain quote of the full path; the button uses the inputs on this tab. */
   const handleExecuteLiveTriangular = useCallback(
@@ -743,8 +747,11 @@ export default function Arbitrage() {
         return;
       }
       setTriWethUsdcPrice(Number(live.wethUsdcPrice.toFixed(2)));
-      setTriUsdcCbbtcRate(Number(live.usdcCbbtcRate.toFixed(6)));
+      // Unrounded: cbBTC/USDC sits around 1e-5, where fixed decimal places (fine for DAI's ~1.0
+      // rate) would keep only a digit or two of precision.
+      setTriUsdcCbbtcRate(live.usdcCbbtcRate);
       setTriCbbtcWethRate(live.cbbtcWethRate);
+      setTriRatesAreLive(true);
       setDualPoolAPrice(Number(live.uniswapEthPrice.toFixed(2)));
       setDualPoolBPrice(Number(live.aerodromeEthPrice.toFixed(2)));
       setLiveRatesStatus("live");
@@ -2858,7 +2865,10 @@ export default function Arbitrage() {
                         id="wethPrice"
                         type="number"
                         value={triWethUsdcPrice}
-                        onChange={(e) => setTriWethUsdcPrice(parseFloat(e.target.value) || 0)}
+                        onChange={(e) => {
+                          setTriWethUsdcPrice(parseFloat(e.target.value) || 0);
+                          setTriRatesAreLive(false);
+                        }}
                       />
                     </div>
                     <div className="space-y-2">
@@ -2866,9 +2876,12 @@ export default function Arbitrage() {
                       <Input
                         id="usdcCbbtc"
                         type="number"
-                        step="0.0001"
+                        step="0.000001"
                         value={triUsdcCbbtcRate}
-                        onChange={(e) => setTriUsdcCbbtcRate(parseFloat(e.target.value) || 0)}
+                        onChange={(e) => {
+                          setTriUsdcCbbtcRate(parseFloat(e.target.value) || 0);
+                          setTriRatesAreLive(false);
+                        }}
                       />
                     </div>
                     <div className="space-y-2">
@@ -2878,7 +2891,10 @@ export default function Arbitrage() {
                         type="number"
                         step="0.000001"
                         value={triCbbtcWethRate}
-                        onChange={(e) => setTriCbbtcWethRate(parseFloat(e.target.value) || 0)}
+                        onChange={(e) => {
+                          setTriCbbtcWethRate(parseFloat(e.target.value) || 0);
+                          setTriRatesAreLive(false);
+                        }}
                       />
                     </div>
                   </div>
