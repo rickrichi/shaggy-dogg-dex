@@ -18,7 +18,7 @@ const VENUES: BotQuoteVenues = {
   aerodromeFactory: "0x420DD381b31aEf6683db6B902084cB0FFECe40Da",
   weth: "0x4200000000000000000000000000000000000006",
   usdc: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-  dai: "0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb",
+  cbbtc: "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
 };
 const POOL = "0xcDAC0d6c6C59727a65F871236188350531885C43";
 const WALLET = "0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98";
@@ -28,7 +28,7 @@ const ok = (result: unknown) => ({ status: "success" as const, result });
 const failed = { status: "failure" as const, error: new Error("reverted") };
 const v3 = (amountOut: bigint) => ok([amountOut, [], [], 0n]);
 
-// 32 triangular paths (f1 x f2 x f3 = 4 x 2 x 4), then 4 single-hop tiers, Aerodrome quote, pool.
+// 64 triangular paths (f1 x f2 x f3 = 4 x 4 x 4), then 4 single-hop tiers, Aerodrome quote, pool.
 interface Call { functionName: string; args: readonly unknown[] }
 function firstRead(
   calls: readonly Call[],
@@ -57,7 +57,8 @@ function firstRead(
 function client(
   pathOut: (fees: number[]) => bigint | null,
   singleOut: (fee: number) => bigint | null,
-  second: unknown[] = [v3(parseUnits("2390", 6)), v3(parseEther("2389")), ok(30n)],
+  // cbBTC uses 8 decimals, not DAI's 18 — this must match bot-market-snapshot.ts's formatUnits call.
+  second: unknown[] = [v3(parseUnits("2390", 6)), v3(parseUnits("2389", 8)), ok(30n)],
   first?: { aero?: unknown; pool?: unknown }
 ) {
   return {
@@ -80,15 +81,15 @@ describe("fetchLiveBotQuotes (Uniswap V3)", () => {
     const c = client(pathOut, singleOut);
     const quotes = await fetchLiveBotQuotes(c, VENUES, 1);
 
-    expect(c.multicall.mock.calls[0]?.[0].contracts).toHaveLength(32 + 4 + 2);
+    expect(c.multicall.mock.calls[0]?.[0].contracts).toHaveLength(64 + 4 + 2);
     expect(quotes?.triangularPath.fees).toEqual([500, 100, 500]);
     expect(quotes?.triangularTerminalWeth).toBeCloseTo(0.99, 12);
     expect(quotes?.wethUsdcPrice).toBeCloseTo(2390, 6);
-    expect(quotes?.usdcDaiRate).toBeCloseTo(2389 / 2390, 9);
-    expect(quotes?.daiWethRate).toBeCloseTo(0.99 / 2389, 12);
+    expect(quotes?.usdcCbbtcRate).toBeCloseTo(2389 / 2390, 9);
+    expect(quotes?.cbbtcWethRate).toBeCloseTo(0.99 / 2389, 12);
     // Product of the rates is the path's real output: the engine must add no fee.
     expect(
-      (quotes?.wethUsdcPrice ?? 0) * (quotes?.usdcDaiRate ?? 0) * (quotes?.daiWethRate ?? 0)
+      (quotes?.wethUsdcPrice ?? 0) * (quotes?.usdcCbbtcRate ?? 0) * (quotes?.cbbtcWethRate ?? 0)
     ).toBeCloseTo(0.99, 9);
   });
 
@@ -129,7 +130,7 @@ describe("fetchLiveBotQuotes (Uniswap V3)", () => {
 
 describe("v3TriangularSwapCall", () => {
   const path = {
-    tokens: [VENUES.weth, VENUES.usdc, VENUES.dai, VENUES.weth] as const,
+    tokens: [VENUES.weth, VENUES.usdc, VENUES.cbbtc, VENUES.weth] as const,
     fees: [500, 100, 500] as const,
   };
 

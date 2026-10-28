@@ -1,7 +1,11 @@
 // src/lib/amm/bot-market-snapshot.ts
 // Live Base quotes for the Auto-Pilot bot, read from the venues its live handlers trade on:
-//   triangular  - Uniswap V3, WETH -> USDC -> DAI -> WETH, best of every fee-tier combination
+//   triangular  - Uniswap V3, WETH -> USDC -> cbBTC -> WETH, best of every fee-tier combination
 //                 (executed with SwapRouter02.exactInput on exactly the quoted path)
+//                 cbBTC replaced DAI here: Base's USDC/DAI and DAI/WETH pools hold low
+//                 hundreds to low thousands of dollars at every fee tier (checked on-chain),
+//                 making any realistic trade size pure price-impact loss. cbBTC/USDC and
+//                 cbBTC/WETH each run into eight figures of liquidity on Base.
 //   cross-DEX   - Uniswap V3 (best WETH/USDC tier) and Aerodrome volatile WETH -> USDC
 // Triangular rates are returned fee-inclusive (each V3 pool has its own fee), so the engine must not
 // add a fee of its own. Cross-DEX prices are returned fee-free with each venue's real fee rate.
@@ -51,8 +55,8 @@ const AERODROME_FACTORY_ABI = [
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const ALL_TIERS = V3_FEE_TIERS.map((tier) => tier.fee);
-// USDC/DAI is a pegged pair: only the stable tiers are worth quoting.
-const STABLE_TIERS = [100, 500] as const;
+// cbBTC isn't a pegged pair like DAI was, and its deepest tier is 0.05% rather than the usual
+// stablecoin tiers — quote every tier on every leg, same as the WETH/USDC legs.
 
 export interface BotQuoteVenues {
   readonly uniswapV3Quoter: Address;
@@ -61,7 +65,7 @@ export interface BotQuoteVenues {
   readonly aerodromeFactory: Address;
   readonly weth: Address;
   readonly usdc: Address;
-  readonly dai: Address;
+  readonly cbbtc: Address;
 }
 
 /** A Uniswap V3 multi-hop path: tokens[i] -> tokens[i + 1] through the pool with fees[i]. */
@@ -73,8 +77,8 @@ export interface V3Path {
 export interface LiveBotQuotes {
   /** Fee-inclusive rates along `triangularPath`; their product is the path's real output. */
   readonly wethUsdcPrice: number;
-  readonly usdcDaiRate: number;
-  readonly daiWethRate: number;
+  readonly usdcCbbtcRate: number;
+  readonly cbbtcWethRate: number;
   readonly triangularPath: V3Path;
   /** WETH out of the full triangular path for `tradeWeth` WETH in, after pool fees. */
   readonly triangularTerminalWeth: number;
@@ -128,12 +132,12 @@ export async function fetchLiveBotQuotes(
 ): Promise<LiveBotQuotes | null> {
   if (!(tradeWeth > 0)) return null;
   const amountIn = parseEther(tradeWeth.toString());
-  const { weth, usdc, dai } = venues;
+  const { weth, usdc, cbbtc } = venues;
   const quoter = { address: venues.uniswapV3Quoter, abi: UNISWAP_V3_QUOTER_V2_ABI as Abi };
 
   const paths: V3Path[] = ALL_TIERS.flatMap((f1) =>
-    STABLE_TIERS.flatMap((f2) =>
-      ALL_TIERS.map((f3): V3Path => ({ tokens: [weth, usdc, dai, weth], fees: [f1, f2, f3] }))
+    ALL_TIERS.flatMap((f2) =>
+      ALL_TIERS.map((f3): V3Path => ({ tokens: [weth, usdc, cbbtc, weth], fees: [f1, f2, f3] }))
     )
   );
 
@@ -210,7 +214,7 @@ export async function fetchLiveBotQuotes(
         {
           ...quoter,
           functionName: "quoteExactInput",
-          args: [encodeV3Path([weth, usdc, dai], [f1, f2]), amountIn],
+          args: [encodeV3Path([weth, usdc, cbbtc], [f1, f2]), amountIn],
         },
         {
           address: venues.aerodromeFactory,
@@ -224,25 +228,27 @@ export async function fetchLiveBotQuotes(
     return null;
   }
   const usdcMid = quotedAmount(second[0]);
-  const daiMid = quotedAmount(second[1]);
+  const cbbtcMid = quotedAmount(second[1]);
   const feeResult = second[2];
   const aeroFeeBps = feeResult?.status === "success" ? (feeResult.result as bigint) : undefined;
-  if (!positive(usdcMid) || !positive(daiMid) || aeroFeeBps === undefined) return null;
+  if (!positive(usdcMid) || !positive(cbbtcMid) || aeroFeeBps === undefined) return null;
 
   const aerodromeFeeRate = Number(aeroFeeBps) / 10_000; // Aerodrome fees are in basis points
   if (!(aerodromeFeeRate >= 0 && aerodromeFeeRate < 0.1)) return null;
   const uniswapFeeRate = uni.fee / 1_000_000; // V3 fees are in hundredths of a basis point
 
   const usdc1 = Number(formatUnits(usdcMid, 6));
-  const dai1 = Number(formatUnits(daiMid, 18));
+  // cbBTC uses 8 decimals, not DAI's 18 — getting this wrong would be off by 10 orders of
+  // magnitude, not a rounding error.
+  const cbbtc1 = Number(formatUnits(cbbtcMid, 8));
   const weth2 = Number(formatUnits(chosen.out, 18));
   const uniswapExecutionPrice = Number(formatUnits(uni.out, 6)) / tradeWeth;
   const aerodromeExecutionPrice = Number(formatUnits(aeroOut, 6)) / tradeWeth;
 
   return {
     wethUsdcPrice: usdc1 / tradeWeth,
-    usdcDaiRate: dai1 / usdc1,
-    daiWethRate: weth2 / dai1,
+    usdcCbbtcRate: cbbtc1 / usdc1,
+    cbbtcWethRate: weth2 / cbbtc1,
     triangularPath: chosen.path,
     triangularTerminalWeth: weth2,
     uniswapEthPrice: uniswapExecutionPrice / (1 - uniswapFeeRate),

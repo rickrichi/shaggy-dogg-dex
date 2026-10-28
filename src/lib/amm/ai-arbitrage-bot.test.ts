@@ -20,8 +20,8 @@ describe("AiArbitrageBotEngine - Anti-Loss & Auto-Pilot Rules", () => {
 
   const baseMarket: MarketSnapshot = {
     wethUsdcPrice: 3450.0,
-    usdcDaiRate: 1.002,
-    daiWethRate: 1 / 3445.0,
+    usdcCbbtcRate: 1.002,
+    cbbtcWethRate: 1 / 3445.0,
     uniswapEthPrice: 3450.0,
     aerodromeEthPrice: 3452.0,
     currentGasGwei: 0.005,
@@ -44,8 +44,8 @@ describe("AiArbitrageBotEngine - Anti-Loss & Auto-Pilot Rules", () => {
     // Highly unfavorable rates where fees eat up the whole margin
     const negativeMarket: MarketSnapshot = {
       ...baseMarket,
-      usdcDaiRate: 0.999, // Inverted
-      daiWethRate: 1 / 3460.0, // Inverted
+      usdcCbbtcRate: 0.999, // Inverted
+      cbbtcWethRate: 1 / 3460.0, // Inverted
       aerodromeEthPrice: 3450.0, // Zero spread
     };
 

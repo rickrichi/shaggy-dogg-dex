@@ -30,8 +30,8 @@ export interface BotConfig {
 
 export interface MarketSnapshot {
   readonly wethUsdcPrice: number;
-  readonly usdcDaiRate: number;
-  readonly daiWethRate: number;
+  readonly usdcCbbtcRate: number;
+  readonly cbbtcWethRate: number;
   readonly uniswapEthPrice: number;
   readonly aerodromeEthPrice: number;
   /** Aerodrome pool fee as a fraction; read on-chain by the live snapshot. Defaults to 0.30%. */
@@ -132,8 +132,8 @@ export class AiArbitrageBotEngine {
         const triResult = ShaggyDoggQuantAiEngine.calculateCrossDexTriangularArbitrage({
           initialWeth: config.tradeCapitalEth,
           wethUsdcPrice: market.wethUsdcPrice,
-          usdcDaiRate: market.usdcDaiRate,
-          daiWethRate: market.daiWethRate,
+          usdcCbbtcRate: market.usdcCbbtcRate,
+          cbbtcWethRate: market.cbbtcWethRate,
           poolFeeBps: market.triangularFeesIncluded ? 0 : 30, // flat 0.30% only for modelled rates
           gasCostUsd: market.gasCostUsd?.triangular ?? 0.08,
         });
@@ -146,7 +146,7 @@ export class AiArbitrageBotEngine {
           grossSpreadPct,
           gasUsd: triResult.gasCostUsd,
           confidence: triResult.arbitrageDetected ? 97.5 : 45.0,
-          summary: `Triangular WETH ➔ USDC ➔ DAI ➔ WETH (${config.tradeCapitalEth} WETH)`,
+          summary: `Triangular WETH ➔ USDC ➔ cbBTC ➔ WETH (${config.tradeCapitalEth} WETH)`,
           breakdown: {
             grossProfitUsd: triResult.grossProfit * market.wethUsdcPrice,
             flashLoanFeeUsd: 0,
@@ -225,8 +225,8 @@ export class AiArbitrageBotEngine {
           sdStakedTier: config.vipTier,
           triangularRoute: {
             wethUsdcPrice: market.wethUsdcPrice,
-            usdcDaiRate: market.usdcDaiRate,
-            daiWethRate: market.daiWethRate,
+            usdcCbbtcRate: market.usdcCbbtcRate,
+            cbbtcWethRate: market.cbbtcWethRate,
             basePoolFeeBps: market.triangularFeesIncluded ? 0 : 30,
           },
           gasCostUsd: flashGasUsd,

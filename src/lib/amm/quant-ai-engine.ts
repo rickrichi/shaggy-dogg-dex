@@ -35,15 +35,15 @@ export interface AmmSlippageResult {
 
 export interface CrossDexArbitrageInput {
   readonly wethUsdcPrice: number;
-  readonly usdcDaiRate: number;
-  readonly daiWethRate: number;
+  readonly usdcCbbtcRate: number;
+  readonly cbbtcWethRate: number;
   readonly initialWeth?: number;
   readonly poolFeeBps?: number;
   readonly gasCostUsd?: number;
 }
 
 export interface CrossDexArbitrageResult {
-  readonly pairRoute: "WETH->USDC->DAI->WETH";
+  readonly pairRoute: "WETH->USDC->cbBTC->WETH";
   readonly initialCapital: number;
   readonly terminalCapital: number;
   readonly grossProfit: number;
@@ -105,8 +105,8 @@ export interface AaveFlashArbitrageInput {
   readonly sdStakedTier?: number; // 0: None, 1: 100 bps (10%), 2: 250 bps (25%), 3: 500 bps (50%), 4: 1000 bps (100%)
   readonly triangularRoute: {
     readonly wethUsdcPrice: number;
-    readonly usdcDaiRate: number;
-    readonly daiWethRate: number;
+    readonly usdcCbbtcRate: number;
+    readonly cbbtcWethRate: number;
     readonly basePoolFeeBps?: number; // default 30 (0.30%)
   };
   readonly gasCostUsd?: number; // default 0.15 on Base L2
@@ -206,7 +206,7 @@ export class ShaggyDoggQuantAiEngine {
 
   /**
    * Directive 338: Cross-DEX Triangular Arbitrage Solver
-   * Solves cyclical cyclic liquidity path WETH -> USDC -> DAI -> WETH accounting for multi-pool fee drag
+   * Solves cyclical cyclic liquidity path WETH -> USDC -> cbBTC -> WETH accounting for multi-pool fee drag
    * and L2 execution gas cost. Formulated directly from Chapter 4 Directive 338 of the Lumioro Quant Manual.
    */
   public static calculateCrossDexTriangularArbitrage(
@@ -214,21 +214,21 @@ export class ShaggyDoggQuantAiEngine {
   ): CrossDexArbitrageResult {
     const {
       wethUsdcPrice,
-      usdcDaiRate,
-      daiWethRate,
+      usdcCbbtcRate,
+      cbbtcWethRate,
       initialWeth = 10.0,
       poolFeeBps = 30.0,
       gasCostUsd = 25.0,
     } = input;
 
-    if (wethUsdcPrice <= 0 || usdcDaiRate <= 0 || daiWethRate <= 0 || initialWeth <= 0) {
+    if (wethUsdcPrice <= 0 || usdcCbbtcRate <= 0 || cbbtcWethRate <= 0 || initialWeth <= 0) {
       throw new Error("Prices, exchange rates, and initial capital must be strictly positive.");
     }
 
     const feeFactor = 1.0 - poolFeeBps / 10000.0;
     const usdc = initialWeth * wethUsdcPrice * feeFactor;
-    const dai = usdc * usdcDaiRate * feeFactor;
-    const termWeth = dai * daiWethRate * feeFactor;
+    const cbbtc = usdc * usdcCbbtcRate * feeFactor;
+    const termWeth = cbbtc * cbbtcWethRate * feeFactor;
 
     const grossProfit = termWeth - initialWeth;
     const gasWeth = gasCostUsd / wethUsdcPrice;
@@ -237,7 +237,7 @@ export class ShaggyDoggQuantAiEngine {
     const arbitrageDetected = netProfit > 0.0;
 
     return {
-      pairRoute: "WETH->USDC->DAI->WETH",
+      pairRoute: "WETH->USDC->cbBTC->WETH",
       initialCapital: initialWeth,
       terminalCapital: termWeth,
       grossProfit,
@@ -384,8 +384,8 @@ export class ShaggyDoggQuantAiEngine {
     if (borrowAmount <= 0) {
       throw new Error("Borrow amount must be strictly positive.");
     }
-    const { wethUsdcPrice, usdcDaiRate, daiWethRate, basePoolFeeBps = 30 } = triangularRoute;
-    if (wethUsdcPrice <= 0 || usdcDaiRate <= 0 || daiWethRate <= 0) {
+    const { wethUsdcPrice, usdcCbbtcRate, cbbtcWethRate, basePoolFeeBps = 30 } = triangularRoute;
+    if (wethUsdcPrice <= 0 || usdcCbbtcRate <= 0 || cbbtcWethRate <= 0) {
       throw new Error("Exchange rates and prices must be positive.");
     }
 
@@ -412,19 +412,19 @@ export class ShaggyDoggQuantAiEngine {
     let netProfitUsd = 0;
 
     if (borrowAsset === "USDC") {
-      // Cyclic Route starting with USDC: USDC -> DAI -> WETH -> USDC
-      const dai = borrowAmount * usdcDaiRate * poolFeeFactor;
-      const weth = dai * daiWethRate * poolFeeFactor;
+      // Cyclic Route starting with USDC: USDC -> cbBTC -> WETH -> USDC
+      const cbbtc = borrowAmount * usdcCbbtcRate * poolFeeFactor;
+      const weth = cbbtc * cbbtcWethRate * poolFeeFactor;
       grossArbitrageReturn = weth * wethUsdcPrice * poolFeeFactor;
 
       grossProfit = grossArbitrageReturn - repaymentRequired;
       netProfit = grossProfit - gasCostUsd;
       netProfitUsd = netProfit;
     } else {
-      // Cyclic Route starting with WETH: WETH -> USDC -> DAI -> WETH
+      // Cyclic Route starting with WETH: WETH -> USDC -> cbBTC -> WETH
       const usdc = borrowAmount * wethUsdcPrice * poolFeeFactor;
-      const dai = usdc * usdcDaiRate * poolFeeFactor;
-      grossArbitrageReturn = dai * daiWethRate * poolFeeFactor;
+      const cbbtc = usdc * usdcCbbtcRate * poolFeeFactor;
+      grossArbitrageReturn = cbbtc * cbbtcWethRate * poolFeeFactor;
 
       grossProfit = grossArbitrageReturn - repaymentRequired;
       const gasInAsset = gasCostUsd / wethUsdcPrice;

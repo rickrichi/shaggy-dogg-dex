@@ -28,18 +28,18 @@ describe("ShaggyDoggQuantAiEngine (Quant Manual Directives 336-341)", () => {
     expect(multiplier).toBeLessThan(6.0);
   });
 
-  it("Directive 338: executes authentic on-chain cross-DEX triangular arbitrage solver (WETH->USDC->DAI->WETH)", () => {
+  it("Directive 338: executes authentic on-chain cross-DEX triangular arbitrage solver (WETH->USDC->cbBTC->WETH)", () => {
     // Chapter 4 Directive 338 canonical test vector
     const arb = ShaggyDoggQuantAiEngine.calculateCrossDexTriangularArbitrage({
       wethUsdcPrice: 2500.0,
-      usdcDaiRate: 1.002,
-      daiWethRate: 0.000405,
+      usdcCbbtcRate: 1.002,
+      cbbtcWethRate: 0.000405,
       initialWeth: 10.0,
       poolFeeBps: 30.0,
       gasCostUsd: 25.0,
     });
 
-    expect(arb.pairRoute).toBe("WETH->USDC->DAI->WETH");
+    expect(arb.pairRoute).toBe("WETH->USDC->cbBTC->WETH");
     expect(arb.initialCapital).toBe(10.0);
     expect(arb.terminalCapital).toBeCloseTo(10.0542, 3);
     expect(arb.grossProfit).toBeCloseTo(0.0542, 3);
@@ -52,8 +52,8 @@ describe("ShaggyDoggQuantAiEngine (Quant Manual Directives 336-341)", () => {
     // Negative case: low exchange rate leads to unprofitable path
     const unprofitable = ShaggyDoggQuantAiEngine.calculateCrossDexTriangularArbitrage({
       wethUsdcPrice: 2500.0,
-      usdcDaiRate: 1.0,
-      daiWethRate: 0.000398,
+      usdcCbbtcRate: 1.0,
+      cbbtcWethRate: 0.000398,
       initialWeth: 10.0,
       poolFeeBps: 30.0,
       gasCostUsd: 25.0,

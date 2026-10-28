@@ -22,26 +22,24 @@ const V: BotQuoteVenues = {
   aerodromeFactory: "0x420DD381b31aEf6683db6B902084cB0FFECe40Da",
   weth: "0x4200000000000000000000000000000000000006",
   usdc: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-  dai: "0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb",
+  cbbtc: "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
 };
 const SELF = "0x70315019D12A11556C837970675cDC8Fa54d186b";
 const v3 = (out: bigint) => ({ status: "success" as const, result: [out, [], [], 0n] });
 const failed = { status: "failure" as const, error: new Error("no pool") };
 
 describe("flash triangle", () => {
-  it("borrows and returns the same asset, trying only stable tiers on USDC/DAI", () => {
+  it("borrows and returns the same asset, cycling through USDC/cbBTC", () => {
     expect(flashTriangleTokens("USDC", V)).toEqual({
-      tokens: [V.usdc, V.dai, V.weth, V.usdc],
-      stableHops: [0],
+      tokens: [V.usdc, V.cbbtc, V.weth, V.usdc],
     });
     expect(flashTriangleTokens("WETH", V)).toEqual({
-      tokens: [V.weth, V.usdc, V.dai, V.weth],
-      stableHops: [1],
+      tokens: [V.weth, V.usdc, V.cbbtc, V.weth],
     });
   });
 
   it("quotes every fee combination and keeps the best", async () => {
-    const { tokens, stableHops } = flashTriangleTokens("USDC", V);
+    const { tokens } = flashTriangleTokens("USDC", V);
     const best = encodeV3Path(tokens, [100, 500, 500]);
     const client = {
       multicall: vi.fn(async ({ contracts }: { contracts: Array<{ args: readonly unknown[] }> }) =>
@@ -50,15 +48,9 @@ describe("flash triangle", () => {
         )
       ),
     };
-    const cycle = await bestV3Cycle(
-      client,
-      V.uniswapV3Quoter,
-      tokens,
-      stableHops,
-      parseUnits("100", 6)
-    );
+    const cycle = await bestV3Cycle(client, V.uniswapV3Quoter, tokens, parseUnits("100", 6));
 
-    expect(client.multicall.mock.calls[0]?.[0].contracts).toHaveLength(2 * 4 * 4);
+    expect(client.multicall.mock.calls[0]?.[0].contracts).toHaveLength(4 * 4 * 4);
     expect(cycle?.fees).toEqual([100, 500, 500]);
     expect(cycle?.amountOut).toBe(parseUnits("101", 6));
   });
@@ -69,10 +61,8 @@ describe("flash triangle", () => {
         contracts.map(() => failed)
       ),
     };
-    const { tokens, stableHops } = flashTriangleTokens("WETH", V);
-    expect(
-      await bestV3Cycle(client, V.uniswapV3Quoter, tokens, stableHops, parseEther("1"))
-    ).toBeNull();
+    const { tokens } = flashTriangleTokens("WETH", V);
+    expect(await bestV3Cycle(client, V.uniswapV3Quoter, tokens, parseEther("1"))).toBeNull();
   });
 
   it("computes Aave's premium from basis points", () => {
