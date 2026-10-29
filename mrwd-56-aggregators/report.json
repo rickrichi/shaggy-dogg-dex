@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-10-29T10:54:42.177Z",
+  "generatedAt": "2026-10-29T23:19:56.015Z",
   "chainId": 8453,
   "lpNftId": "6367926",
   "verification": {
-    "blockNumber": "53240962",
+    "blockNumber": "53263316",
     "pool": "0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5",
     "weth": "0x4200000000000000000000000000000000000006",
     "mrwd": "0xC17227AAa33C54634B6cE7AD0bf33A156563c179",
@@ -14,59 +14,83 @@
     "tick": 292604,
     "mrwdDecimals": 18
   },
-  "methodology": "Only 0x, LI.FI, Odos have active API adapters. Other entries are prospects requiring independent verification. Quote != pool routing or registration.",
+  "methodology": "7 active quote adapters (KyberSwap, Velora/ParaSwap, Uniswap Auto Router via QuoterV2, LI.FI, Rubic, 0x, Odos). KyberSwap, Velora/ParaSwap, and Uniswap QuoterV2 explicitly verify routing through pool 0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5.",
   "results": [
     {
       "name": "0x",
       "direction": "WETH->MRWD",
       "status": "requires_key",
       "detail": "Set ZEROX_API_KEY; API key required",
-      "testedAt": "2026-10-29T10:54:33.539Z"
+      "testedAt": "2026-10-29T23:19:40.957Z"
     },
     {
       "name": "0x",
       "direction": "MRWD->WETH",
       "status": "requires_key",
       "detail": "Set ZEROX_API_KEY; API key required",
-      "testedAt": "2026-10-29T10:54:33.940Z"
+      "testedAt": "2026-10-29T23:19:41.360Z"
     },
     {
       "name": "1inch",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:34.349Z"
+      "testedAt": "2026-10-29T23:19:41.772Z"
     },
     {
       "name": "KyberSwap",
-      "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:34.349Z"
+      "direction": "WETH->MRWD",
+      "status": "quote_returned",
+      "output": "4894885127515920033483063296",
+      "exactPoolMatched": true,
+      "detail": "KyberSwap exchange=uniswapv3 pool=0xa7d4d975988daa77b46c5d637717e2dfe07fbdb5 (EXACT POOL MATCH)",
+      "testedAt": "2026-10-29T23:19:41.953Z"
+    },
+    {
+      "name": "KyberSwap",
+      "direction": "MRWD->WETH",
+      "status": "quote_returned",
+      "output": "195743",
+      "exactPoolMatched": true,
+      "detail": "KyberSwap exchange=uniswapv3 pool=0xa7d4d975988daa77b46c5d637717e2dfe07fbdb5 (EXACT POOL MATCH)",
+      "testedAt": "2026-10-29T23:19:42.476Z"
     },
     {
       "name": "OKX DEX",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:34.349Z"
+      "testedAt": "2026-10-29T23:19:42.878Z"
     },
     {
       "name": "Uniswap Auto Router",
-      "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:34.349Z"
+      "direction": "WETH->MRWD",
+      "status": "quote_returned",
+      "output": "4894816052803850937341381500",
+      "exactPoolMatched": true,
+      "detail": "Canonical Base Uniswap V3 QuoterV2 (0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a) exact pool 0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5 (EXACT POOL MATCH)",
+      "testedAt": "2026-10-29T23:19:42.979Z"
+    },
+    {
+      "name": "Uniswap Auto Router",
+      "direction": "MRWD->WETH",
+      "status": "quote_returned",
+      "output": "195741",
+      "exactPoolMatched": true,
+      "detail": "Canonical Base Uniswap V3 QuoterV2 (0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a) exact pool 0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5 (EXACT POOL MATCH)",
+      "testedAt": "2026-10-29T23:19:43.488Z"
     },
     {
       "name": "Odos",
       "direction": "WETH->MRWD",
       "status": "api_error",
       "detail": "Error: HTTP 530: {\"message\":\"<!doctype html>\\n<!--[if lt IE 7]> <html class=\\\"no-js ie6 oldie\\\" lang=\\\"en-US\\\"> <![endif]-->\\n<!--[if IE 7]>    <html class=\\\"no-js ie7 oldie\\\" lang=\\\"en-US\\\"> <![endi\"}",
-      "testedAt": "2026-10-29T10:54:34.568Z"
+      "testedAt": "2026-10-29T23:19:44.119Z"
     },
     {
       "name": "Odos",
       "direction": "MRWD->WETH",
       "status": "api_error",
       "detail": "Error: HTTP 530: {\"message\":\"<!doctype html>\\n<!--[if lt IE 7]> <html class=\\\"no-js ie6 oldie\\\" lang=\\\"en-US\\\"> <![endif]-->\\n<!--[if IE 7]>    <html class=\\\"no-js ie7 oldie\\\" lang=\\\"en-US\\\"> <![endi\"}",
-      "testedAt": "2026-10-29T10:54:35.051Z"
+      "testedAt": "2026-10-29T23:19:44.600Z"
     },
     {
       "name": "LI.FI",
@@ -74,7 +98,7 @@
       "status": "quote_returned",
       "output": "4883019759753508054127083520",
       "detail": "LI.FI tool=sushiswap; quote does not establish selected pool",
-      "testedAt": "2026-10-29T10:54:39.129Z"
+      "testedAt": "2026-10-29T23:19:45.919Z"
     },
     {
       "name": "LI.FI",
@@ -82,301 +106,323 @@
       "status": "quote_returned",
       "output": "195252",
       "detail": "LI.FI tool=sushiswap; quote does not establish selected pool",
-      "testedAt": "2026-10-29T10:54:41.769Z"
+      "testedAt": "2026-10-29T23:19:48.705Z"
     },
     {
       "name": "CoW Swap",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.176Z"
+      "testedAt": "2026-10-29T23:19:49.109Z"
     },
     {
       "name": "Velora",
-      "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.176Z"
+      "direction": "WETH->MRWD",
+      "status": "quote_returned",
+      "output": "4894816052803850937341381500",
+      "exactPoolMatched": true,
+      "detail": "Velora/ParaSwap exchange=uniswapv3 pool=0xa7d4d975988daa77b46c5d637717e2dfe07fbdb5 (EXACT POOL MATCH)",
+      "testedAt": "2026-10-29T23:19:49.559Z"
+    },
+    {
+      "name": "Velora",
+      "direction": "MRWD->WETH",
+      "status": "quote_returned",
+      "output": "195741",
+      "exactPoolMatched": true,
+      "detail": "Velora/ParaSwap exchange=uniswapv3 pool=0xa7d4d975988daa77b46c5d637717e2dfe07fbdb5 (EXACT POOL MATCH)",
+      "testedAt": "2026-10-29T23:19:50.086Z"
     },
     {
       "name": "Bebop",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.176Z"
+      "testedAt": "2026-10-29T23:19:50.487Z"
     },
     {
       "name": "Sushi",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.176Z"
+      "testedAt": "2026-10-29T23:19:50.487Z"
     },
     {
       "name": "DODO X",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.176Z"
+      "testedAt": "2026-10-29T23:19:50.487Z"
     },
     {
       "name": "OpenOcean",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.176Z"
+      "testedAt": "2026-10-29T23:19:50.487Z"
     },
     {
       "name": "Rango",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.176Z"
+      "testedAt": "2026-10-29T23:19:50.487Z"
     },
     {
       "name": "Jumper",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.176Z"
+      "testedAt": "2026-10-29T23:19:50.487Z"
     },
     {
       "name": "Matcha",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.176Z"
+      "testedAt": "2026-10-29T23:19:50.487Z"
     },
     {
       "name": "LlamaSwap",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.176Z"
+      "testedAt": "2026-10-29T23:19:50.487Z"
     },
     {
       "name": "Rubic",
-      "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.176Z"
+      "direction": "WETH->MRWD",
+      "status": "quote_returned",
+      "output": "4893872427725784306528813056",
+      "detail": "Rubic providerType=LIFI",
+      "testedAt": "2026-10-29T23:19:52.479Z"
+    },
+    {
+      "name": "Rubic",
+      "direction": "MRWD->WETH",
+      "status": "quote_returned",
+      "output": "195702",
+      "detail": "Rubic providerType=LIFI",
+      "testedAt": "2026-10-29T23:19:55.612Z"
     },
     {
       "name": "Symbiosis",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.176Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "Transit Swap",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.176Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "RocketX",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.176Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "Fibrous Finance",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.176Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "DZap",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.176Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "ShapeShift",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.176Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "Swoop Exchange",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.176Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "Interport",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.176Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "Chainspot",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.176Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "ButterSwap",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.176Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "SwapBox",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.176Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "Nordstern Finance",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.176Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "OneKey Swap",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.177Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "Bitget Wallet Swap",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.177Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "Ave.ai",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.177Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "Portal Swaps",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.177Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "SODA Exchange",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.177Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "Kana Labs",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.177Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "Onchain.cc",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.177Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "Instadapp",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.177Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "DeFi App",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.177Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "Bungee",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.177Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "Enso",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.177Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "MetaMask Swaps",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.177Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "Zerion",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.177Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "Binance Wallet",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.177Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "PancakeSwap Router",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.177Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "Oku",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.177Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "vfat",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.177Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "Gate DEX",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.177Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "Alien Base",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.177Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "Unizen",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.177Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "Houdini Swap",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.177Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "Swing",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.177Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "Haiku",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.177Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "GlueX",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.177Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "Aperture Finance",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.177Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     },
     {
       "name": "Jeton",
       "status": "manual_review",
       "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T10:54:42.177Z"
+      "testedAt": "2026-10-29T23:19:56.015Z"
     }
   ]
 }

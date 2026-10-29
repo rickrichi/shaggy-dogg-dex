@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Activity, AlertTriangle, BarChart3, Loader2, Search } from "lucide-react";
 
+import { MrwdAggregatorAuditCard } from "@/components/MrwdAggregatorAuditCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -268,6 +269,8 @@ export default function MarketData() {
         <HistoryCard asset={selected} row={selectedRow} />
         <TokenLookup />
       </div>
+
+      <MrwdAggregatorAuditCard />
 
       {coverage && <PairCoverage coverage={coverage} rows={allRows} onSelect={setSelected} />}
 

@@ -13,9 +13,11 @@ This read-only audit evaluates whether external swap aggregators recognize or ca
 quote the WETH/MRWD pair on Base. It does not register the pool, execute swaps,
 approve tokens, sign messages, or modify any LP NFT or staking position.
 
-The registry contains 56 prospective platforms. Three platforms currently have
-implemented HTTP quote adapters: 0x, LI.FI, and Odos. The other 53 entries remain
-a research and integration queue rather than completed registrations.
+The registry contains 56 prospective platforms. Seven platforms currently have
+implemented quote adapters: KyberSwap, Velora (ParaSwap), Uniswap Auto Router
+(via canonical Base Uniswap V3 QuoterV2), LI.FI, Rubic, 0x, and Odos. The other
+49 entries remain a research and integration queue rather than completed
+registrations.
 
 ## Corrections made before execution
 
@@ -70,19 +72,31 @@ The audit pinned its pool reads to Base block `53,240,962` and returned:
 
 ## Aggregator results
 
-| Provider | WETH → MRWD | MRWD → WETH | Notes |
-| --- | --- | --- | --- |
-| LI.FI | Quote returned | Quote returned | A quote confirms pair recognition, not that this exact pool was selected. |
-| 0x | Requires API key | Requires API key | Set `ZEROX_API_KEY` and rerun to perform live checks. |
-| Odos | HTTP 530 | HTTP 530 | The requests were rejected by the provider's Cloudflare edge during this run. |
-| Remaining 53 targets | Manual review | Manual review | No verified adapter is implemented yet. |
+| Provider | WETH → MRWD | MRWD → WETH | Exact Pool Match (`0xa7D4…bDB5`) | Notes |
+| --- | --- | --- | --- | --- |
+| KyberSwap | Quote returned | Quote returned | **Yes** | Route breakdown explicitly identifies Uniswap V3 pool `0xa7d4d975988daa77b46c5d637717e2dfe07fbdb5`. |
+| Velora (ParaSwap) | Quote returned | Quote returned | **Yes** | `bestRoute` explicitly lists `poolAddresses: ["0xa7d4d975988daa77b46c5d637717e2dfe07fbdb5"]`. |
+| Uniswap Auto Router | Quote returned | Quote returned | **Yes** | Direct on-chain quote via canonical Base Uniswap V3 `QuoterV2` (`0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a`). |
+| LI.FI | Quote returned | Quote returned | Unspecified | Quote confirms pair recognition and live routing. |
+| Rubic | Quote returned | Quote returned | Unspecified | Meta-aggregator quote returned on Base (`providerType=LIFI`). |
+| 0x | Requires API key | Requires API key | — | Set `ZEROX_API_KEY` and rerun to perform live checks. |
+| Odos | HTTP 530 | HTTP 530 | — | The requests were rejected by the provider's Cloudflare edge during this run. |
+| Remaining 49 targets | Manual review | Manual review | — | No verified adapter is implemented yet. |
 
-LI.FI returned these raw indicative outputs:
+Live raw indicative outputs from the 5 quoting providers:
 
-| Direction | Input | Raw output |
-| --- | ---: | ---: |
-| WETH → MRWD | `0.001 WETH` | `4883019759753508054127083520` MRWD wei |
-| MRWD → WETH | `1 MRWD` | `195252` WETH wei |
+| Provider | Direction | Input | Raw output |
+| --- | --- | ---: | ---: |
+| KyberSwap | WETH → MRWD | `0.001 WETH` | `4894885127515920033483063296` MRWD wei |
+| KyberSwap | MRWD → WETH | `1 MRWD` | `195743` WETH wei |
+| Velora (ParaSwap) | WETH → MRWD | `0.001 WETH` | `4894816052803850937341381500` MRWD wei |
+| Velora (ParaSwap) | MRWD → WETH | `1 MRWD` | `195741` WETH wei |
+| Uniswap Auto Router (QuoterV2) | WETH → MRWD | `0.001 WETH` | `4894816052803850937341381500` MRWD wei |
+| Uniswap Auto Router (QuoterV2) | MRWD → WETH | `1 MRWD` | `195741` WETH wei |
+| Rubic | WETH → MRWD | `0.001 WETH` | `4893872427725784306528813056` MRWD wei |
+| Rubic | MRWD → WETH | `1 MRWD` | `195702` WETH wei |
+| LI.FI | WETH → MRWD | `0.001 WETH` | `4883019759753508054127083520` MRWD wei |
+| LI.FI | MRWD → WETH | `1 MRWD` | `195252` WETH wei |
 
 The Odos failures were recorded as HTTP `530` responses containing a Cloudflare
 error page. This does not prove that Odos lacks support for the pair; it means the

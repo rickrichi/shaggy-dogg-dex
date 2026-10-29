@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, Award, Sparkles } from "lucide-react";
 
 import { LaunchpadNav } from "@/components/launchpad/LaunchpadNav";
+import { MrwdLpStakerPanel } from "@/components/MrwdLpStakerPanel";
 import { MrwdProStakingPanel } from "@/components/MrwdProStakingPanel";
 import { RouterOperatorPanel } from "@/components/RouterOperatorPanel";
 import { Badge } from "@/components/ui/badge";
@@ -48,9 +49,12 @@ export default function Stake() {
             <Sparkles className="size-5" />
           </div>
           <div>
-            <p className="text-sm font-bold text-gray-900">Need to create or seed new tokens?</p>
+            <p className="text-sm font-bold text-gray-900">
+              MRWD Protocol Hub &amp; 56-Aggregator Routing Audit
+            </p>
             <p className="text-xs text-gray-600">
-              Launch new tokens or manage protocol parameters in the Token Studio & Protocol Hub.
+              View canonical MRWD Base Mainnet contracts, the 56-aggregator routing audit, or launch
+              new tokens in Token Studio.
             </p>
           </div>
         </div>
@@ -71,6 +75,7 @@ export default function Stake() {
         </div>
       </div>
 
+      <MrwdLpStakerPanel />
       <YieldVaultPanel />
       <RouterOperatorPanel />
 
