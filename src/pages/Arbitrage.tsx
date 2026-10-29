@@ -2072,8 +2072,10 @@ export default function Arbitrage() {
               </Badge>
             ) : isLiveMode ? (
               <Badge className="flex items-center gap-1.5 border-rose-500 bg-rose-600 px-3 py-1 font-black text-white shadow-sm shadow-rose-200">
-                <span className="size-2 animate-ping rounded-full bg-white" />⚡ LIVE UNRESTRICTED
-                ARBITRAGE
+                <span className="size-2 animate-ping rounded-full bg-white" />
+                {activeArbitrageTab === "live" || activeArbitrageTab === "cedefi"
+                  ? "EXCHANGE DESK · CONFIRMED ORDERS"
+                  : "LIVE MAINNET"}
               </Badge>
             ) : (
               <Badge className="border-amber-300 bg-amber-100 font-bold text-amber-900">

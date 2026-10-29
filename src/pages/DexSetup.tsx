@@ -15,7 +15,11 @@ import {
   loadDexDeployment,
   parseDeployment,
 } from "@/config/dex/deployment";
-import { DEX_ROUTER_METADATA_ABI, verifyDexDeployment } from "@/lib/amm/own-dex";
+import {
+  DEX_FACTORY_ABI,
+  DEX_ROUTER_METADATA_ABI,
+  verifyDexDeployment,
+} from "@/lib/amm/own-dex";
 
 import type { Abi, Address, Hash, Hex } from "viem";
 
@@ -49,6 +53,9 @@ export default function DexSetup() {
     () => loadDexDeployment()?.router ?? savedDraft().router ?? ""
   );
   const [admin, setAdmin] = useState<Address | "">("");
+  const [feeRecipient, setFeeRecipient] = useState<Address | "">("");
+  const [currentFeeTo, setCurrentFeeTo] = useState<Address | null>(null);
+  const [currentFeeSetter, setCurrentFeeSetter] = useState<Address | null>(null);
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);
   const [message, setMessage] = useState("");
@@ -57,7 +64,43 @@ export default function DexSetup() {
   const [active, setActive] = useState(false);
   useEffect(() => {
     if (!admin && address) setAdmin(address);
-  }, [address, admin]);
+    if (!feeRecipient && address) setFeeRecipient(address);
+  }, [address, admin, feeRecipient]);
+  useEffect(() => {
+    if (!client || !isAddress(factory)) {
+      setCurrentFeeTo(null);
+      setCurrentFeeSetter(null);
+      return;
+    }
+    let cancelled = false;
+    void Promise.all([
+      client.readContract({
+        address: factory,
+        abi: DEX_FACTORY_ABI,
+        functionName: "feeTo",
+      }),
+      client.readContract({
+        address: factory,
+        abi: DEX_FACTORY_ABI,
+        functionName: "feeToSetter",
+      }),
+    ])
+      .then(([feeToAddr, setterAddr]) => {
+        if (!cancelled) {
+          setCurrentFeeTo(feeToAddr);
+          setCurrentFeeSetter(setterAddr);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCurrentFeeTo(null);
+          setCurrentFeeSetter(null);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [client, factory]);
   useEffect(() => {
     localStorage.setItem(DRAFT_KEY, JSON.stringify({ factory, router, hash }));
   }, [factory, router, hash]);
@@ -185,6 +228,38 @@ export default function DexSetup() {
       setActive(false);
       setMessage(
         "Deployment recovered from its confirmed Base receipt. Verify and activate below."
+      );
+    });
+  const setProtocolFeeTo = (target: Address) =>
+    run(async () => {
+      if (
+        !wallet ||
+        !client ||
+        !address ||
+        chainId !== base.id ||
+        (await wallet.getChainId()) !== base.id ||
+        (await wallet.getAddresses())[0]?.toLowerCase() !== address.toLowerCase()
+      )
+        throw new Error("Connect your wallet on Base mainnet.");
+      if (!isAddress(factory)) throw new Error("Enter a valid deployed factory address first.");
+      if (!isAddress(target)) throw new Error("Enter a valid fee recipient address.");
+      const { request } = await client.simulateContract({
+        account: address,
+        address: factory,
+        abi: DEX_FACTORY_ABI,
+        functionName: "setFeeTo",
+        args: [target],
+      });
+      const tx = await wallet.writeContract({ ...request, chain: base });
+      setHash(tx);
+      setMessage("Submitting setFeeTo transaction on Base...");
+      const receipt = await client.waitForTransactionReceipt({ hash: tx });
+      if (receipt.status !== "success") throw new Error("setFeeTo transaction reverted.");
+      setCurrentFeeTo(target);
+      setMessage(
+        target === zeroAddress
+          ? "Protocol fee collection disabled (feeTo = 0x0)."
+          : `Protocol fee collection enabled! Recipient set to ${target}.`
       );
     });
   const exportConfig = () => {
@@ -347,6 +422,58 @@ export default function DexSetup() {
             Browser selection is local. Set the exported VITE_SHAGGY addresses in the site’s build
             environment and rebuild to publish the same deployment to all visitors.
           </p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>4. Protocol fee collection (setFeeTo)</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm">
+            Enable or update the V2 factory protocol fee recipient (<code>feeTo</code>) so the
+            protocol collects 1/6th of the 0.30% swap fee (0.05%) as LP shares when liquidity is
+            minted or burned. Only the factory <code>feeToSetter</code> can call this.
+          </p>
+          {currentFeeTo && (
+            <p className="text-xs text-slate-600">
+              Current <code>feeTo</code>:{" "}
+              <strong>
+                {currentFeeTo === zeroAddress ? "Disabled (0x0)" : currentFeeTo}
+              </strong>
+              {currentFeeSetter ? ` · feeToSetter: ${currentFeeSetter}` : ""}
+            </p>
+          )}
+          <label className="block text-sm">
+            Protocol fee recipient address (<code>feeTo</code>)
+            <Input
+              disabled={busy}
+              value={feeRecipient}
+              onChange={(e) => setFeeRecipient(e.target.value as Address)}
+            />
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              disabled={
+                busy ||
+                chainId !== base.id ||
+                !isAddress(factory) ||
+                !isAddress(feeRecipient) ||
+                feeRecipient === zeroAddress
+              }
+              onClick={() => void setProtocolFeeTo(feeRecipient as Address)}
+            >
+              Enable protocol fee collection
+            </Button>
+            {currentFeeTo && currentFeeTo !== zeroAddress && (
+              <Button
+                variant="outline"
+                disabled={busy || chainId !== base.id || !isAddress(factory)}
+                onClick={() => void setProtocolFeeTo(zeroAddress)}
+              >
+                Disable protocol fee
+              </Button>
+            )}
+          </div>
         </CardContent>
       </Card>
       <Card>

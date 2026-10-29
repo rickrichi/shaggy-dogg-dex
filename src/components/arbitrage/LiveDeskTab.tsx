@@ -33,7 +33,9 @@ function AccountCard({
       <CardHeader className="pb-2">
         <CardTitle className="flex flex-wrap items-center gap-2 text-sm">
           {venue}
-          <Badge className="bg-rose-600 text-white">LIVE</Badge>
+          <Badge className="bg-rose-600 text-white">
+            {account?.mode === "paper" ? "PAPER" : "LIVE"}
+          </Badge>
           {account?.tradingEnabled === false && (
             <Badge variant="destructive">Trading blocked</Badge>
           )}
@@ -43,7 +45,12 @@ function AccountCard({
         {!account ? (
           <p className="text-slate-500">Waiting for live account telemetry…</p>
         ) : !account.configured ? (
-          <p className="text-rose-600">{account.error ?? "Account unavailable"}</p>
+          <div className="space-y-2">
+            <p className="text-rose-600">{account.error ?? "Account unavailable"}</p>
+            <p className="text-slate-500">
+              Desktop: open Shaggy-Dogg-Dex → Edit exchange settings, add your keys, then restart.
+            </p>
+          </div>
         ) : (
           <>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">

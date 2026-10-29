@@ -1,5 +1,5 @@
 // src/components/arbitrage/CeDeFiStudio.tsx
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   AlertTriangle,
@@ -30,6 +30,7 @@ import { ARB_API_URL, ARB_PRIVATE_API } from "@/config/crypto-arb";
 import { useCeFiArbStream } from "@/hooks/useCeFiArbStream";
 import { useLiveAccounts } from "@/hooks/useLiveAccounts";
 
+import { KrakenTriangleJournal } from "./KrakenTriangleJournal";
 import { LiveVenueComparison } from "./LiveVenueComparison";
 
 import type { Subscription, VenueState } from "@/types/crypto-arb";
@@ -132,6 +133,8 @@ export function CeDeFiStudio({
   const [krakenTriangularOpps, setKrakenTriangularOpps] = useState<KrakenTriangularRoute[]>([]);
   const [isScanningTriangular, setIsScanningTriangular] = useState(false);
   const [isExecutingKrakenTrade, setIsExecutingKrakenTrade] = useState(false);
+  const triangleIntent = useRef<{ routeId: string; requestId: string } | null>(null);
+  const triangleInFlight = useRef(false);
   const [isAutoSnipeKraken, setIsAutoSnipeKraken] = useState(false);
   const [lastSnipeLog, setLastSnipeLog] = useState<string | null>(null);
   const [krakenTradingPerm, setKrakenTradingPerm] = useState<{
@@ -172,6 +175,13 @@ export function CeDeFiStudio({
 
   const handleExecuteKrakenTrade = useCallback(
     async (route: KrakenTriangularRoute) => {
+      if (triangleInFlight.current) return;
+      if (triangleIntent.current && triangleIntent.current.routeId !== route.id) {
+        toast.error(
+          "Retry the pending triangle or check its broker status before selecting another route."
+        );
+        return;
+      }
       if (!krakenTradingPerm?.trading_enabled) {
         toast.error(
           krakenTradingPerm?.reason || "Trading permission not enabled on Kraken API key."
@@ -184,25 +194,41 @@ export function CeDeFiStudio({
         );
         return;
       }
+      if (
+        !triangleIntent.current &&
+        !window.confirm(
+          `Execute ${route.route} using up to $${route.capitalUsdc.toFixed(2)} USD on Kraken? Three real orders will be submitted. Partial fills can leave currency exposure.`
+        )
+      )
+        return;
       setIsExecutingKrakenTrade(true);
+      triangleInFlight.current = true;
+      triangleIntent.current ??= { routeId: route.id, requestId: crypto.randomUUID() };
       try {
         const res = await fetch(`${ARB_API_URL}/api/kraken/triangular/execute`, {
           method: "POST",
           headers: { "Content-Type": "application/json", "X-Trade-Intent": "live" },
-          body: JSON.stringify(route),
+          body: JSON.stringify({
+            ...route,
+            confirmLive: true,
+            requestId: triangleIntent.current.requestId,
+          }),
+          signal: AbortSignal.timeout(45000),
         });
         const data = await res.json();
+        if (res.ok || (res.status >= 400 && res.status < 500)) triangleIntent.current = null;
         if (data.success) {
           toast.success(`🎉 Real trade executed on Kraken! ${data.summary}`);
           setLastSnipeLog(`✅ Executed ${route.asset} triangle on Kraken (+${route.netProfitPct})`);
           fetchKrakenAccount();
           scanKrakenTriangular();
         } else {
-          toast.error(`Kraken trade failed: ${data.error}`);
+          toast.error(`Kraken trade failed: ${data.error || data.detail}`);
         }
       } catch (err) {
         toast.error(`Execution error: ${String(err)}`);
       } finally {
+        triangleInFlight.current = false;
         setIsExecutingKrakenTrade(false);
       }
     },
@@ -217,21 +243,6 @@ export function CeDeFiStudio({
     }, 3500);
     return () => clearInterval(interval);
   }, [isAutoSnipeKraken, scanKrakenTriangular]);
-
-  // Autonomous trigger when profitable route appears
-  useEffect(() => {
-    if (!isAutoSnipeKraken || isExecutingKrakenTrade || !krakenTradingPerm?.trading_enabled) return;
-    const profitable = krakenTriangularOpps.find((o) => o.isProfitable && o.netProfitUsdc > 0);
-    if (profitable) {
-      handleExecuteKrakenTrade(profitable);
-    }
-  }, [
-    krakenTriangularOpps,
-    isAutoSnipeKraken,
-    isExecutingKrakenTrade,
-    krakenTradingPerm,
-    handleExecuteKrakenTrade,
-  ]);
 
   useEffect(() => {
     // Kraken permissions and scans come from the local crypto-arb backend only.
@@ -379,9 +390,9 @@ export function CeDeFiStudio({
                   </Badge>
                 </div>
                 <CardDescription className="text-xs text-slate-300">
-                  Executes real cyclical trades inside Kraken using your{" "}
-                  <strong>$29.20 USDC</strong> (e.g. USDC ➔ ETH ➔ USD ➔ USDC). All profits stay
-                  directly in your Kraken account.
+                  Scan USD ➔ BTC ➔ asset ➔ USD routes and their reverse using live Kraken books.
+                  Each execution requires your confirmation. Partial fills can leave currency
+                  exposure.
                 </CardDescription>
               </div>
             </div>
@@ -397,7 +408,7 @@ export function CeDeFiStudio({
                   htmlFor="auto-snipe-kraken"
                   className="cursor-pointer select-none text-xs font-bold text-white"
                 >
-                  {isAutoSnipeKraken ? "🟢 Autonomous Auto-Snipe ON" : "⚪ Auto-Snipe OFF"}
+                  {isAutoSnipeKraken ? "🟢 Automatic scanning ON" : "⚪ Automatic scanning OFF"}
                 </label>
               </div>
 
@@ -431,14 +442,9 @@ export function CeDeFiStudio({
                   </div>
                   <p className="text-[11px] text-amber-200/90">{krakenTradingPerm.reason}</p>
                   <div className="mt-2 rounded bg-black/40 p-2 font-mono text-[11px] text-amber-300">
-                    <strong>To enable live trading on Kraken in 30 seconds:</strong>
-                    <br />
-                    1. Log into <strong>Kraken.com</strong> ➔ Settings ➔ API.
-                    <br />
-                    2. Edit your API key and check <strong>
-                      [x] Create and modify orders
-                    </strong> and <strong>[x] Cancel/close orders</strong>.<br />
-                    3. Save changes.
+                    Add your Kraken key through the desktop app's exchange settings, then restart.
+                    Reading balances requires query permissions. Executing and settling orders also
+                    requires create and cancel permissions and live trading enabled locally.
                   </div>
                 </div>
               </div>
@@ -448,8 +454,8 @@ export function CeDeFiStudio({
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="size-4 text-emerald-400" />
                 <span>
-                  Kraken Trading Permissions Active: Ready to place real orders with your $29.20
-                  USDC!
+                  Kraken order queries available. Each real trade requires confirmation and a fresh
+                  balance check.
                 </span>
               </div>
               {lastSnipeLog && (
@@ -463,11 +469,10 @@ export function CeDeFiStudio({
             <div className="flex flex-col justify-between gap-2 text-xs font-bold text-slate-300 sm:flex-row sm:items-center">
               <div className="flex items-center gap-2">
                 <span>
-                  Live Scanned Kraken Triangular Loops ({krakenTriangularOpps.length} Routes • 24
-                  Volatile Assets)
+                  Live Scanned Kraken Triangular Loops ({krakenTriangularOpps.length} Routes)
                 </span>
                 <Badge className="border-emerald-500/40 bg-emerald-950/60 font-mono text-[10px] text-emerald-300">
-                  {isAutoSnipeKraken ? "⚡ 3.5s Sweep Active" : "100% Autonomous Ready"}
+                  {isAutoSnipeKraken ? "⚡ 3.5s Scan Active" : "Manual scan"}
                 </Badge>
               </div>
               <div className="flex items-center gap-2">
@@ -482,19 +487,19 @@ export function CeDeFiStudio({
                       : "border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700"
                   }`}
                 >
-                  $25.00 USDC
+                  $25.00 USD
                 </Button>
                 <Button
                   size="sm"
-                  variant={snipeCapitalUsdc === 29.2 ? "default" : "outline"}
-                  onClick={() => setSnipeCapitalUsdc(29.2)}
+                  variant={snipeCapitalUsdc === 100 ? "default" : "outline"}
+                  onClick={() => setSnipeCapitalUsdc(100)}
                   className={`h-6 px-2 font-mono text-[10px] ${
-                    snipeCapitalUsdc === 29.2
+                    snipeCapitalUsdc === 100
                       ? "bg-emerald-600 text-white hover:bg-emerald-500"
                       : "border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700"
                   }`}
                 >
-                  $29.20 (Max Free)
+                  $100.00 USD
                 </Button>
               </div>
             </div>
@@ -523,14 +528,14 @@ export function CeDeFiStudio({
                     <p className="font-mono text-[11px] text-slate-300">{opp.route}</p>
                     <div className="flex items-center gap-3 pt-1 text-[10px] text-slate-400">
                       <span>
-                        Capital: <strong>${opp.capitalUsdc} USDC</strong>
+                        Capital: <strong>${opp.capitalUsdc} USD</strong>
                       </span>
                       <span>
                         Est Return:{" "}
                         <strong
                           className={opp.isProfitable ? "text-emerald-400" : "text-slate-300"}
                         >
-                          ${opp.expectedUsdcOut} USDC
+                          ${opp.expectedUsdcOut} USD
                         </strong>
                       </span>
                     </div>
@@ -560,7 +565,7 @@ export function CeDeFiStudio({
                       {!krakenTradingPerm?.trading_enabled
                         ? "Permission Required"
                         : opp.isProfitable
-                          ? `Snatch +$${opp.netProfitUsdc} USD`
+                          ? `Review trade (+$${opp.netProfitUsdc} estimated)`
                           : "Anti-Loss Lock (Spread Negative)"}
                     </Button>
                   </div>
@@ -663,11 +668,11 @@ export function CeDeFiStudio({
               </span>
               <div className="flex flex-wrap gap-1">
                 {[
-                  { sym: "ETH/USDC", label: "#50 ETH/USDC", note: "29.20 USDC & ETH" },
+                  { sym: "ETH/USDC", label: "#50 ETH/USDC", note: "ETH quoted in USDC" },
                   { sym: "SEI/USD", label: "#31 SEI/USD", note: "77.03 SEI" },
-                  { sym: "USDC/USDT", label: "#5 USDC/USDT", note: "29.20 USDC" },
+                  { sym: "USDC/USDT", label: "#5 USDC/USDT", note: "USDC pair" },
                   { sym: "ETH/USD", label: "#2 ETH/USD", note: "0.0117 ETH" },
-                  { sym: "BTC/USDC", label: "#49 BTC/USDC", note: "29.20 USDC" },
+                  { sym: "BTC/USDC", label: "#49 BTC/USDC", note: "USDC pair" },
                 ].map((p) => (
                   <Button
                     key={p.sym}
@@ -936,6 +941,7 @@ export function CeDeFiStudio({
         </Card>
       </div>
 
+      <KrakenTriangleJournal />
       {quoteAsset === "USD" && (
         <LiveVenueComparison
           symbol={selectedSymbol}

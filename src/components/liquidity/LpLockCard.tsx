@@ -54,10 +54,31 @@ export const LOCKER_PLATFORMS = [
   },
 ] as const;
 
-// Base Mainnet Contracts & Position
+// Base Mainnet Contracts & Positions
 const SD_V3_POOL: Address = "0x449730674404a29856c6b1e5941549d73c5b8f10";
+const MRWD_V3_POOL: Address = "0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5";
 const SD_V3_NFT_TOKEN_ID = 6245990n;
+const MRWD_V3_NFT_TOKEN_ID = 6351512n;
 const V3_POSITION_MANAGER: Address = CANONICAL_BASE_CONTRACTS.UniswapV3PositionManager;
+
+export const LOCKED_V3_POSITIONS = [
+  {
+    tokenId: SD_V3_NFT_TOKEN_ID,
+    label: "NFT #6245990 (SD / WETH 1.0%)",
+    shortLabel: "#6245990 · SD / WETH (1.0%)",
+    pool: SD_V3_POOL,
+    token0Symbol: "SD",
+    token1Symbol: "WETH",
+  },
+  {
+    tokenId: MRWD_V3_NFT_TOKEN_ID,
+    label: "NFT #6351512 (WETH / MRWD 0.3%)",
+    shortLabel: "#6351512 · WETH / MRWD (0.3%)",
+    pool: MRWD_V3_POOL,
+    token0Symbol: "WETH",
+    token1Symbol: "MRWD",
+  },
+] as const;
 
 type LockDuration = 3 | 12;
 
@@ -66,6 +87,7 @@ export function LpLockCard() {
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
 
+  const [selectedTokenId, setSelectedTokenId] = useState<bigint>(SD_V3_NFT_TOKEN_ID);
   const [selectedDuration, setSelectedDuration] = useState<LockDuration>(12);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [isApproving, setIsApproving] = useState(false);
@@ -73,6 +95,20 @@ export function LpLockCard() {
   const [isHarvesting, setIsHarvesting] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [showExternalLockers, setShowExternalLockers] = useState(false);
+  const [simulatedFees, setSimulatedFees] = useState<{ amount0: bigint; amount1: bigint } | null>(null);
+
+  const selectedPreset = useMemo(
+    () =>
+      LOCKED_V3_POSITIONS.find((p) => p.tokenId === selectedTokenId) ?? {
+        tokenId: selectedTokenId,
+        label: `NFT #${selectedTokenId.toString()}`,
+        shortLabel: `#${selectedTokenId.toString()}`,
+        pool: SD_V3_POOL,
+        token0Symbol: "Token0",
+        token1Symbol: "Token1",
+      },
+    [selectedTokenId]
+  );
 
   // Live countdown state
   const [timeLeft, setTimeLeft] = useState<{
@@ -91,7 +127,7 @@ export function LpLockCard() {
     address: V3_POSITION_MANAGER,
     abi: V3_POSITION_MANAGER_ABI,
     functionName: "ownerOf",
-    args: [SD_V3_NFT_TOKEN_ID],
+    args: [selectedTokenId],
     chainId: 8453,
     query: {
       refetchInterval: 5_000,
@@ -106,7 +142,7 @@ export function LpLockCard() {
     address: SOVEREIGN_V3_TIMELOCK_ADDRESS,
     abi: SOVEREIGN_V3_TIMELOCK_ABI,
     functionName: "getLock",
-    args: [SD_V3_NFT_TOKEN_ID],
+    args: [selectedTokenId],
     chainId: 8453,
     query: {
       refetchInterval: 5_000,
@@ -121,7 +157,7 @@ export function LpLockCard() {
     address: V3_POSITION_MANAGER,
     abi: V3_POSITION_MANAGER_ABI,
     functionName: "getApproved",
-    args: [SD_V3_NFT_TOKEN_ID],
+    args: [selectedTokenId],
     chainId: 8453,
     query: {
       refetchInterval: 5_000,
@@ -150,7 +186,7 @@ export function LpLockCard() {
     address: V3_POSITION_MANAGER,
     abi: V3_POSITION_MANAGER_ABI,
     functionName: "positions",
-    args: [SD_V3_NFT_TOKEN_ID],
+    args: [selectedTokenId],
     chainId: 8453,
     query: {
       refetchInterval: 10_000,
@@ -225,6 +261,42 @@ export function LpLockCard() {
     return () => clearInterval(interval);
   }, [isPositionInTimelock, lockInfo]);
 
+  // Simulate harvestTradingFees on-chain so live uncollected fees (from feeGrowthInside) display accurately
+  const refreshSimulatedFees = useCallback(async () => {
+    const caller =
+      lockInfo?.owner && !isAddressEqual(lockInfo.owner, "0x0000000000000000000000000000000000000000")
+        ? lockInfo.owner
+        : userAddress;
+    if (
+      !isPositionInTimelock ||
+      !caller ||
+      !publicClient ||
+      typeof (publicClient as { simulateContract?: unknown }).simulateContract !== "function"
+    ) {
+      setSimulatedFees(null);
+      return;
+    }
+    try {
+      const sim = await publicClient.simulateContract({
+        account: caller,
+        address: SOVEREIGN_V3_TIMELOCK_ADDRESS,
+        abi: SOVEREIGN_V3_TIMELOCK_ABI,
+        functionName: "harvestTradingFees",
+        args: [selectedTokenId],
+      });
+      const [amount0, amount1] = sim.result;
+      setSimulatedFees({ amount0, amount1 });
+    } catch {
+      setSimulatedFees(null);
+    }
+  }, [isPositionInTimelock, lockInfo?.owner, publicClient, selectedTokenId, userAddress]);
+
+  useEffect(() => {
+    void refreshSimulatedFees();
+    const timer = setInterval(() => void refreshSimulatedFees(), 10_000);
+    return () => clearInterval(timer);
+  }, [refreshSimulatedFees]);
+
   // Handlers
   const handleCopy = (text: string, key: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -239,8 +311,9 @@ export function LpLockCard() {
     refetchApproval();
     refetchApprovalAll();
     refetchPositionInfo();
+    void refreshSimulatedFees();
     toast.info("Refreshed on-chain lock status from Base");
-  }, [refetchNftOwner, refetchLock, refetchApproval, refetchApprovalAll, refetchPositionInfo]);
+  }, [refetchNftOwner, refetchLock, refetchApproval, refetchApprovalAll, refetchPositionInfo, refreshSimulatedFees]);
 
   // 1. Approve Sovereign Timelock to take custody of NFT
   const handleApprove = async () => {
@@ -252,7 +325,7 @@ export function LpLockCard() {
         address: V3_POSITION_MANAGER,
         abi: V3_POSITION_MANAGER_ABI,
         functionName: "approve",
-        args: [SOVEREIGN_V3_TIMELOCK_ADDRESS, SD_V3_NFT_TOKEN_ID],
+        args: [SOVEREIGN_V3_TIMELOCK_ADDRESS, selectedTokenId],
         chainId: 8453,
       });
 
@@ -278,13 +351,13 @@ export function LpLockCard() {
     setIsLocking(true);
     try {
       const unlockTimestamp = BigInt(previewUnlock.unlockTimestamp);
-      toast.info(`Locking NFT #${SD_V3_NFT_TOKEN_ID} for ${selectedDuration} Months...`);
+      toast.info(`Locking NFT #${selectedTokenId} for ${selectedDuration} Months...`);
 
       const hash = await writeContractAsync({
         address: SOVEREIGN_V3_TIMELOCK_ADDRESS,
         abi: SOVEREIGN_V3_TIMELOCK_ABI,
         functionName: "lockPosition",
-        args: [SD_V3_NFT_TOKEN_ID, unlockTimestamp],
+        args: [selectedTokenId, unlockTimestamp],
         chainId: 8453,
       });
 
@@ -309,13 +382,13 @@ export function LpLockCard() {
     if (!userAddress) return;
     setIsHarvesting(true);
     try {
-      toast.info("Harvesting 100% of accumulated trading fees...");
+      toast.info(`Harvesting 100% of accumulated trading fees from NFT #${selectedTokenId.toString()}...`);
 
       const hash = await writeContractAsync({
         address: SOVEREIGN_V3_TIMELOCK_ADDRESS,
         abi: SOVEREIGN_V3_TIMELOCK_ABI,
         functionName: "harvestTradingFees",
-        args: [SD_V3_NFT_TOKEN_ID],
+        args: [selectedTokenId],
         chainId: 8453,
       });
 
@@ -346,7 +419,7 @@ export function LpLockCard() {
         address: SOVEREIGN_V3_TIMELOCK_ADDRESS,
         abi: SOVEREIGN_V3_TIMELOCK_ABI,
         functionName: "withdraw",
-        args: [SD_V3_NFT_TOKEN_ID],
+        args: [selectedTokenId],
         chainId: 8453,
       });
 
@@ -366,9 +439,11 @@ export function LpLockCard() {
     }
   };
 
-  // Unclaimed fees display
-  const tokensOwed0 = positionInfo ? formatUnits(positionInfo[10] ?? 0n, 18) : "0.00";
-  const tokensOwed1 = positionInfo ? formatUnits(positionInfo[11] ?? 0n, 18) : "0.00";
+  // Unclaimed fees display (uses live on-chain collect simulation when available, falling back to positions.tokensOwed)
+  const rawOwed0 = simulatedFees ? simulatedFees.amount0 : (positionInfo?.[10] ?? 0n);
+  const rawOwed1 = simulatedFees ? simulatedFees.amount1 : (positionInfo?.[11] ?? 0n);
+  const tokensOwed0 = formatUnits(rawOwed0, 18);
+  const tokensOwed1 = formatUnits(rawOwed1, 18);
 
   const formattedUnlockDate = lockInfo?.unlockTimestamp
     ? new Date(lockInfo.unlockTimestamp * 1000).toLocaleDateString(undefined, {
@@ -434,6 +509,29 @@ export function LpLockCard() {
       </CardHeader>
 
       <CardContent className="space-y-6 p-5">
+        {/* ── Locked Position Switcher (#6245990 SD/WETH & #6351512 WETH/MRWD) ── */}
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-indigo-100 bg-white/90 p-2.5">
+          <span className="text-xs font-bold text-slate-700">Select Locked V3 Position:</span>
+          <div className="flex flex-wrap gap-2">
+            {LOCKED_V3_POSITIONS.map((pos) => (
+              <Button
+                key={pos.tokenId.toString()}
+                type="button"
+                size="sm"
+                variant={selectedTokenId === pos.tokenId ? "default" : "outline"}
+                onClick={() => setSelectedTokenId(pos.tokenId)}
+                className={
+                  selectedTokenId === pos.tokenId
+                    ? "bg-indigo-600 text-xs font-bold text-white hover:bg-indigo-700"
+                    : "text-xs font-semibold"
+                }
+              >
+                {pos.shortLabel}
+              </Button>
+            ))}
+          </div>
+        </div>
+
         {/* ── Active Lock Dashboard (If Position is Locked in Contract) ─────── */}
         {isPositionInTimelock ? (
           <div className="space-y-5">
@@ -446,7 +544,7 @@ export function LpLockCard() {
                     <span>Active Cryptographic Timelock</span>
                   </div>
                   <h3 className="mt-1 text-xl font-black text-gray-900">
-                    NFT #{SD_V3_NFT_TOKEN_ID.toString()} (SD / WETH 1.0%)
+                    {selectedPreset.label}
                   </h3>
                   <p className="mt-1 text-xs text-gray-600">
                     Position is safely locked in your sovereign smart contract. Unlocks on{" "}
@@ -513,17 +611,21 @@ export function LpLockCard() {
                     Whenever swaps occur on your pool, trading fees accumulate. Harvest 100% of accumulated fees anytime without touching your locked principal.
                   </p>
                   <p className="mt-1 text-[11px] text-gray-500 italic">
-                    Note: Uncollected fee growth is computed and settled on-chain upon harvest.
+                    Note: Uncollected fee growth is simulated live from Uniswap V3 and settled on-chain upon harvest.
                   </p>
 
                   <div className="mt-3 flex items-center gap-6">
                     <div>
-                      <span className="text-[11px] text-gray-500">Unclaimed SD:</span>
-                      <div className="font-mono text-base font-bold text-gray-900">{tokensOwed0} SD</div>
+                      <span className="text-[11px] text-gray-500">Unclaimed {selectedPreset.token0Symbol}:</span>
+                      <div className="font-mono text-base font-bold text-gray-900">
+                        {tokensOwed0} {selectedPreset.token0Symbol}
+                      </div>
                     </div>
                     <div>
-                      <span className="text-[11px] text-gray-500">Unclaimed WETH:</span>
-                      <div className="font-mono text-base font-bold text-gray-900">{tokensOwed1} WETH</div>
+                      <span className="text-[11px] text-gray-500">Unclaimed {selectedPreset.token1Symbol}:</span>
+                      <div className="font-mono text-base font-bold text-gray-900">
+                        {tokensOwed1} {selectedPreset.token1Symbol}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -654,15 +756,15 @@ export function LpLockCard() {
                     <span>Target Uniswap V3 Position NFT</span>
                   </div>
                   <div className="mt-1 flex items-center gap-2">
-                    <span className="font-mono text-base font-bold text-gray-900">#{SD_V3_NFT_TOKEN_ID.toString()}</span>
-                    <Badge variant="outline" className="text-[10px] text-slate-600">SD / WETH (1.0%)</Badge>
+                    <span className="font-mono text-base font-bold text-gray-900">#{selectedTokenId.toString()}</span>
+                    <Badge variant="outline" className="text-[10px] text-slate-600">{selectedPreset.shortLabel}</Badge>
                     <span className="text-xs text-slate-500">Unlocks: <strong className="text-slate-900">{previewUnlock.unlockDate}</strong></span>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
                   <a
-                    href={`https://base.blockscout.com/token/${V3_POSITION_MANAGER}/instance/${SD_V3_NFT_TOKEN_ID}`}
+                    href={`https://base.blockscout.com/token/${V3_POSITION_MANAGER}/instance/${selectedTokenId}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs text-slate-600 hover:text-indigo-600"
@@ -755,19 +857,19 @@ export function LpLockCard() {
               </Button>
             </div>
 
-            {/* SD / WETH V3 Pool */}
+            {/* Active V3 Pool */}
             <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs">
               <div>
-                <span className="block font-semibold text-slate-700">SD / WETH V3 Pool (1.0%)</span>
+                <span className="block font-semibold text-slate-700">{selectedPreset.token0Symbol} / {selectedPreset.token1Symbol} V3 Pool</span>
                 <span className="font-mono text-[11px] text-slate-500">
-                  {SD_V3_POOL.slice(0, 8)}...{SD_V3_POOL.slice(-6)}
+                  {selectedPreset.pool.slice(0, 8)}...{selectedPreset.pool.slice(-6)}
                 </span>
               </div>
               <Button
                 variant="outline"
                 size="sm"
                 className="h-7 gap-1 bg-white text-[11px]"
-                onClick={() => handleCopy(SD_V3_POOL, "pool", "V3 Pool Address")}
+                onClick={() => handleCopy(selectedPreset.pool, "pool", "V3 Pool Address")}
               >
                 {copiedKey === "pool" ? <Check className="size-3 text-emerald-600" /> : <Copy className="size-3" />}
               </Button>

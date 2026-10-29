@@ -4,7 +4,7 @@ import { ARB_API_URL, ARB_PRIVATE_API } from "@/config/crypto-arb";
 
 export interface LiveAccount {
   configured: boolean;
-  mode: "live";
+  mode: "live" | "paper";
   endpointVerified?: boolean;
   endpoint?: string;
   inventoryVerified: boolean;
@@ -80,7 +80,12 @@ export function useLiveAccounts() {
     return {
       ...value,
       configured: value.configured && value.mode === "live" && !stale,
-      error: stale ? "Balance update is stale; reconnecting" : value.error,
+      error:
+        value.mode === "paper"
+          ? "Alpaca paper account: unavailable for live cross-venue trading"
+          : stale
+            ? "Balance update is stale; reconnecting"
+            : value.error,
     };
   };
 

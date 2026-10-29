@@ -191,8 +191,10 @@ export function PairMatrix100({ onSelectPair, krakenBalances, snapshot }: PairMa
       if (live) return fmt(live);
     }
 
-    // 2. Fall back to snapshot venueIndex if present
-    const venue = venueIndex.get(`${exchange}:${symbol}`);
+    // 2. Fall back to snapshot venueIndex if present (mapping binanceus -> binance column)
+    const venue =
+      venueIndex.get(`${exchange}:${symbol}`) ??
+      (exchange === "binance" ? venueIndex.get(`binanceus:${symbol}`) : undefined);
     if (!venue) return "Unverified";
     if (venue.status !== "live") return venue.status;
     const age = (venue.ageMs ?? Infinity) + Math.max(0, now - (snapshot?.ts ?? 0));
