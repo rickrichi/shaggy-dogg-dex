@@ -58,6 +58,10 @@
   ],
   "rewrites": [
     {
+      "source": "/api/mrwd/pool.json",
+      "destination": "/api/mrwd/pool"
+    },
+    {
       "source": "/api/market-data",
       "destination": "https://34-9-52-175.sslip.io/api/market-data"
     },
