@@ -44,6 +44,7 @@
     "desktop:pack": "node desktop/build-ui.mjs && electron-builder --config desktop/electron-builder.json --win --dir",
     "desktop:installer": "node desktop/build-ui.mjs && electron-builder --config desktop/electron-builder.json --win nsis",
     "routing:check": "tsx scripts/check-private-routing.ts",
+    "router:check": "tsx scripts/router-check.ts",
     "desktop:release": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop/release.ps1"
   },
   "overrides": {
