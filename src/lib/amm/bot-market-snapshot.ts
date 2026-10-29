@@ -1,11 +1,10 @@
 // src/lib/amm/bot-market-snapshot.ts
 // Live Base quotes for the Auto-Pilot bot, read from the venues its live handlers trade on:
-//   triangular  - Uniswap V3, WETH -> USDC -> cbBTC -> WETH, best of every fee-tier combination
-//                 (executed with SwapRouter02.exactInput on exactly the quoted path)
-//                 cbBTC replaced DAI here: Base's USDC/DAI and DAI/WETH pools hold low
-//                 hundreds to low thousands of dollars at every fee tier (checked on-chain),
-//                 making any realistic trade size pure price-impact loss. cbBTC/USDC and
-//                 cbBTC/WETH each run into eight figures of liquidity on Base.
+//   triangular  - Uniswap V3, WETH -> USDC -> X -> WETH for whichever candidate middle asset X
+//                 currently quotes best (executed with SwapRouter02.exactInput on exactly the
+//                 quoted path). Scanning multiple candidates instead of one fixed asset (first
+//                 DAI, then cbBTC alone) means a single candidate's liquidity thinning out no
+//                 longer makes the whole feature go dark -- see rankMidAssetCandidates below.
 //   cross-DEX   - Uniswap V3 (best WETH/USDC tier) and Aerodrome volatile WETH -> USDC
 // Triangular rates are returned fee-inclusive (each V3 pool has its own fee), so the engine must not
 // add a fee of its own. Cross-DEX prices are returned fee-free with each venue's real fee rate.
@@ -18,6 +17,7 @@ import {
   formatUnits,
   type Hex,
   parseEther,
+  parseUnits,
   type PublicClient,
 } from "viem";
 
@@ -55,8 +55,15 @@ const AERODROME_FACTORY_ABI = [
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const ALL_TIERS = V3_FEE_TIERS.map((tier) => tier.fee);
-// cbBTC isn't a pegged pair like DAI was, and its deepest tier is 0.05% rather than the usual
-// stablecoin tiers — quote every tier on every leg, same as the WETH/USDC legs.
+// None of the candidate middle assets are pegged pairs, and their deepest tier isn't always the
+// usual stablecoin one — quote every tier on every leg, same as the WETH/USDC legs.
+
+/** A candidate middle asset for the triangular cycle: WETH -> USDC -> candidate -> WETH. */
+export interface TriangularCandidate {
+  readonly symbol: string;
+  readonly address: Address;
+  readonly decimals: number;
+}
 
 export interface BotQuoteVenues {
   readonly uniswapV3Quoter: Address;
@@ -65,7 +72,7 @@ export interface BotQuoteVenues {
   readonly aerodromeFactory: Address;
   readonly weth: Address;
   readonly usdc: Address;
-  readonly cbbtc: Address;
+  readonly candidates: readonly TriangularCandidate[];
 }
 
 /** A Uniswap V3 multi-hop path: tokens[i] -> tokens[i + 1] through the pool with fees[i]. */
@@ -77,8 +84,10 @@ export interface V3Path {
 export interface LiveBotQuotes {
   /** Fee-inclusive rates along `triangularPath`; their product is the path's real output. */
   readonly wethUsdcPrice: number;
-  readonly usdcCbbtcRate: number;
-  readonly cbbtcWethRate: number;
+  readonly usdcMidRate: number;
+  readonly midWethRate: number;
+  /** Which candidate middle asset actually won this tick's scan. */
+  readonly midAsset: TriangularCandidate;
   readonly triangularPath: V3Path;
   /** WETH out of the full triangular path for `tradeWeth` WETH in, after pool fees. */
   readonly triangularTerminalWeth: number;
@@ -121,9 +130,99 @@ function quotedAmount(
   return typeof amount === "bigint" ? amount : undefined;
 }
 
+function bestSingleHop(
+  results: readonly ({ status: string; result?: unknown } | undefined)[],
+  offset: number
+): { fee: number; out: bigint } | null {
+  let best: { fee: number; out: bigint } | null = null;
+  ALL_TIERS.forEach((fee, i) => {
+    const out = quotedAmount(results[offset + i]);
+    if (positive(out) && (!best || out > best.out)) best = { fee, out };
+  });
+  return best;
+}
+
+// Ranking uses a fixed reference size, independent of the bot's actual trade size: it only needs
+// to compare candidates against each other, not produce the real numbers (stage 2 does that).
+const RANK_PROBE_USDC = parseUnits("2000", 6);
+
 /**
- * Quote the bot's legs at its trade size. Returns null when any leg cannot be quoted (RPC failure,
- * missing pool, zero output): the caller must skip the tick rather than evaluate made-up numbers.
+ * Cheap screen across every candidate in `venues.candidates`: quotes USDC -> candidate -> WETH
+ * (best single-hop tier each leg, not the full combination search) for a fixed reference size,
+ * and ranks candidates by how much WETH value survived the round trip. Candidates missing either
+ * leg's liquidity entirely are dropped. Best candidate first; empty when none have both legs.
+ */
+export async function rankMidAssetCandidates(
+  client: Pick<PublicClient, "multicall">,
+  venues: BotQuoteVenues
+): Promise<TriangularCandidate[]> {
+  const { usdc, weth, candidates } = venues;
+  if (candidates.length === 0) return [];
+  const quoter = { address: venues.uniswapV3Quoter, abi: UNISWAP_V3_QUOTER_V2_ABI as Abi };
+
+  let firstLeg;
+  try {
+    firstLeg = await client.multicall({
+      allowFailure: true,
+      contracts: candidates.flatMap((c) =>
+        ALL_TIERS.map((fee) => ({
+          ...quoter,
+          functionName: "quoteExactInputSingle",
+          args: [{ tokenIn: usdc, tokenOut: c.address, amountIn: RANK_PROBE_USDC, fee, sqrtPriceLimitX96: 0n }],
+        }))
+      ),
+    });
+  } catch {
+    return [];
+  }
+
+  const midAmounts = candidates.map((c, idx) => ({
+    candidate: c,
+    best: bestSingleHop(firstLeg, idx * ALL_TIERS.length),
+  }));
+  const withMid = midAmounts.filter(
+    (m): m is { candidate: TriangularCandidate; best: { fee: number; out: bigint } } => m.best !== null
+  );
+  if (withMid.length === 0) return [];
+
+  let secondLeg;
+  try {
+    secondLeg = await client.multicall({
+      allowFailure: true,
+      contracts: withMid.flatMap(({ candidate, best }) =>
+        ALL_TIERS.map((fee) => ({
+          ...quoter,
+          functionName: "quoteExactInputSingle",
+          args: [
+            { tokenIn: candidate.address, tokenOut: weth, amountIn: best.out, fee, sqrtPriceLimitX96: 0n },
+          ],
+        }))
+      ),
+    });
+  } catch {
+    return [];
+  }
+
+  return withMid
+    .map(({ candidate }, idx) => ({
+      candidate,
+      wethOut: bestSingleHop(secondLeg, idx * ALL_TIERS.length)?.out ?? 0n,
+    }))
+    .filter((r) => r.wethOut > 0n)
+    .sort((a, b) => (b.wethOut > a.wethOut ? 1 : b.wethOut < a.wethOut ? -1 : 0))
+    .map((r) => r.candidate);
+}
+
+// Only the top few candidates from the cheap screen get the full, expensive combination search.
+const STAGE2_SURVIVORS = 3;
+
+/**
+ * Quote the bot's legs at its trade size. Scans every candidate in `venues.candidates` via
+ * rankMidAssetCandidates first, then runs the full fee-tier combination search only on the top
+ * STAGE2_SURVIVORS -- see the module comment for why. Returns null when no candidate survives
+ * the cheap screen, or the full search finds no usable path for any survivor, or any other leg
+ * cannot be quoted (RPC failure, missing pool, zero output): the caller must skip the tick rather
+ * than evaluate made-up numbers.
  */
 export async function fetchLiveBotQuotes(
   client: Pick<PublicClient, "multicall">,
@@ -132,12 +231,20 @@ export async function fetchLiveBotQuotes(
 ): Promise<LiveBotQuotes | null> {
   if (!(tradeWeth > 0)) return null;
   const amountIn = parseEther(tradeWeth.toString());
-  const { weth, usdc, cbbtc } = venues;
+  const { weth, usdc } = venues;
   const quoter = { address: venues.uniswapV3Quoter, abi: UNISWAP_V3_QUOTER_V2_ABI as Abi };
 
-  const paths: V3Path[] = ALL_TIERS.flatMap((f1) =>
-    ALL_TIERS.flatMap((f2) =>
-      ALL_TIERS.map((f3): V3Path => ({ tokens: [weth, usdc, cbbtc, weth], fees: [f1, f2, f3] }))
+  const ranked = await rankMidAssetCandidates(client, venues);
+  const survivors = ranked.slice(0, STAGE2_SURVIVORS);
+  if (survivors.length === 0) return null;
+
+  const paths: V3Path[] = survivors.flatMap((candidate) =>
+    ALL_TIERS.flatMap((f1) =>
+      ALL_TIERS.flatMap((f2) =>
+        ALL_TIERS.map(
+          (f3): V3Path => ({ tokens: [weth, usdc, candidate.address, weth], fees: [f1, f2, f3] })
+        )
+      )
     )
   );
 
@@ -199,6 +306,10 @@ export async function fetchLiveBotQuotes(
   const uni = uniswap as { fee: number; out: bigint } | null;
   if (!chosen || !uni || !positive(aeroOut) || !aeroPool || aeroPool === ZERO_ADDRESS) return null;
 
+  // The path's middle token is the winning candidate; look it up for its decimals.
+  const midCandidate = survivors.find((c) => c.address === chosen.path.tokens[2]);
+  if (!midCandidate) return null;
+
   // Intermediate amounts along the chosen path, and Aerodrome's fee for the pool it routes through.
   const [f1, f2] = chosen.path.fees;
   let second;
@@ -214,7 +325,7 @@ export async function fetchLiveBotQuotes(
         {
           ...quoter,
           functionName: "quoteExactInput",
-          args: [encodeV3Path([weth, usdc, cbbtc], [f1, f2]), amountIn],
+          args: [encodeV3Path([weth, usdc, midCandidate.address], [f1, f2]), amountIn],
         },
         {
           address: venues.aerodromeFactory,
@@ -228,27 +339,28 @@ export async function fetchLiveBotQuotes(
     return null;
   }
   const usdcMid = quotedAmount(second[0]);
-  const cbbtcMid = quotedAmount(second[1]);
+  const midMid = quotedAmount(second[1]);
   const feeResult = second[2];
   const aeroFeeBps = feeResult?.status === "success" ? (feeResult.result as bigint) : undefined;
-  if (!positive(usdcMid) || !positive(cbbtcMid) || aeroFeeBps === undefined) return null;
+  if (!positive(usdcMid) || !positive(midMid) || aeroFeeBps === undefined) return null;
 
   const aerodromeFeeRate = Number(aeroFeeBps) / 10_000; // Aerodrome fees are in basis points
   if (!(aerodromeFeeRate >= 0 && aerodromeFeeRate < 0.1)) return null;
   const uniswapFeeRate = uni.fee / 1_000_000; // V3 fees are in hundredths of a basis point
 
   const usdc1 = Number(formatUnits(usdcMid, 6));
-  // cbBTC uses 8 decimals, not DAI's 18 — getting this wrong would be off by 10 orders of
-  // magnitude, not a rounding error.
-  const cbbtc1 = Number(formatUnits(cbbtcMid, 8));
+  // Each candidate has its own decimals (cbBTC=8, USDT=6, most others=18) -- getting this wrong
+  // would be off by orders of magnitude, not a rounding error.
+  const mid1 = Number(formatUnits(midMid, midCandidate.decimals));
   const weth2 = Number(formatUnits(chosen.out, 18));
   const uniswapExecutionPrice = Number(formatUnits(uni.out, 6)) / tradeWeth;
   const aerodromeExecutionPrice = Number(formatUnits(aeroOut, 6)) / tradeWeth;
 
   return {
     wethUsdcPrice: usdc1 / tradeWeth,
-    usdcCbbtcRate: cbbtc1 / usdc1,
-    cbbtcWethRate: weth2 / cbbtc1,
+    usdcMidRate: mid1 / usdc1,
+    midWethRate: weth2 / mid1,
+    midAsset: midCandidate,
     triangularPath: chosen.path,
     triangularTerminalWeth: weth2,
     uniswapEthPrice: uniswapExecutionPrice / (1 - uniswapFeeRate),

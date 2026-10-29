@@ -15,6 +15,7 @@ import {
   SPREAD_LEG2_BUFFER_BPS,
 } from "./flash-routes";
 
+const CBBTC = "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf";
 const V: BotQuoteVenues = {
   uniswapV3Quoter: "0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a",
   uniswapV3Router: "0x2626664c2603336E57B271c5C0b26F421741e481",
@@ -22,24 +23,24 @@ const V: BotQuoteVenues = {
   aerodromeFactory: "0x420DD381b31aEf6683db6B902084cB0FFECe40Da",
   weth: "0x4200000000000000000000000000000000000006",
   usdc: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-  cbbtc: "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
+  candidates: [{ symbol: "cbBTC", address: CBBTC, decimals: 8 }],
 };
 const SELF = "0x70315019D12A11556C837970675cDC8Fa54d186b";
 const v3 = (out: bigint) => ({ status: "success" as const, result: [out, [], [], 0n] });
 const failed = { status: "failure" as const, error: new Error("no pool") };
 
 describe("flash triangle", () => {
-  it("borrows and returns the same asset, cycling through USDC/cbBTC", () => {
-    expect(flashTriangleTokens("USDC", V)).toEqual({
-      tokens: [V.usdc, V.cbbtc, V.weth, V.usdc],
+  it("borrows and returns the same asset, cycling through USDC/midAsset", () => {
+    expect(flashTriangleTokens("USDC", V, CBBTC)).toEqual({
+      tokens: [V.usdc, CBBTC, V.weth, V.usdc],
     });
-    expect(flashTriangleTokens("WETH", V)).toEqual({
-      tokens: [V.weth, V.usdc, V.cbbtc, V.weth],
+    expect(flashTriangleTokens("WETH", V, CBBTC)).toEqual({
+      tokens: [V.weth, V.usdc, CBBTC, V.weth],
     });
   });
 
   it("quotes every fee combination and keeps the best", async () => {
-    const { tokens } = flashTriangleTokens("USDC", V);
+    const { tokens } = flashTriangleTokens("USDC", V, CBBTC);
     const best = encodeV3Path(tokens, [100, 500, 500]);
     const client = {
       multicall: vi.fn(async ({ contracts }: { contracts: Array<{ args: readonly unknown[] }> }) =>
@@ -61,7 +62,7 @@ describe("flash triangle", () => {
         contracts.map(() => failed)
       ),
     };
-    const { tokens } = flashTriangleTokens("WETH", V);
+    const { tokens } = flashTriangleTokens("WETH", V, CBBTC);
     expect(await bestV3Cycle(client, V.uniswapV3Quoter, tokens, parseEther("1"))).toBeNull();
   });
 

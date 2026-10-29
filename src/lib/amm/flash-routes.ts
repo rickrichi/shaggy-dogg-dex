@@ -119,12 +119,20 @@ export async function bestV3Cycle(
   return best;
 }
 
-/** The flash triangle for a borrowed asset: USDC -> cbBTC -> WETH -> USDC, or WETH -> USDC -> cbBTC -> WETH. */
-export function flashTriangleTokens(asset: "USDC" | "WETH", venues: BotQuoteVenues) {
-  const { weth, usdc, cbbtc } = venues;
+/**
+ * The flash triangle for a borrowed asset: USDC -> midAsset -> WETH -> USDC, or
+ * WETH -> USDC -> midAsset -> WETH. `midAsset` is the caller's choice (typically the top result
+ * from rankMidAssetCandidates) since `venues` no longer carries one fixed middle asset.
+ */
+export function flashTriangleTokens(
+  asset: "USDC" | "WETH",
+  venues: BotQuoteVenues,
+  midAsset: Address
+) {
+  const { weth, usdc } = venues;
   return asset === "USDC"
-    ? { tokens: [usdc, cbbtc, weth, usdc] as const }
-    : { tokens: [weth, usdc, cbbtc, weth] as const };
+    ? { tokens: [usdc, midAsset, weth, usdc] as const }
+    : { tokens: [weth, usdc, midAsset, weth] as const };
 }
 
 /**

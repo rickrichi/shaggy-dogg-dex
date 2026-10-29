@@ -28,12 +28,13 @@ describe("ShaggyDoggQuantAiEngine (Quant Manual Directives 336-341)", () => {
     expect(multiplier).toBeLessThan(6.0);
   });
 
-  it("Directive 338: executes authentic on-chain cross-DEX triangular arbitrage solver (WETH->USDC->cbBTC->WETH)", () => {
+  it("Directive 338: executes authentic on-chain cross-DEX triangular arbitrage solver (WETH->USDC->midAsset->WETH)", () => {
     // Chapter 4 Directive 338 canonical test vector
     const arb = ShaggyDoggQuantAiEngine.calculateCrossDexTriangularArbitrage({
       wethUsdcPrice: 2500.0,
-      usdcCbbtcRate: 1.002,
-      cbbtcWethRate: 0.000405,
+      usdcMidRate: 1.002,
+      midWethRate: 0.000405,
+      midSymbol: "cbBTC",
       initialWeth: 10.0,
       poolFeeBps: 30.0,
       gasCostUsd: 25.0,
@@ -52,8 +53,8 @@ describe("ShaggyDoggQuantAiEngine (Quant Manual Directives 336-341)", () => {
     // Negative case: low exchange rate leads to unprofitable path
     const unprofitable = ShaggyDoggQuantAiEngine.calculateCrossDexTriangularArbitrage({
       wethUsdcPrice: 2500.0,
-      usdcCbbtcRate: 1.0,
-      cbbtcWethRate: 0.000398,
+      usdcMidRate: 1.0,
+      midWethRate: 0.000398,
       initialWeth: 10.0,
       poolFeeBps: 30.0,
       gasCostUsd: 25.0,
@@ -61,6 +62,15 @@ describe("ShaggyDoggQuantAiEngine (Quant Manual Directives 336-341)", () => {
 
     expect(unprofitable.arbitrageDetected).toBe(false);
     expect(unprofitable.decision).toBe("ARBITRAGE_UNPROFITABLE_AFTER_GAS");
+  });
+
+  it("builds a generic pairRoute when no midSymbol is given", () => {
+    const arb = ShaggyDoggQuantAiEngine.calculateCrossDexTriangularArbitrage({
+      wethUsdcPrice: 2500.0,
+      usdcMidRate: 1.002,
+      midWethRate: 0.000405,
+    });
+    expect(arb.pairRoute).toBe("WETH->USDC->MID->WETH");
   });
 
   it("evaluates decentralized dual-pool cross-DEX spread across Base on-chain pools", () => {

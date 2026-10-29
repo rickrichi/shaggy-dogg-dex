@@ -19,8 +19,8 @@ describe("Aave Flash Liquidity & Yield Staking Vault Integrations", () => {
         sdStakedTier: 0, // No SD stake discount
         triangularRoute: {
           wethUsdcPrice: 3000.0,
-          usdcCbbtcRate: 1.004, // slight discrepancy
-          cbbtcWethRate: 1 / 2980.0,
+          usdcMidRate: 1.004, // slight discrepancy
+          midWethRate: 1 / 2980.0,
           basePoolFeeBps: 10, // 0.10% pool fee
         },
         gasCostUsd: 0.15,
@@ -40,8 +40,8 @@ describe("Aave Flash Liquidity & Yield Staking Vault Integrations", () => {
     it("demonstrates SD staking tiers increasing net arbitrage profits by discounting pool fees", () => {
       const baseRoute = {
         wethUsdcPrice: 3000.0,
-        usdcCbbtcRate: 1.003,
-        cbbtcWethRate: 1 / 2990.0,
+        usdcMidRate: 1.003,
+        midWethRate: 1 / 2990.0,
         basePoolFeeBps: 30, // 0.30%
       };
 
@@ -86,8 +86,8 @@ describe("Aave Flash Liquidity & Yield Staking Vault Integrations", () => {
         sdStakedTier: 0,
         triangularRoute: {
           wethUsdcPrice: 3000.0,
-          usdcCbbtcRate: 1.0, // perfectly balanced
-          cbbtcWethRate: 1 / 3000.0,
+          usdcMidRate: 1.0, // perfectly balanced
+          midWethRate: 1 / 3000.0,
           basePoolFeeBps: 30,
         },
         gasCostUsd: 0.5,

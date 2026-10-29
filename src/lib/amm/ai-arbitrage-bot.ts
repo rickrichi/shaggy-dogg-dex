@@ -30,8 +30,10 @@ export interface BotConfig {
 
 export interface MarketSnapshot {
   readonly wethUsdcPrice: number;
-  readonly usdcCbbtcRate: number;
-  readonly cbbtcWethRate: number;
+  readonly usdcMidRate: number;
+  readonly midWethRate: number;
+  /** Which asset the triangular middle leg actually traded through this tick. */
+  readonly midSymbol?: string;
   readonly uniswapEthPrice: number;
   readonly aerodromeEthPrice: number;
   /** Aerodrome pool fee as a fraction; read on-chain by the live snapshot. Defaults to 0.30%. */
@@ -132,8 +134,9 @@ export class AiArbitrageBotEngine {
         const triResult = ShaggyDoggQuantAiEngine.calculateCrossDexTriangularArbitrage({
           initialWeth: config.tradeCapitalEth,
           wethUsdcPrice: market.wethUsdcPrice,
-          usdcCbbtcRate: market.usdcCbbtcRate,
-          cbbtcWethRate: market.cbbtcWethRate,
+          usdcMidRate: market.usdcMidRate,
+          midWethRate: market.midWethRate,
+          midSymbol: market.midSymbol ?? "MID",
           poolFeeBps: market.triangularFeesIncluded ? 0 : 30, // flat 0.30% only for modelled rates
           gasCostUsd: market.gasCostUsd?.triangular ?? 0.08,
         });
@@ -146,7 +149,7 @@ export class AiArbitrageBotEngine {
           grossSpreadPct,
           gasUsd: triResult.gasCostUsd,
           confidence: triResult.arbitrageDetected ? 97.5 : 45.0,
-          summary: `Triangular WETH ➔ USDC ➔ cbBTC ➔ WETH (${config.tradeCapitalEth} WETH)`,
+          summary: `Triangular ${triResult.pairRoute.replace(/->/g, " ➔ ")} (${config.tradeCapitalEth} WETH)`,
           breakdown: {
             grossProfitUsd: triResult.grossProfit * market.wethUsdcPrice,
             flashLoanFeeUsd: 0,
@@ -225,8 +228,8 @@ export class AiArbitrageBotEngine {
           sdStakedTier: config.vipTier,
           triangularRoute: {
             wethUsdcPrice: market.wethUsdcPrice,
-            usdcCbbtcRate: market.usdcCbbtcRate,
-            cbbtcWethRate: market.cbbtcWethRate,
+            usdcMidRate: market.usdcMidRate,
+            midWethRate: market.midWethRate,
             basePoolFeeBps: market.triangularFeesIncluded ? 0 : 30,
           },
           gasCostUsd: flashGasUsd,

@@ -69,6 +69,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AERODROME_ROUTER_ABI, ERC20_ABI } from "@/config/abis";
 import { UNISWAP_V3_QUOTER_V2_BASE, UNISWAP_V3_ROUTER_BASE } from "@/config/contracts";
 import { BASE_MAINNET_TOKENS } from "@/config/tokens";
+import { TRIANGULAR_CANDIDATES } from "@/config/triangular-candidates";
 import { useCeFiArbStream } from "@/hooks/useCeFiArbStream";
 import {
   AiArbitrageBotEngine,
@@ -79,6 +80,7 @@ import {
   type BotQuoteVenues,
   fetchLiveBotQuotes,
   type LiveBotQuotes,
+  rankMidAssetCandidates,
   v3TriangularSwapCall,
 } from "@/lib/amm/bot-market-snapshot";
 import {
@@ -138,11 +140,6 @@ const BASE_ASSETS = {
     address: "0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb",
     decimals: 18,
     symbol: "DAI",
-  },
-  CBBTC: {
-    address: "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
-    decimals: 8,
-    symbol: "cbBTC",
   },
 } satisfies Record<string, { address: Address; decimals: number; symbol: string }>;
 
@@ -226,7 +223,7 @@ const PAGE_META = {
     icon: TrendingUp,
     category: "Atomic 3-Hop Cyclical Swap",
     subtitle:
-      "Atomic cyclical swap path routing across WETH → USDC → cbBTC → WETH liquidity pools on Base Uniswap V3 and Aerodrome.",
+      "Atomic cyclical swap path routing across WETH → USDC → [best of 8 candidates] → WETH liquidity pools on Base Uniswap V3 and Aerodrome.",
     documentTitle: "📐 Triangular Arbitrage | Shaggy Dogg Arbitrage",
   },
   dualpool: {
@@ -291,7 +288,7 @@ const BOT_QUOTE_VENUES: BotQuoteVenues = {
   aerodromeFactory: BASE_AERODROME_FACTORY,
   weth: BASE_ASSETS.WETH.address as Address,
   usdc: BASE_ASSETS.USDC.address as Address,
-  cbbtc: BASE_ASSETS.CBBTC.address as Address,
+  candidates: TRIANGULAR_CANDIDATES,
 };
 
 // Base reads (quotes, and simulation when the wallet client is unavailable) independent of the wallet.
@@ -510,8 +507,10 @@ export default function Arbitrage() {
   // ──────────────────────────────────────────────────────────────────────────
   const [triInitialWeth, setTriInitialWeth] = useState<number>(1.0);
   const [triWethUsdcPrice, setTriWethUsdcPrice] = useState<number>(3450.0);
-  const [triUsdcCbbtcRate, setTriUsdcCbbtcRate] = useState<number>(1.002);
-  const [triCbbtcWethRate, setTriCbbtcWethRate] = useState<number>(1 / 3445.0);
+  const [triUsdcMidRate, setTriUsdcMidRate] = useState<number>(1.002);
+  const [triMidWethRate, setTriMidWethRate] = useState<number>(1 / 3445.0);
+  // Which candidate the live scan actually picked this tick; drives the dynamic "Leg 2/3" labels.
+  const [triMidSymbol, setTriMidSymbol] = useState<string>("cbBTC");
   // True while the three rates above are exactly what the live quote returned (already
   // fee-inclusive); flips false the moment any of them is hand-edited, so the modeled estimate
   // below applies an assumed pool fee only to rates that don't already have one baked in.
@@ -525,15 +524,16 @@ export default function Arbitrage() {
       return ShaggyDoggQuantAiEngine.calculateCrossDexTriangularArbitrage({
         initialWeth: triInitialWeth,
         wethUsdcPrice: triWethUsdcPrice,
-        usdcCbbtcRate: triUsdcCbbtcRate,
-        cbbtcWethRate: triCbbtcWethRate,
+        usdcMidRate: triUsdcMidRate,
+        midWethRate: triMidWethRate,
+        midSymbol: triMidSymbol,
         poolFeeBps: triRatesAreLive ? 0 : triFeeBps,
         gasCostUsd: 0.08,
       });
     } catch {
       return null;
     }
-  }, [triInitialWeth, triWethUsdcPrice, triUsdcCbbtcRate, triCbbtcWethRate, triRatesAreLive]);
+  }, [triInitialWeth, triWethUsdcPrice, triUsdcMidRate, triMidWethRate, triMidSymbol, triRatesAreLive]);
 
   /** live: the bot's on-chain quote of the full path; the button uses the inputs on this tab. */
   const handleExecuteLiveTriangular = useCallback(
@@ -570,7 +570,7 @@ export default function Arbitrage() {
         if (!quote) {
           addTerminalLog(
             "danger",
-            "🛡️ [HELD] No live Uniswap V3 route for WETH → USDC → cbBTC → WETH. Nothing sent."
+            "🛡️ [HELD] No live Uniswap V3 route found through any candidate middle asset. Nothing sent."
           );
           toast.error("No live Uniswap V3 route", {
             id: toastId,
@@ -656,7 +656,7 @@ export default function Arbitrage() {
           id: `tx-${Date.now()}`,
           txHash: hash,
           type: "TRIANGULAR_ARB",
-          summary: `Cyclic swap ${triInitialWeth} ETH -> USDC -> cbBTC -> WETH (Uniswap V3 ${route.fees
+          summary: `Cyclic swap ${triInitialWeth} ETH -> USDC -> ${quote.midAsset.symbol} -> WETH (Uniswap V3 ${route.fees
             .map((fee) => `${fee / 10_000}%`)
             .join("/")})`,
           timestamp: new Date().toLocaleTimeString(),
@@ -747,10 +747,11 @@ export default function Arbitrage() {
         return;
       }
       setTriWethUsdcPrice(Number(live.wethUsdcPrice.toFixed(2)));
-      // Unrounded: cbBTC/USDC sits around 1e-5, where fixed decimal places (fine for DAI's ~1.0
-      // rate) would keep only a digit or two of precision.
-      setTriUsdcCbbtcRate(live.usdcCbbtcRate);
-      setTriCbbtcWethRate(live.cbbtcWethRate);
+      // Unrounded: a candidate's USDC rate can sit well below 1 (e.g. cbBTC around 1e-5), where
+      // fixed decimal places would keep only a digit or two of precision.
+      setTriUsdcMidRate(live.usdcMidRate);
+      setTriMidWethRate(live.midWethRate);
+      setTriMidSymbol(live.midAsset.symbol);
       setTriRatesAreLive(true);
       setDualPoolAPrice(Number(live.uniswapEthPrice.toFixed(2)));
       setDualPoolBPrice(Number(live.aerodromeEthPrice.toFixed(2)));
@@ -1031,8 +1032,8 @@ export default function Arbitrage() {
         sdStakedTier: flashVipTier,
         triangularRoute: {
           wethUsdcPrice: 3450.0,
-          usdcCbbtcRate: 1.0025,
-          cbbtcWethRate: 1 / 3442.0,
+          usdcMidRate: 1.0025,
+          midWethRate: 1 / 3442.0,
           basePoolFeeBps: 30,
         },
         gasCostUsd: 0.15,
@@ -1140,7 +1141,19 @@ export default function Arbitrage() {
           isAutoDispatchingRef.current = false;
           return;
         }
-        const { tokens } = flashTriangleTokens(flashBorrowAsset, BOT_QUOTE_VENUES);
+        const ranked = await rankMidAssetCandidates(BASE_QUOTE_CLIENT, BOT_QUOTE_VENUES);
+        const bestCandidate = ranked[0];
+        if (!bestCandidate) {
+          addTerminalLog(
+            "danger",
+            "🛡️ [HELD] No candidate middle asset currently quotes on both legs. Nothing sent."
+          );
+          toast.error("No viable route", { id: toastId, description: "Nothing was sent." });
+          setIsExecutingFlash(false);
+          isAutoDispatchingRef.current = false;
+          return;
+        }
+        const { tokens } = flashTriangleTokens(flashBorrowAsset, BOT_QUOTE_VENUES, bestCandidate.address);
         const [cycle, premiumBps] = await Promise.all([
           bestV3Cycle(
             BASE_QUOTE_CLIENT,
@@ -1694,8 +1707,9 @@ export default function Arbitrage() {
         const gasPriceWei = BigInt(Math.round(params.gasPriceGwei * 1e9));
         const marketSnapshot: MarketSnapshot = {
           wethUsdcPrice: live.wethUsdcPrice,
-          usdcCbbtcRate: live.usdcCbbtcRate,
-          cbbtcWethRate: live.cbbtcWethRate,
+          usdcMidRate: live.usdcMidRate,
+          midWethRate: live.midWethRate,
+          midSymbol: live.midAsset.symbol,
           uniswapEthPrice: live.uniswapEthPrice,
           aerodromeEthPrice: live.aerodromeEthPrice,
           aerodromeFeeRate: live.aerodromeFeeRate,
@@ -2516,7 +2530,7 @@ export default function Arbitrage() {
                           htmlFor="stratTri"
                           className="cursor-pointer font-medium text-slate-700"
                         >
-                          1. Triangular Arbitrage (WETH/USDC/cbBTC)
+                          1. Triangular Arbitrage (WETH/USDC/best-of-8)
                         </Label>
                         <Switch
                           id="stratTri"
@@ -2816,7 +2830,7 @@ export default function Arbitrage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-xl text-gray-900">
                     <TrendingUp className="size-5 text-purple-600" />
-                    Triangular Cycle: WETH ➔ USDC ➔ cbBTC ➔ WETH
+                    Triangular Cycle: WETH ➔ USDC ➔ {triMidSymbol} ➔ WETH
                   </CardTitle>
                   <CardDescription>
                     Cyclic 3-hop swap on Base Uniswap V3 SwapRouter02 (
@@ -2872,27 +2886,27 @@ export default function Arbitrage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="usdcCbbtc">Leg 2: USDC/cbBTC</Label>
+                      <Label htmlFor="usdcMid">Leg 2: USDC/{triMidSymbol}</Label>
                       <Input
-                        id="usdcCbbtc"
+                        id="usdcMid"
                         type="number"
                         step="0.000001"
-                        value={triUsdcCbbtcRate}
+                        value={triUsdcMidRate}
                         onChange={(e) => {
-                          setTriUsdcCbbtcRate(parseFloat(e.target.value) || 0);
+                          setTriUsdcMidRate(parseFloat(e.target.value) || 0);
                           setTriRatesAreLive(false);
                         }}
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="cbbtcWeth">Leg 3: cbBTC/WETH</Label>
+                      <Label htmlFor="midWeth">Leg 3: {triMidSymbol}/WETH</Label>
                       <Input
-                        id="cbbtcWeth"
+                        id="midWeth"
                         type="number"
                         step="0.000001"
-                        value={triCbbtcWethRate}
+                        value={triMidWethRate}
                         onChange={(e) => {
-                          setTriCbbtcWethRate(parseFloat(e.target.value) || 0);
+                          setTriMidWethRate(parseFloat(e.target.value) || 0);
                           setTriRatesAreLive(false);
                         }}
                       />
