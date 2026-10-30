@@ -6,7 +6,12 @@ import { usePublicClient } from "wagmi";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BASE_MAINNET_TOKENS } from "@/config/tokens";
-import { quoteSmartRoutes, v3RouteFees } from "@/lib/amm/smart-routing";
+import {
+  BASE_EXTRA_VENUES,
+  isV3Route,
+  quoteSmartRoutes,
+  v3RouteFees,
+} from "@/lib/amm/smart-routing";
 
 const usdc = BASE_MAINNET_TOKENS.find((t) => t.symbol === "USDC")!;
 const weth = BASE_MAINNET_TOKENS.find((t) => t.symbol === "WETH")!;
@@ -44,22 +49,24 @@ export function BaseExecutionComparison({ notional }: { notional: number }) {
               Quoted at block {quote.data.blockNumber.toString()} ·{" "}
               {new Date(quote.data.observedAt).toLocaleTimeString()}
             </p>
-            {(["Uniswap V3", "Uniswap V2", "Aerodrome"] as const).map((venue) => {
-              const route = quote.data.quotes.find((q) => q.route.venue === venue);
-              const extraLabel =
-                route?.route.venue === "Uniswap V3"
-                  ? ` (${v3RouteFees(route.route)
-                      .map((fee) => `${fee / 10000}%`)
-                      .join(" → ")})`
-                  : "";
-              return (
-                <p key={venue}>
-                  {venue}
-                  {extraLabel}:{" "}
-                  {route ? `${formatUnits(route.output, 18)} WETH` : "No executable pool route"}
-                </p>
-              );
-            })}
+            {(["Uniswap V3", "Uniswap V2", "Aerodrome", ...BASE_EXTRA_VENUES] as const).map(
+              (venue) => {
+                const route = quote.data.quotes.find((q) => q.route.venue === venue);
+                const extraLabel =
+                  route && isV3Route(route.route)
+                    ? ` (${v3RouteFees(route.route)
+                        .map((fee) => `${fee / 10000}%`)
+                        .join(" → ")})`
+                    : "";
+                return (
+                  <p key={venue}>
+                    {venue}
+                    {extraLabel}:{" "}
+                    {route ? `${formatUnits(route.output, 18)} WETH` : "No executable pool route"}
+                  </p>
+                );
+              }
+            )}
           </>
         )}
         <p>

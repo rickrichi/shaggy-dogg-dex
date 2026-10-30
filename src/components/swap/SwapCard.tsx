@@ -352,6 +352,18 @@ export const SwapCard = memo<SwapCardProps>(
                 )}{" "}
                 {state.buyToken.symbol}
               </p>
+              {!!quote.extraVenueQuotes?.length && (
+                <dl className="my-1 grid grid-cols-1 gap-x-4 gap-y-0.5 sm:grid-cols-2">
+                  {quote.extraVenueQuotes.map(({ name, amount }) => (
+                    <div key={name} className="flex min-w-0 justify-between gap-2">
+                      <dt className="shrink-0">{name}</dt>
+                      <dd className="truncate" title={amount}>
+                        {formatSwapAmount(amount)}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
               <p>
                 Pool fees are included. Network fees are separate. Submission uses your wallet’s
                 RPC; private routing is unverified.

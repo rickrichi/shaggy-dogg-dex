@@ -1,13 +1,17 @@
-import { type Abi, type Address, encodeFunctionData, type PublicClient } from "viem";
+import { type Abi, type Address, encodeFunctionData, type PublicClient, zeroAddress } from "viem";
 
 import {
   AERODROME_ROUTER_ABI,
+  SUSHI_V3_SWAP_ROUTER_ABI,
   UNISWAP_V2_ROUTER_ABI,
   UNISWAP_V3_QUOTER_V2_ABI,
   UNISWAP_V3_SWAP_ROUTER_02_ABI,
 } from "@/config/abis";
 import {
+  BASE_V2_VENUES,
+  BASE_V3_VENUES,
   getChainUsdcAddress,
+  getUniswapV2Factory,
   getUniswapV2Router,
   getUniswapV3Deployment,
   UNISWAP_V3,
@@ -20,8 +24,21 @@ import { V3_FEE_TIERS } from "./uniswap-v3";
 
 export const AERODROME_ROUTER: Address = "0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43";
 export const AERODROME_FACTORY: Address = "0x420DD381b31aEf6683db6B902084cB0FFECe40Da";
+type BaseV2Venue = keyof typeof BASE_V2_VENUES;
+type BaseV3Venue = keyof typeof BASE_V3_VENUES;
+export type SmartRouteVenue = "Uniswap V3" | "Uniswap V2" | "Aerodrome" | BaseV2Venue | BaseV3Venue;
+export const BASE_EXTRA_VENUES = [
+  ...(Object.keys(BASE_V3_VENUES) as BaseV3Venue[]),
+  ...(Object.keys(BASE_V2_VENUES) as BaseV2Venue[]),
+];
+/** Routers the paymaster's sponsorship policy accepts. */
+export const SPONSORED_ROUTE_VENUES: readonly SmartRouteVenue[] = [
+  "Uniswap V3",
+  "Uniswap V2",
+  "Aerodrome",
+];
 export interface SmartRoute {
-  venue: "Uniswap V3" | "Uniswap V2" | "Aerodrome";
+  venue: SmartRouteVenue;
   router: Address;
   path: Address[];
   stable: boolean[];
@@ -32,7 +49,23 @@ export interface SmartRoute {
 }
 /** Per-hop V3 fees, whether the route is single- or multi-hop. */
 export const v3RouteFees = (route: SmartRoute): number[] => route.fees ?? [route.fee ?? 3000];
-const isV3Fee = (fee: number) => V3_FEE_TIERS.some((tier) => tier.fee === fee);
+export const isV3Route = (route: SmartRoute) =>
+  route.venue === "Uniswap V3" || route.venue in BASE_V3_VENUES;
+const baseV3Venue = (route: SmartRoute) =>
+  route.venue in BASE_V3_VENUES ? BASE_V3_VENUES[route.venue as BaseV3Venue] : undefined;
+/** Factory and quoter of a V3 route's venue on the given chain. */
+export const v3RouteDeployment = (route: SmartRoute, chainId: number) =>
+  route.venue === "Uniswap V3"
+    ? getUniswapV3Deployment(chainId)
+    : chainId === 8453
+      ? baseV3Venue(route)
+      : undefined;
+export const v2RouteFactory = (route: SmartRoute, chainId: number): Address =>
+  route.venue in BASE_V2_VENUES
+    ? BASE_V2_VENUES[route.venue as BaseV2Venue].factory
+    : getUniswapV2Factory(chainId);
+const isV3Fee = (route: SmartRoute, fee: number) =>
+  (baseV3Venue(route)?.fees ?? V3_FEE_TIERS.map((tier) => tier.fee)).some((tier) => tier === fee);
 export const aeroRoutes = (route: SmartRoute) =>
   route.path.slice(0, -1).map((from, i) => ({
     from,
@@ -40,7 +73,11 @@ export const aeroRoutes = (route: SmartRoute) =>
     stable: route.stable[i] ?? false,
     factory: AERODROME_FACTORY,
   }));
-export function routeCandidates(sell: Token, buy: Token): SmartRoute[] {
+export function routeCandidates(
+  sell: Token,
+  buy: Token,
+  venues?: readonly SmartRouteVenue[]
+): SmartRoute[] {
   if (sell.chainId !== buy.chainId) return [];
   const wrapped = getWrappedNativeAddress(sell.chainId);
   const usdc = getChainUsdcAddress(sell.chainId);
@@ -54,7 +91,7 @@ export function routeCandidates(sell: Token, buy: Token): SmartRoute[] {
     }
   }
   const v3 = getUniswapV3Deployment(sell.chainId);
-  return paths.flatMap((path) => {
+  const routes = paths.flatMap((path) => {
     const uniV2: SmartRoute = {
       venue: "Uniswap V2",
       router: getUniswapV2Router(sell.chainId),
@@ -92,14 +129,44 @@ export function routeCandidates(sell: Token, buy: Token): SmartRoute[] {
             })
           )
         : [];
-    return [...uniV3, uniV2, ...aero];
+    const extra: SmartRoute[] =
+      sell.chainId === 8453
+        ? [
+            ...(Object.keys(BASE_V3_VENUES) as BaseV3Venue[]).flatMap((venue): SmartRoute[] => {
+              const { router, fees, hopFees } = BASE_V3_VENUES[venue];
+              return path.length === 2
+                ? fees.map((fee) => ({ venue, router, path, stable: [], fee }))
+                : hopFees.flatMap((first) =>
+                    hopFees.map((second) => ({
+                      venue,
+                      router,
+                      path,
+                      stable: [],
+                      fees: [first, second],
+                    }))
+                  );
+            }),
+            ...(Object.keys(BASE_V2_VENUES) as BaseV2Venue[]).map(
+              (venue): SmartRoute => ({
+                venue,
+                router: BASE_V2_VENUES[venue].router,
+                path,
+                stable: [],
+              })
+            ),
+          ]
+        : [];
+    return [...uniV3, uniV2, ...aero, ...extra];
   });
+  return venues ? routes.filter((route) => venues.includes(route.venue)) : routes;
 }
 export function routeQuoteCall(route: SmartRoute, amount: bigint) {
-  if (route.venue === "Uniswap V3") {
+  if (isV3Route(route)) {
     const v3Quoter =
+      baseV3Venue(route)?.quoter ??
       Object.values(UNISWAP_V3).find((d) => d.router.toLowerCase() === route.router.toLowerCase())
-        ?.quoter ?? UNISWAP_V3_QUOTER_V2_BASE;
+        ?.quoter ??
+      UNISWAP_V3_QUOTER_V2_BASE;
     if (route.fees)
       return {
         address: v3Quoter,
@@ -138,9 +205,10 @@ export function routeSwapCall(
   recipient: Address,
   deadline: bigint
 ) {
-  if (route.venue === "Uniswap V3") {
-    const v3 = getUniswapV3Deployment(sell.chainId);
+  if (isV3Route(route)) {
+    const v3 = v3RouteDeployment(route, sell.chainId);
     const fees = v3RouteFees(route);
+    const isSushi = route.venue === "SushiSwap V3";
     if (
       !v3 ||
       sell.chainId !== buy.chainId ||
@@ -150,7 +218,7 @@ export function routeSwapCall(
       (route.fees !== undefined && route.fee !== undefined) ||
       amount <= 0n ||
       minimum <= 0n ||
-      !fees.every(isV3Fee)
+      !fees.every((fee) => isV3Fee(route, fee))
     ) {
       throw new Error("Invalid V3 swap parameters");
     }
@@ -164,36 +232,68 @@ export function routeSwapCall(
     ) {
       throw new Error("V3 route does not match the selected tokens and router");
     }
-    const swapRecipient =
-      buy.address === "native" ? "0x0000000000000000000000000000000000000002" : recipient;
-    const swapData = route.fees
-      ? encodeFunctionData({
-          abi: UNISWAP_V3_SWAP_ROUTER_02_ABI,
-          functionName: "exactInput",
-          args: [
-            {
-              path: encodeV3Path(route.path, route.fees),
-              recipient: swapRecipient,
-              amountIn: amount,
-              amountOutMinimum: minimum,
-            },
-          ],
-        })
-      : encodeFunctionData({
-          abi: UNISWAP_V3_SWAP_ROUTER_02_ABI,
-          functionName: "exactInputSingle",
-          args: [
-            {
-              tokenIn: route.path[0]!,
-              tokenOut: route.path[1]!,
-              fee: route.fee ?? 3000,
-              recipient: swapRecipient,
-              amountIn: amount,
-              amountOutMinimum: minimum,
-              sqrtPriceLimitX96: 0n,
-            },
-          ],
-        });
+    // The router holds the WETH until unwrapWETH9; its sentinel for "this contract" differs.
+    const routerSelf = isSushi ? zeroAddress : "0x0000000000000000000000000000000000000002";
+    const swapRecipient = buy.address === "native" ? routerSelf : recipient;
+    const swapData = isSushi
+      ? route.fees
+        ? encodeFunctionData({
+            abi: SUSHI_V3_SWAP_ROUTER_ABI,
+            functionName: "exactInput",
+            args: [
+              {
+                path: encodeV3Path(route.path, route.fees),
+                recipient: swapRecipient,
+                deadline,
+                amountIn: amount,
+                amountOutMinimum: minimum,
+              },
+            ],
+          })
+        : encodeFunctionData({
+            abi: SUSHI_V3_SWAP_ROUTER_ABI,
+            functionName: "exactInputSingle",
+            args: [
+              {
+                tokenIn: route.path[0]!,
+                tokenOut: route.path[1]!,
+                fee: route.fee ?? 3000,
+                recipient: swapRecipient,
+                deadline,
+                amountIn: amount,
+                amountOutMinimum: minimum,
+                sqrtPriceLimitX96: 0n,
+              },
+            ],
+          })
+      : route.fees
+        ? encodeFunctionData({
+            abi: UNISWAP_V3_SWAP_ROUTER_02_ABI,
+            functionName: "exactInput",
+            args: [
+              {
+                path: encodeV3Path(route.path, route.fees),
+                recipient: swapRecipient,
+                amountIn: amount,
+                amountOutMinimum: minimum,
+              },
+            ],
+          })
+        : encodeFunctionData({
+            abi: UNISWAP_V3_SWAP_ROUTER_02_ABI,
+            functionName: "exactInputSingle",
+            args: [
+              {
+                tokenIn: route.path[0]!,
+                tokenOut: route.path[1]!,
+                fee: route.fee ?? 3000,
+                recipient: swapRecipient,
+                amountIn: amount,
+                amountOutMinimum: minimum,
+                sqrtPriceLimitX96: 0n,
+              },
+            ],
+          });
     const calls = [swapData];
     if (buy.address === "native")
       calls.push(
@@ -212,9 +312,9 @@ export function routeSwapCall(
       );
     return {
       address: route.router,
-      abi: UNISWAP_V3_SWAP_ROUTER_02_ABI as Abi,
+      abi: (isSushi ? SUSHI_V3_SWAP_ROUTER_ABI : UNISWAP_V3_SWAP_ROUTER_02_ABI) as Abi,
       functionName: "multicall",
-      args: [deadline, calls],
+      args: isSushi ? [calls] : [deadline, calls],
       ...(sell.address === "native" ? { value: amount } : {}),
     };
   }
@@ -240,10 +340,11 @@ export async function quoteSmartRoutes(
   client: Pick<PublicClient, "getBlockNumber" | "multicall">,
   sell: Token,
   buy: Token,
-  amount: bigint
+  amount: bigint,
+  venues?: readonly SmartRouteVenue[]
 ) {
   if (amount <= 0n) throw new Error("Enter a positive amount.");
-  const routes = routeCandidates(sell, buy);
+  const routes = routeCandidates(sell, buy, venues);
   const observedAt = Date.now();
   const blockNumber = await client.getBlockNumber();
   const results = await client.multicall({
@@ -256,7 +357,7 @@ export async function quoteSmartRoutes(
       if (r.status !== "success") return [];
       const route = routes[i]!;
       let output: bigint | undefined;
-      if (route.venue === "Uniswap V3") {
+      if (isV3Route(route)) {
         const res = r.result as readonly [bigint, bigint, number, bigint] | readonly bigint[];
         output = Array.isArray(res) ? res[0] : undefined;
       } else {

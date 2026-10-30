@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getUniswapV3Deployment } from "@/config/contracts";
+import { BASE_EXTRA_VENUES } from "@/lib/amm/smart-routing";
 import { formatSwapAmount } from "@/lib/format-swap-amount";
 
 import type { UseSwapReturn } from "@/hooks/useSwap";
@@ -14,7 +15,13 @@ export function PriceChart({ swap }: { swap: UseSwapReturn }) {
       : []),
     { name: "Uniswap V2", amount: quote.uniswapAmountOut },
     ...(state.sellToken.chainId === 8453
-      ? [{ name: "Aerodrome", amount: quote.aerodromeAmountOut }]
+      ? [
+          { name: "Aerodrome", amount: quote.aerodromeAmountOut },
+          ...BASE_EXTRA_VENUES.map((name) => ({
+            name,
+            amount: quote.extraVenueQuotes?.find((extra) => extra.name === name)?.amount,
+          })),
+        ]
       : []),
   ];
   return (
@@ -38,34 +45,36 @@ export function PriceChart({ swap }: { swap: UseSwapReturn }) {
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
-        {venues.map(({ name, amount }) => (
-          <div
-            key={name}
-            className={`rounded-xl border p-4 ${quote.status === "SUCCESS" && quote.bestVenue === name ? "border-purple-300 bg-purple-50" : "border-gray-100 bg-gray-50"}`}
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="font-semibold">{name}</p>
-              {quote.status === "SUCCESS" && quote.bestVenue === name && (
-                <span className="rounded-full bg-purple-700 px-2 py-1 text-xs font-semibold text-white">
-                  Best quoted output
-                </span>
-              )}
+        <div className="grid gap-3 sm:grid-cols-2">
+          {venues.map(({ name, amount }) => (
+            <div
+              key={name}
+              className={`rounded-xl border p-4 ${quote.status === "SUCCESS" && quote.bestVenue === name ? "border-purple-300 bg-purple-50" : "border-gray-100 bg-gray-50"}`}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="font-semibold">{name}</p>
+                {quote.status === "SUCCESS" && quote.bestVenue === name && (
+                  <span className="rounded-full bg-purple-700 px-2 py-1 text-xs font-semibold text-white">
+                    Best quoted output
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 break-words text-sm" title={amount}>
+                {quote.status === "IDLE"
+                  ? "Enter an amount"
+                  : quote.status === "LOADING"
+                    ? "Checking…"
+                    : quote.status === "ERROR"
+                      ? "Quote unavailable"
+                      : quote.status === "NO_ROUTE"
+                        ? "No current quote"
+                        : amount
+                          ? `${formatSwapAmount(amount)} ${state.buyToken.symbol}`
+                          : "No liquidity route"}
+              </p>
             </div>
-            <p className="mt-1 break-words text-sm" title={amount}>
-              {quote.status === "IDLE"
-                ? "Enter an amount"
-                : quote.status === "LOADING"
-                  ? "Checking…"
-                  : quote.status === "ERROR"
-                    ? "Quote unavailable"
-                    : quote.status === "NO_ROUTE"
-                      ? "No current quote"
-                      : amount
-                        ? `${formatSwapAmount(amount)} ${state.buyToken.symbol}`
-                        : "No liquidity route"}
-            </p>
-          </div>
-        ))}
+          ))}
+        </div>
         <p className="text-xs leading-relaxed text-gray-500">
           Same pair and amount as your swap. Highest output among checked routes; pool fees
           included, network fees separate. A best quote can still have high price impact.

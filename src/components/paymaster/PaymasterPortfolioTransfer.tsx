@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { AlertTriangle, ArrowRightLeft, CheckCircle2, Coins, Lock, Send, Sparkles } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRightLeft,
+  CheckCircle2,
+  Coins,
+  Lock,
+  Send,
+  Sparkles,
+} from "lucide-react";
 import { createSmartAccountClient } from "permissionless";
 import { to7702SimpleSmartAccount } from "permissionless/accounts";
 import {
@@ -20,11 +28,7 @@ import {
   parseUnits,
   toHex,
 } from "viem";
-import {
-  entryPoint07Abi,
-  entryPoint07Address,
-  toSmartAccount,
-} from "viem/account-abstraction";
+import { entryPoint07Abi, entryPoint07Address, toSmartAccount } from "viem/account-abstraction";
 import { base } from "viem/chains";
 import { useAccount, usePublicClient, useSwitchChain, useWalletClient } from "wagmi";
 
@@ -36,7 +40,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getSwapDropdownTokens, type Token } from "@/config/tokens";
 import { usePortfolio } from "@/hooks/usePortfolio";
-import { quoteSmartRoutes, routeSwapCall } from "@/lib/amm/smart-routing";
+import { quoteSmartRoutes, routeSwapCall, SPONSORED_ROUTE_VENUES } from "@/lib/amm/smart-routing";
 import { calculateMinimumAmountOut } from "@/lib/amm/swap-protection";
 import {
   SPONSORED_REWARD_PAYMASTER_ABI,
@@ -369,7 +373,13 @@ export function PaymasterPortfolioTransfer() {
   // Live Swap Quote preview when on Swap tab
   useEffect(() => {
     setSwapQuoteInfo(null);
-    if (operationType !== "swap" || !publicClient || !token || !resolvedBuyToken || !amount.trim()) {
+    if (
+      operationType !== "swap" ||
+      !publicClient ||
+      !token ||
+      !resolvedBuyToken ||
+      !amount.trim()
+    ) {
       return;
     }
     let units = 0n;
@@ -395,7 +405,7 @@ export function PaymasterPortfolioTransfer() {
       chainId: base.id,
       kind: "erc20",
     };
-    quoteSmartRoutes(publicClient, sellTokenObj, resolvedBuyToken, units)
+    quoteSmartRoutes(publicClient, sellTokenObj, resolvedBuyToken, units, SPONSORED_ROUTE_VENUES)
       .then((res) => {
         if (!active) return;
         if (res.best) {
@@ -473,8 +483,7 @@ export function PaymasterPortfolioTransfer() {
         await switchChainAsync({ chainId: base.id });
       }
       const oldStatus = paymasterStatus;
-      const isOldOwner =
-        oldStatus && oldStatus.owner.toLowerCase() === address.toLowerCase();
+      const isOldOwner = oldStatus && oldStatus.owner.toLowerCase() === address.toLowerCase();
       const signerAddr =
         config?.signerAddress ??
         oldStatus?.signer ??
@@ -499,9 +508,7 @@ export function PaymasterPortfolioTransfer() {
       }
 
       // Step 2: Deploy EntryPoint v0.7 SponsoredRewardPaymaster (compatible with MetaMask 7702)
-      setUpgradeStep(
-        "Step 2/4: Deploying EntryPoint v0.7 Paymaster for MetaMask Smart Account…"
-      );
+      setUpgradeStep("Step 2/4: Deploying EntryPoint v0.7 Paymaster for MetaMask Smart Account…");
       const deployHash = await walletClient.deployContract({
         abi: SPONSORED_REWARD_PAYMASTER_ABI,
         bytecode: SPONSORED_REWARD_PAYMASTER_BYTECODE,
@@ -559,9 +566,7 @@ export function PaymasterPortfolioTransfer() {
       setUpgradeStep("");
       await refreshPaymasterStatus();
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Paymaster v0.7 upgrade failed."
-      );
+      setError(cause instanceof Error ? cause.message : "Paymaster v0.7 upgrade failed.");
       setUpgradeStep("");
       await refreshPaymasterStatus();
     } finally {
@@ -622,7 +627,8 @@ export function PaymasterPortfolioTransfer() {
           publicClient,
           sellTokenObj,
           resolvedBuyToken,
-          units
+          units,
+          SPONSORED_ROUTE_VENUES
         );
         if (!routeResult.best) {
           throw new Error("No liquid DEX route found on Base for this token pair.");
@@ -996,10 +1002,7 @@ export function PaymasterPortfolioTransfer() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {isMetaMaskDelegator && (
-              <Badge
-                variant="outline"
-                className="border-indigo-200 bg-indigo-50 text-indigo-900"
-              >
+              <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-indigo-900">
                 <Sparkles className="mr-1 size-3" /> MetaMask Smart Account (EIP-7702 · v0.7)
               </Badge>
             )}
@@ -1048,7 +1051,7 @@ export function PaymasterPortfolioTransfer() {
         {needsV07PaymasterUpgrade && (
           <div className="rounded-xl border border-amber-300 bg-amber-50/90 p-4 text-sm text-amber-950">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="space-y-1 max-w-2xl">
+              <div className="max-w-2xl space-y-1">
                 <p className="flex items-center gap-1.5 font-semibold text-amber-950">
                   <AlertTriangle className="size-4 shrink-0 text-amber-700" />
                   MetaMask Smart Account Detected (ERC-4337 EntryPoint v0.7)
@@ -1059,8 +1062,9 @@ export function PaymasterPortfolioTransfer() {
                     EIP7702StatelessDeleGator
                   </code>{" "}
                   which executes on <strong>EntryPoint v0.7</strong>, while the currently attached
-                  paymaster (<code className="font-mono">{activePaymasterAddress?.slice(0, 10)}…</code>)
-                  was deployed for EntryPoint v0.8. Click below to automatically withdraw your ETH
+                  paymaster (
+                  <code className="font-mono">{activePaymasterAddress?.slice(0, 10)}…</code>) was
+                  deployed for EntryPoint v0.8. Click below to automatically withdraw your ETH
                   deposit &amp; 10,000 MRWD from the v0.8 paymaster, deploy the EntryPoint v0.7
                   paymaster, and fund it.
                 </p>
@@ -1171,9 +1175,7 @@ export function PaymasterPortfolioTransfer() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="paymaster-amount">
-                  Amount {token ? `(${token.symbol})` : ""}
-                </Label>
+                <Label htmlFor="paymaster-amount">Amount {token ? `(${token.symbol})` : ""}</Label>
                 <Input
                   id="paymaster-amount"
                   value={amount}

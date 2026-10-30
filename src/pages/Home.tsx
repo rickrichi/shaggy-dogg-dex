@@ -15,7 +15,7 @@ const FEATURES = [
     icon: Trophy,
     title: "Best quote on Base",
     description:
-      "Every Base swap is quoted on Uniswap V3, Uniswap V2 and Aerodrome, and the best quote is the one you get.",
+      "Every Base swap is quoted on Uniswap, Aerodrome, PancakeSwap, SushiSwap and BaseSwap, and the best quote is the one you get.",
   },
   {
     icon: Layers,
@@ -57,8 +57,8 @@ export default function Home() {
             </span>
           </h1>
           <p className="mx-auto max-w-xl text-lg text-gray-600 lg:mx-0">
-            A friendly, non-custodial DEX. Trade straight from your own wallet, and on Base get the best of Uniswap
-            and Aerodrome in one swap.
+            A friendly, non-custodial DEX. Trade straight from your own wallet, and on Base get the
+            best of Uniswap and Aerodrome in one swap.
           </p>
           <div className="flex flex-wrap justify-center gap-3 lg:justify-start">
             <Link
@@ -97,7 +97,9 @@ export default function Home() {
               className="mx-auto size-32 rounded-full shadow-lg ring-4 ring-white"
             />
             <h2 className="mt-5 text-2xl font-extrabold text-gray-900">Shaggy Mutt DEX</h2>
-            <p className="text-sm font-semibold tracking-wide text-purple-600">Non-custodial · Base</p>
+            <p className="text-sm font-semibold tracking-wide text-purple-600">
+              Non-custodial · Base
+            </p>
             <dl className="mt-5 grid grid-cols-2 gap-3 text-left">
               <div className="rounded-xl bg-purple-50 p-3">
                 <dt className="text-xs text-gray-500">Base venues compared</dt>
@@ -158,7 +160,9 @@ export default function Home() {
             </div>
             <Link to="/activity" className="group block">
               <div className="text-3xl font-bold">{stats.totalSwaps}</div>
-              <div className="text-purple-100 underline-offset-4 group-hover:underline">Your swaps</div>
+              <div className="text-purple-100 underline-offset-4 group-hover:underline">
+                Your swaps
+              </div>
             </Link>
             <div>
               <div className="text-3xl font-bold">{stats.activeChains}</div>
