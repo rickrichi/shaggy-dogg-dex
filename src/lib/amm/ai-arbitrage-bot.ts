@@ -253,7 +253,7 @@ export class AiArbitrageBotEngine {
             returnOnCapitalBps: (flashResult.netProfitUsd / config.flashBorrowUsdc) * 10000,
           },
           plan: {
-            targetRouter: "0x70315019d12a11556c837970675cdc8fa54d186b",
+            targetRouter: "0xdF77eBFB6e0468aE4e94b13Fc9881427B82178Fd",
             action: "requestFlashLoan",
             inputAsset: "USDC",
             inputAmount: `${config.flashBorrowUsdc.toLocaleString()} USDC`,

@@ -122,7 +122,12 @@ const BASE_AAVE_POOL: Address =
 const DEFAULT_AAVE_BORROWER: Address = "0x936a3D52c3037848879F3641dfBc9132aAe51bDF";
 const DEPLOYED_ATOMIC_ROUTER: Address =
   (import.meta.env.VITE_ATOMIC_ROUTER_ADDRESS as Address) ||
-  "0x70315019d12a11556c837970675cdc8fa54d186b";
+  "0xdF77eBFB6e0468aE4e94b13Fc9881427B82178Fd";
+const LEGACY_ATOMIC_ROUTERS = new Set([
+  "0x936a3d52c3037848879f3641dfbc9132aae51bdf",
+  "0x871fa00692b843ddda67b7cc2d4aecdd7047eab9",
+  "0x70315019d12a11556c837970675cdc8fa54d186b",
+]);
 const DEFAULT_ATOMIC_ROUTER_KEY = "shaggy_dogg_atomic_router";
 
 const BASE_ASSETS = {
@@ -1004,11 +1009,7 @@ export default function Arbitrage() {
   const [flashVipTier, setFlashVipTier] = useState<number>(3);
   const [customBorrowerAddress, setCustomBorrowerAddress] = useState<string>(() => {
     const stored = localStorage.getItem(DEFAULT_ATOMIC_ROUTER_KEY);
-    if (
-      !stored ||
-      !isAddress(stored) ||
-      stored.toLowerCase() === DEFAULT_AAVE_BORROWER.toLowerCase()
-    ) {
+    if (!stored || !isAddress(stored) || LEGACY_ATOMIC_ROUTERS.has(stored.toLowerCase())) {
       return DEPLOYED_ATOMIC_ROUTER;
     }
     return stored;
@@ -2415,7 +2416,7 @@ export default function Arbitrage() {
               <div className="shrink-0 font-mono text-slate-400">
                 Router:{" "}
                 <a
-                  href="https://basescan.org/address/0x70315019d12a11556c837970675cdc8fa54d186b"
+                  href="https://basescan.org/address/0xdF77eBFB6e0468aE4e94b13Fc9881427B82178Fd"
                   target="_blank"
                   rel="noreferrer"
                   className="text-slate-300 underline"

@@ -21,7 +21,7 @@ export const CANONICAL_BASE_CONTRACTS = {
   PancakeSwapV2Factory: "0x02a84c1b3BBD7401a5f7fa98a384EBC70bB5749E" as Address,
   AerodromeRouter: "0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43" as Address,
   AerodromeFactory: "0x420DD381b31aEf6683db6B902084cB0FFECe40Da" as Address,
-  AtomicFlashArbitrageRouter: "0x70315019d12a11556c837970675cdc8fa54d186b" as Address,
+  AtomicFlashArbitrageRouter: "0xdF77eBFB6e0468aE4e94b13Fc9881427B82178Fd" as Address,
   CompoundComet: "0xb125E6687d4313864e53df431d5425969c15Eb2F" as Address,
   DeployerAdminWallet: "0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98" as Address,
   LaunchpadFees: "0x2443C90eB4eA63b74383a5f0dB36c95A1091b68b" as Address,
