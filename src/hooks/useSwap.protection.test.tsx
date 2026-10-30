@@ -89,6 +89,60 @@ beforeEach(() => {
   client.waitForTransactionReceipt.mockResolvedValue({ status: "success" });
 });
 
+const baseSwapRoute = routeCandidates(eth, sd).find((r) => r.venue === "BaseSwap")!;
+
+describe("venue choice", () => {
+  it("quotes, approves and shows the picked venue, including its shortfall", async () => {
+    const picked = { route: baseSwapRoute, output: parseEther("90") };
+    const top = { route, output };
+    vi.mocked(quoteSmartRoutes).mockResolvedValue({
+      quotes: [top, picked],
+      best: top,
+      blockNumber: 1n,
+      observedAt: Date.now(),
+    });
+    const hook = setup();
+    await waitFor(() => expect(hook.result.current.state.buyAmount).toBe("100"));
+
+    act(() => hook.result.current.actions.setPreferredVenue("BaseSwap"));
+    await waitFor(() => expect(hook.result.current.state.buyAmount).toBe("90"));
+    await waitFor(() =>
+      expect(getRoutePriceImpact).toHaveBeenLastCalledWith(
+        client,
+        8453,
+        baseSwapRoute,
+        parseEther("0.01"),
+        picked.output,
+        1n
+      )
+    );
+    expect(hook.result.current.quote.preferredVenue).toBe("BaseSwap");
+    expect(hook.result.current.quote.bestVenue).toBe("Uniswap V2");
+    expect(hook.result.current.quote.venueShortfallPercent).toBe(10);
+    expect(hook.result.current.quote.comparisonText).toContain("10.00% fewer tokens");
+
+    act(() => hook.result.current.actions.setPreferredVenue(null));
+    await waitFor(() => expect(hook.result.current.state.buyAmount).toBe("100"));
+  });
+
+  it("blocks the swap instead of falling back when the picked venue has no route", async () => {
+    vi.mocked(quoteSmartRoutes).mockResolvedValue({
+      quotes: [{ route, output }],
+      best: { route, output },
+      blockNumber: 1n,
+      observedAt: Date.now(),
+    });
+    const hook = setup();
+    act(() => hook.result.current.actions.setPreferredVenue("BaseSwap"));
+    await waitFor(() => expect(hook.result.current.quote.status).toBe("NO_ROUTE"));
+    await waitFor(() => expect(hook.result.current.quote.bestVenue).toBe("Uniswap V2"));
+    expect(hook.result.current.quote.routedVenues).toEqual(["Uniswap V2"]);
+    expect(hook.result.current.state.buyAmount).toBe("");
+    expect(hook.result.current.swap.canSwap).toBe(false);
+    expect(hook.result.current.quote.comparisonText).toContain("BaseSwap has no route");
+  });
+});
+
 describe("swap impact execution guard", () => {
   it("cannot submit a high-impact swap without explicit confirmation", async () => {
     const { result } = setup();

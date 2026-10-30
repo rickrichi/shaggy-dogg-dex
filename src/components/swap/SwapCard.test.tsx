@@ -28,6 +28,7 @@ function makeSwap(): UseSwapReturn {
       setBuyToken: vi.fn(),
       setSlippage: vi.fn(),
       reverseTokens: vi.fn(),
+      setPreferredVenue: vi.fn(),
       setMaxSellAmount: vi.fn(),
     },
     quote: {
@@ -100,7 +101,9 @@ describe("Swap impact review", () => {
     const { rerender } = render(<PriceChart swap={swap} />);
     expect(screen.getByText("0.01 ETH → SD")).toBeInTheDocument();
     expect(screen.getByText("Uniswap V3")).toBeInTheDocument();
-    expect(screen.getByText("Best quoted output").parentElement).toHaveTextContent("Uniswap V2");
+    expect(screen.getByText("Best quoted output").closest("button")).toHaveTextContent(
+      "Uniswap V2"
+    );
     expect(screen.getByText("43,089,871.17 SD")).toBeInTheDocument();
     expect(screen.queryByText(/USDT/)).not.toBeInTheDocument();
     rerender(
@@ -119,5 +122,87 @@ describe("Swap impact review", () => {
     expect(screen.getByText("2 ETH → USDC")).toBeInTheDocument();
     expect(screen.queryByText("Best quoted output")).not.toBeInTheDocument();
     expect(screen.queryByText("43,089,871.17 SD")).not.toBeInTheDocument();
+  });
+
+  it("picks a venue from its quote card and clears the pick from the same card", () => {
+    const swap = makeSwap();
+    const { rerender } = render(<PriceChart swap={swap} />);
+    expect(screen.queryByRole("button", { name: "Use best price" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /PancakeSwap V3/ })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: /Uniswap V2/ }));
+    expect(swap.actions.setPreferredVenue).toHaveBeenCalledExactlyOnceWith("Uniswap V2");
+
+    rerender(
+      <PriceChart swap={{ ...swap, quote: { ...swap.quote, preferredVenue: "Uniswap V2" } }} />
+    );
+    expect(screen.getByRole("button", { name: /Uniswap V2/ })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    expect(screen.getByText("Your route")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Uniswap V2/ }));
+    expect(swap.actions.setPreferredVenue).toHaveBeenLastCalledWith(null);
+    fireEvent.click(screen.getByRole("button", { name: "Use best price" }));
+    expect(swap.actions.setPreferredVenue).toHaveBeenLastCalledWith(null);
+  });
+
+  it("keeps other venues' quotes visible when the picked venue has no route", () => {
+    const swap = makeSwap();
+    render(
+      <PriceChart
+        swap={{
+          ...swap,
+          quote: { ...swap.quote, status: "NO_ROUTE", preferredVenue: "BaseSwap" },
+        }}
+      />
+    );
+    expect(screen.getByText("43,089,871.17 SD")).toBeInTheDocument();
+    expect(screen.getByText("Best quoted output").closest("button")).toHaveTextContent(
+      "Uniswap V2"
+    );
+    expect(screen.getByRole("button", { name: /BaseSwap/ })).toBeEnabled();
+  });
+
+  it("offers a one-tap way out when the picked venue has no route", () => {
+    const swap = makeSwap();
+    swap.swap.canSwap = false;
+    render(
+      <SwapCard
+        {...props}
+        swap={{
+          ...swap,
+          quote: {
+            ...swap.quote,
+            status: "NO_ROUTE",
+            priceImpact: 0,
+            preferredVenue: "BaseSwap",
+            routedVenues: ["Uniswap V2"],
+          },
+        }}
+      />
+    );
+    expect(screen.getByRole("button", { name: "No route on BaseSwap" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Switch to best price" }));
+    expect(swap.actions.setPreferredVenue).toHaveBeenCalledExactlyOnceWith(null);
+  });
+
+  it("shows the route choice and warns when a pick gives up 1% or more", () => {
+    const swap = makeSwap();
+    render(
+      <SwapCard
+        {...props}
+        swap={{
+          ...swap,
+          quote: {
+            ...swap.quote,
+            preferredVenue: "BaseSwap",
+            venueShortfallPercent: 1.5,
+            comparisonText: "You chose BaseSwap: 1.50% fewer tokens than Uniswap V2.",
+          },
+        }}
+      />
+    );
+    expect(screen.getByRole("combobox", { name: "Route" })).toHaveTextContent("BaseSwap");
+    expect(screen.getByText(/1\.50% fewer tokens/)).toHaveClass("text-orange-700");
   });
 });

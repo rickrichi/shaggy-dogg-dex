@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { getUniswapV3Deployment } from "@/config/contracts";
 import { HIGH_PRICE_IMPACT, SEVERE_PRICE_IMPACT } from "@/lib/amm/price-impact";
+import { routeVenuesForChain, type SmartRouteVenue } from "@/lib/amm/smart-routing";
 import { formatSwapAmount } from "@/lib/format-swap-amount";
 
 import type { Token } from "@/config/tokens";
@@ -41,6 +42,8 @@ interface SwapCardProps {
   showSettings: boolean;
   onSettingsChange: (open: boolean) => void;
 }
+
+const BEST_PRICE = "best-price";
 
 export const SwapCard = memo<SwapCardProps>(
   ({
@@ -76,11 +79,14 @@ export const SwapCard = memo<SwapCardProps>(
       if (swapActions.isSwapping) return "Swapping...";
       if (!state.sellAmount) return "Enter amount";
       if (quote.status === "LOADING") return "Fetching best price...";
+      if (quote.status === "NO_ROUTE" && quote.preferredVenue)
+        return `No route on ${quote.preferredVenue}`;
       if (quote.status === "NO_ROUTE" || quote.status === "ERROR") return "Route unavailable";
       if (quote.status === "SUCCESS" && quote.priceImpact === null) return "Impact unavailable";
       if (approval.needed) return "Approve token first";
       if (!swapActions.canSwap) return "Insufficient balance";
-      return highImpact ? "Review high-impact swap" : "Swap";
+      if (highImpact) return "Review high-impact swap";
+      return quote.preferredVenue ? `Swap on ${quote.preferredVenue}` : "Swap";
     })();
 
     const handlePrimaryAction = () => {
@@ -323,9 +329,52 @@ export const SwapCard = memo<SwapCardProps>(
             </div>
           </div>
 
+          {/* Route Choice */}
+          <div className="space-y-2">
+            <Label htmlFor="swap-route" className="text-sm font-medium text-gray-700">
+              Route
+            </Label>
+            <Select
+              value={quote.preferredVenue ?? BEST_PRICE}
+              onValueChange={(value) =>
+                actions.setPreferredVenue(value === BEST_PRICE ? null : (value as SmartRouteVenue))
+              }
+            >
+              <SelectTrigger id="swap-route" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={BEST_PRICE}>Best price (automatic)</SelectItem>
+                {routeVenuesForChain(state.sellToken.chainId).map((venue) => {
+                  const unavailable = !!quote.routedVenues && !quote.routedVenues.includes(venue);
+                  return (
+                    <SelectItem key={venue} value={venue} disabled={unavailable}>
+                      {venue}
+                      {unavailable ? " (no route)" : ""}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+            {quote.status === "NO_ROUTE" && quote.preferredVenue && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => actions.setPreferredVenue(null)}
+              >
+                Switch to best price
+              </Button>
+            )}
+          </div>
+
           {/* Quote Information */}
           {quote.comparisonText && (
-            <p className="text-sm text-purple-800">{quote.comparisonText}</p>
+            <p
+              className={`text-sm ${(quote.venueShortfallPercent ?? 0) >= 1 ? "font-medium text-orange-700" : "text-purple-800"}`}
+            >
+              {quote.comparisonText}
+            </p>
           )}
           {quote.bestVenue && (
             <div className="text-xs text-slate-600">

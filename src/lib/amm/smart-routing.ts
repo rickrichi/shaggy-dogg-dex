@@ -31,6 +31,14 @@ export const BASE_EXTRA_VENUES = [
   ...(Object.keys(BASE_V3_VENUES) as BaseV3Venue[]),
   ...(Object.keys(BASE_V2_VENUES) as BaseV2Venue[]),
 ];
+/** Venues a swap on this chain can quote, in display order. */
+export function routeVenuesForChain(chainId: number): SmartRouteVenue[] {
+  return [
+    ...(getUniswapV3Deployment(chainId) ? (["Uniswap V3"] as const) : []),
+    "Uniswap V2",
+    ...(chainId === 8453 ? (["Aerodrome", ...BASE_EXTRA_VENUES] as const) : []),
+  ];
+}
 /** Routers the paymaster's sponsorship policy accepts. */
 export const SPONSORED_ROUTE_VENUES: readonly SmartRouteVenue[] = [
   "Uniswap V3",
