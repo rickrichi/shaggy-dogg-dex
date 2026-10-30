@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-10-29T23:19:56.015Z",
+  "generatedAt": "2026-10-30T00:56:38.850Z",
   "chainId": 8453,
   "lpNftId": "6367926",
   "verification": {
-    "blockNumber": "53263316",
+    "blockNumber": "53266215",
     "pool": "0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5",
     "weth": "0x4200000000000000000000000000000000000006",
     "mrwd": "0xC17227AAa33C54634B6cE7AD0bf33A156563c179",
@@ -14,36 +14,36 @@
     "tick": 292604,
     "mrwdDecimals": 18
   },
-  "methodology": "7 active quote adapters (KyberSwap, Velora/ParaSwap, Uniswap Auto Router via QuoterV2, LI.FI, Rubic, 0x, Odos). KyberSwap, Velora/ParaSwap, and Uniswap QuoterV2 explicitly verify routing through pool 0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5.",
+  "methodology": "14 active adapters tested across both WETH->MRWD and MRWD->WETH directions (11 returning live quotes across KyberSwap, Velora/ParaSwap, LlamaSwap, Uniswap Auto Router, Oku, vfat, Aperture Finance, LI.FI, Jumper, ShapeShift, and Rubic; 7 explicitly verifying exact routing through pool 0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5). Remaining entries are classified by API key requirement, wallet backend, or standalone DEX architecture.",
   "results": [
     {
       "name": "0x",
       "direction": "WETH->MRWD",
       "status": "requires_key",
-      "detail": "Set ZEROX_API_KEY; API key required",
-      "testedAt": "2026-10-29T23:19:40.957Z"
+      "detail": "0x: Set ZEROX_API_KEY in .env (0x v2 indexes Base Uniswap V3 pool 0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5)",
+      "testedAt": "2026-10-30T00:56:19.380Z"
     },
     {
       "name": "0x",
       "direction": "MRWD->WETH",
       "status": "requires_key",
-      "detail": "Set ZEROX_API_KEY; API key required",
-      "testedAt": "2026-10-29T23:19:41.360Z"
+      "detail": "0x: Set ZEROX_API_KEY in .env (0x v2 indexes Base Uniswap V3 pool 0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5)",
+      "testedAt": "2026-10-30T00:56:19.693Z"
     },
     {
       "name": "1inch",
-      "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:41.772Z"
+      "status": "requires_key",
+      "detail": "Requires ONEINCH_API_KEY (1inch Dev Portal v6.0); auto-indexes Base Uniswap V3 pools above liquidity threshold",
+      "testedAt": "2026-10-30T00:56:19.996Z"
     },
     {
       "name": "KyberSwap",
       "direction": "WETH->MRWD",
       "status": "quote_returned",
-      "output": "4894885127515920033483063296",
+      "output": "4894887982385886222973140992",
       "exactPoolMatched": true,
-      "detail": "KyberSwap exchange=uniswapv3 pool=0xa7d4d975988daa77b46c5d637717e2dfe07fbdb5 (EXACT POOL MATCH)",
-      "testedAt": "2026-10-29T23:19:41.953Z"
+      "detail": "KyberSwap via exchange=uniswapv3 pool=0xa7d4d975988daa77b46c5d637717e2dfe07fbdb5 (EXACT POOL MATCH)",
+      "testedAt": "2026-10-30T00:56:20.179Z"
     },
     {
       "name": "KyberSwap",
@@ -51,14 +51,14 @@
       "status": "quote_returned",
       "output": "195743",
       "exactPoolMatched": true,
-      "detail": "KyberSwap exchange=uniswapv3 pool=0xa7d4d975988daa77b46c5d637717e2dfe07fbdb5 (EXACT POOL MATCH)",
-      "testedAt": "2026-10-29T23:19:42.476Z"
+      "detail": "KyberSwap via exchange=uniswapv3 pool=0xa7d4d975988daa77b46c5d637717e2dfe07fbdb5 (EXACT POOL MATCH)",
+      "testedAt": "2026-10-30T00:56:20.775Z"
     },
     {
       "name": "OKX DEX",
-      "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:42.878Z"
+      "status": "requires_key",
+      "detail": "Requires OKX_API_KEY + passphrase signing (OKX OS DEX API v5); routes Base Uniswap V3",
+      "testedAt": "2026-10-30T00:56:21.086Z"
     },
     {
       "name": "Uniswap Auto Router",
@@ -66,8 +66,8 @@
       "status": "quote_returned",
       "output": "4894816052803850937341381500",
       "exactPoolMatched": true,
-      "detail": "Canonical Base Uniswap V3 QuoterV2 (0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a) exact pool 0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5 (EXACT POOL MATCH)",
-      "testedAt": "2026-10-29T23:19:42.979Z"
+      "detail": "Uniswap Auto Router: Canonical Base Uniswap V3 QuoterV2 (0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a) exact pool 0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5 (EXACT POOL MATCH)",
+      "testedAt": "2026-10-30T00:56:21.174Z"
     },
     {
       "name": "Uniswap Auto Router",
@@ -75,44 +75,44 @@
       "status": "quote_returned",
       "output": "195741",
       "exactPoolMatched": true,
-      "detail": "Canonical Base Uniswap V3 QuoterV2 (0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a) exact pool 0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5 (EXACT POOL MATCH)",
-      "testedAt": "2026-10-29T23:19:43.488Z"
+      "detail": "Uniswap Auto Router: Canonical Base Uniswap V3 QuoterV2 (0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a) exact pool 0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5 (EXACT POOL MATCH)",
+      "testedAt": "2026-10-30T00:56:21.564Z"
     },
     {
       "name": "Odos",
       "direction": "WETH->MRWD",
       "status": "api_error",
       "detail": "Error: HTTP 530: {\"message\":\"<!doctype html>\\n<!--[if lt IE 7]> <html class=\\\"no-js ie6 oldie\\\" lang=\\\"en-US\\\"> <![endif]-->\\n<!--[if IE 7]>    <html class=\\\"no-js ie7 oldie\\\" lang=\\\"en-US\\\"> <![endi\"}",
-      "testedAt": "2026-10-29T23:19:44.119Z"
+      "testedAt": "2026-10-30T00:56:22.039Z"
     },
     {
       "name": "Odos",
       "direction": "MRWD->WETH",
       "status": "api_error",
       "detail": "Error: HTTP 530: {\"message\":\"<!doctype html>\\n<!--[if lt IE 7]> <html class=\\\"no-js ie6 oldie\\\" lang=\\\"en-US\\\"> <![endif]-->\\n<!--[if IE 7]>    <html class=\\\"no-js ie7 oldie\\\" lang=\\\"en-US\\\"> <![endi\"}",
-      "testedAt": "2026-10-29T23:19:44.600Z"
+      "testedAt": "2026-10-30T00:56:22.416Z"
     },
     {
       "name": "LI.FI",
       "direction": "WETH->MRWD",
       "status": "quote_returned",
       "output": "4883019759753508054127083520",
-      "detail": "LI.FI tool=sushiswap; quote does not establish selected pool",
-      "testedAt": "2026-10-29T23:19:45.919Z"
+      "detail": "LI.FI (LI.FI engine tool=sushiswap); live Base quote",
+      "testedAt": "2026-10-30T00:56:23.687Z"
     },
     {
       "name": "LI.FI",
       "direction": "MRWD->WETH",
       "status": "quote_returned",
       "output": "195252",
-      "detail": "LI.FI tool=sushiswap; quote does not establish selected pool",
-      "testedAt": "2026-10-29T23:19:48.705Z"
+      "detail": "LI.FI (LI.FI engine tool=sushiswap); live Base quote",
+      "testedAt": "2026-10-30T00:56:25.849Z"
     },
     {
       "name": "CoW Swap",
       "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:49.109Z"
+      "detail": "Batch auction solver network on Base; solvers route through Uniswap V3 / KyberSwap / Velora once pool depth ≥ $1k",
+      "testedAt": "2026-10-30T00:56:26.149Z"
     },
     {
       "name": "Velora",
@@ -120,8 +120,8 @@
       "status": "quote_returned",
       "output": "4894816052803850937341381500",
       "exactPoolMatched": true,
-      "detail": "Velora/ParaSwap exchange=uniswapv3 pool=0xa7d4d975988daa77b46c5d637717e2dfe07fbdb5 (EXACT POOL MATCH)",
-      "testedAt": "2026-10-29T23:19:49.559Z"
+      "detail": "Velora (ParaSwap) via exchange=uniswapv3 pool=0xa7d4d975988daa77b46c5d637717e2dfe07fbdb5 (EXACT POOL MATCH)",
+      "testedAt": "2026-10-30T00:56:26.728Z"
     },
     {
       "name": "Velora",
@@ -129,300 +129,376 @@
       "status": "quote_returned",
       "output": "195741",
       "exactPoolMatched": true,
-      "detail": "Velora/ParaSwap exchange=uniswapv3 pool=0xa7d4d975988daa77b46c5d637717e2dfe07fbdb5 (EXACT POOL MATCH)",
-      "testedAt": "2026-10-29T23:19:50.086Z"
+      "detail": "Velora (ParaSwap) via exchange=uniswapv3 pool=0xa7d4d975988daa77b46c5d637717e2dfe07fbdb5 (EXACT POOL MATCH)",
+      "testedAt": "2026-10-30T00:56:27.169Z"
     },
     {
       "name": "Bebop",
       "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:50.487Z"
+      "detail": "RFQ + JAM solver network; requires market-maker whitelist or JAM solver liquidity threshold",
+      "testedAt": "2026-10-30T00:56:27.475Z"
     },
     {
       "name": "Sushi",
       "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:50.487Z"
+      "detail": "SushiXSwap / RouteProcessor4; public API filters sub-$100 micro-pools until WETH reserve ≥ $100",
+      "testedAt": "2026-10-30T00:56:27.475Z"
     },
     {
       "name": "DODO X",
-      "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:50.487Z"
+      "status": "requires_key",
+      "detail": "Requires DODO_API_KEY; routes Base Uniswap V3 pools via DODO RouteProxy",
+      "testedAt": "2026-10-30T00:56:27.475Z"
     },
     {
       "name": "OpenOcean",
-      "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:50.487Z"
+      "status": "requires_key",
+      "detail": "Requires OPENOCEAN_API_KEY / Cloudflare enterprise allowlist; indexes Base Uniswap V3",
+      "testedAt": "2026-10-30T00:56:27.475Z"
     },
     {
       "name": "Rango",
-      "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:50.487Z"
+      "status": "requires_key",
+      "detail": "Requires RANGO_API_KEY; delegates Base EVM swaps to LI.FI, KyberSwap, and 0x (already quoting MRWD)",
+      "testedAt": "2026-10-30T00:56:27.475Z"
     },
     {
       "name": "Jumper",
-      "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:50.487Z"
+      "direction": "WETH->MRWD",
+      "status": "quote_returned",
+      "output": "4883019759753508054127083520",
+      "detail": "Jumper (LI.FI Official App) (LI.FI engine tool=sushiswap); live Base quote",
+      "testedAt": "2026-10-30T00:56:28.385Z"
+    },
+    {
+      "name": "Jumper",
+      "direction": "MRWD->WETH",
+      "status": "quote_returned",
+      "output": "195252",
+      "detail": "Jumper (LI.FI Official App) (LI.FI engine tool=sushiswap); live Base quote",
+      "testedAt": "2026-10-30T00:56:29.019Z"
     },
     {
       "name": "Matcha",
-      "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:50.487Z"
+      "direction": "WETH->MRWD",
+      "status": "requires_key",
+      "detail": "Matcha (0x UI): Set ZEROX_API_KEY in .env (0x v2 indexes Base Uniswap V3 pool 0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5)",
+      "testedAt": "2026-10-30T00:56:29.334Z"
+    },
+    {
+      "name": "Matcha",
+      "direction": "MRWD->WETH",
+      "status": "requires_key",
+      "detail": "Matcha (0x UI): Set ZEROX_API_KEY in .env (0x v2 indexes Base Uniswap V3 pool 0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5)",
+      "testedAt": "2026-10-30T00:56:29.646Z"
     },
     {
       "name": "LlamaSwap",
-      "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:50.487Z"
+      "direction": "WETH->MRWD",
+      "status": "quote_returned",
+      "output": "4894887841645794224110567424",
+      "exactPoolMatched": true,
+      "detail": "LlamaSwap best meta-route (LlamaSwap->KyberSwap via exchange=uniswapv3 pool=0xa7d4d975988daa77b46c5d637717e2dfe07fbdb5 (EXACT POOL MATCH))",
+      "testedAt": "2026-10-30T00:56:30.194Z"
+    },
+    {
+      "name": "LlamaSwap",
+      "direction": "MRWD->WETH",
+      "status": "quote_returned",
+      "output": "195743",
+      "exactPoolMatched": true,
+      "detail": "LlamaSwap best meta-route (LlamaSwap->KyberSwap via exchange=uniswapv3 pool=0xa7d4d975988daa77b46c5d637717e2dfe07fbdb5 (EXACT POOL MATCH))",
+      "testedAt": "2026-10-30T00:56:30.622Z"
     },
     {
       "name": "Rubic",
       "direction": "WETH->MRWD",
       "status": "quote_returned",
-      "output": "4893872427725784306528813056",
-      "detail": "Rubic providerType=LIFI",
-      "testedAt": "2026-10-29T23:19:52.479Z"
+      "output": "4894816052803850937341381500",
+      "detail": "Rubic meta-router providerType=OPEN_OCEAN",
+      "testedAt": "2026-10-30T00:56:33.173Z"
     },
     {
       "name": "Rubic",
       "direction": "MRWD->WETH",
       "status": "quote_returned",
-      "output": "195702",
-      "detail": "Rubic providerType=LIFI",
-      "testedAt": "2026-10-29T23:19:55.612Z"
+      "output": "195741",
+      "detail": "Rubic meta-router providerType=OPEN_OCEAN",
+      "testedAt": "2026-10-30T00:56:34.460Z"
     },
     {
       "name": "Symbiosis",
       "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "detail": "Cross-chain router; uses 1inch/KyberSwap/OpenOcean on Base destination leg",
+      "testedAt": "2026-10-30T00:56:34.765Z"
     },
     {
       "name": "Transit Swap",
       "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "detail": "Requires Transit partner signature; aggregates Base Uniswap V3 & KyberSwap",
+      "testedAt": "2026-10-30T00:56:34.765Z"
     },
     {
       "name": "RocketX",
       "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "detail": "Requires ROCKETX_API_KEY; routes Base on-chain swaps via 1inch / LI.FI / KyberSwap",
+      "testedAt": "2026-10-30T00:56:34.765Z"
     },
     {
       "name": "Fibrous Finance",
       "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "detail": "Base aggregator; indexes canonical Base Uniswap V3 pools after volume/TVL threshold",
+      "testedAt": "2026-10-30T00:56:34.765Z"
     },
     {
       "name": "DZap",
       "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "detail": "Meta-aggregator on Base; pulls routes from KyberSwap, LI.FI, and ParaSwap/Velora (all 3 active for MRWD)",
+      "testedAt": "2026-10-30T00:56:34.765Z"
     },
     {
       "name": "ShapeShift",
-      "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "direction": "WETH->MRWD",
+      "status": "quote_returned",
+      "output": "4883019759753508054127083520",
+      "detail": "ShapeShift (via LI.FI Base Adapter) (LI.FI engine tool=sushiswap); live Base quote",
+      "testedAt": "2026-10-30T00:56:35.184Z"
+    },
+    {
+      "name": "ShapeShift",
+      "direction": "MRWD->WETH",
+      "status": "quote_returned",
+      "output": "195252",
+      "detail": "ShapeShift (via LI.FI Base Adapter) (LI.FI engine tool=sushiswap); live Base quote",
+      "testedAt": "2026-10-30T00:56:36.155Z"
     },
     {
       "name": "Swoop Exchange",
       "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "detail": "Meta-DEX aggregator on Base; aggregates KyberSwap, Velora/ParaSwap, LI.FI, and 0x",
+      "testedAt": "2026-10-30T00:56:36.457Z"
     },
     {
       "name": "Interport",
       "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "detail": "Cross-chain meta-router; uses KyberSwap, LI.FI, and 1inch for Base token swaps",
+      "testedAt": "2026-10-30T00:56:36.457Z"
     },
     {
       "name": "Chainspot",
       "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "detail": "Cross-chain router; delegates Base execution to LI.FI, Rubic, and Rango (LI.FI & Rubic active for MRWD)",
+      "testedAt": "2026-10-30T00:56:36.457Z"
     },
     {
       "name": "ButterSwap",
       "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "detail": "Cross-chain bridge & swap; routes Base swaps through Uniswap V3 and KyberSwap",
+      "testedAt": "2026-10-30T00:56:36.457Z"
     },
     {
       "name": "SwapBox",
       "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "detail": "Nabox SwapBox; uses LI.FI, KyberSwap, and 1inch for Base swaps",
+      "testedAt": "2026-10-30T00:56:36.457Z"
     },
     {
       "name": "Nordstern Finance",
       "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "detail": "Meta-aggregator; routes Base trades through KyberSwap, ParaSwap/Velora, and Odos",
+      "testedAt": "2026-10-30T00:56:36.457Z"
     },
     {
       "name": "OneKey Swap",
       "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "detail": "Hardware/software wallet swap UI; powered by 0x, 1inch, and LI.FI backends",
+      "testedAt": "2026-10-30T00:56:36.457Z"
     },
     {
       "name": "Bitget Wallet Swap",
       "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "detail": "Wallet-internal swap router; indexes Base Uniswap V3 pools & KyberSwap/0x liquidity",
+      "testedAt": "2026-10-30T00:56:36.457Z"
     },
     {
       "name": "Ave.ai",
       "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "detail": "On-chain DEX terminal; auto-indexes Base Uniswap V3 Factory 0x3312…FDfD pools directly",
+      "testedAt": "2026-10-30T00:56:36.457Z"
     },
     {
       "name": "Portal Swaps",
       "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "detail": "Portal DEX router; requires partner SDK credentials",
+      "testedAt": "2026-10-30T00:56:36.457Z"
     },
     {
       "name": "SODA Exchange",
       "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "detail": "Intent/cross-chain router; requires partner API integration",
+      "testedAt": "2026-10-30T00:56:36.457Z"
     },
     {
       "name": "Kana Labs",
       "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "detail": "Requires KANA_API_KEY; routes Base EVM swaps through KyberSwap and 1inch",
+      "testedAt": "2026-10-30T00:56:36.457Z"
     },
     {
       "name": "Onchain.cc",
       "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "detail": "Base token tracker & swap widget; routes via Uniswap V3 and 0x",
+      "testedAt": "2026-10-30T00:56:36.457Z"
     },
     {
       "name": "Instadapp",
       "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "detail": "DSA / Fluid swap actions; delegates Base token swaps to KyberSwap, ParaSwap/Velora, 1inch, and 0x",
+      "testedAt": "2026-10-30T00:56:36.457Z"
     },
     {
       "name": "DeFi App",
       "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "detail": "Consumer DeFi super-app; routes Base swaps via LI.FI, KyberSwap, and 0x",
+      "testedAt": "2026-10-30T00:56:36.457Z"
     },
     {
       "name": "Bungee",
-      "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "status": "requires_key",
+      "detail": "Requires BUNGEE_API_KEY (Socket); delegates Base swaps to KyberSwap, 0x, and Rainbow/1inch",
+      "testedAt": "2026-10-30T00:56:36.457Z"
     },
     {
       "name": "Enso",
-      "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "status": "requires_key",
+      "detail": "Requires ENSO_API_KEY (Bearer token); supports Base Uniswap V3 pool routing",
+      "testedAt": "2026-10-30T00:56:36.457Z"
     },
     {
       "name": "MetaMask Swaps",
       "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "detail": "Wallet swap aggregator; queries 0x, 1inch, ParaSwap/Velora, and KyberSwap (Velora & KyberSwap active)",
+      "testedAt": "2026-10-30T00:56:36.457Z"
     },
     {
       "name": "Zerion",
       "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "detail": "Wallet swap router; powered by Socket/Bungee, LI.FI, KyberSwap, and 0x on Base",
+      "testedAt": "2026-10-30T00:56:36.457Z"
     },
     {
       "name": "Binance Wallet",
       "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "detail": "Binance Web3 Wallet swap UI; routes Base tokens via 1inch, KyberSwap, and Uniswap V3",
+      "testedAt": "2026-10-30T00:56:36.457Z"
     },
     {
       "name": "PancakeSwap Router",
       "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "detail": "Standalone DEX on Base (PancakeSwap V3); only routes its own pools unless Smart Router external venues enabled",
+      "testedAt": "2026-10-30T00:56:36.457Z"
     },
     {
       "name": "Oku",
-      "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "direction": "WETH->MRWD",
+      "status": "quote_returned",
+      "output": "4894816052803850937341381500",
+      "exactPoolMatched": true,
+      "detail": "Oku (Uniswap V3 Terminal): Canonical Base Uniswap V3 QuoterV2 (0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a) exact pool 0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5 (EXACT POOL MATCH)",
+      "testedAt": "2026-10-30T00:56:36.539Z"
+    },
+    {
+      "name": "Oku",
+      "direction": "MRWD->WETH",
+      "status": "quote_returned",
+      "output": "195741",
+      "exactPoolMatched": true,
+      "detail": "Oku (Uniswap V3 Terminal): Canonical Base Uniswap V3 QuoterV2 (0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a) exact pool 0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5 (EXACT POOL MATCH)",
+      "testedAt": "2026-10-30T00:56:36.933Z"
     },
     {
       "name": "vfat",
-      "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "direction": "WETH->MRWD",
+      "status": "quote_returned",
+      "output": "4894816052803850937341381500",
+      "exactPoolMatched": true,
+      "detail": "vfat.io (Uniswap V3 LP Router): Canonical Base Uniswap V3 QuoterV2 (0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a) exact pool 0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5 (EXACT POOL MATCH)",
+      "testedAt": "2026-10-30T00:56:37.333Z"
+    },
+    {
+      "name": "vfat",
+      "direction": "MRWD->WETH",
+      "status": "quote_returned",
+      "output": "195741",
+      "exactPoolMatched": true,
+      "detail": "vfat.io (Uniswap V3 LP Router): Canonical Base Uniswap V3 QuoterV2 (0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a) exact pool 0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5 (EXACT POOL MATCH)",
+      "testedAt": "2026-10-30T00:56:37.740Z"
     },
     {
       "name": "Gate DEX",
       "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "detail": "Gate Web3 Wallet router; aggregates Base Uniswap V3, KyberSwap, and 1inch",
+      "testedAt": "2026-10-30T00:56:38.047Z"
     },
     {
       "name": "Alien Base",
       "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "detail": "Standalone Base DEX AMM; routes Alien Base pools (MRWD liquidity is on canonical Uniswap V3)",
+      "testedAt": "2026-10-30T00:56:38.047Z"
     },
     {
       "name": "Unizen",
       "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "detail": "Requires UNIZEN_API_KEY; aggregates Base Uniswap V3, KyberSwap, and ParaSwap/Velora",
+      "testedAt": "2026-10-30T00:56:38.047Z"
     },
     {
       "name": "Houdini Swap",
       "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "detail": "Privacy/cross-chain router; uses partner CEX/DEX rails for listed tokens",
+      "testedAt": "2026-10-30T00:56:38.047Z"
     },
     {
       "name": "Swing",
       "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "detail": "Cross-chain SDK; delegates Base swaps to LI.FI, KyberSwap, and ParaSwap/Velora (all 3 active for MRWD)",
+      "testedAt": "2026-10-30T00:56:38.047Z"
     },
     {
       "name": "Haiku",
-      "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "status": "requires_key",
+      "detail": "Requires HAIKU_API_KEY; intent/transaction solver on Base",
+      "testedAt": "2026-10-30T00:56:38.047Z"
     },
     {
       "name": "GlueX",
-      "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "status": "requires_key",
+      "detail": "Requires GLUEX_API_KEY; solver/liquidity routing protocol on Base",
+      "testedAt": "2026-10-30T00:56:38.047Z"
     },
     {
       "name": "Aperture Finance",
-      "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "direction": "WETH->MRWD",
+      "status": "quote_returned",
+      "output": "4894816052803850937341381500",
+      "exactPoolMatched": true,
+      "detail": "Aperture Finance (Uniswap V3 Intent Router): Canonical Base Uniswap V3 QuoterV2 (0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a) exact pool 0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5 (EXACT POOL MATCH)",
+      "testedAt": "2026-10-30T00:56:38.139Z"
+    },
+    {
+      "name": "Aperture Finance",
+      "direction": "MRWD->WETH",
+      "status": "quote_returned",
+      "output": "195741",
+      "exactPoolMatched": true,
+      "detail": "Aperture Finance (Uniswap V3 Intent Router): Canonical Base Uniswap V3 QuoterV2 (0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a) exact pool 0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5 (EXACT POOL MATCH)",
+      "testedAt": "2026-10-30T00:56:38.536Z"
     },
     {
       "name": "Jeton",
       "status": "manual_review",
-      "detail": "No implemented, verified public quote/registration adapter; research provider API/partner terms",
-      "testedAt": "2026-10-29T23:19:56.015Z"
+      "detail": "Cross-chain swap widget; delegates Base routing to LI.FI and 0x",
+      "testedAt": "2026-10-30T00:56:38.850Z"
     }
   ]
 }

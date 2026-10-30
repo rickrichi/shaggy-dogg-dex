@@ -493,8 +493,8 @@ function Sparkline({ points }: { points: Array<{ ts: number; priceUsd: number }>
 // ───────────────────────────── Base token lookup ─────────────────────────────
 
 function TokenLookup() {
-  const [input, setInput] = useState("0x940181a94A35A4569E4529A3CDfB74e38FD98631");
-  const [address, setAddress] = useState<string | null>(null);
+  const [input, setInput] = useState<string>(MRWD);
+  const [address, setAddress] = useState<string | null>(MRWD.toLowerCase());
   const valid = /^0x[0-9a-fA-F]{40}$/.test(input.trim());
   const token = useQuery({
     queryKey: ["md-token", address],

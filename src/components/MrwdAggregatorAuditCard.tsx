@@ -23,7 +23,7 @@ interface AuditRow {
   testedAt: string;
 }
 
-type FilterMode = "all" | "adapters" | "quote_returned" | "manual_review";
+type FilterMode = "quote_returned" | "adapters" | "requires_key" | "manual_review" | "all";
 
 const POOL_ADDRESS = auditReport.verification.pool as Address;
 const FACTORY_ADDRESS = auditReport.verification.factory as Address;
@@ -83,7 +83,7 @@ function formatQuoteOutput(row: AuditRow): string {
 
 export function MrwdAggregatorAuditCard() {
   const client = usePublicClient({ chainId: 8453 });
-  const [filter, setFilter] = useState<FilterMode>("adapters");
+  const [filter, setFilter] = useState<FilterMode>("quote_returned");
   const [search, setSearch] = useState("");
 
   const livePool = useQuery({
@@ -123,20 +123,33 @@ export function MrwdAggregatorAuditCard() {
 
   const counts = useMemo(() => {
     const unique = new Set(allResults.map((r) => r.name)).size;
-    const adapters = allResults.filter((r) => r.status !== "manual_review").length;
+    const adapters = allResults.filter((r) => Boolean(r.direction)).length;
     const quotes = allResults.filter((r) => r.status === "quote_returned").length;
+    const requiresKey = allResults.filter((r) => r.status === "requires_key").length;
     const manual = allResults.filter((r) => r.status === "manual_review").length;
     const quotingProviders = new Set(
       allResults.filter((r) => r.status === "quote_returned").map((r) => r.name)
     );
-    return { unique, adapters, quotes, manual, quotingProviders: [...quotingProviders] };
+    const exactMatchProviders = new Set(
+      allResults.filter((r) => r.exactPoolMatched).map((r) => r.name)
+    );
+    return {
+      unique,
+      adapters,
+      quotes,
+      requiresKey,
+      manual,
+      quotingProviders: [...quotingProviders],
+      exactMatchCount: exactMatchProviders.size,
+    };
   }, [allResults]);
 
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
     return allResults.filter((row) => {
-      if (filter === "adapters" && row.status === "manual_review") return false;
       if (filter === "quote_returned" && row.status !== "quote_returned") return false;
+      if (filter === "adapters" && !row.direction) return false;
+      if (filter === "requires_key" && row.status !== "requires_key") return false;
       if (filter === "manual_review" && row.status !== "manual_review") return false;
       if (!q) return true;
       return (
@@ -214,21 +227,21 @@ export function MrwdAggregatorAuditCard() {
             <p className="text-xs font-medium text-indigo-800">
               Live Bidirectional Quotes ({counts.quotingProviders.length} Routers)
             </p>
-            <p className="mt-1 text-sm font-bold text-indigo-950">
+            <p className="mt-1 truncate text-sm font-bold text-indigo-950" title={counts.quotingProviders.join(", ")}>
               {counts.quotingProviders.join(", ")}
             </p>
             <p className="mt-1 text-[11px] text-indigo-700">
-              0.001 WETH → ~4.89B MRWD · 3 verify exact pool 0xa7D4…bDB5
+              0.001 WETH → ~4.89B MRWD · {counts.exactMatchCount} verify exact pool 0xa7D4…bDB5
             </p>
           </div>
 
           <div className="rounded-xl border border-purple-100 bg-purple-50/50 p-3.5">
             <p className="text-xs font-medium text-purple-800">Registry Coverage</p>
             <p className="mt-1 text-base font-bold text-purple-950">
-              {counts.unique} Platforms Tracked
+              {counts.unique} Platforms Classified
             </p>
             <p className="mt-1 text-[11px] text-purple-700">
-              7 Active Adapters ({counts.quotes} live quotes) · {counts.manual} Partner Queue
+              {counts.quotes} Live Quotes · {counts.requiresKey} API Key · {counts.manual} Wallet/DEX
             </p>
           </div>
 
@@ -261,9 +274,10 @@ export function MrwdAggregatorAuditCard() {
           <div className="flex flex-wrap gap-1.5">
             {(
               [
-                { id: "adapters", label: `Active Adapters (${counts.adapters})` },
                 { id: "quote_returned", label: `Quotes Returned (${counts.quotes})` },
-                { id: "manual_review", label: `Partner Queue (${counts.manual})` },
+                { id: "adapters", label: `Tested Adapters (${counts.adapters})` },
+                { id: "requires_key", label: `API Key Gated (${counts.requiresKey})` },
+                { id: "manual_review", label: `Wallet / DEX Architecture (${counts.manual})` },
                 { id: "all", label: `All Entries (${allResults.length})` },
               ] as const
             ).map((tab) => (
