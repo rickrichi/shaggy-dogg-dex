@@ -1,32 +1,25 @@
-# Base portfolio paymaster
+# Base Portfolio Paymaster
 
-The `/launchpad/paymaster` page sponsors eligible Base ERC-20 transfers from an enrolled wallet and rewards successful operations with MRWD. The paymaster pays ETH gas from its EntryPoint deposit. It does not collect MRWD or the transferred token. A held token may be selected from the Base portfolio list or entered by contract address.
+The `/launchpad/paymaster` page sponsors eligible Base ERC-20 portfolio operations (transfers, DEX swaps across Uniswap V3 / Uniswap V2 / Aerodrome, and staking in `MuttProStaking` or Launchpad `FeeDiscountStaking`) and rewards successful operations with **100 MRWD**. The paymaster pays ETH gas from its EntryPoint v0.8 deposit and never charges MRWD or the user's portfolio token as a fee.
 
-Base mainnet deployment: [`0x221A9765844511Ef01E383273b396c45372E462a`](https://basescan.org/address/0x221A9765844511Ef01E383273b396c45372E462a). It uses EntryPoint v0.8, rewards 100 MRWD per successful operation, caps one sponsorship at 0.001 ETH, and starts with a one-day wallet cooldown.
+Base mainnet deployment: [`0x221A9765844511Ef01E383273b396c45372E462a`](https://basescan.org/address/0x221A9765844511Ef01E383273b396c45372E462a). It uses EntryPoint v0.8 (`0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108`), rewards 100 MRWD per successful operation, caps one sponsorship at 0.001 ETH, and enforces a 24-hour per-wallet cooldown.
 
-## Deployment
-
-1. Generate a dedicated sponsor signing key and keep its private key on the API server. Enter only its **public address** in the page's deployment form.
-2. Connect the owner wallet to Base. Deploy `SponsoredRewardPaymaster` from the page with MRWD as reward token, a fixed MRWD reward, and a maximum ETH cost per operation.
-3. Deposit ETH, add EntryPoint stake, and transfer MRWD to the paymaster through the operations console. Set a cooldown and verify the displayed deposit, stake, and unreserved MRWD balance.
-4. Set the server environment variables below, restart the API server, and attach the deployed paymaster address in the page. The signer address held by the contract must match the signing key.
-5. Enroll wallet addresses through `PAYMASTER_ALLOWED_WALLETS`. The signer API declines all users when this list is empty.
+## Environment Variables
 
 | Variable | Purpose |
 | --- | --- |
-| `PAYMASTER_ADDRESS` | Base paymaster contract address |
-| `PAYMASTER_SIGNER_PRIVATE_KEY` | Dedicated signer key, server side only |
+| `PAYMASTER_ADDRESS` | Base paymaster contract address (`0x221A9765844511Ef01E383273b396c45372E462a`) |
+| `PAYMASTER_SIGNER_PRIVATE_KEY` | Dedicated signer key, server/edge side only (`0x852Cd18B109Be741d04bBcb98CB2BD766D9A7d70`) |
 | `PAYMASTER_BUNDLER_URL` | ERC-4337 v0.8 bundler RPC; credentials stay on the server |
-| `PAYMASTER_ALLOWED_WALLETS` | Comma separated enrolled Base wallet addresses |
-| `BASE_RPC_URL` | Base execution RPC used for policy checks |
+| `PAYMASTER_ELIGIBILITY_MODE` | `open_portfolio` (default: any Base portfolio holder) or `allowlist` |
+| `PAYMASTER_ALLOWED_WALLETS` | Comma-separated wallet addresses (used when `PAYMASTER_ELIGIBILITY_MODE=allowlist`) |
+| `BASE_RPC_URL` | Base execution RPC used for on-chain policy verification |
 
-The Vercel page routes `/api/paymaster/*` to the existing API server. A Google Cloud account is not required. Any server capable of protecting the signer key and reaching a v0.8 bundler works. The current deployment needs the API server to have these environment variables; putting the key or bundler credential in a `VITE_` variable exposes it in the browser.
+## Supported Portfolio Operations & Policy
 
-## Transaction policy
-
-- EntryPoint v0.8 and EIP-7702 use the wallet's existing Base address. The wallet must support signing EIP-7702 authorizations on first use. The delegated implementation is fixed to the Simple 7702 account used by permissionless.js.
-- The server signs a short-lived sponsorship for one `execute` call containing one ERC-20 `transfer`. It checks the enrolled sender, token balance, destination, gas limits, onchain pause/cooldown, reward reserve, and sponsor signer. The contract binds the signature to the sender, nonce, call data, gas fields, chain, and expiry. The contract also checks the EIP-7702 implementation onchain.
-- The contract pays MRWD to the sender only after `postOp` reports success. A reverted operation receives no reward, though it can still consume sponsored ETH gas and start the cooldown.
-- The contract's deposit, maximum gas cost, and fixed reward set the program's financial exposure. The allowlist and cooldown limit abuse. An owner can pause, rotate the signer, or withdraw unreserved funds.
-
-This flow currently covers Base ERC-20 transfers. Swaps, liquidity actions, native ETH, and other chains need their own narrowly defined signer policy and UI before sponsorship is enabled for them. The paymaster has not been independently audited; test on Base Sepolia and review the deployed bytecode and signer policy before funding a mainnet campaign.
+- **EIP-7702 + EntryPoint v0.8**: Uses the connected wallet's existing Base address (`Simple 7702` implementation `0xe6Cae83BdE06E4c305530e199D7217f42808555B`). Users do not need to move portfolio tokens to a separate smart account address.
+- **Eligible Operations**:
+  1. **ERC-20 Portfolio Transfers**: Single `transfer(recipient, amount)` on any held Base ERC-20 token.
+  2. **DEX Swaps**: Single `swap` or atomic `executeBatch([approve, swap])` on Base Uniswap V3 (`0x2626...e481`), Uniswap V2 (`0x4752...aD24`), or Aerodrome (`0xcF77...4E43`) for any held Base ERC-20 token.
+  3. **Staking & Vaults**: Single `stake` / `unstake` / `relockAll` / `withdrawMatured` or atomic `executeBatch([approve, stake])` on `MuttProStaking` (`0x67dB...1766`) or any Launchpad `FeeDiscountStaking` vault.
+- **Reward Settlement**: The contract reserves `rewardAmount` during validation and transfers MRWD to `userOp.sender` inside `_postOp` only when `mode == PostOpMode.opSucceeded`.

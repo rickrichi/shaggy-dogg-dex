@@ -20,30 +20,31 @@ export default function Paymaster() {
         <LaunchpadNav />
         <div className="mb-8 rounded-3xl border border-indigo-100 bg-white p-6 shadow-sm md:p-9">
           <div className="flex flex-wrap items-center gap-3">
-            <Badge className="bg-indigo-700 text-white">Base · ERC-4337 v0.8</Badge>
+            <Badge className="bg-indigo-700 text-white">Base · ERC-4337 v0.8 · EIP-7702</Badge>
             <Badge variant="outline" className="border-emerald-200 text-emerald-800">
-              MRWD reward
+              MRWD reward · 0 MRWD fee
             </Badge>
           </div>
           <h1 className="mt-4 text-3xl font-bold tracking-tight text-slate-950 md:text-4xl">
             Portfolio Paymaster
           </h1>
           <p className="mt-3 max-w-3xl text-base leading-relaxed text-slate-600">
-            Use a Base token you already hold for an eligible transfer. The program sponsors the
-            network gas and sends MRWD to your existing wallet after the operation succeeds. You do
-            not pay gas in MRWD.
+            Transfer, swap, or stake any Base ERC-20 token you hold in your portfolio. The
+            paymaster sponsors the network gas in ETH and rewards your existing wallet with MRWD
+            after the operation succeeds. You never pay gas in MRWD.
           </p>
           <div className="mt-6 grid gap-3 text-sm sm:grid-cols-3">
             <div className="flex items-start gap-2 rounded-xl bg-indigo-50 p-3 text-indigo-950">
-              <Coins className="mt-0.5 size-4 shrink-0" /> Select any held Base ERC-20, including a
-              custom address.
+              <Coins className="mt-0.5 size-4 shrink-0" /> Works with any held Base ERC-20 for
+              transfers, DEX swaps, and staking vaults.
             </div>
             <div className="flex items-start gap-2 rounded-xl bg-indigo-50 p-3 text-indigo-950">
-              <Fuel className="mt-0.5 size-4 shrink-0" /> Sponsor ETH covers eligible network fees.
+              <Fuel className="mt-0.5 size-4 shrink-0" /> Sponsor ETH covers eligible network fees
+              and batches token approvals automatically.
             </div>
             <div className="flex items-start gap-2 rounded-xl bg-indigo-50 p-3 text-indigo-950">
-              <ShieldCheck className="mt-0.5 size-4 shrink-0" /> An allowlist, cost cap, and
-              cooldown protect the reward pool.
+              <ShieldCheck className="mt-0.5 size-4 shrink-0" /> Open portfolio eligibility with
+              on-chain balance checks, cost caps, and wallet cooldowns.
             </div>
           </div>
         </div>

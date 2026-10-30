@@ -83,7 +83,7 @@ async function poolSnapshot() {
     wethDecimals,
     mrwdSymbol,
     mrwdDecimals,
-  ] = await client.multicall({ contracts, blockNumber, allowFailure: false });
+  ] = await client.multicall({ contracts, blockNumber, allowFailure: false, authorizationList: undefined });
 
   if (
     !sameAddress(token0, WETH) ||
