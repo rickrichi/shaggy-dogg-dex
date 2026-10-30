@@ -10,7 +10,7 @@ export const SIMPLE_7702_ACCOUNT_ON_BASE =
   "0xe6Cae83BdE06E4c305530e199D7217f42808555B" as const;
 export const MRWD_ON_BASE = "0xC17227AAa33C54634B6cE7AD0bf33A156563c179" as const;
 export const SPONSORED_REWARD_PAYMASTER_ON_BASE =
-  "0x221A9765844511Ef01E383273b396c45372E462a" as const;
+  "0x9cD40EBa4B0793C43FdF8C5A3272073820f77CB4" as const;
 
 const entryPointStakeAbi = parseAbi([
   "function getDepositInfo(address account) view returns ((uint256 deposit, bool staked, uint112 stake, uint32 unstakeDelaySec, uint48 withdrawTime) info)",

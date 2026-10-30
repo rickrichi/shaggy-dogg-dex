@@ -442,7 +442,7 @@ const app = new Hono()
 
 const rpcUrl = process.env.BASE_RPC_URL ?? 'https://mainnet.base.org'
 const client = createPublicClient({ chain: base, transport: http(rpcUrl) })
-const rawPaymaster = process.env.PAYMASTER_ADDRESS ?? '0x221A9765844511Ef01E383273b396c45372E462a'
+const rawPaymaster = process.env.PAYMASTER_ADDRESS ?? '0x9cD40EBa4B0793C43FdF8C5A3272073820f77CB4'
 const paymaster = isAddress(rawPaymaster) ? getAddress(rawPaymaster) : undefined
 const signer = process.env.PAYMASTER_SIGNER_PRIVATE_KEY
   ? privateKeyToAccount(process.env.PAYMASTER_SIGNER_PRIVATE_KEY as Hex)
