@@ -915,6 +915,8 @@ export function PaymasterPortfolioTransfer() {
       const smartClient = createSmartAccountClient({
         account,
         chain: base,
+        // Fee estimation needs a public RPC: the bundler proxy only allows ERC-4337 methods.
+        client: publicClient,
         bundlerTransport: http(`${window.location.origin}/api/paymaster/bundler`),
         paymaster: {
           getPaymasterStubData: async () => ({
