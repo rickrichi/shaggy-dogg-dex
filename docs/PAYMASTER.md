@@ -1,19 +1,21 @@
 # Base Portfolio Paymaster
 
-The `/launchpad/paymaster` page sponsors eligible Base ERC-20 portfolio operations (transfers, DEX swaps across Uniswap V3 / Uniswap V2 / Aerodrome, and staking in `MuttProStaking` or Launchpad `FeeDiscountStaking`) and rewards successful operations with **100 MRWD**. The paymaster pays ETH gas from its EntryPoint v0.8 deposit and never charges MRWD or the user's portfolio token as a fee.
+The `/launchpad/paymaster` page sponsors eligible Base ERC-20 portfolio operations (transfers, DEX swaps across Uniswap V3 / Uniswap V2 / Aerodrome, and staking in `MuttProStaking` or Launchpad `FeeDiscountStaking`) and rewards successful operations with **100 MRWD**. The paymaster pays ETH gas from its EntryPoint deposit and never charges MRWD or the user's portfolio token as a fee.
 
-Base mainnet deployment: [`0x221A9765844511Ef01E383273b396c45372E462a`](https://basescan.org/address/0x221A9765844511Ef01E383273b396c45372E462a). It uses EntryPoint v0.8 (`0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108`), rewards 100 MRWD per successful operation, caps one sponsorship at 0.001 ETH, and enforces a 24-hour per-wallet cooldown.
+Base mainnet deployment: [`0x9cD40EBa4B0793C43FdF8C5A3272073820f77CB4`](https://basescan.org/address/0x9cD40EBa4B0793C43FdF8C5A3272073820f77CB4). It uses EntryPoint v0.7 (`0x0000000071727De22E5E9d8BAf0edAc6f37da032`), rewards 100 MRWD per successful operation, caps one sponsorship at 0.0001 ETH, and enforces a 24-hour per-wallet cooldown. The earlier v0.8 paymaster `0x221A9765844511Ef01E383273b396c45372E462a` is unfunded.
+
+**Known limitation:** MetaMask refuses the signature that its EIP-7702 Smart Account requires, so sponsored operations cannot complete from those wallets. See [the 2026-10-30 session record](SWAP_ROUTING_SESSION_RECORD_2026-10-30.md#known-limitation).
 
 ## Environment Variables
 
 | Variable | Purpose |
 | --- | --- |
-| `PAYMASTER_ADDRESS` | Base paymaster contract address (`0x221A9765844511Ef01E383273b396c45372E462a`) |
+| `PAYMASTER_ADDRESS` | Base paymaster contract address (`0x9cD40EBa4B0793C43FdF8C5A3272073820f77CB4`). Production reads this from Vercel. |
 | `PAYMASTER_SIGNER_PRIVATE_KEY` | Dedicated signer key, server/edge side only (`0x852Cd18B109Be741d04bBcb98CB2BD766D9A7d70`) |
-| `PAYMASTER_BUNDLER_URL` | ERC-4337 v0.8 bundler RPC; credentials stay on the server |
+| `PAYMASTER_BUNDLER_URL` | ERC-4337 bundler RPC; credentials stay on the server |
 | `PAYMASTER_ELIGIBILITY_MODE` | `open_portfolio` (default: any Base portfolio holder) or `allowlist` |
 | `PAYMASTER_ALLOWED_WALLETS` | Comma-separated wallet addresses (used when `PAYMASTER_ELIGIBILITY_MODE=allowlist`) |
-| `BASE_RPC_URL` | Base execution RPC used for on-chain policy verification |
+| `BASE_RPC_URL` | Base execution RPC used for on-chain policy verification. Set a private RPC in production: the public default can block Vercel servers. |
 
 ## Supported Portfolio Operations & Policy
 
