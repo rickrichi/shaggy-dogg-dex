@@ -2,7 +2,12 @@ import { type Address, parseAbi, type PublicClient } from "viem";
 
 import { SPONSORED_REWARD_PAYMASTER_ABI } from "./artifact";
 
+export const BASE_ENTRYPOINT_V07 = "0x0000000071727De22E5E9d8BAf0edAc6f37da032" as const;
 export const BASE_ENTRYPOINT_V08 = "0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108" as const;
+export const METAMASK_7702_DELEGATOR_ON_BASE =
+  "0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B" as const;
+export const SIMPLE_7702_ACCOUNT_ON_BASE =
+  "0xe6Cae83BdE06E4c305530e199D7217f42808555B" as const;
 export const MRWD_ON_BASE = "0xC17227AAa33C54634B6cE7AD0bf33A156563c179" as const;
 export const SPONSORED_REWARD_PAYMASTER_ON_BASE =
   "0x221A9765844511Ef01E383273b396c45372E462a" as const;
@@ -20,6 +25,7 @@ export const rewardTokenAbi = parseAbi([
 
 export interface PaymasterStatus {
   address: Address;
+  entryPoint: Address;
   owner: Address;
   pendingOwner: Address;
   signer: Address;
@@ -59,7 +65,6 @@ export async function readPaymasterStatus(
     maxCostPerOp,
     cooldownSeconds,
     paused,
-    depositInfo,
   ] = await Promise.all([
     client.readContract({
       address,
@@ -108,27 +113,32 @@ export async function readPaymasterStatus(
       functionName: "cooldownSeconds",
     }),
     client.readContract({ address, abi: SPONSORED_REWARD_PAYMASTER_ABI, functionName: "paused" }),
-    client.readContract({
-      address: BASE_ENTRYPOINT_V08,
-      abi: entryPointStakeAbi,
-      functionName: "getDepositInfo",
-      args: [address],
-    }),
   ]);
-  if (entryPoint.toLowerCase() !== BASE_ENTRYPOINT_V08.toLowerCase()) {
+  const epLower = entryPoint.toLowerCase();
+  if (
+    epLower !== BASE_ENTRYPOINT_V07.toLowerCase() &&
+    epLower !== BASE_ENTRYPOINT_V08.toLowerCase()
+  ) {
     throw new Error(
-      "That contract uses a different EntryPoint. This console requires ERC-4337 v0.8."
+      "That contract uses a different EntryPoint. This console supports ERC-4337 v0.7 and v0.8."
     );
   }
   if (rewardToken.toLowerCase() !== MRWD_ON_BASE.toLowerCase()) {
     throw new Error("That paymaster rewards a different token. This program rewards MRWD.");
   }
-  const [decimals, symbol] = await Promise.all([
+  const [depositInfo, decimals, symbol] = await Promise.all([
+    client.readContract({
+      address: entryPoint,
+      abi: entryPointStakeAbi,
+      functionName: "getDepositInfo",
+      args: [address],
+    }),
     client.readContract({ address: rewardToken, abi: rewardTokenAbi, functionName: "decimals" }),
     client.readContract({ address: rewardToken, abi: rewardTokenAbi, functionName: "symbol" }),
   ]);
   return {
     address,
+    entryPoint,
     owner,
     pendingOwner,
     signer,

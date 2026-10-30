@@ -24,9 +24,12 @@ contract SponsoredRewardPaymaster is Paymaster, Ownable2Step, Pausable {
 
     uint256 public constant MAX_SIGNATURE_AGE = 10 minutes;
     uint32 public constant MAX_COOLDOWN = 7 days;
-    address public constant ACCOUNT_IMPLEMENTATION = 0xe6Cae83BdE06E4c305530e199D7217f42808555B;
+    address public constant ACCOUNT_IMPLEMENTATION = 0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B;
+    address public constant SIMPLE_7702_IMPLEMENTATION = 0xe6Cae83BdE06E4c305530e199D7217f42808555B;
     bytes32 public constant ACCOUNT_DESIGNATOR_HASH =
         keccak256(abi.encodePacked(hex"ef0100", ACCOUNT_IMPLEMENTATION));
+    bytes32 public constant SIMPLE_7702_DESIGNATOR_HASH =
+        keccak256(abi.encodePacked(hex"ef0100", SIMPLE_7702_IMPLEMENTATION));
     bytes32 public constant SPONSORSHIP_TYPEHASH = keccak256(
         "Sponsorship(address paymaster,uint256 chainId,address sender,uint256 nonce,bytes32 initCodeHash,bytes32 callDataHash,bytes32 accountGasLimits,uint256 preVerificationGas,bytes32 gasFees,uint128 paymasterVerificationGasLimit,uint128 paymasterPostOpGasLimit,uint48 validUntil,uint256 rewardAmount)"
     );
@@ -62,7 +65,7 @@ contract SponsoredRewardPaymaster is Paymaster, Ownable2Step, Pausable {
     }
 
     function entryPoint() public pure override returns (IEntryPoint) {
-        return ERC4337Utils.ENTRYPOINT_V08;
+        return ERC4337Utils.ENTRYPOINT_V07;
     }
 
     function setSponsorSigner(address signer_) external onlyOwner {
@@ -166,8 +169,9 @@ contract SponsoredRewardPaymaster is Paymaster, Ownable2Step, Pausable {
         returns (bytes memory context, uint256 validationData)
     {
         bytes calldata data = userOp.paymasterAndData;
+        bytes32 senderHash = userOp.sender.codehash;
         if (paused() || data.length != 52 + 6 + 65 || maxCost > maxCostPerOp ||
-            userOp.sender.codehash != ACCOUNT_DESIGNATOR_HASH) {
+            (senderHash != ACCOUNT_DESIGNATOR_HASH && senderHash != SIMPLE_7702_DESIGNATOR_HASH)) {
             return ("", ERC4337Utils.SIG_VALIDATION_FAILED);
         }
         if (lastSponsoredAt[userOp.sender] != 0 &&

@@ -35,6 +35,7 @@ import {
   SPONSORED_REWARD_PAYMASTER_BYTECODE,
 } from "@/lib/paymaster/artifact";
 import {
+  BASE_ENTRYPOINT_V07,
   BASE_ENTRYPOINT_V08,
   MRWD_ON_BASE,
   SPONSORED_REWARD_PAYMASTER_ON_BASE,
@@ -139,9 +140,9 @@ export function PaymasterOperationsConsole() {
     walletBalance?: bigint;
   }>();
   const [tokenError, setTokenError] = useState("");
-  const [signerInput, setSignerInput] = useState("");
-  const [deployReward, setDeployReward] = useState("");
-  const [deployMaxCost, setDeployMaxCost] = useState("");
+  const [signerInput, setSignerInput] = useState("0x852Cd18B109Be741d04bBcb98CB2BD766D9A7d70");
+  const [deployReward, setDeployReward] = useState("100");
+  const [deployMaxCost, setDeployMaxCost] = useState("0.0001");
 
   const [depositAmount, setDepositAmount] = useState("");
   const [stakeAmount, setStakeAmount] = useState("");
@@ -245,6 +246,18 @@ export function PaymasterOperationsConsole() {
     if (contractAddress) void refresh(contractAddress);
   }, [contractAddress, refresh]);
 
+  useEffect(() => {
+    const syncFromEvent = () => {
+      const next = savedAddress();
+      if (next) {
+        setContractAddress(next);
+        setAttachInput(next);
+      }
+    };
+    window.addEventListener("paymaster-address-changed", syncFromEvent);
+    return () => window.removeEventListener("paymaster-address-changed", syncFromEvent);
+  }, []);
+
   const requireWallet = async () => {
     if (!publicClient || !walletClient || !address || chainId !== base.id)
       throw new Error("Connect a wallet on Base mainnet before submitting a transaction.");
@@ -287,6 +300,7 @@ export function PaymasterOperationsConsole() {
         setAttachInput(deployed);
         try {
           localStorage.setItem(storageKey, deployed);
+          window.dispatchEvent(new Event("paymaster-address-changed"));
         } catch {
           /* The verified address remains visible in this session. */
         }
@@ -318,6 +332,7 @@ export function PaymasterOperationsConsole() {
       setStatus(verified);
       try {
         localStorage.setItem(storageKey, target);
+        window.dispatchEvent(new Event("paymaster-address-changed"));
       } catch {
         /* Attaching still works if storage is unavailable. */
       }
@@ -513,7 +528,10 @@ export function PaymasterOperationsConsole() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-indigo-700">
-                <ShieldCheck className="size-4" /> Base · ERC-4337 v0.8
+                <ShieldCheck className="size-4" /> Base · ERC-4337{" "}
+                {status?.entryPoint.toLowerCase() === BASE_ENTRYPOINT_V07.toLowerCase()
+                  ? "v0.7 (MetaMask 7702 + Simple7702)"
+                  : "v0.7 / v0.8"}
               </div>
               <CardTitle
                 id="paymaster-console-title"
@@ -716,14 +734,17 @@ export function PaymasterOperationsConsole() {
               </div>
               <div className="flex flex-wrap gap-x-6 gap-y-2 border-t border-slate-200 bg-slate-50 px-5 py-3 text-xs text-slate-700">
                 <span>
-                  EntryPoint v0.8{" "}
+                  EntryPoint{" "}
+                  {status.entryPoint.toLowerCase() === BASE_ENTRYPOINT_V07.toLowerCase()
+                    ? "v0.7"
+                    : "v0.8"}{" "}
                   <a
                     className="break-all font-mono text-indigo-700 underline"
-                    href={baseLink("address", BASE_ENTRYPOINT_V08)}
+                    href={baseLink("address", status.entryPoint)}
                     target="_blank"
                     rel="noreferrer"
                   >
-                    {BASE_ENTRYPOINT_V08}
+                    {status.entryPoint}
                   </a>
                 </span>
                 <span>

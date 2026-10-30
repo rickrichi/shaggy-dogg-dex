@@ -44,7 +44,7 @@ contract MockEntryPointStake {
 
 contract SponsoredRewardPaymasterTest {
     PaymasterVm constant vm = PaymasterVm(address(uint160(uint256(keccak256("hevm cheat code")))));
-    address constant ENTRYPOINT = 0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108;
+    address constant ENTRYPOINT = 0x0000000071727De22E5E9d8BAf0edAc6f37da032;
     address constant SMART_ACCOUNT = address(0xB0B);
     address constant EVE = address(0xE7E);
     uint256 constant SIGNER_KEY = 0xA11CE;
@@ -66,7 +66,7 @@ contract SponsoredRewardPaymasterTest {
     }
 
     function paymasterImplementation() internal pure returns (address) {
-        return 0xe6Cae83BdE06E4c305530e199D7217f42808555B;
+        return 0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B;
     }
 
     function _operation(uint48 validUntil) internal returns (PackedUserOperation memory op) {

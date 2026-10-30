@@ -3,6 +3,7 @@ import { z } from 'zod'
 import {
   concat,
   createPublicClient,
+  decodeAbiParameters,
   decodeFunctionData,
   encodeAbiParameters,
   getAddress,
@@ -20,7 +21,13 @@ import { recoverAuthorizationAddress } from 'viem/utils'
 
 export const config = { runtime: 'edge' }
 
-const entryPoint = '0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108' as const
+const entryPointV07 = '0x0000000071727De22E5E9d8BAf0edAc6f37da032' as const
+const entryPointV08 = '0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108' as const
+const supportedEntryPoints = new Set([
+  entryPointV07.toLowerCase(),
+  entryPointV08.toLowerCase(),
+])
+const metamaskImplementation = '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B' as const
 const implementation = '0xe6Cae83BdE06E4c305530e199D7217f42808555B' as const
 const mrwd = '0xC17227AAa33C54634B6cE7AD0bf33A156563c179' as const
 const muttProStaking = '0x67dBC193bF510225EBf189ab25dC3b34a32c1766' as const
@@ -28,7 +35,13 @@ const uniswapV2Router = '0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24' as const
 const aerodromeRouter = '0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43' as const
 const uniswapV3Router = '0x2626664c2603336E57B271c5C0b26F421741e481' as const
 
-const designator = `0xef0100${implementation.slice(2).toLowerCase()}`
+const metamaskDesignator = `0xef0100${metamaskImplementation.slice(2).toLowerCase()}`
+const simpleDesignator = `0xef0100${implementation.slice(2).toLowerCase()}`
+const supportedDesignators = new Set([metamaskDesignator, simpleDesignator])
+const supportedImplementations = new Set([
+  metamaskImplementation.toLowerCase(),
+  implementation.toLowerCase(),
+])
 const hex = z.string().regex(/^0x(?:[0-9a-fA-F]{2})*$/)
 const address = z.string().refine(isAddress, 'Invalid address')
 const uint = z.string().regex(/^(0|[1-9][0-9]*)$/)
@@ -41,6 +54,7 @@ const authorizationSchema = z.object({
   yParity: z.union([z.literal(0), z.literal(1)]),
 })
 const signSchema = z.object({
+  paymaster: address.optional(),
   sender: address,
   nonce: uint,
   callData: hex,
@@ -59,6 +73,7 @@ const signSchema = z.object({
 const accountAbi = parseAbi([
   'function execute(address target, uint256 value, bytes data)',
   'function executeBatch((address target, uint256 value, bytes data)[] calls)',
+  'function execute(bytes32 mode, bytes executionCalldata)',
 ])
 
 const erc20Abi = parseAbi([
@@ -92,6 +107,7 @@ const stakingAbi = parseAbi([
 ])
 
 const paymasterAbi = parseAbi([
+  'function entryPoint() view returns (address)',
   'function sponsorSigner() view returns (address)',
   'function rewardToken() view returns (address)',
   'function rewardAmount() view returns (uint256)',
@@ -140,8 +156,42 @@ function packGas(upper: bigint, lower: bigint): Hex {
 function extractCalls(callData: Hex): InnerCall[] {
   const decoded = decodeFunctionData({ abi: accountAbi, data: callData })
   if (decoded.functionName === 'execute') {
-    const [target, value, data] = decoded.args
-    return [{ target: getAddress(target), value, data }]
+    if (decoded.args.length === 3) {
+      const [target, value, data] = decoded.args
+      return [{ target: getAddress(target), value, data }]
+    }
+    const [mode, executionCalldata] = decoded.args
+    const callType = mode.slice(0, 4).toLowerCase()
+    if (callType === '0x00') {
+      if (executionCalldata.length < 2 + 40 + 64) {
+        throw new Error('Invalid ERC-7579 single execution calldata')
+      }
+      const target = getAddress(`0x${executionCalldata.slice(2, 42)}`)
+      const value = BigInt(`0x${executionCalldata.slice(42, 106)}`)
+      const data = (`0x${executionCalldata.slice(106)}` || '0x') as Hex
+      return [{ target, value, data }]
+    }
+    if (callType === '0x01') {
+      const [calls] = decodeAbiParameters(
+        [
+          {
+            type: 'tuple[]',
+            components: [
+              { name: 'target', type: 'address' },
+              { name: 'value', type: 'uint256' },
+              { name: 'callData', type: 'bytes' },
+            ],
+          },
+        ],
+        executionCalldata
+      )
+      return calls.map((call) => ({
+        target: getAddress(call.target),
+        value: call.value,
+        data: call.callData,
+      }))
+    }
+    throw new Error('Unsupported ERC-7579 execution mode')
   }
   if (decoded.functionName === 'executeBatch') {
     const [calls] = decoded.args
@@ -425,9 +475,13 @@ app.get('/api/paymaster/config', (c) => {
   return c.json({
     ready,
     chainId: base.id,
-    entryPoint,
+    entryPoint: entryPointV07,
+    entryPointV07,
+    entryPointV08,
     paymaster: paymaster ?? null,
+    signerAddress: signer?.address ?? null,
     accountImplementation: implementation,
+    metamaskAccountImplementation: metamaskImplementation,
     muttProStaking,
     eligibilityMode,
     supportedOperations: ['transfer', 'swap', 'stake'],
@@ -462,7 +516,7 @@ app.post('/api/paymaster/bundler', async (c) => {
       typeof operation.sender !== 'string' ||
       !isWalletEligible(operation.sender) ||
       typeof requestedEntryPoint !== 'string' ||
-      requestedEntryPoint.toLowerCase() !== entryPoint.toLowerCase()
+      !supportedEntryPoints.has(requestedEntryPoint.toLowerCase())
     ) {
       return c.json({ error: 'User operation is not eligible' }, 403)
     }
@@ -494,17 +548,22 @@ app.post('/api/paymaster/sign', async (c) => {
   if (!parsed.success) return c.json({ error: 'Invalid sponsorship request' }, 400)
   const op = parsed.data
   const sender = getAddress(op.sender)
+  const targetPaymaster = op.paymaster ? getAddress(op.paymaster) : paymaster
   if (!isWalletEligible(sender)) return c.json({ error: 'Wallet is not eligible' }, 403)
 
   try {
-    const senderCode = await client.getBytecode({ address: sender })
-    if (senderCode?.toLowerCase() !== designator) {
+    const senderCode = (await client.getBytecode({ address: sender }))?.toLowerCase()
+    const isDelegated = Boolean(senderCode && supportedDesignators.has(senderCode))
+    if (!isDelegated) {
       if (senderCode && senderCode !== '0x') {
         throw new Error('Wallet uses a different account implementation')
       }
       if (!op.authorization) throw new Error('EIP-7702 authorization is required')
       const auth = op.authorization
-      if (getAddress(auth.address) !== implementation || auth.chainId !== base.id) {
+      if (
+        !supportedImplementations.has(getAddress(auth.address).toLowerCase()) ||
+        auth.chainId !== base.id
+      ) {
         throw new Error('Authorization targets the wrong chain or account implementation')
       }
       const recovered = await recoverAuthorizationAddress({
@@ -530,6 +589,7 @@ app.post('/api/paymaster/sign', async (c) => {
     await verifyEligiblePortfolioCalls(client, sender, calls)
 
     const [
+      paymasterEntryPoint,
       onchainSigner,
       rewardToken,
       rewardAmount,
@@ -538,34 +598,69 @@ app.post('/api/paymaster/sign', async (c) => {
       lastSponsoredAt,
       paused,
       available,
-      depositInfo,
     ] = await Promise.all([
-      client.readContract({ address: paymaster, abi: paymasterAbi, functionName: 'sponsorSigner' }),
-      client.readContract({ address: paymaster, abi: paymasterAbi, functionName: 'rewardToken' }),
-      client.readContract({ address: paymaster, abi: paymasterAbi, functionName: 'rewardAmount' }),
-      client.readContract({ address: paymaster, abi: paymasterAbi, functionName: 'maxCostPerOp' }),
-      client.readContract({ address: paymaster, abi: paymasterAbi, functionName: 'cooldownSeconds' }),
       client.readContract({
-        address: paymaster,
+        address: targetPaymaster,
+        abi: paymasterAbi,
+        functionName: 'entryPoint',
+      }),
+      client.readContract({
+        address: targetPaymaster,
+        abi: paymasterAbi,
+        functionName: 'sponsorSigner',
+      }),
+      client.readContract({
+        address: targetPaymaster,
+        abi: paymasterAbi,
+        functionName: 'rewardToken',
+      }),
+      client.readContract({
+        address: targetPaymaster,
+        abi: paymasterAbi,
+        functionName: 'rewardAmount',
+      }),
+      client.readContract({
+        address: targetPaymaster,
+        abi: paymasterAbi,
+        functionName: 'maxCostPerOp',
+      }),
+      client.readContract({
+        address: targetPaymaster,
+        abi: paymasterAbi,
+        functionName: 'cooldownSeconds',
+      }),
+      client.readContract({
+        address: targetPaymaster,
         abi: paymasterAbi,
         functionName: 'lastSponsoredAt',
         args: [sender],
       }),
-      client.readContract({ address: paymaster, abi: paymasterAbi, functionName: 'paused' }),
+      client.readContract({ address: targetPaymaster, abi: paymasterAbi, functionName: 'paused' }),
       client.readContract({
-        address: paymaster,
+        address: targetPaymaster,
         abi: paymasterAbi,
         functionName: 'availableRewards',
       }),
-      client.readContract({
-        address: entryPoint,
-        abi: parseAbi([
-          'function getDepositInfo(address account) view returns ((uint256 deposit, bool staked, uint112 stake, uint32 unstakeDelaySec, uint48 withdrawTime) info)',
-        ]),
-        functionName: 'getDepositInfo',
-        args: [paymaster],
-      }),
     ])
+    if (!supportedEntryPoints.has(paymasterEntryPoint.toLowerCase())) {
+      throw new Error('Paymaster uses an unsupported EntryPoint')
+    }
+    if (
+      senderCode === metamaskDesignator &&
+      paymasterEntryPoint.toLowerCase() !== entryPointV07.toLowerCase()
+    ) {
+      throw new Error(
+        'Your MetaMask Smart Account uses ERC-4337 EntryPoint v0.7, while the active paymaster contract uses v0.8. Click "Upgrade Paymaster for MetaMask (v0.7)" above to deploy & attach a v0.7 paymaster.'
+      )
+    }
+    const depositInfo = await client.readContract({
+      address: paymasterEntryPoint,
+      abi: parseAbi([
+        'function getDepositInfo(address account) view returns ((uint256 deposit, bool staked, uint112 stake, uint32 unstakeDelaySec, uint48 withdrawTime) info)',
+      ]),
+      functionName: 'getDepositInfo',
+      args: [targetPaymaster],
+    })
     if (onchainSigner.toLowerCase() !== signer.address.toLowerCase()) {
       throw new Error('Sponsor signer does not match contract')
     }
@@ -606,7 +701,7 @@ app.post('/api/paymaster/sign', async (c) => {
     }
     if (depositInfo.deposit < estimatedMaxCost) {
       throw new Error(
-        'Paymaster ETH gas deposit on EntryPoint v0.8 is below this operation cost. Deposit ETH in the Paymaster Operations console.'
+        'Paymaster ETH gas deposit on EntryPoint is below this operation cost. Deposit ETH in the Paymaster Operations console.'
       )
     }
     if (op.factory || op.factoryData) throw new Error('Account factory is not eligible')
@@ -632,7 +727,7 @@ app.post('/api/paymaster/sign', async (c) => {
         ],
         [
           typehash,
-          paymaster,
+          targetPaymaster,
           BigInt(base.id),
           sender,
           BigInt(op.nonce),
@@ -650,7 +745,7 @@ app.post('/api/paymaster/sign', async (c) => {
     )
     const signature = await signer.signMessage({ message: { raw: message } })
     return c.json({
-      paymaster,
+      paymaster: targetPaymaster,
       paymasterData: concat([toHex(validUntil, { size: 6 }), signature]),
       paymasterVerificationGasLimit: paymasterVerificationGas.toString(),
       paymasterPostOpGasLimit: postOpGas.toString(),
