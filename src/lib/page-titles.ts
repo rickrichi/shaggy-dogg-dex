@@ -17,6 +17,8 @@ const pageNames: Record<string, string> = {
   "/launchpad/my-tokens": "My Tokens",
   "/protocol": "Protocol Hub",
   "/launchpad/manage": "Protocol Hub",
+  "/paymaster": "ERC-4337 Gas Paymaster",
+  "/launchpad/paymaster": "ERC-4337 Gas Paymaster",
   "/markets": "Markets",
   "/market-data": "Market Data",
   "/portfolio": "Portfolio",

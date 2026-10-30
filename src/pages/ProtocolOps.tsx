@@ -82,6 +82,15 @@ export default function ProtocolOps() {
         </div>
 
         <div className="flex flex-wrap gap-2">
+          <Link to="/paymaster">
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-purple-200 bg-purple-50/70 font-semibold text-purple-800 hover:bg-purple-100"
+            >
+              ERC-4337 Gas Paymaster
+            </Button>
+          </Link>
           <Link to="/stake">
             <Button size="sm" className="bg-indigo-600 font-semibold text-white hover:bg-indigo-700">
               Stake MRWD

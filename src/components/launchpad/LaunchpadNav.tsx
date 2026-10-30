@@ -1,7 +1,7 @@
 // src/components/launchpad/LaunchpadNav.tsx
 import { Link, useLocation } from "react-router-dom";
 
-import { Coins, Compass, Rocket, ShieldCheck, Sparkles, Zap } from "lucide-react";
+import { Coins, Compass, Fuel, Rocket, ShieldCheck, Sparkles, Zap } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
@@ -26,6 +26,12 @@ export const LaunchpadNav = () => {
       href: "/launchpad/my-tokens",
       icon: Coins,
       description: "Tokens created by your wallet",
+    },
+    {
+      name: "Gas Paymaster",
+      href: "/paymaster",
+      icon: Fuel,
+      description: "ERC-4337 ERC-20 Token Gas Paymaster & Chainlink Oracles",
     },
     {
       name: "Protocol Hub",
@@ -62,6 +68,8 @@ export const LaunchpadNav = () => {
           (item.href === "/launchpad" && location.pathname === "/create-token") ||
           (item.href === "/launchpad" &&
             /^\/launchpad\/(identity|purpose|liquidity|review)\/?$/.test(location.pathname)) ||
+          (item.href === "/paymaster" &&
+            (location.pathname === "/paymaster" || location.pathname === "/launchpad/paymaster")) ||
           (item.href.startsWith("/arbitrage") && location.pathname.startsWith("/arbitrage"));
 
         return (

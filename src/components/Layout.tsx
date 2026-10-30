@@ -7,6 +7,7 @@ import {
   CandlestickChart,
   ChevronDown,
   Droplets,
+  Fuel,
   LineChart,
   Menu,
   PieChart,
@@ -64,6 +65,7 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
     items: [
       { name: "Token Studio", href: "/launchpad", icon: Rocket },
       { name: "Protocol Hub", href: "/protocol", icon: Sparkles },
+      { name: "Gas Paymaster", href: "/paymaster", icon: Fuel },
     ],
   },
   {
