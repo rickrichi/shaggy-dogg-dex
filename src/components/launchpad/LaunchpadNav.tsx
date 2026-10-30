@@ -31,7 +31,7 @@ export const LaunchpadNav = () => {
       name: "Gas Paymaster",
       href: "/paymaster",
       icon: Fuel,
-      description: "ERC-4337 ERC-20 Token Gas Paymaster & Chainlink Oracles",
+      description: "Sponsored Base portfolio operations and MRWD rewards",
     },
     {
       name: "Protocol Hub",

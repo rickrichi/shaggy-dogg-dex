@@ -90,6 +90,10 @@
       "destination": "https://shaggy-dogg-api.onrender.com/api/cedefi/:path*"
     },
     {
+      "source": "/api/paymaster/:path*",
+      "destination": "https://shaggy-dogg-api.onrender.com/api/paymaster/:path*"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/"
     }

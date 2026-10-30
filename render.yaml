@@ -15,6 +15,14 @@ services:
         value: production
       - key: ORIGIN
         value: https://dex.lumsian.com
+      - key: PAYMASTER_ADDRESS
+        value: 0x221A9765844511Ef01E383273b396c45372E462a
+      - key: PAYMASTER_ALLOWED_WALLETS
+        value: 0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98
+      - key: PAYMASTER_SIGNER_PRIVATE_KEY
+        sync: false
+      - key: PAYMASTER_BUNDLER_URL
+        sync: false
       # Set after the market-data service is live, e.g. https://shaggy-dogg-market-data.onrender.com
       - key: MARKET_DATA_URL
         sync: false
