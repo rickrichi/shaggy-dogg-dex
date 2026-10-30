@@ -4,6 +4,8 @@ import { mountPaymasterRoutes } from '../../server/src/routes/paymaster.js'
 
 import type { Env } from '../../server/src/env.js'
 
+export const config = { runtime: 'edge' }
+
 const app = new Hono()
 
 mountPaymasterRoutes(app, {
