@@ -83,6 +83,8 @@ export interface PoolPlannerConfig {
   protocol: "v2" | "v3";
   /** Base V2 swap fees, read from each router's getAmountOut on-chain. */
   swapFee?: string;
+  /** Base V3 tier for volatile pairs, read from each factory's feeAmountTickSpacing. */
+  volatileFeeTier?: { value: number; label: string };
   liquidityUrl: string;
   rewardsCondition: string;
 }
@@ -106,6 +108,15 @@ const POOL_PLANNERS: Partial<Record<string, PoolPlannerConfig>> = {
     ...PANCAKESWAP_PLANNER,
     name: "PancakeSwap V3",
     protocol: "v3",
+    volatileFeeTier: { value: 2500, label: "0.25%" },
+  },
+  "SushiSwap V3": {
+    name: "SushiSwap V3",
+    dexName: "SushiSwap",
+    protocol: "v3",
+    volatileFeeTier: { value: 3000, label: "0.30%" },
+    liquidityUrl: "https://www.sushi.com/base/pool/v3/add",
+    rewardsCondition: "a separately funded incentive is",
   },
   "PancakeSwap V2": {
     ...PANCAKESWAP_PLANNER,

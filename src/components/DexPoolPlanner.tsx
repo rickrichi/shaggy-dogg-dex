@@ -17,12 +17,12 @@ import { cn } from "@/lib/utils";
 import type { Address } from "viem";
 import type { PoolPlannerConfig } from "@/config/dex-venues";
 
-const FEE_TIERS = [
+const feeTiersFor = ({ value, label }: { value: number; label: string }) => [
   { value: 100, label: "0.01%", note: "Stable pairs" },
   { value: 500, label: "0.05%", note: "Tight spreads" },
-  { value: 2500, label: "0.25%", note: "Volatile pairs" },
+  { value, label, note: "Volatile pairs" },
   { value: 10000, label: "1%", note: "High volatility" },
-] as const;
+];
 
 const RANGE_PLANS = [
   {
@@ -79,7 +79,9 @@ export function DexPoolPlanner({
 }: DexPoolPlannerProps) {
   const isV2 = planner.protocol === "v2";
   const { dexName } = planner;
-  const [feeTier, setFeeTier] = useState(2500);
+  const volatileFeeTier = planner.volatileFeeTier ?? { value: 0, label: "" };
+  const feeTiers = feeTiersFor(volatileFeeTier);
+  const [feeTier, setFeeTier] = useState(volatileFeeTier.value);
   const [tokenAmount, setTokenAmount] = useState("");
   const [quoteAmount, setQuoteAmount] = useState("");
   const [rangePlan, setRangePlan] = useState("wide");
@@ -88,14 +90,14 @@ export function DexPoolPlanner({
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    setFeeTier(2500);
+    setFeeTier(volatileFeeTier.value);
     setTokenAmount("");
     setQuoteAmount("");
     setRangePlan("wide");
     setPriceConfirmed(false);
     setRiskConfirmed(false);
     setCopied(false);
-  }, [planner.name, tokenKey]);
+  }, [planner.name, tokenKey, volatileFeeTier.value]);
 
   const tokenValue = parsePositiveAmount(tokenAmount);
   const quoteValue = parsePositiveAmount(quoteAmount);
@@ -218,7 +220,7 @@ export function DexPoolPlanner({
                 02 · Fee tier
               </legend>
               <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {FEE_TIERS.map((tier) => (
+                {feeTiers.map((tier) => (
                   <button
                     key={tier.value}
                     type="button"
@@ -237,7 +239,7 @@ export function DexPoolPlanner({
                 ))}
               </div>
               <p className="mt-2 text-xs text-slate-500">
-                0.25% is a common starting point for volatile pairs, not personalized advice.
+                {volatileFeeTier.label} is a common starting point for volatile pairs, not personalized advice.
               </p>
             </fieldset>
           )}
@@ -392,7 +394,7 @@ export function DexPoolPlanner({
               : [
                   "Select Base network.",
                   `Import ${tokenSymbol} using the copied contract address.`,
-                  `Choose the matching ${FEE_TIERS.find((tier) => tier.value === feeTier)?.label} fee tier.`,
+                  `Choose the matching ${feeTiers.find((tier) => tier.value === feeTier)?.label} fee tier.`,
                   "Enter the same amounts and choose your range.",
                   "Review every value before approving the wallet transaction.",
                 ]

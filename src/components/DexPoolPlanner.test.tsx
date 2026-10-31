@@ -8,6 +8,7 @@ import { DexPoolPlanner } from "./DexPoolPlanner";
 const pancakeV3 = poolPlannerForVenue("PancakeSwap V3")!;
 const pancakeV2 = poolPlannerForVenue("PancakeSwap V2")!;
 const sushiV2 = poolPlannerForVenue("SushiSwap V2")!;
+const sushiV3 = poolPlannerForVenue("SushiSwap V3")!;
 const uniswapV2 = poolPlannerForVenue("Uniswap V2")!;
 
 const address = "0x1234567890123456789012345678901234567890" as const;
@@ -120,6 +121,31 @@ describe("DexPoolPlanner", () => {
     expect(sushiV2.swapFee).toBe("0.30%");
     expect(uniswapV2.swapFee).toBe("0.30%");
     expect(poolPlannerForVenue("BaseSwap")).toBeUndefined();
+  });
+
+  it("offers SushiSwap V3's own fee tiers, handoff, and rewards wording", async () => {
+    const user = userEvent.setup();
+    renderPlanner({ planner: sushiV3 });
+    expect(screen.getByRole("heading", { name: "Create a SushiSwap V3 pool" })).toBeInTheDocument();
+    for (const fee of ["0.01%", "0.05%", "0.30%", "1%"])
+      expect(
+        screen.getByRole("button", {
+          name: new RegExp(`^${fee.replace(".", "\\.")}`),
+        }),
+      ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^0\.25%/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^0\.30%/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText(/0\.30% is a common starting point/)).toBeInTheDocument();
+    expect(screen.getByText(/Choose the matching 0\.30% fee tier/)).toBeInTheDocument();
+    expect(screen.getByText(/a separately funded incentive is independently verified/)).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("MRWD amount"), "4");
+    await user.type(screen.getByLabelText("WETH amount"), "2");
+    for (const checkbox of screen.getAllByRole("checkbox")) await user.click(checkbox);
+    expect(screen.getByRole("link", { name: /continue on sushiswap/i })).toHaveAttribute(
+      "href",
+      "https://www.sushi.com/base/pool/v3/add",
+    );
   });
 
   it("uses Uniswap's fee, handoff, and rewards wording", async () => {
