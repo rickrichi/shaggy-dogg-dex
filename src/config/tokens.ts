@@ -161,7 +161,8 @@ export const MAINNET_TOKENS = [
     symbol: "LINK",
     name: "Chainlink",
     decimals: 18,
-    logoURI: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x514910771AF9Ca656af840dff83E8264EcF986CA/logo.png",
+    logoURI:
+      "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x514910771AF9Ca656af840dff83E8264EcF986CA/logo.png",
     chainId: 1,
   },
   {
@@ -232,7 +233,8 @@ export const MAINNET_TOKENS = [
     symbol: "CRV",
     name: "Curve DAO",
     decimals: 18,
-    logoURI: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xD533a949740bb3306d119CC777fa900bA034cd52/logo.png",
+    logoURI:
+      "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xD533a949740bb3306d119CC777fa900bA034cd52/logo.png",
     chainId: 1,
   },
   {
@@ -250,7 +252,8 @@ export const MAINNET_TOKENS = [
     symbol: "SNX",
     name: "Synthetix",
     decimals: 18,
-    logoURI: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F/logo.png",
+    logoURI:
+      "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F/logo.png",
     chainId: 1,
   },
   {
@@ -423,7 +426,8 @@ export const MAINNET_TOKENS = [
     symbol: "LRC",
     name: "Loopring",
     decimals: 18,
-    logoURI: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xBBbbCA6A901c926F240b89EacB641d8Aec7AEafD/logo.png",
+    logoURI:
+      "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xBBbbCA6A901c926F240b89EacB641d8Aec7AEafD/logo.png",
     chainId: 1,
   },
   {
@@ -831,7 +835,7 @@ export const BASE_MAINNET_TOKENS = [
   },
   {
     kind: "erc20",
-    address: "0x91F9CC2649AC70A071602cadE9b0c1A5868Af51d" as Address,
+    address: "0x91F9cc2649ac70a071602cadE9b0C1A5868af51D" as Address,
     symbol: "WXTZ",
     name: "Tezos (Wrapped XTZ)",
     decimals: 18,
@@ -847,7 +851,7 @@ export const BASE_MAINNET_TOKENS = [
   },
   {
     kind: "erc20",
-    address: "0xb2000000000000000000008501B13360000cb2EC" as Address,
+    address: "0xB2000000000000000000008501b13360000cb2EC" as Address,
     symbol: "cbZEC",
     name: "Zcash (Coinbase Wrapped)",
     decimals: 8,
@@ -877,7 +881,8 @@ export const BASE_MAINNET_TOKENS = [
     symbol: "CRV",
     name: "Curve DAO",
     decimals: 18,
-    logoURI: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xD533a949740bb3306d119CC777fa900bA034cd52/logo.png",
+    logoURI:
+      "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xD533a949740bb3306d119CC777fa900bA034cd52/logo.png",
     chainId: 8453,
   },
   {
@@ -926,30 +931,141 @@ const USDC_LOGO = "https://tokens.1inch.io/0xa0b86991c6218b36c1d19d4a2e9eb0ce360
 const USDT_LOGO = "https://tokens.1inch.io/0xdac17f958d2ee523a2206206994597c13d831ec7.png";
 
 export const ARBITRUM_TOKENS = [
-  { kind: "native", address: "native", symbol: "ETH", name: "Ether", decimals: 18, logoURI: ETH_LOGO, chainId: 42161 },
-  { kind: "erc20", address: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831" as Address, symbol: "USDC", name: "USD Coin", decimals: 6, logoURI: USDC_LOGO, chainId: 42161 },
-  { kind: "erc20", address: "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9" as Address, symbol: "USDT", name: "Tether USD", decimals: 6, logoURI: USDT_LOGO, chainId: 42161 },
-  { kind: "erc20", address: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1" as Address, symbol: "WETH", name: "Wrapped Ether", decimals: 18, logoURI: WETH_LOGO, chainId: 42161 },
+  {
+    kind: "native",
+    address: "native",
+    symbol: "ETH",
+    name: "Ether",
+    decimals: 18,
+    logoURI: ETH_LOGO,
+    chainId: 42161,
+  },
+  {
+    kind: "erc20",
+    address: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831" as Address,
+    symbol: "USDC",
+    name: "USD Coin",
+    decimals: 6,
+    logoURI: USDC_LOGO,
+    chainId: 42161,
+  },
+  {
+    kind: "erc20",
+    address: "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9" as Address,
+    symbol: "USDT",
+    name: "Tether USD",
+    decimals: 6,
+    logoURI: USDT_LOGO,
+    chainId: 42161,
+  },
+  {
+    kind: "erc20",
+    address: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1" as Address,
+    symbol: "WETH",
+    name: "Wrapped Ether",
+    decimals: 18,
+    logoURI: WETH_LOGO,
+    chainId: 42161,
+  },
 ] as const satisfies readonly [Token, Token, ...Token[]];
 
 export const OPTIMISM_TOKENS = [
-  { kind: "native", address: "native", symbol: "ETH", name: "Ether", decimals: 18, logoURI: ETH_LOGO, chainId: 10 },
-  { kind: "erc20", address: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85" as Address, symbol: "USDC", name: "USD Coin", decimals: 6, logoURI: USDC_LOGO, chainId: 10 },
-  { kind: "erc20", address: "0x94b008aA00579c1307B0EF2c499aD98a8ce58e58" as Address, symbol: "USDT", name: "Tether USD", decimals: 6, logoURI: USDT_LOGO, chainId: 10 },
-  { kind: "erc20", address: "0x4200000000000000000000000000000000000006" as Address, symbol: "WETH", name: "Wrapped Ether", decimals: 18, logoURI: WETH_LOGO, chainId: 10 },
+  {
+    kind: "native",
+    address: "native",
+    symbol: "ETH",
+    name: "Ether",
+    decimals: 18,
+    logoURI: ETH_LOGO,
+    chainId: 10,
+  },
+  {
+    kind: "erc20",
+    address: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85" as Address,
+    symbol: "USDC",
+    name: "USD Coin",
+    decimals: 6,
+    logoURI: USDC_LOGO,
+    chainId: 10,
+  },
+  {
+    kind: "erc20",
+    address: "0x94b008aA00579c1307B0EF2c499aD98a8ce58e58" as Address,
+    symbol: "USDT",
+    name: "Tether USD",
+    decimals: 6,
+    logoURI: USDT_LOGO,
+    chainId: 10,
+  },
+  {
+    kind: "erc20",
+    address: "0x4200000000000000000000000000000000000006" as Address,
+    symbol: "WETH",
+    name: "Wrapped Ether",
+    decimals: 18,
+    logoURI: WETH_LOGO,
+    chainId: 10,
+  },
 ] as const satisfies readonly [Token, Token, ...Token[]];
 
 export const POLYGON_TOKENS = [
   { kind: "native", address: "native", symbol: "POL", name: "POL", decimals: 18, chainId: 137 },
-  { kind: "erc20", address: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359" as Address, symbol: "USDC", name: "USD Coin", decimals: 6, logoURI: USDC_LOGO, chainId: 137 },
-  { kind: "erc20", address: "0xc2132D05D31c914a87C6611C10748AEb04B58e8F" as Address, symbol: "USDT", name: "Tether USD", decimals: 6, logoURI: USDT_LOGO, chainId: 137 },
-  { kind: "erc20", address: "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270" as Address, symbol: "WPOL", name: "Wrapped POL", decimals: 18, chainId: 137 },
+  {
+    kind: "erc20",
+    address: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359" as Address,
+    symbol: "USDC",
+    name: "USD Coin",
+    decimals: 6,
+    logoURI: USDC_LOGO,
+    chainId: 137,
+  },
+  {
+    kind: "erc20",
+    address: "0xc2132D05D31c914a87C6611C10748AEb04B58e8F" as Address,
+    symbol: "USDT",
+    name: "Tether USD",
+    decimals: 6,
+    logoURI: USDT_LOGO,
+    chainId: 137,
+  },
+  {
+    kind: "erc20",
+    address: "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270" as Address,
+    symbol: "WPOL",
+    name: "Wrapped POL",
+    decimals: 18,
+    chainId: 137,
+  },
 ] as const satisfies readonly [Token, Token, ...Token[]];
 
 export const SEPOLIA_TOKENS = [
-  { kind: "native", address: "native", symbol: "ETH", name: "Sepolia Ether", decimals: 18, logoURI: ETH_LOGO, chainId: 11155111 },
-  { kind: "erc20", address: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238" as Address, symbol: "USDC", name: "USD Coin (test)", decimals: 6, logoURI: USDC_LOGO, chainId: 11155111 },
-  { kind: "erc20", address: "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14" as Address, symbol: "WETH", name: "Wrapped Ether", decimals: 18, logoURI: WETH_LOGO, chainId: 11155111 },
+  {
+    kind: "native",
+    address: "native",
+    symbol: "ETH",
+    name: "Sepolia Ether",
+    decimals: 18,
+    logoURI: ETH_LOGO,
+    chainId: 11155111,
+  },
+  {
+    kind: "erc20",
+    address: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238" as Address,
+    symbol: "USDC",
+    name: "USD Coin (test)",
+    decimals: 6,
+    logoURI: USDC_LOGO,
+    chainId: 11155111,
+  },
+  {
+    kind: "erc20",
+    address: "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14" as Address,
+    symbol: "WETH",
+    name: "Wrapped Ether",
+    decimals: 18,
+    logoURI: WETH_LOGO,
+    chainId: 11155111,
+  },
 ] as const satisfies readonly [Token, Token, ...Token[]];
 
 export function getTokensForChain(chainId?: number): readonly [Token, Token, ...Token[]] {
@@ -1094,10 +1210,7 @@ export function getSwapDropdownTokens(chainId?: number): readonly [Token, Token,
  * to native ETH / USDC on `targetChainId` so sellToken and buyToken always share a chain
  * and are never identical).
  */
-export function matchTokenOnChain(
-  counterparty: Token,
-  selectedToken: Token
-): Token {
+export function matchTokenOnChain(counterparty: Token, selectedToken: Token): Token {
   const targetChainId = selectedToken.chainId;
   const chainTokens = getTokensForChain(targetChainId);
   const crossAliases: Record<string, string> = {
