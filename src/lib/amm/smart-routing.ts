@@ -55,6 +55,41 @@ export interface SmartRoute {
   /** One fee per hop of a multi-hop V3 route. */
   fees?: number[];
 }
+export interface SmartRouteQuote {
+  route: SmartRoute;
+  output: bigint;
+}
+
+/**
+ * A venue quote must remain reasonably close to the cross-venue median. We only
+ * apply the gate when at least three independent venues answered, so a thin
+ * market with one or two usable venues is not rejected on weak evidence.
+ */
+export const MAX_QUOTE_DEVIATION_BPS = 3_500n;
+export function admitVenueQuotes(quotes: SmartRouteQuote[]) {
+  const bestByVenue = new Map<SmartRouteVenue, SmartRouteQuote>();
+  for (const quote of quotes) {
+    const current = bestByVenue.get(quote.route.venue);
+    if (!current || quote.output > current.output) bestByVenue.set(quote.route.venue, quote);
+  }
+  if (bestByVenue.size < 3) return { admitted: quotes, excluded: [] as SmartRouteQuote[] };
+
+  const venueOutputs = [...bestByVenue.values()]
+    .map(({ output }) => output)
+    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  const median = venueOutputs[Math.floor(venueOutputs.length / 2)]!;
+  const unsafeVenues = new Set<SmartRouteVenue>();
+  for (const quote of bestByVenue.values()) {
+    const difference = quote.output > median ? quote.output - median : median - quote.output;
+    if ((difference * 10_000n) / median > MAX_QUOTE_DEVIATION_BPS) {
+      unsafeVenues.add(quote.route.venue);
+    }
+  }
+  return {
+    admitted: quotes.filter((quote) => !unsafeVenues.has(quote.route.venue)),
+    excluded: quotes.filter((quote) => unsafeVenues.has(quote.route.venue)),
+  };
+}
 /** Per-hop V3 fees, whether the route is single- or multi-hop. */
 export const v3RouteFees = (route: SmartRoute): number[] => route.fees ?? [route.fee ?? 3000];
 export const isV3Route = (route: SmartRoute) =>
@@ -360,7 +395,7 @@ export async function quoteSmartRoutes(
     allowFailure: true,
     contracts: routes.map((route) => routeQuoteCall(route, amount)),
   });
-  const quotes = results
+  const rawQuotes = results
     .flatMap((r, i) => {
       if (r.status !== "success") return [];
       const route = routes[i]!;
@@ -375,5 +410,6 @@ export async function quoteSmartRoutes(
       return output && output > 0n ? [{ route, output }] : [];
     })
     .sort((a, b) => (a.output > b.output ? -1 : a.output < b.output ? 1 : 0));
-  return { quotes, blockNumber, observedAt, best: quotes[0] ?? null };
+  const { admitted: quotes, excluded } = admitVenueQuotes(rawQuotes);
+  return { quotes, excluded, blockNumber, observedAt, best: quotes[0] ?? null };
 }

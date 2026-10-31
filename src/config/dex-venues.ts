@@ -1,8 +1,5 @@
 import { BASE_V2_VENUES, BASE_V3_VENUES } from "@/config/contracts";
-import {
-  routeVenuesForChain,
-  type SmartRouteVenue,
-} from "@/lib/amm/smart-routing";
+import { routeVenuesForChain, type SmartRouteVenue } from "@/lib/amm/smart-routing";
 
 export type VenueKind = "v2" | "v3" | "aerodrome";
 
@@ -47,8 +44,7 @@ const DETAILS: Record<SmartRouteVenue, Omit<DexVenueCapability, "name">> = {
     kind: "v3",
     ammType: "Concentrated liquidity V3",
     ...BASE_V3_VENUES["SushiSwap V3"],
-    rewardNote:
-      "A separately funded incentive may be available; none is verified here.",
+    rewardNote: "A separately funded incentive may be available; none is verified here.",
   },
   "PancakeSwap V2": {
     kind: "v2",
@@ -60,8 +56,7 @@ const DETAILS: Record<SmartRouteVenue, Omit<DexVenueCapability, "name">> = {
     kind: "v2",
     ammType: "Constant product V2",
     ...BASE_V2_VENUES["SushiSwap V2"],
-    rewardNote:
-      "A separately funded incentive may be available; none is verified here.",
+    rewardNote: "A separately funded incentive may be available; none is verified here.",
   },
   BaseSwap: {
     kind: "v2",
@@ -72,10 +67,13 @@ const DETAILS: Record<SmartRouteVenue, Omit<DexVenueCapability, "name">> = {
 };
 
 /** Venues shown for liquidity. BaseSwap still routes swaps, but its site is parked. */
-export const BASE_DEX_VENUES: readonly DexVenueCapability[] =
-  routeVenuesForChain(8453)
-    .filter((name) => name !== "BaseSwap")
-    .map((name) => ({ name, ...DETAILS[name] }));
+export const BASE_DEX_VENUES: readonly DexVenueCapability[] = routeVenuesForChain(8453)
+  .filter((name) => name !== "BaseSwap")
+  .map((name) => ({ name, ...DETAILS[name] }));
+
+/** Single source of truth for public Base routing claims. */
+export const BASE_SWAP_VENUE_NAMES = routeVenuesForChain(8453);
+export const BASE_SWAP_VENUE_LABEL = BASE_SWAP_VENUE_NAMES.join(", ");
 
 export interface PoolPlannerConfig {
   name: SmartRouteVenue;
@@ -137,11 +135,7 @@ const POOL_PLANNERS: Partial<Record<string, PoolPlannerConfig>> = {
 /** Guided pool planner for a venue, if it has one. */
 export const poolPlannerForVenue = (venue: string) => POOL_PLANNERS[venue];
 
-export const MRWD_ADDRESS =
-  "0xC17227AAa33C54634B6cE7AD0bf33A156563c179" as const;
-export const WETH_ADDRESS =
-  "0x4200000000000000000000000000000000000006" as const;
-export const USDC_ADDRESS =
-  "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as const;
-export const MRWD_UNISWAP_V3_POOL =
-  "0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5" as const;
+export const MRWD_ADDRESS = "0xC17227AAa33C54634B6cE7AD0bf33A156563c179" as const;
+export const WETH_ADDRESS = "0x4200000000000000000000000000000000000006" as const;
+export const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as const;
+export const MRWD_UNISWAP_V3_POOL = "0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5" as const;

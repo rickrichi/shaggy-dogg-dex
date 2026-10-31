@@ -85,6 +85,11 @@ export interface UseSwapReturn {
     routedVenues?: SmartRouteVenue[];
     /** How far the picked venue's output is below the best quote, in percent. */
     venueShortfallPercent?: number;
+    observedAt?: number;
+    blockNumber?: bigint;
+    routeDescription?: string;
+    excludedVenues?: SmartRouteVenue[];
+    estimatedNetworkFee?: string;
   };
 }
 
@@ -393,6 +398,20 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
         void quotes.refetch();
       },
       isRefreshing: quotes.isFetching,
+      ...(quotes.data?.observedAt !== undefined ? { observedAt: quotes.data.observedAt } : {}),
+      ...(quotes.data?.blockNumber !== undefined ? { blockNumber: quotes.data.blockNumber } : {}),
+      ...(best
+        ? {
+            routeDescription: `${best.route.venue} · ${best.route.path.length - 1} ${best.route.path.length === 2 ? "pool" : "pools"}${
+              isV3Route(best.route)
+                ? ` · ${v3RouteFees(best.route)
+                    .map((fee) => `${fee / 10_000}%`)
+                    .join(" → ")}`
+                : ""
+            }`,
+          }
+        : {}),
+      excludedVenues: [...new Set((quotes.data?.excluded ?? []).map((item) => item.route.venue))],
       preferredVenue,
       ...(compared
         ? {

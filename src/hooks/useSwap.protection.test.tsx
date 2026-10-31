@@ -76,6 +76,7 @@ beforeEach(() => {
   vi.mocked(quoteSmartRoutes).mockImplementation(async () => ({
     quotes: [{ route, output }],
     best: { route, output },
+    excluded: [],
     blockNumber: 100n,
     observedAt: Date.now(),
   }));
@@ -98,6 +99,7 @@ describe("venue choice", () => {
     vi.mocked(quoteSmartRoutes).mockResolvedValue({
       quotes: [top, picked],
       best: top,
+      excluded: [],
       blockNumber: 1n,
       observedAt: Date.now(),
     });
@@ -129,6 +131,7 @@ describe("venue choice", () => {
     vi.mocked(quoteSmartRoutes).mockResolvedValue({
       quotes: [{ route, output }],
       best: { route, output },
+      excluded: [],
       blockNumber: 1n,
       observedAt: Date.now(),
     });

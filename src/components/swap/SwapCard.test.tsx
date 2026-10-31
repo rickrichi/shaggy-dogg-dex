@@ -38,6 +38,9 @@ function makeSwap(): UseSwapReturn {
       priceImpact: 94.7875,
       status: "SUCCESS",
       bestVenue: "Uniswap V2",
+      observedAt: Date.now() - 5_000,
+      blockNumber: 12_345n,
+      routeDescription: "Uniswap V2 · 1 pool",
       uniswapAmountOut: "43089871.174776702040638151",
       refresh: vi.fn(),
       isRefreshing: false,
@@ -48,6 +51,17 @@ function makeSwap(): UseSwapReturn {
 const props = { tokens: BASE_MAINNET_TOKENS, showSettings: false, onSettingsChange: vi.fn() };
 
 describe("Swap impact review", () => {
+  it("uses level-two headings beneath the Swap page title", () => {
+    const swap = makeSwap();
+    const { unmount } = render(<SwapCard {...props} swap={swap} />);
+    expect(screen.getByRole("heading", { level: 2, name: "Swap" })).toBeInTheDocument();
+    unmount();
+    render(<PriceChart swap={swap} />);
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Quotes for your trade" })
+    ).toBeInTheDocument();
+  });
+
   it("warns before opening the wallet and requires a separate confirmation", () => {
     const swap = makeSwap();
     render(<SwapCard {...props} swap={swap} />);
@@ -204,5 +218,41 @@ describe("Swap impact review", () => {
     );
     expect(screen.getByRole("combobox", { name: "Route" })).toHaveTextContent("BaseSwap");
     expect(screen.getByText(/1\.50% fewer tokens/)).toHaveClass("text-orange-700");
+  });
+
+  it("explains excluded routes and honest execution metadata", () => {
+    const swap = makeSwap();
+    swap.quote.excludedVenues = ["PancakeSwap V2"];
+    swap.quote.routedVenues = ["Uniswap V2"];
+    render(<SwapCard {...props} swap={swap} />);
+    expect(screen.getByRole("status")).toHaveTextContent("PancakeSwap V2");
+    expect(screen.getByText("Uniswap V2 · 1 pool")).toBeInTheDocument();
+    expect(screen.getByText("#12,345")).toBeInTheDocument();
+    expect(screen.getByText("Available in wallet")).toBeInTheDocument();
+    expect(screen.getByText(/Net value is not calculated/)).toBeInTheDocument();
+  });
+
+  it("labels an excluded quote with its safety reason in the venue panel", () => {
+    const swap = makeSwap();
+    swap.quote.excludedVenues = ["PancakeSwap V2"];
+    render(<PriceChart swap={swap} />);
+    const excluded = screen.getByRole("button", { name: /PancakeSwap V2/ });
+    expect(excluded).toBeDisabled();
+    expect(excluded).toHaveTextContent("Excluded · unsafe quote deviation");
+    expect(excluded).not.toHaveTextContent("No liquidity route");
+  });
+
+  it("gives the settings dialog an accessible description", () => {
+    const swap = makeSwap();
+    const onSettingsChange = vi.fn();
+    const { rerender } = render(
+      <SwapCard {...props} onSettingsChange={onSettingsChange} swap={swap} />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Swap settings" }));
+    expect(onSettingsChange).toHaveBeenCalledWith(true);
+    rerender(<SwapCard {...props} showSettings onSettingsChange={onSettingsChange} swap={swap} />);
+    expect(screen.getByRole("dialog", { name: "Swap Settings" })).toHaveAccessibleDescription(
+      /price movement/
+    );
   });
 });

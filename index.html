@@ -26,7 +26,8 @@
 
   <body>
     <!-- Shown until the app starts (and to crawlers that do not run JavaScript); React replaces it. -->
-    <div id="root">
+    <!-- Keep the React event-delegation container out of the accessibility tree. -->
+    <div id="root" role="presentation">
       <main style="max-width:44rem;margin:3rem auto;padding:0 1rem;font-family:system-ui,sans-serif;line-height:1.5">
         <h1>Shaggy Mutt DEX</h1>
         <p>A decentralized exchange interface on Base for swapping tokens, adding liquidity and following markets.</p>

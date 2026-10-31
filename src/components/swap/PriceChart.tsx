@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { getUniswapV3Deployment } from "@/config/contracts";
 import { BASE_EXTRA_VENUES, type SmartRouteVenue } from "@/lib/amm/smart-routing";
 import { formatSwapAmount } from "@/lib/format-swap-amount";
@@ -31,7 +31,9 @@ export function PriceChart({ swap }: { swap: UseSwapReturn }) {
     <Card className="rounded-2xl border-purple-100 bg-white/90 shadow-sm">
       <CardHeader>
         <div className="flex items-center justify-between gap-3">
-          <CardTitle className="text-lg">Quotes for your trade</CardTitle>
+          <h2 className="text-lg font-semibold leading-none tracking-tight text-foreground">
+            Quotes for your trade
+          </h2>
           <div className="flex items-center gap-2">
             {quote.preferredVenue && (
               <Button variant="ghost" size="sm" onClick={() => actions.setPreferredVenue(null)}>
@@ -59,14 +61,15 @@ export function PriceChart({ swap }: { swap: UseSwapReturn }) {
           {venues.map(({ name, amount }) => {
             const isBest = showQuotes && quote.bestVenue === name;
             const isPicked = quote.preferredVenue === name;
+            const isExcluded = quote.excludedVenues?.includes(name) ?? false;
             return (
               <button
                 key={name}
                 type="button"
                 aria-pressed={isPicked}
-                disabled={showQuotes && !amount && !isPicked}
+                disabled={showQuotes && (!amount || isExcluded) && !isPicked}
                 onClick={() => actions.setPreferredVenue(isPicked ? null : name)}
-                className={`rounded-xl border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 disabled:cursor-not-allowed disabled:opacity-60 ${isPicked ? "border-purple-600 bg-purple-50 ring-1 ring-purple-600" : isBest ? "border-purple-300 bg-purple-50" : "border-gray-100 bg-gray-50 hover:border-purple-200"}`}
+                className={`rounded-xl border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 disabled:cursor-not-allowed ${isExcluded ? "border-amber-200 bg-amber-50/70 text-amber-950" : "disabled:opacity-60"} ${isPicked ? "border-purple-600 bg-purple-50 ring-1 ring-purple-600" : isBest ? "border-purple-300 bg-purple-50" : !isExcluded ? "border-gray-100 bg-gray-50 hover:border-purple-200" : ""}`}
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="font-semibold">{name}</p>
@@ -84,18 +87,25 @@ export function PriceChart({ swap }: { swap: UseSwapReturn }) {
                   </div>
                 </div>
                 <p className="mt-1 break-words text-sm" title={amount}>
-                  {quote.status === "IDLE"
-                    ? "Enter an amount"
-                    : quote.status === "LOADING"
-                      ? "Checking…"
-                      : quote.status === "ERROR"
-                        ? "Quote unavailable"
-                        : !showQuotes
-                          ? "No current quote"
-                          : amount
-                            ? `${formatSwapAmount(amount)} ${state.buyToken.symbol}`
-                            : "No liquidity route"}
+                  {isExcluded
+                    ? "Excluded · unsafe quote deviation"
+                    : quote.status === "IDLE"
+                      ? "Enter an amount"
+                      : quote.status === "LOADING"
+                        ? "Checking…"
+                        : quote.status === "ERROR"
+                          ? "Quote unavailable"
+                          : !showQuotes
+                            ? "No current quote"
+                            : amount
+                              ? `${formatSwapAmount(amount)} ${state.buyToken.symbol}`
+                              : "No liquidity route"}
                 </p>
+                {isExcluded && (
+                  <p className="mt-1 text-xs text-amber-800">
+                    Outside the 35% cross-venue safety range.
+                  </p>
+                )}
               </button>
             );
           })}

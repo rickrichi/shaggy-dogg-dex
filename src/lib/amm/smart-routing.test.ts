@@ -12,6 +12,7 @@ import { BASE_MAINNET_TOKENS } from "@/config/tokens";
 
 import { encodeV3Path } from "./bot-market-snapshot";
 import {
+  admitVenueQuotes,
   AERODROME_ROUTER,
   isV3Route,
   routeCandidates,
@@ -26,6 +27,26 @@ const usdc = BASE_MAINNET_TOKENS.find((t) => t.symbol === "USDC")!;
 const cbbtc = BASE_MAINNET_TOKENS.find((t) => t.symbol === "cbBTC")!;
 
 describe("Executable router plans", () => {
+  it("excludes venue outliers before best-route selection", () => {
+    const routes = routeCandidates(usdc, weth);
+    const route = (venue: "Uniswap V2" | "Aerodrome" | "PancakeSwap V2") =>
+      routes.find((candidate) => candidate.venue === venue)!;
+    const result = admitVenueQuotes([
+      { route: route("Uniswap V2"), output: 2_250n },
+      { route: route("Aerodrome"), output: 2_200n },
+      { route: route("PancakeSwap V2"), output: 320n },
+    ]);
+    expect(result.admitted.map((quote) => quote.route.venue)).toEqual(["Uniswap V2", "Aerodrome"]);
+    expect(result.excluded.map((quote) => quote.route.venue)).toEqual(["PancakeSwap V2"]);
+  });
+
+  it("does not infer safety from fewer than three independent venues", () => {
+    const quotes = routeCandidates(usdc, weth)
+      .filter((route) => ["Uniswap V2", "Aerodrome"].includes(route.venue))
+      .map((route, index) => ({ route, output: index ? 1n : 100n }));
+    expect(admitVenueQuotes(quotes).excluded).toEqual([]);
+  });
+
   it("compares Uniswap V3 fee tiers, Uniswap V2, and Aerodrome pools without degenerate wrapped routes", () => {
     const routes = routeCandidates(usdc, weth);
     expect(routes.filter((r) => SPONSORED_ROUTE_VENUES.includes(r.venue))).toHaveLength(7);
