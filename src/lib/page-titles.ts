@@ -7,6 +7,7 @@ const pageNames: Record<string, string> = {
   "/dex/setup": "DEX Setup",
   "/legacy/liquidity": "Legacy Liquidity",
   "/stake": "VIP Staking",
+  "/stake/dexes": "Portfolio Liquidity & Rewards",
   "/launchpad": "Token Studio",
   "/launchpad/identity": "Token Identity · Token Studio",
   "/launchpad/purpose": "Purpose & Lending · Token Studio",

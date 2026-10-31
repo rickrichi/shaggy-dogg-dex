@@ -7,7 +7,13 @@ import { useAccount, usePublicClient } from "wagmi";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { MRWD } from "@/lib/mrwd-pro";
 
@@ -16,7 +22,13 @@ const STAKER: Address = "0x42bE4D6527829FeFA1493e1fb9F3676d2425C3C1";
 const NPM: Address = "0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1";
 const POOL: Address = "0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5";
 const TIMELOCK: Address = "0xB5C9BeDb57f4E348e40A5E6326c90dE474072E25";
-const DEFAULT_TOKEN_IDS = ["6383553", "6383541", "6383531", "6367926", "6351512"];
+const DEFAULT_TOKEN_IDS = [
+  "6383553",
+  "6383541",
+  "6383531",
+  "6367926",
+  "6351512",
+];
 const MAX_UINT128 = (1n << 128n) - 1n;
 
 const schedulerAbi = parseAbi([
@@ -105,7 +117,12 @@ export function MrwdLpStakerPanel() {
         tokenIds.map(async (idStr) => {
           const tid = BigInt(idStr);
           const [nftHolder, pos, deposit, stake] = await Promise.all([
-            client!.readContract({ address: NPM, abi: npmAbi, functionName: "ownerOf", args: [tid] }),
+            client!.readContract({
+              address: NPM,
+              abi: npmAbi,
+              functionName: "ownerOf",
+              args: [tid],
+            }),
             client!.readContract({
               address: NPM,
               abi: npmAbi,
@@ -188,7 +205,7 @@ export function MrwdLpStakerPanel() {
             feeWeth,
             feeMrwd,
           };
-        })
+        }),
       );
 
       const totalAccruedMrwd = rows.reduce((sum, r) => sum + r.accruedMrwd, 0n);
@@ -226,8 +243,8 @@ export function MrwdLpStakerPanel() {
             <CardTitle className="text-xl text-gray-900">
               Uniswap V3 LP Staking Rewards &amp; Accrued Fees
             </CardTitle>
-            <Badge className="border-emerald-200 bg-emerald-50 text-emerald-800">
-              Quarter 1 Live (55.45B MRWD)
+            <Badge className="border-indigo-200 bg-indigo-50 text-indigo-800">
+              Quarter 1 program · contract data
             </Badge>
           </div>
           {stakerQuery.isSuccess && (
@@ -246,17 +263,21 @@ export function MrwdLpStakerPanel() {
           )}
         </div>
         <CardDescription>
-          Live on-chain rewards from <code>UniswapV3Staker</code> ({STAKER}) and uncollected LP swap
-          fees from <code>NonfungiblePositionManager</code> ({NPM}).
+          Live on-chain rewards from <code>UniswapV3Staker</code> ({STAKER}) and
+          uncollected LP swap fees from <code>NonfungiblePositionManager</code>{" "}
+          ({NPM}).
         </CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-4 text-sm">
         {stakerQuery.isPending ? (
-          <p className="text-slate-500">Reading UniswapV3Staker positions on Base Mainnet…</p>
+          <p className="text-slate-500">
+            Reading UniswapV3Staker positions on Base Mainnet…
+          </p>
         ) : stakerQuery.isError ? (
           <p className="text-rose-600" role="alert">
-            Could not load V3 Staker positions: {(stakerQuery.error as Error).message}
+            Could not load V3 Staker positions:{" "}
+            {(stakerQuery.error as Error).message}
           </p>
         ) : (
           <>
@@ -270,7 +291,9 @@ export function MrwdLpStakerPanel() {
                   {fmtMrwd(stakerQuery.data.totalAccruedMrwd)} MRWD
                 </p>
                 <p className="mt-0.5 text-[11px] text-indigo-700">
-                  Across {stakerQuery.data.rows.filter((r) => r.isStaked).length} staked NFTs
+                  Across{" "}
+                  {stakerQuery.data.rows.filter((r) => r.isStaked).length}{" "}
+                  staked NFTs
                 </p>
               </div>
 
@@ -287,12 +310,15 @@ export function MrwdLpStakerPanel() {
               </div>
 
               <div className="rounded-xl border border-purple-100 bg-purple-50/50 p-3.5">
-                <p className="text-xs font-medium text-purple-800">Quarter 1 Remaining Reserve</p>
+                <p className="text-xs font-medium text-purple-800">
+                  Quarter 1 Remaining Reserve
+                </p>
                 <p className="mt-1 font-mono text-base font-bold text-purple-950">
                   {fmtMrwd(stakerQuery.data.unclaimedPoolMrwd)} MRWD
                 </p>
                 <p className="mt-0.5 text-[11px] text-purple-700">
-                  {stakerQuery.data.activeStakesCount} total active stakes in pool
+                  {stakerQuery.data.activeStakesCount} total active stakes in
+                  pool
                 </p>
               </div>
             </div>
@@ -309,7 +335,9 @@ export function MrwdLpStakerPanel() {
                     <th className="px-3 py-2.5 text-right font-semibold">
                       Accrued MRWD (Claimable)
                     </th>
-                    <th className="px-3 py-2.5 text-right font-semibold">Uncollected WETH Fees</th>
+                    <th className="px-3 py-2.5 text-right font-semibold">
+                      Uncollected WETH Fees
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -343,7 +371,9 @@ export function MrwdLpStakerPanel() {
                         )}
                       </td>
                       <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono font-semibold text-slate-900">
-                        {row.isStaked ? `${fmtMrwd(row.accruedMrwd)} MRWD` : "— (Not Staked)"}
+                        {row.isStaked
+                          ? `${fmtMrwd(row.accruedMrwd)} MRWD`
+                          : "— (Not Staked)"}
                       </td>
                       <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono text-slate-800">
                         {fmtWeth(row.feeWeth)}
@@ -376,7 +406,12 @@ export function MrwdLpStakerPanel() {
                   placeholder="Inspect V3 NFT Token ID (e.g. 6383553)"
                   className="h-8 w-64 font-mono text-xs"
                 />
-                <Button type="button" size="sm" variant="outline" onClick={addTokenId}>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={addTokenId}
+                >
                   <Plus className="mr-1 size-3.5" /> Add Position
                 </Button>
               </div>

@@ -31,6 +31,7 @@ const LaunchpadExplore = lazy(() => import("./pages/LaunchpadExplore"));
 const ProtocolOps = lazy(() => import("./pages/ProtocolOps"));
 const Paymaster = lazy(() => import("./pages/Paymaster"));
 const Stake = lazy(() => import("./pages/Stake"));
+const DexStaking = lazy(() => import("./pages/DexStaking"));
 const Arbitrage = lazy(() => import("./pages/Arbitrage"));
 const MarketData = lazy(() => import("./pages/MarketData"));
 const Markets = lazy(() => import("./pages/Markets"));
@@ -224,6 +225,7 @@ export const AppRoutes = (): JSX.Element => (
         <Route path="/legacy/liquidity" element={<Liquidity />} />
         <Route path="/own-dex" element={<BaseDex key="swap" />} />
         <Route path="/stake" element={<Stake />} />
+        <Route path="/stake/dexes" element={<DexStaking />} />
         <Route path="/launchpad/:step?" element={<Launchpad />} />
         <Route path="/create-token" element={<Launchpad />} />
         <Route path="/launchpad/explore" element={<LaunchpadExplore />} />

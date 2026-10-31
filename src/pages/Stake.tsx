@@ -76,6 +76,30 @@ export default function Stake() {
       </div>
 
       <MrwdLpStakerPanel />
+      <Card className="overflow-hidden border-indigo-200 shadow-sm">
+        <CardContent className="flex flex-col items-start justify-between gap-4 bg-gradient-to-r from-indigo-50 via-purple-50/60 to-white p-5 sm:flex-row sm:items-center">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-indigo-600">
+              Multi-DEX venue ledger
+            </p>
+            <h2 className="mt-1 text-lg font-black text-slate-950">
+              Compare MRWD liquidity &amp; rewards
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">
+              See which of the eight Base routing venues has a pool, a rewards program, or trading
+              fees only.
+            </p>
+          </div>
+          <Button
+            asChild
+            className="shrink-0 bg-indigo-600 font-semibold text-white hover:bg-indigo-700"
+          >
+            <Link to="/stake/dexes">
+              Compare venues <ArrowRight className="ml-2 size-4" />
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
       <YieldVaultPanel />
       <RouterOperatorPanel />
 
