@@ -184,6 +184,8 @@ Vercel authentication protection remains enabled for the deployment.
 - Automated post-deployment browser QA could not run because Chrome exited before producing a DevTools endpoint in the local automation environment. Local type-check, focused tests, production build, and Vercel's clean remote production build all passed.
 - The PancakeSwap handoff opens the general liquidity page. PancakeSwap's guide documents adding to existing V2 pools but not creating new ones, so that page is unconfirmed for creating a new V2 pair.
 - The SushiSwap V2 handoff opens `https://www.sushi.com/base/pool/v2/add`. `/base/pool/v2/create` was rejected because it is served like a nonexistent path. Whether `/add` can create a new pair is unconfirmed, because Sushi's tutorial page returned no readable content.
+- The Uniswap V2 handoff opens `https://app.uniswap.org/positions/create/v2?chain=base`. Uniswap's interface source keeps `/positions/create/:protocolVersion` as a redirect for external links and its create flow covers new pairs, but the app is a single-page site that returns 200 for any path, so a status code proves nothing. The user still selects the pair and confirms the network on Uniswap.
+- BaseSwap has no planner: `baseswap.fi` is parked and for sale, so it must not be linked. Its contracts remain live for routing.
 
 ## Later changes
 
@@ -193,10 +195,10 @@ Invalid mixed-case checksums on WXTZ and cbZEC made viem reject the whole balanc
 
 ### DEX pool planners
 
-`src/components/DexPoolPlanner.tsx` renders beneath the selected PancakeSwap V3, PancakeSwap V2, or SushiSwap V2 venue for any portfolio or imported token. Each venue's facts live in `POOL_PLANNERS` in `src/config/dex-venues.ts`. The planner prepares a deposit and hands off to the DEX; it never requests approvals or submits transactions.
+`src/components/DexPoolPlanner.tsx` renders beneath the selected Uniswap V2, PancakeSwap V3, PancakeSwap V2, or SushiSwap V2 venue for any portfolio or imported token. Each venue's facts live in `POOL_PLANNERS` in `src/config/dex-venues.ts`. The planner prepares a deposit and hands off to the DEX; it never requests approvals or submits transactions.
 
 - **V3:** the four Base fee tiers, implied price, and range guidance.
-- **V2:** a fixed fee and full-range model, with no fee-tier or range selection. Each router's `getAmountOut` on Base confirms the fee: 0.25% for PancakeSwap V2 and 0.30% for SushiSwap V2.
+- **V2:** a fixed fee and full-range model, with no fee-tier or range selection. Each router's `getAmountOut` on Base confirms the fee: 0.25% for PancakeSwap V2 and 0.30% for Uniswap V2 and SushiSwap V2.
 - **Existing pairs:** a V2 pair with reserves fixes the deposit ratio, so entered amounts do not change the price. A pair without confirmed reserves warns that a first deposit into an empty pair sets the price.
 
 Production now deploys from a clean export of `origin/main` rather than the working tree.

@@ -8,6 +8,7 @@ import { DexPoolPlanner } from "./DexPoolPlanner";
 const pancakeV3 = poolPlannerForVenue("PancakeSwap V3")!;
 const pancakeV2 = poolPlannerForVenue("PancakeSwap V2")!;
 const sushiV2 = poolPlannerForVenue("SushiSwap V2")!;
+const uniswapV2 = poolPlannerForVenue("Uniswap V2")!;
 
 const address = "0x1234567890123456789012345678901234567890" as const;
 
@@ -117,7 +118,25 @@ describe("DexPoolPlanner", () => {
     expect(pancakeV3.protocol).toBe("v3");
     expect(pancakeV2.swapFee).toBe("0.25%");
     expect(sushiV2.swapFee).toBe("0.30%");
+    expect(uniswapV2.swapFee).toBe("0.30%");
     expect(poolPlannerForVenue("BaseSwap")).toBeUndefined();
+  });
+
+  it("uses Uniswap's fee, handoff, and rewards wording", async () => {
+    const user = userEvent.setup();
+    renderPlanner({ planner: uniswapV2, poolExists: true, poolActive: true });
+    expect(screen.getByRole("heading", { name: "Add Uniswap V2 liquidity" })).toBeInTheDocument();
+    expect(screen.getByText("Standard 0.30% swap fee")).toBeInTheDocument();
+    expect(screen.getByText(/Uniswap matches your second amount/)).toBeInTheDocument();
+    expect(screen.getByText(/a separately funded incentive is independently verified/)).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("MRWD amount"), "4");
+    await user.type(screen.getByLabelText("WETH amount"), "2");
+    for (const checkbox of screen.getAllByRole("checkbox")) await user.click(checkbox);
+    expect(screen.getByRole("link", { name: /continue on uniswap/i })).toHaveAttribute(
+      "href",
+      "https://app.uniswap.org/positions/create/v2?chain=base",
+    );
   });
 
   it("uses SushiSwap's fee, handoff, and rewards wording", async () => {

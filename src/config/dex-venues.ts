@@ -91,6 +91,14 @@ const PANCAKESWAP_PLANNER = {
 } as const;
 
 const POOL_PLANNERS: Partial<Record<string, PoolPlannerConfig>> = {
+  "Uniswap V2": {
+    name: "Uniswap V2",
+    dexName: "Uniswap",
+    protocol: "v2",
+    swapFee: "0.30%",
+    liquidityUrl: "https://app.uniswap.org/positions/create/v2?chain=base",
+    rewardsCondition: "a separately funded incentive is",
+  },
   "PancakeSwap V3": {
     ...PANCAKESWAP_PLANNER,
     name: "PancakeSwap V3",
