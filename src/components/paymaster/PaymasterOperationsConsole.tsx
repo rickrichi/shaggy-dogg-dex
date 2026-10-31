@@ -36,12 +36,11 @@ import {
 } from "@/lib/paymaster/artifact";
 import {
   BASE_ENTRYPOINT_V07,
-  BASE_ENTRYPOINT_V08,
   MRWD_ON_BASE,
-  SPONSORED_REWARD_PAYMASTER_ON_BASE,
   type PaymasterStatus,
   readPaymasterStatus,
   rewardTokenAbi,
+  SPONSORED_REWARD_PAYMASTER_ON_BASE,
 } from "@/lib/paymaster/client";
 
 const storageKey = "shaggy-sponsored-reward-paymaster-base-8453";
