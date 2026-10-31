@@ -71,8 +71,11 @@ const DETAILS: Record<SmartRouteVenue, Omit<DexVenueCapability, "name">> = {
   },
 };
 
+/** Venues shown for liquidity. BaseSwap still routes swaps, but its site is parked. */
 export const BASE_DEX_VENUES: readonly DexVenueCapability[] =
-  routeVenuesForChain(8453).map((name) => ({ name, ...DETAILS[name] }));
+  routeVenuesForChain(8453)
+    .filter((name) => name !== "BaseSwap")
+    .map((name) => ({ name, ...DETAILS[name] }));
 
 export interface PoolPlannerConfig {
   name: SmartRouteVenue;

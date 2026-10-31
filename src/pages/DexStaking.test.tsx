@@ -30,7 +30,7 @@ describe("DexStaking", () => {
   });
 
   it("keeps the canonical Base capability list dynamic and ordered", () => {
-    expect(BASE_DEX_VENUES).toHaveLength(8);
+    expect(BASE_DEX_VENUES).toHaveLength(7);
     expect(BASE_DEX_VENUES.map((venue) => venue.name)).toEqual([
       "Uniswap V3",
       "Uniswap V2",
@@ -39,7 +39,6 @@ describe("DexStaking", () => {
       "SushiSwap V3",
       "PancakeSwap V2",
       "SushiSwap V2",
-      "BaseSwap",
     ]);
   });
 
