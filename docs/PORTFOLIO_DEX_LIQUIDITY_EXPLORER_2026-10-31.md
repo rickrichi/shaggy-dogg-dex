@@ -183,6 +183,7 @@ Vercel authentication protection remains enabled for the deployment.
 - Incentive timing and funding should be verified on-chain before presenting any generic reward program as live.
 - Automated post-deployment browser QA could not run because Chrome exited before producing a DevTools endpoint in the local automation environment. Local type-check, focused tests, production build, and Vercel's clean remote production build all passed.
 - The PancakeSwap handoff opens the general liquidity page. PancakeSwap's guide documents adding to existing V2 pools but not creating new ones, so that page is unconfirmed for creating a new V2 pair.
+- The SushiSwap V2 handoff opens `https://www.sushi.com/base/pool/v2/add`. `/base/pool/v2/create` was rejected because it is served like a nonexistent path. Whether `/add` can create a new pair is unconfirmed, because Sushi's tutorial page returned no readable content.
 
 ## Later changes
 
@@ -190,12 +191,12 @@ Vercel authentication protection remains enabled for the deployment.
 
 Invalid mixed-case checksums on WXTZ and cbZEC made viem reject the whole balance multicall, which appeared on the page as "28 balance reads failed". Both addresses were corrected, and `src/config/tokens.test.ts` now requires strict checksums across the Base catalog. A live multicall over all 34 configured ERC-20s returned 0 failures.
 
-### PancakeSwap pool planners
+### DEX pool planners
 
-`src/components/PancakeSwapPoolPlanner.tsx` renders beneath the selected PancakeSwap V3 or V2 venue for any portfolio or imported token. It prepares a deposit and hands off to PancakeSwap; it never requests approvals or submits transactions.
+`src/components/DexPoolPlanner.tsx` renders beneath the selected PancakeSwap V3, PancakeSwap V2, or SushiSwap V2 venue for any portfolio or imported token. Each venue's facts live in `POOL_PLANNERS` in `src/config/dex-venues.ts`. The planner prepares a deposit and hands off to the DEX; it never requests approvals or submits transactions.
 
 - **V3:** the four Base fee tiers, implied price, and range guidance.
-- **V2:** a fixed fee and full-range model, with no fee-tier or range selection. The router's `getAmountOut` on Base confirms the 0.25% fee.
+- **V2:** a fixed fee and full-range model, with no fee-tier or range selection. Each router's `getAmountOut` on Base confirms the fee: 0.25% for PancakeSwap V2 and 0.30% for SushiSwap V2.
 - **Existing pairs:** a V2 pair with reserves fixes the deposit ratio, so entered amounts do not change the price. A pair without confirmed reserves warns that a first deposit into an empty pair sets the price.
 
 Production now deploys from a clean export of `origin/main` rather than the working tree.

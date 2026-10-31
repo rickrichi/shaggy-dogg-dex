@@ -20,9 +20,9 @@ import {
 import { type Address, formatUnits, getAddress, isAddress } from "viem";
 import { useAccount, useChainId, usePublicClient, useSwitchChain } from "wagmi";
 
+import { DexPoolPlanner } from "@/components/DexPoolPlanner";
 import { LaunchpadNav } from "@/components/launchpad/LaunchpadNav";
 import { MrwdLpStakerPanel } from "@/components/MrwdLpStakerPanel";
-import { PancakeSwapPoolPlanner } from "@/components/PancakeSwapPoolPlanner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +31,7 @@ import {
   BASE_DEX_VENUES,
   MRWD_ADDRESS,
   MRWD_UNISWAP_V3_POOL,
-  pancakeProtocolForVenue,
+  poolPlannerForVenue,
   USDC_ADDRESS,
   WETH_ADDRESS,
 } from "@/config/dex-venues";
@@ -253,7 +253,7 @@ export default function DexStaking() {
   const state = matrix.isLoading
     ? "loading"
     : (selectedResult?.state ?? "unsupported");
-  const pancakeProtocol = pancakeProtocolForVenue(selectedVenue);
+  const poolPlanner = poolPlannerForVenue(selectedVenue);
   const canonical = isCanonicalMrwdSelection(
     queryToken,
     selectedVenue,
@@ -835,7 +835,7 @@ export default function DexStaking() {
                   ? "Known program · inspect contract data in controls"
                   : "Rewards not verified · expect fees only unless confirmed separately"}
               </span>
-              {pancakeProtocol ? (
+              {poolPlanner ? (
                 <span className="text-cyan-800 dark:text-cyan-300">
                   Guided pool planner below
                 </span>
@@ -857,9 +857,9 @@ export default function DexStaking() {
               )}
             </div>
           </section>
-          {pancakeProtocol && (
-            <PancakeSwapPoolPlanner
-              protocol={pancakeProtocol}
+          {poolPlanner && (
+            <DexPoolPlanner
+              planner={poolPlanner}
               tokenKey={selectedToken.id}
               tokenName={selectedToken.name}
               tokenSymbol={selectedToken.symbol}

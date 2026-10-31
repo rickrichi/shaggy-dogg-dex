@@ -74,13 +74,46 @@ const DETAILS: Record<SmartRouteVenue, Omit<DexVenueCapability, "name">> = {
 export const BASE_DEX_VENUES: readonly DexVenueCapability[] =
   routeVenuesForChain(8453).map((name) => ({ name, ...DETAILS[name] }));
 
-/** PancakeSwap protocol that has a guided pool planner, if the venue is one. */
-export const pancakeProtocolForVenue = (venue: string) =>
-  venue === "PancakeSwap V3"
-    ? ("v3" as const)
-    : venue === "PancakeSwap V2"
-      ? ("v2" as const)
-      : undefined;
+export interface PoolPlannerConfig {
+  name: SmartRouteVenue;
+  dexName: string;
+  protocol: "v2" | "v3";
+  /** Base V2 swap fees, read from each router's getAmountOut on-chain. */
+  swapFee?: string;
+  liquidityUrl: string;
+  rewardsCondition: string;
+}
+
+const PANCAKESWAP_PLANNER = {
+  dexName: "PancakeSwap",
+  liquidityUrl: "https://pancakeswap.finance/liquidity/pools",
+  rewardsCondition: "farm eligibility and rewards are",
+} as const;
+
+const POOL_PLANNERS: Partial<Record<string, PoolPlannerConfig>> = {
+  "PancakeSwap V3": {
+    ...PANCAKESWAP_PLANNER,
+    name: "PancakeSwap V3",
+    protocol: "v3",
+  },
+  "PancakeSwap V2": {
+    ...PANCAKESWAP_PLANNER,
+    name: "PancakeSwap V2",
+    protocol: "v2",
+    swapFee: "0.25%",
+  },
+  "SushiSwap V2": {
+    name: "SushiSwap V2",
+    dexName: "SushiSwap",
+    protocol: "v2",
+    swapFee: "0.30%",
+    liquidityUrl: "https://www.sushi.com/base/pool/v2/add",
+    rewardsCondition: "a separately funded incentive is",
+  },
+};
+
+/** Guided pool planner for a venue, if it has one. */
+export const poolPlannerForVenue = (venue: string) => POOL_PLANNERS[venue];
 
 export const MRWD_ADDRESS =
   "0xC17227AAa33C54634B6cE7AD0bf33A156563c179" as const;

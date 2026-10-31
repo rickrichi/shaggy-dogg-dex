@@ -15,9 +15,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 import type { Address } from "viem";
-
-const PANCAKESWAP_LIQUIDITY_URL =
-  "https://pancakeswap.finance/liquidity/pools";
+import type { PoolPlannerConfig } from "@/config/dex-venues";
 
 const FEE_TIERS = [
   { value: 100, label: "0.01%", note: "Stable pairs" },
@@ -56,10 +54,8 @@ const formatPrice = (value: number) =>
     notation: value >= 1e9 || value < 1e-6 ? "scientific" : "standard",
   }).format(value);
 
-export type PancakeSwapProtocol = "v2" | "v3";
-
-interface PancakeSwapPoolPlannerProps {
-  protocol?: PancakeSwapProtocol;
+interface DexPoolPlannerProps {
+  planner: PoolPlannerConfig;
   tokenKey: string;
   tokenName: string;
   tokenSymbol: string;
@@ -70,8 +66,8 @@ interface PancakeSwapPoolPlannerProps {
   poolActive?: boolean;
 }
 
-export function PancakeSwapPoolPlanner({
-  protocol = "v3",
+export function DexPoolPlanner({
+  planner,
   tokenKey,
   tokenName,
   tokenSymbol,
@@ -80,8 +76,9 @@ export function PancakeSwapPoolPlanner({
   native = false,
   poolExists,
   poolActive = poolExists,
-}: PancakeSwapPoolPlannerProps) {
-  const isV2 = protocol === "v2";
+}: DexPoolPlannerProps) {
+  const isV2 = planner.protocol === "v2";
+  const { dexName } = planner;
   const [feeTier, setFeeTier] = useState(2500);
   const [tokenAmount, setTokenAmount] = useState("");
   const [quoteAmount, setQuoteAmount] = useState("");
@@ -98,7 +95,7 @@ export function PancakeSwapPoolPlanner({
     setPriceConfirmed(false);
     setRiskConfirmed(false);
     setCopied(false);
-  }, [protocol, tokenKey]);
+  }, [planner.name, tokenKey]);
 
   const tokenValue = parsePositiveAmount(tokenAmount);
   const quoteValue = parsePositiveAmount(quoteAmount);
@@ -112,7 +109,7 @@ export function PancakeSwapPoolPlanner({
   const amountsReady = Boolean(prices);
   const risksReady = priceConfirmed && riskConfirmed;
   const ready = amountsReady && risksReady;
-  const protocolLabel = isV2 ? "PancakeSwap V2" : "PancakeSwap V3";
+  const protocolLabel = planner.name;
   const heading = poolExists
     ? `Add ${protocolLabel} liquidity`
     : `Create a ${protocolLabel} pool`;
@@ -129,7 +126,7 @@ export function PancakeSwapPoolPlanner({
 
   return (
     <section
-      aria-labelledby="pancake-planner-heading"
+      aria-labelledby="pool-planner-planner-heading"
       className="border border-cyan-200 bg-white shadow-sm dark:border-cyan-950 dark:bg-slate-950"
     >
       <header className="border-b border-slate-200 p-5 dark:border-slate-800 md:p-6">
@@ -141,12 +138,12 @@ export function PancakeSwapPoolPlanner({
               </Badge>
               <Badge variant="outline">Preparation only</Badge>
             </div>
-            <h2 id="pancake-planner-heading" className="text-xl font-black">
+            <h2 id="pool-planner-planner-heading" className="text-xl font-black">
               {heading}
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
               Plan the pair here, then review and submit the transaction on
-              PancakeSwap. This page never requests token approval or creates a
+              {dexName}. This page never requests token approval or creates a
               pool.
             </p>
           </div>
@@ -158,9 +155,9 @@ export function PancakeSwapPoolPlanner({
 
       <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_19rem]">
         <div className="space-y-7 p-5 md:p-6">
-          <section aria-labelledby="pancake-assets-heading">
+          <section aria-labelledby="pool-planner-assets-heading">
             <h3
-              id="pancake-assets-heading"
+              id="pool-planner-assets-heading"
               className="text-xs font-black uppercase tracking-[.16em] text-cyan-700 dark:text-cyan-300"
             >
               01 · Assets
@@ -182,16 +179,16 @@ export function PancakeSwapPoolPlanner({
             {native && (
               <p className="mt-3 flex gap-2 text-xs text-amber-800 dark:text-amber-300">
                 <Info className="mt-0.5 size-4 shrink-0" />
-                Native ETH is paired as WETH. PancakeSwap may ask you to wrap ETH
+                Native ETH is paired as WETH. {dexName} may ask you to wrap ETH
                 during the liquidity flow.
               </p>
             )}
           </section>
 
           {isV2 ? (
-            <section aria-labelledby="pancake-v2-structure-heading">
+            <section aria-labelledby="pool-planner-v2-structure-heading">
               <h3
-                id="pancake-v2-structure-heading"
+                id="pool-planner-v2-structure-heading"
                 className="text-xs font-black uppercase tracking-[.16em] text-cyan-700 dark:text-cyan-300"
               >
                 02 · Constant product V2
@@ -199,7 +196,7 @@ export function PancakeSwapPoolPlanner({
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 <div className="border border-cyan-200 bg-cyan-50/70 p-3 dark:border-cyan-900 dark:bg-cyan-950/40">
                   <p className="text-sm font-black text-cyan-950 dark:text-cyan-100">
-                    Standard 0.25% swap fee
+                    Standard {planner.swapFee} swap fee
                   </p>
                   <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-300">
                     Fixed V2 pair model; no fee-tier selection is required.
@@ -245,9 +242,9 @@ export function PancakeSwapPoolPlanner({
             </fieldset>
           )}
 
-          <section aria-labelledby="pancake-deposit-heading">
+          <section aria-labelledby="pool-planner-deposit-heading">
             <h3
-              id="pancake-deposit-heading"
+              id="pool-planner-deposit-heading"
               className="text-xs font-black uppercase tracking-[.16em] text-cyan-700 dark:text-cyan-300"
             >
               03 · Deposit plan
@@ -294,7 +291,7 @@ export function PancakeSwapPoolPlanner({
               <p className="mt-3 flex gap-2 text-xs leading-5 text-slate-600 dark:text-slate-300">
                 <Info className="mt-0.5 size-4 shrink-0" />
                 {poolActive
-                  ? "This pair already holds reserves, so the pool ratio decides your deposit. PancakeSwap matches your second amount to it, and the amounts above do not change the price."
+                  ? `This pair already holds reserves, so the pool ratio decides your deposit. ${dexName} matches your second amount to it, and the amounts above do not change the price.`
                   : "This pair exists, but active reserves were not confirmed. If it is empty, your first deposit sets the price."}
               </p>
             )}
@@ -319,7 +316,7 @@ export function PancakeSwapPoolPlanner({
                     <span className="flex items-center gap-2 font-black">
                       <input
                         type="radio"
-                        name="pancake-range"
+                        name="pool-planner-range"
                         value={plan.value}
                         checked={rangePlan === plan.value}
                         onChange={() => setRangePlan(plan.value)}
@@ -332,14 +329,14 @@ export function PancakeSwapPoolPlanner({
                 ))}
               </div>
               <p className="mt-2 text-xs text-slate-500">
-                Choose exact bounds in PancakeSwap. This planner does not fabricate ticks or price limits.
+                Choose exact bounds in {dexName}. This planner does not fabricate ticks or price limits.
               </p>
             </fieldset>
           )}
 
-          <section aria-labelledby="pancake-risks-heading">
+          <section aria-labelledby="pool-planner-risks-heading">
             <h3
-              id="pancake-risks-heading"
+              id="pool-planner-risks-heading"
               className="text-xs font-black uppercase tracking-[.16em] text-cyan-700 dark:text-cyan-300"
             >
               {isV2 ? "04 · Confirm risks" : "05 · Confirm risks"}
@@ -372,7 +369,7 @@ export function PancakeSwapPoolPlanner({
             </div>
             <div className="mt-3 flex gap-2 border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
               <AlertTriangle className="size-4 shrink-0" />
-              {poolExists ? "Adding liquidity" : "Pool creation"} earns trading fees only unless farm eligibility and rewards are independently verified.
+              {poolExists ? "Adding liquidity" : "Pool creation"} earns trading fees only unless {planner.rewardsCondition} independently verified.
             </div>
           </section>
         </div>
@@ -388,7 +385,7 @@ export function PancakeSwapPoolPlanner({
                   `Import ${tokenSymbol} using the copied contract address.`,
                   "Select the V2 liquidity option for this pair.",
                   poolExists && poolActive
-                    ? "Enter one amount and let PancakeSwap match the pool ratio."
+                    ? `Enter one amount and let ${dexName} match the pool ratio.`
                     : "Enter the same equal-value amounts.",
                   "Review LP token output and pool share before approving the wallet transaction.",
                 ]
@@ -416,7 +413,7 @@ export function PancakeSwapPoolPlanner({
           {[
             [amountsReady, "Set amounts"],
             [risksReady, "Confirm risks"],
-            [ready, "Ready for PancakeSwap"],
+            [ready, `Ready for ${dexName}`],
           ].map(([complete, text], index) => (
             <div
               key={String(text)}
@@ -436,18 +433,18 @@ export function PancakeSwapPoolPlanner({
         </div>
         <div className="mt-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
           <p className="text-xs text-slate-500">
-            You will leave this app and review the transaction on PancakeSwap.
+            You will leave this app and review the transaction on {dexName}.
           </p>
           {ready ? (
             <Button asChild className="bg-cyan-700 text-white hover:bg-cyan-800">
-              <a href={PANCAKESWAP_LIQUIDITY_URL} target="_blank" rel="noopener noreferrer">
-                Continue on PancakeSwap
+              <a href={planner.liquidityUrl} target="_blank" rel="noopener noreferrer">
+                Continue on {dexName}
                 <ExternalLink className="ml-2 size-4" />
               </a>
             </Button>
           ) : (
             <Button disabled>
-              Continue on PancakeSwap
+              Continue on {dexName}
               <ExternalLink className="ml-2 size-4" />
             </Button>
           )}

@@ -1,17 +1,22 @@
 import { screen } from "@testing-library/react";
 
-import { pancakeProtocolForVenue } from "@/config/dex-venues";
+import { poolPlannerForVenue } from "@/config/dex-venues";
 import { render, userEvent } from "@/test/utils";
 
-import { PancakeSwapPoolPlanner } from "./PancakeSwapPoolPlanner";
+import { DexPoolPlanner } from "./DexPoolPlanner";
+
+const pancakeV3 = poolPlannerForVenue("PancakeSwap V3")!;
+const pancakeV2 = poolPlannerForVenue("PancakeSwap V2")!;
+const sushiV2 = poolPlannerForVenue("SushiSwap V2")!;
 
 const address = "0x1234567890123456789012345678901234567890" as const;
 
 const renderPlanner = (
-  props: Partial<React.ComponentProps<typeof PancakeSwapPoolPlanner>> = {},
+  props: Partial<React.ComponentProps<typeof DexPoolPlanner>> = {},
 ) =>
   render(
-    <PancakeSwapPoolPlanner
+    <DexPoolPlanner
+        planner={pancakeV3}
       tokenKey="token-a"
       tokenName="Mutt Rewards"
       tokenSymbol="MRWD"
@@ -22,7 +27,7 @@ const renderPlanner = (
     />,
   );
 
-describe("PancakeSwapPoolPlanner", () => {
+describe("DexPoolPlanner", () => {
   it("shows the selected pair, full address, exact fee tiers, and default tier", () => {
     renderPlanner();
     expect(screen.getByText("MRWD/WETH")).toBeInTheDocument();
@@ -74,7 +79,8 @@ describe("PancakeSwapPoolPlanner", () => {
     await user.type(screen.getByLabelText("WETH amount"), "1");
     await user.click(screen.getAllByRole("checkbox")[0]!);
     view.rerender(
-      <PancakeSwapPoolPlanner
+      <DexPoolPlanner
+        planner={pancakeV3}
         tokenKey="token-b"
         tokenName="Second Token"
         tokenSymbol="TWO"
@@ -92,7 +98,8 @@ describe("PancakeSwapPoolPlanner", () => {
     const view = renderPlanner({ tokenSymbol: "ETH", native: true });
     expect(screen.getByText(/Native ETH is paired as WETH/)).toBeInTheDocument();
     view.rerender(
-      <PancakeSwapPoolPlanner
+      <DexPoolPlanner
+        planner={pancakeV3}
         tokenKey="weth"
         tokenName="Wrapped Ether"
         tokenSymbol="WETH"
@@ -106,14 +113,32 @@ describe("PancakeSwapPoolPlanner", () => {
     expect(screen.queryByText(/first liquidity position initializes/i)).not.toBeInTheDocument();
   });
 
-  it("shows only pool planners for the PancakeSwap venues", () => {
-    expect(pancakeProtocolForVenue("PancakeSwap V3")).toBe("v3");
-    expect(pancakeProtocolForVenue("PancakeSwap V2")).toBe("v2");
-    expect(pancakeProtocolForVenue("SushiSwap V2")).toBeUndefined();
+  it("offers planners only for venues with a verified handoff", () => {
+    expect(pancakeV3.protocol).toBe("v3");
+    expect(pancakeV2.swapFee).toBe("0.25%");
+    expect(sushiV2.swapFee).toBe("0.30%");
+    expect(poolPlannerForVenue("BaseSwap")).toBeUndefined();
+  });
+
+  it("uses SushiSwap's fee, handoff, and rewards wording", async () => {
+    const user = userEvent.setup();
+    renderPlanner({ planner: sushiV2, poolExists: true, poolActive: true });
+    expect(screen.getByRole("heading", { name: "Add SushiSwap V2 liquidity" })).toBeInTheDocument();
+    expect(screen.getByText("Standard 0.30% swap fee")).toBeInTheDocument();
+    expect(screen.getByText(/SushiSwap matches your second amount/)).toBeInTheDocument();
+    expect(screen.getByText(/a separately funded incentive is independently verified/)).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("MRWD amount"), "4");
+    await user.type(screen.getByLabelText("WETH amount"), "2");
+    for (const checkbox of screen.getAllByRole("checkbox")) await user.click(checkbox);
+    expect(screen.getByRole("link", { name: /continue on sushiswap/i })).toHaveAttribute(
+      "href",
+      "https://www.sushi.com/base/pool/v2/add",
+    );
   });
 
   it("replaces fee tiers and ranges with the fixed V2 model", () => {
-    renderPlanner({ protocol: "v2" });
+    renderPlanner({ planner: pancakeV2 });
     expect(screen.getByRole("heading", { name: "Create a PancakeSwap V2 pool" })).toBeInTheDocument();
     expect(screen.getByText("Standard 0.25% swap fee")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^0\.01%/ })).not.toBeInTheDocument();
@@ -125,7 +150,7 @@ describe("PancakeSwapPoolPlanner", () => {
   });
 
   it("explains that reserves fix the ratio on an active V2 pair", () => {
-    renderPlanner({ protocol: "v2", poolExists: true, poolActive: true });
+    renderPlanner({ planner: pancakeV2, poolExists: true, poolActive: true });
     expect(screen.getByRole("heading", { name: "Add PancakeSwap V2 liquidity" })).toBeInTheDocument();
     expect(screen.getByText(/pool ratio decides your deposit/)).toBeInTheDocument();
     expect(screen.getByText(/let PancakeSwap match the pool ratio/)).toBeInTheDocument();
@@ -133,7 +158,7 @@ describe("PancakeSwapPoolPlanner", () => {
   });
 
   it("warns that a V2 pair without confirmed reserves can still be priced by a first deposit", () => {
-    renderPlanner({ protocol: "v2", poolExists: true, poolActive: false });
+    renderPlanner({ planner: pancakeV2, poolExists: true, poolActive: false });
     expect(screen.getByText(/your first deposit sets the price/)).toBeInTheDocument();
     expect(screen.queryByText(/pool ratio decides your deposit/)).not.toBeInTheDocument();
   });
