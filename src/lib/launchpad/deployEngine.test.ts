@@ -1,11 +1,11 @@
-import { decodeFunctionData, type PublicClient, type WalletClient } from "viem";
+import { decodeFunctionData, encodeFunctionData, type PublicClient, type WalletClient } from "viem";
 import { base } from "viem/chains";
 import { describe, expect, it, vi } from "vitest";
 
 import { NONFUNGIBLE_POSITION_MANAGER_ABI } from "@/lib/amm/uniswap-v3";
 
 import { LAUNCHPAD_ARTIFACTS } from "./artifacts";
-import { CANONICAL_BASE_CONTRACTS } from "./constants";
+import { AERODROME_ROUTER_ABI, CANONICAL_BASE_CONTRACTS, LAUNCHPAD_ARCHETYPES } from "./constants";
 import { executeLaunchpadDeployment } from "./deployEngine";
 
 import type { LaunchpadFormState } from "./types";
@@ -29,7 +29,18 @@ const form: LaunchpadFormState = {
   executionMode: "metamask",
   recipientAdminAddress: "",
 };
-function clients(revertWrap = false, launchFee = 0n) {
+const lastSuite = (deploy: ReturnType<typeof vi.fn>) =>
+  deploy.mock.calls.at(-1)?.[0].args[0] as
+    | { deployAaveVault?: boolean; deployFullSuite?: boolean }
+    | undefined;
+const SUITE_ADDRESSES: Record<string, string> = {
+  staking: "0x0000000000000000000000000000000000000A01",
+  aaveVault: "0x0000000000000000000000000000000000000A02",
+  compoundVault: "0x0000000000000000000000000000000000000A03",
+  arbitrageRouter: "0x0000000000000000000000000000000000000A04",
+};
+const zero = "0x0000000000000000000000000000000000000000";
+function clients(revertWrap = false, launchFee = 0n, usdcBalance = launchFee) {
   const deployContract = vi.fn().mockResolvedValue("0x01");
   const writeContract = vi.fn().mockResolvedValue("0x02");
   const wallet = { getChainId: vi.fn().mockResolvedValue(8453), deployContract, writeContract };
@@ -37,7 +48,17 @@ function clients(revertWrap = false, launchFee = 0n) {
     chain: base,
     // Defaults to 0 so existing tests below never trigger the launch-fee step at all
     // (executeLaunchpadDeployment skips it entirely when feeAmount() reads as 0).
-    readContract: vi.fn().mockResolvedValue(launchFee),
+    readContract: vi.fn().mockImplementation(({ functionName }) => {
+      if (functionName === "feeAmount") return Promise.resolve(launchFee);
+      if (functionName === "balanceOf") return Promise.resolve(usdcBalance);
+      return Promise.resolve(
+        lastSuite(deployContract)?.deployFullSuite ||
+          functionName === "staking" ||
+          (functionName === "aaveVault" && lastSuite(deployContract)?.deployAaveVault)
+          ? SUITE_ADDRESSES[functionName]
+          : zero
+      );
+    }),
     waitForTransactionReceipt: vi.fn().mockImplementation(({ hash }) =>
       Promise.resolve({
         status: revertWrap && hash === "0x02" ? "reverted" : "success",
@@ -122,7 +143,137 @@ describe("V3 launchpad safety", () => {
   });
 });
 
+describe("launchpad card settings", () => {
+  const signer = "0x00000000000000000000000000000000000C0FFE";
+  const noSeed = { ...form, enableDexSeeding: false };
+  const config = (wallet: ReturnType<typeof clients>["wallet"]) =>
+    wallet.deployContract.mock.calls[1]![0].args[0];
+
+  it("offers only the four cards whose contracts do what they describe", () => {
+    expect(LAUNCHPAD_ARCHETYPES.map((a) => a.id)).toEqual([
+      "standard_governance",
+      "staking_rewards",
+      "aave_v3_yield",
+      "full_defi_suite",
+    ]);
+    expect(JSON.stringify(LAUNCHPAD_ARCHETYPES)).not.toMatch(/Moonwell|Morpho|Silo|Fluid/);
+  });
+
+  it("configures staking in one transaction after the token", async () => {
+    const { wallet, run } = clients();
+    const result = await run({
+      ...noSeed,
+      selectedArchetype: "staking_rewards",
+      stakingLockDays: 30,
+      earlyUnstakeFeeBps: 250,
+    });
+    expect(wallet.deployContract).toHaveBeenCalledTimes(2);
+    expect(wallet.writeContract).not.toHaveBeenCalled();
+    const suite = wallet.deployContract.mock.calls[1]![0];
+    expect(suite.bytecode).toBe(LAUNCHPAD_ARTIFACTS.LaunchpadSuiteDeployer.bytecode);
+    const supply = 1_000_000n * 10n ** 18n;
+    expect(suite.args[0]).toMatchObject({
+      lockSeconds: 2_592_000n,
+      unstakeFeeBps: 250,
+      deployAaveVault: false,
+      deployFullSuite: false,
+      tiers: [
+        { stakeRequired: supply / 10_000n, discountBps: 100 },
+        { stakeRequired: supply / 1_000n, discountBps: 250 },
+        { stakeRequired: supply / 100n, discountBps: 500 },
+        { stakeRequired: supply / 10n, discountBps: 1000 },
+      ],
+    });
+    expect(result.stakingAddress).toBe(SUITE_ADDRESSES.staking);
+    expect(result.vaultAddress).toBeUndefined();
+  });
+
+  it("deploys the full suite with one signature and returns every address", async () => {
+    const { wallet, run } = clients();
+    const result = await run({
+      ...noSeed,
+      selectedArchetype: "full_defi_suite",
+      performanceFeeBps: 1500,
+    });
+    expect(wallet.deployContract).toHaveBeenCalledTimes(2);
+    expect(wallet.writeContract).not.toHaveBeenCalled();
+    expect(config(wallet)).toMatchObject({ performanceFeeBps: 1500, deployFullSuite: true });
+    expect(result.vaultAddress).toBe(SUITE_ADDRESSES.aaveVault);
+    expect(result.compoundVaultAddress).toBe(SUITE_ADDRESSES.compoundVault);
+    expect(result.borrowerAddress).toBe(SUITE_ADDRESSES.arbitrageRouter);
+  });
+
+  it("gives a different recipient ownership inside the suite transaction", async () => {
+    const { wallet, run } = clients();
+    const recipient = CANONICAL_BASE_CONTRACTS.WETH;
+    await run(
+      { ...noSeed, selectedArchetype: "aave_v3_yield", recipientAdminAddress: recipient },
+      signer
+    );
+    expect(config(wallet).admin).toBe(recipient);
+    expect(wallet.writeContract).not.toHaveBeenCalled();
+  });
+
+  it("deploys nothing when a setting is outside the contract limits", async () => {
+    const { wallet, run } = clients();
+    const staking = { ...noSeed, selectedArchetype: "staking_rewards" as const };
+    await expect(run({ ...staking, earlyUnstakeFeeBps: 5001 })).rejects.toThrow("Unstake fee");
+    await expect(run({ ...staking, stakingLockDays: 1.5 })).rejects.toThrow("Staking lock");
+    await expect(run({ ...staking, stakingLockDays: 366 })).rejects.toThrow("Staking lock");
+    await expect(
+      run({ ...noSeed, selectedArchetype: "aave_v3_yield", performanceFeeBps: 3001 })
+    ).rejects.toThrow("Performance fee");
+    expect(wallet.deployContract).not.toHaveBeenCalled();
+  });
+
+  it("ignores staking and vault settings on the plain token card", async () => {
+    const { wallet, run } = clients();
+    await run({ ...noSeed, earlyUnstakeFeeBps: 9999, performanceFeeBps: 9999 });
+    expect(wallet.deployContract).toHaveBeenCalledTimes(1);
+    expect(wallet.writeContract).not.toHaveBeenCalled();
+  });
+
+  it("names the token when the suite transaction is rejected", async () => {
+    const { wallet, run } = clients();
+    wallet.deployContract
+      .mockResolvedValueOnce("0x01")
+      .mockRejectedValueOnce(new Error("User rejected"));
+    await expect(run({ ...noSeed, selectedArchetype: "staking_rewards" })).rejects.toThrow(
+      /Token 0x.* is deployed, but its staking contracts were not: User rejected/
+    );
+  });
+});
+
+describe("Aerodrome seeding", () => {
+  it("uses Aerodrome's own addLiquidityETH on a volatile pool", async () => {
+    const { wallet, run } = clients();
+    const result = await run({ ...form, selectedDex: "aerodrome" });
+    expect(result.liquiditySeedingError).toBeUndefined();
+    const seed = wallet.writeContract.mock.calls.at(-1)![0];
+    expect(seed.address).toBe(CANONICAL_BASE_CONTRACTS.AerodromeRouter);
+    expect(seed.abi).toBe(AERODROME_ROUTER_ABI);
+    expect(seed.args[1]).toBe(false);
+    expect(encodeFunctionData(seed).slice(0, 10)).not.toBe("0xf305d719");
+  });
+
+  it("keeps the V2 call for V2 routers and reports a reverted seed", async () => {
+    const { wallet, run } = clients(true);
+    const result = await run({ ...form, selectedDex: "uniswap_v2" });
+    expect(result.liquiditySeedingError).toContain("reverted");
+    expect(wallet.writeContract).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("launchpad fee", () => {
+  it("refuses a wallet short of the fee before deploying anything", async () => {
+    const { wallet, run } = clients(false, 500_000_000n, 499_000_000n);
+    await expect(run({ ...form, enableDexSeeding: false })).rejects.toThrow(
+      "The launch fee is 500 USDC and this wallet holds 499 USDC. Nothing was deployed."
+    );
+    expect(wallet.deployContract).not.toHaveBeenCalled();
+    expect(wallet.writeContract).not.toHaveBeenCalled();
+  });
+
   it("skips the fee step entirely when feeAmount() reads as 0", async () => {
     const { wallet, run, publicClient } = clients(false, 0n);
     await run({ ...form, enableDexSeeding: false });

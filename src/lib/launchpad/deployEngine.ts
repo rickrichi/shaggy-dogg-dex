@@ -1,10 +1,12 @@
 import {
   type Address,
+  formatUnits,
   parseAbi,
   parseEther,
   parseUnits,
   type PublicClient,
   type WalletClient,
+  zeroAddress,
 } from "viem";
 import { base } from "viem/chains";
 
@@ -12,8 +14,14 @@ import { ERC20_ABI, UNISWAP_V2_ROUTER_ABI } from "@/config/abis";
 import { buildV3MintCall } from "@/lib/amm/uniswap-v3";
 
 import { LAUNCHPAD_ARTIFACTS } from "./artifacts";
-import { CANONICAL_BASE_CONTRACTS, DEX_VENUES } from "./constants";
+import {
+  AERODROME_ROUTER_ABI,
+  CANONICAL_BASE_CONTRACTS,
+  DEX_VENUES,
+  LAUNCHPAD_FEES_ABI,
+} from "./constants";
 import { seedingProblem } from "./seeding";
+import { deploysStaking, deploysYieldVault, launchSettingsProblem, stakingTiers } from "./settings";
 
 import type { DeployedEcosystemResult, LaunchpadFormState } from "./types";
 
@@ -36,10 +44,33 @@ export async function executeLaunchpadDeployment(
   }
   const seedProblem = seedingProblem(form);
   if (seedProblem) throw new Error(seedProblem);
+  const settingsProblem = launchSettingsProblem(form);
+  if (settingsProblem) throw new Error(settingsProblem);
 
   const supplyUnits = parseUnits(form.initialSupply, form.decimals || 18);
   const recipient = (form.recipientAdminAddress?.trim() as Address) || userAddress;
   const activeChain = base;
+
+  // Checked first: the fee is charged after the token deploys, so a short wallet must not start.
+  const currentLaunchFee = await publicClient.readContract({
+    address: CANONICAL_BASE_CONTRACTS.LaunchpadFees,
+    abi: LAUNCHPAD_FEES_ABI,
+    functionName: "feeAmount",
+  });
+  if (currentLaunchFee > 0n) {
+    const usdcBalance = (await publicClient.readContract({
+      address: CANONICAL_BASE_CONTRACTS.USDC,
+      abi: ERC20_ABI,
+      functionName: "balanceOf",
+      args: [userAddress],
+    })) as bigint;
+    if (usdcBalance < currentLaunchFee) {
+      throw new Error(
+        `The launch fee is ${formatUnits(currentLaunchFee, 6)} USDC and this wallet holds ` +
+          `${formatUnits(usdcBalance, 6)} USDC. Nothing was deployed.`
+      );
+    }
+  }
 
   // ────────────────────────────────────────────────────────────────────────────
   // Step 1: Deploy Token (FixedSupplyToken.sol: whole supply minted once, no mint or admin)
@@ -67,23 +98,14 @@ export async function executeLaunchpadDeployment(
   let liquiditySeedingError: string | undefined;
   const confirm = async (hash: `0x${string}`) => {
     const receipt = await publicClient.waitForTransactionReceipt({ hash });
-    if (receipt.status !== "success") throw new Error("Liquidity transaction reverted");
+    if (receipt.status !== "success") throw new Error("Transaction reverted");
   };
 
   // ────────────────────────────────────────────────────────────────────────────
   // Step 1.5: Pay the launchpad fee (LaunchpadFees.sol)
-  // Reads the live fee rather than hardcoding it, so changing LaunchpadFees.setFee()
-  // on-chain never requires a frontend redeploy. Skips entirely if the fee is 0.
+  // Uses the live fee read above, so changing LaunchpadFees.setFee() on-chain never requires a
+  // frontend redeploy. Skips entirely if the fee is 0.
   // ────────────────────────────────────────────────────────────────────────────
-  const launchpadFeesAbi = parseAbi([
-    "function feeAmount() view returns (uint256)",
-    "function payLaunchFee(address project) external",
-  ]);
-  const currentLaunchFee = await publicClient.readContract({
-    address: CANONICAL_BASE_CONTRACTS.LaunchpadFees,
-    abi: launchpadFeesAbi,
-    functionName: "feeAmount",
-  });
   if (currentLaunchFee > 0n) {
     console.log(`[Launchpad] Approving USDC for the launch fee...`);
     const approveFeeHash = await walletClient.writeContract({
@@ -99,7 +121,7 @@ export async function executeLaunchpadDeployment(
     console.log(`[Launchpad] Paying launch fee...`);
     const feeTxHash = await walletClient.writeContract({
       address: CANONICAL_BASE_CONTRACTS.LaunchpadFees,
-      abi: launchpadFeesAbi,
+      abi: LAUNCHPAD_FEES_ABI,
       functionName: "payLaunchFee",
       args: [tokenAddress],
       account: userAddress,
@@ -110,124 +132,60 @@ export async function executeLaunchpadDeployment(
   }
 
   // ────────────────────────────────────────────────────────────────────────────
-  // Step 2: Deploy Staking if Archetype requires it
+  // Step 2: Staking and vaults, created and configured in one transaction so a rejected signature
+  // can never leave a half-configured deployment. Everything is owned by the recipient on return.
   // ────────────────────────────────────────────────────────────────────────────
-  const needsStaking = [
-    "staking_rewards",
-    "moonwell_lending",
-    "silo_isolated_vault",
-    "aave_v3_yield",
-    "full_defi_suite",
-  ].includes(form.selectedArchetype);
-
-  if (needsStaking) {
-    console.log(`[Launchpad] Deploying FeeDiscountStaking for ${tokenAddress}...`);
-    const stakingHash = await walletClient.deployContract({
-      abi: LAUNCHPAD_ARTIFACTS.FeeDiscountStaking.abi,
-      bytecode: LAUNCHPAD_ARTIFACTS.FeeDiscountStaking.bytecode,
-      args: [tokenAddress, recipient, recipient],
-      account: userAddress,
-      chain: activeChain,
-    });
-    const stakingReceipt = await publicClient.waitForTransactionReceipt({ hash: stakingHash });
-    stakingAddress = stakingReceipt.contractAddress ?? undefined;
-    console.log(`[Launchpad] Staking contract deployed at: ${stakingAddress}`);
-  }
-
-  // ────────────────────────────────────────────────────────────────────────────
-  // Step 3: Deploy Vault if Archetype requires it
-  // ────────────────────────────────────────────────────────────────────────────
-  if (
-    form.selectedArchetype === "moonwell_lending" ||
-    form.selectedArchetype === "morpho_blue_isolated" ||
-    form.selectedArchetype === "silo_isolated_vault" ||
-    form.selectedArchetype === "fluid_hybrid_amm"
-  ) {
-    console.log(`[Launchpad] Deploying IsolatedLendingVault (ERC-4626) on Base...`);
-    const vaultHash = await walletClient.deployContract({
-      abi: LAUNCHPAD_ARTIFACTS.IsolatedLendingVault.abi,
-      bytecode: LAUNCHPAD_ARTIFACTS.IsolatedLendingVault.bytecode,
-      args: [
-        `${form.tokenName} Isolated Vault`,
-        `v${form.tokenSymbol}`,
-        tokenAddress,
-        stakingAddress ?? "0x0000000000000000000000000000000000000000",
-        recipient,
-        recipient,
-      ],
-      account: userAddress,
-      chain: activeChain,
-    });
-    const vaultReceipt = await publicClient.waitForTransactionReceipt({ hash: vaultHash });
-    vaultAddress = vaultReceipt.contractAddress ?? undefined;
-    console.log(`[Launchpad] Isolated Lending Vault deployed at: ${vaultAddress}`);
-  } else if (form.selectedArchetype === "aave_v3_yield") {
-    console.log(`[Launchpad] Deploying YieldStakingVault (Aave v3)...`);
-    const vaultHash = await walletClient.deployContract({
-      abi: LAUNCHPAD_ARTIFACTS.YieldStakingVault.abi,
-      bytecode: LAUNCHPAD_ARTIFACTS.YieldStakingVault.bytecode,
-      args: [
-        CANONICAL_BASE_CONTRACTS.USDC,
-        CANONICAL_BASE_CONTRACTS.AaveV3Pool,
-        CANONICAL_BASE_CONTRACTS.aUSDC,
-        stakingAddress ?? "0x0000000000000000000000000000000000000000",
-        recipient,
-        recipient,
-      ],
-      account: userAddress,
-      chain: activeChain,
-    });
-    const vaultReceipt = await publicClient.waitForTransactionReceipt({ hash: vaultHash });
-    vaultAddress = vaultReceipt.contractAddress ?? undefined;
-  } else if (form.selectedArchetype === "full_defi_suite") {
-    console.log(`[Launchpad] Deploying YieldStakingVault (Aave v3) suite component...`);
-    const vaultHash = await walletClient.deployContract({
-      abi: LAUNCHPAD_ARTIFACTS.YieldStakingVault.abi,
-      bytecode: LAUNCHPAD_ARTIFACTS.YieldStakingVault.bytecode,
-      args: [
-        CANONICAL_BASE_CONTRACTS.USDC,
-        CANONICAL_BASE_CONTRACTS.AaveV3Pool,
-        CANONICAL_BASE_CONTRACTS.aUSDC,
-        stakingAddress ?? "0x0000000000000000000000000000000000000000",
-        recipient,
-        recipient,
-      ],
-      account: userAddress,
-      chain: activeChain,
-    });
-    const vaultReceipt = await publicClient.waitForTransactionReceipt({ hash: vaultHash });
-    vaultAddress = vaultReceipt.contractAddress ?? undefined;
-    console.log(`[Launchpad] Yield Staking Vault deployed at: ${vaultAddress}`);
-
-    console.log(`[Launchpad] Deploying CompoundYieldVault suite component...`);
-    const compHash = await walletClient.deployContract({
-      abi: LAUNCHPAD_ARTIFACTS.CompoundYieldVault.abi,
-      bytecode: LAUNCHPAD_ARTIFACTS.CompoundYieldVault.bytecode,
-      args: [
-        CANONICAL_BASE_CONTRACTS.USDC,
-        CANONICAL_BASE_CONTRACTS.CompoundComet,
-        stakingAddress ?? "0x0000000000000000000000000000000000000000",
-        recipient,
-        recipient,
-      ],
-      account: userAddress,
-      chain: activeChain,
-    });
-    const compReceipt = await publicClient.waitForTransactionReceipt({ hash: compHash });
-    compoundVaultAddress = compReceipt.contractAddress ?? undefined;
-    console.log(`[Launchpad] Compound Yield Vault deployed at: ${compoundVaultAddress}`);
-
-    console.log(`[Launchpad] Deploying AaveFlashBorrower suite component...`);
-    const borrowerHash = await walletClient.deployContract({
-      abi: LAUNCHPAD_ARTIFACTS.AaveFlashBorrower.abi,
-      bytecode: LAUNCHPAD_ARTIFACTS.AaveFlashBorrower.bytecode,
-      args: [CANONICAL_BASE_CONTRACTS.AaveV3Pool, recipient],
-      account: userAddress,
-      chain: activeChain,
-    });
-    const borrowerReceipt = await publicClient.waitForTransactionReceipt({ hash: borrowerHash });
-    borrowerAddress = borrowerReceipt.contractAddress ?? undefined;
-    console.log(`[Launchpad] Flash Loan Borrower deployed at: ${borrowerAddress}`);
+  if (deploysStaking(form.selectedArchetype)) {
+    const { abi, bytecode } = LAUNCHPAD_ARTIFACTS.LaunchpadSuiteDeployer;
+    const fullSuite = form.selectedArchetype === "full_defi_suite";
+    let suiteAddress: Address;
+    try {
+      const suiteHash = await walletClient.deployContract({
+        abi,
+        bytecode,
+        args: [
+          {
+            token: tokenAddress,
+            admin: recipient,
+            lockSeconds: BigInt(form.stakingLockDays) * 86_400n,
+            unstakeFeeBps: form.earlyUnstakeFeeBps,
+            performanceFeeBps: form.performanceFeeBps,
+            tiers: stakingTiers(supplyUnits),
+            deployAaveVault: deploysYieldVault(form.selectedArchetype),
+            deployFullSuite: fullSuite,
+            usdc: CANONICAL_BASE_CONTRACTS.USDC,
+            aavePool: CANONICAL_BASE_CONTRACTS.AaveV3Pool,
+            aUsdc: CANONICAL_BASE_CONTRACTS.aUSDC,
+            comet: CANONICAL_BASE_CONTRACTS.CompoundComet,
+          },
+        ],
+        account: userAddress,
+        chain: activeChain,
+      });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: suiteHash });
+      if (receipt.status !== "success" || !receipt.contractAddress) {
+        throw new Error("Transaction reverted");
+      }
+      suiteAddress = receipt.contractAddress;
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : "transaction failed";
+      throw new Error(
+        `Token ${tokenAddress} is deployed, but its staking contracts were not: ${reason}`
+      );
+    }
+    const suiteAddressOf = async (functionName: string) => {
+      const value = (await publicClient.readContract({
+        address: suiteAddress,
+        abi,
+        functionName,
+      })) as Address;
+      return value === zeroAddress ? undefined : value;
+    };
+    stakingAddress = await suiteAddressOf("staking");
+    vaultAddress = await suiteAddressOf("aaveVault");
+    compoundVaultAddress = await suiteAddressOf("compoundVault");
+    borrowerAddress = await suiteAddressOf("arbitrageRouter");
+    console.log(`[Launchpad] Suite deployed by ${suiteAddress}`);
   }
 
   // ────────────────────────────────────────────────────────────────────────────
@@ -308,27 +266,33 @@ export async function executeLaunchpadDeployment(
           account: userAddress,
           chain: activeChain,
         });
-        await publicClient.waitForTransactionReceipt({ hash: approveHash });
+        await confirm(approveHash);
 
         console.log(`[Launchpad] Adding initial liquidity to ${venue.name}...`);
         const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200); // 20 mins
-        const liqHash = await walletClient.writeContract({
+        const tokenMin = (tokenAmount * 95n) / 100n; // 5% slippage floor for initial seed
+        const ethMin = (ethAmount * 95n) / 100n;
+        const shared = {
           address: router,
-          abi: UNISWAP_V2_ROUTER_ABI,
           functionName: "addLiquidityETH",
-          args: [
-            tokenAddress,
-            tokenAmount,
-            (tokenAmount * 95n) / 100n, // 5% slippage floor for initial seed
-            (ethAmount * 95n) / 100n,
-            recipient,
-            deadline,
-          ],
           value: ethAmount,
           account: userAddress,
           chain: activeChain,
-        });
-        await publicClient.waitForTransactionReceipt({ hash: liqHash });
+        } as const;
+        // Aerodrome's router takes a stable flag; launched tokens go in its volatile pools.
+        const liqHash =
+          venue.id === "aerodrome"
+            ? await walletClient.writeContract({
+                ...shared,
+                abi: AERODROME_ROUTER_ABI,
+                args: [tokenAddress, false, tokenAmount, tokenMin, ethMin, recipient, deadline],
+              })
+            : await walletClient.writeContract({
+                ...shared,
+                abi: UNISWAP_V2_ROUTER_ABI,
+                args: [tokenAddress, tokenAmount, tokenMin, ethMin, recipient, deadline],
+              });
+        await confirm(liqHash);
         console.log(`[Launchpad] Liquidity added successfully to ${venue.name}!`);
       }
     } catch (seedErr) {

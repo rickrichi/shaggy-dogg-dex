@@ -1,0 +1,88 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.28;
+
+import "./AtomicFlashArbitrageRouter.sol";
+import "./CompoundYieldVault.sol";
+import "./FeeDiscountStaking.sol";
+import "./YieldStakingVault.sol";
+
+/**
+ * @title LaunchpadSuiteDeployer
+ * @notice Deployed once per launch. Its constructor creates and fully configures the staking and
+ *         vault contracts in one transaction, so a launch cannot end half-configured. Any invalid
+ *         setting reverts the whole transaction. It keeps no privileges afterwards: every contract
+ *         it creates is handed to `admin` before the constructor returns.
+ */
+contract LaunchpadSuiteDeployer {
+    struct Config {
+        address token;
+        address admin;
+        uint256 lockSeconds;
+        uint16 unstakeFeeBps;
+        uint16 performanceFeeBps;
+        FeeDiscountStaking.Tier[] tiers;
+        bool deployAaveVault;
+        bool deployFullSuite;
+        address usdc;
+        address aavePool;
+        address aUsdc;
+        address comet;
+    }
+
+    address public immutable staking;
+    address public immutable aaveVault;
+    address public immutable compoundVault;
+    address public immutable arbitrageRouter;
+
+    constructor(Config memory config) {
+        require(config.admin != address(0), "Invalid admin");
+
+        FeeDiscountStaking newStaking = new FeeDiscountStaking(config.token, address(this), address(this));
+        newStaking.setTiers(config.tiers);
+        newStaking.setMinimumStakePeriod(config.lockSeconds);
+        newStaking.setWithdrawalFee(config.unstakeFeeBps);
+        newStaking.setTierAdmin(config.admin);
+        newStaking.setAdmin(config.admin);
+        staking = address(newStaking);
+
+        address newAaveVault;
+        address newCompoundVault;
+        address newRouter;
+
+        if (config.deployAaveVault || config.deployFullSuite) {
+            YieldStakingVault vault = new YieldStakingVault(
+                config.usdc,
+                config.aavePool,
+                config.aUsdc,
+                address(newStaking),
+                address(this),
+                config.admin
+            );
+            vault.setPerformanceFee(config.performanceFeeBps);
+            vault.setAdmin(config.admin);
+            newAaveVault = address(vault);
+        }
+
+        if (config.deployFullSuite) {
+            CompoundYieldVault vault = new CompoundYieldVault(
+                config.usdc,
+                config.comet,
+                address(newStaking),
+                address(this),
+                config.admin
+            );
+            vault.setPerformanceFee(config.performanceFeeBps);
+            vault.setAdmin(config.admin);
+            newCompoundVault = address(vault);
+
+            AtomicFlashArbitrageRouter router = new AtomicFlashArbitrageRouter(config.aavePool, address(this));
+            router.setOperator(address(this), false);
+            router.setAdmin(config.admin);
+            newRouter = address(router);
+        }
+
+        aaveVault = newAaveVault;
+        compoundVault = newCompoundVault;
+        arbitrageRouter = newRouter;
+    }
+}

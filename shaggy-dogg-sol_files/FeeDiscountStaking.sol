@@ -25,6 +25,7 @@ contract FeeDiscountStaking {
 
     uint256 public minimumStakePeriod;
     uint16 public withdrawalFeeBps;
+    uint256 public accruedFees; // unstake fees held here, withdrawable by admin
 
     mapping(address => uint256) public stakedBalance;
     mapping(address => uint256) public stakeTimestamp;
@@ -40,6 +41,7 @@ contract FeeDiscountStaking {
     event MinimumStakePeriodUpdated(uint256 period);
     event AdminChanged(address newAdmin);
     event TierAdminChanged(address newTierAdmin);
+    event FeesWithdrawn(address indexed recipient, uint256 amount);
 
     constructor(
         address tokenAddress,
@@ -106,6 +108,19 @@ contract FeeDiscountStaking {
         emit TierAdminChanged(newTierAdmin);
     }
 
+    /// @notice Pays out collected unstake fees. Bounded by accruedFees, so stakes are out of reach.
+    function withdrawFees(address to, uint256 amount) external onlyAdmin nonReentrant {
+        require(to != address(0), "Invalid");
+        require(amount > 0 && amount <= accruedFees, "Exceeds fees");
+
+        accruedFees -= amount;
+        emit FeesWithdrawn(to, amount);
+
+        // Guarded by nonReentrant; the linter does not model modifier state.
+        // forge-lint: disable-next-line(reentrancy-no-eth)
+        require(token.transfer(to, amount), "Transfer failed");
+    }
+
     // --- Staking Logic ---
 
     function stake(uint256 amount) external nonReentrant {
@@ -141,6 +156,7 @@ contract FeeDiscountStaking {
 
         uint256 fee = (amount * withdrawalFeeBps) / 10_000;
         uint256 payout = amount - fee;
+        accruedFees += fee;
 
         emit Unstaked(msg.sender, amount, fee);
 

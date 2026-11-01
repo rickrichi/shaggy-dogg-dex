@@ -1,7 +1,6 @@
 // src/lib/permit.ts
 import { type Address, type Hex, parseSignature, type PublicClient, type WalletClient } from "viem";
 
-import FeeDiscountStakingAbiJson from "@/abi/FeeDiscountStaking.json";
 // ─────────────────────────────────────────────────────────────────────────────
 // ABIs (import the JSON from your Remix build artifacts)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -13,12 +12,7 @@ export type ShaggyDoggTokenAbi = typeof ShaggyDoggTokenAbiJson extends Abi
   ? typeof ShaggyDoggTokenAbiJson
   : never;
 
-export type FeeDiscountStakingAbi = typeof FeeDiscountStakingAbiJson extends Abi
-  ? typeof FeeDiscountStakingAbiJson
-  : never;
-
 const SDT_ABI = ShaggyDoggTokenAbiJson as ShaggyDoggTokenAbi;
-const STAKING_ABI = FeeDiscountStakingAbiJson as FeeDiscountStakingAbi;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -44,7 +38,7 @@ export interface SignPermitArgs {
   walletClient: WalletClient;
   token: Address; // SDT token address
   owner: Address; // msg.sender (signer)
-  spender: Address; // FeeDiscountStaking contract address
+  spender: Address; // contract allowed to spend the tokens
   value: bigint; // amount to approve (18-decimals: use parseUnits if needed)
   deadline: bigint; // unix seconds (e.g., BigInt(Math.floor(Date.now()/1000) + 3600))
   // Optional overrides (will be fetched if omitted)
@@ -76,7 +70,7 @@ function isNonEmptyString(input: unknown): input is string {
 
 /**
  * Signs an EIP-2612 permit for an ERC20Permit token.
- * Produces (v,r,s) ready for depositWithPermit(amount, deadline, v, r, s).
+ * Produces (v,r,s) for a contract that accepts permits.
  */
 export async function signPermit(args: SignPermitArgs): Promise<SignedPermitVRS> {
   const {
@@ -156,46 +150,4 @@ export async function signPermit(args: SignPermitArgs): Promise<SignedPermitVRS>
     throw new Error("Signature parsing failed: v is undefined or not a number");
   }
   return { v, r, s };
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Convenience: sign + depositWithPermit in one call
-// ─────────────────────────────────────────────────────────────────────────────
-
-export interface DepositWithPermitArgs extends Omit<SignPermitArgs, "spender"> {
-  staking: Address; // FeeDiscountStaking contract
-}
-
-/**
- * Signs the permit for {token, owner -> staking} and then calls
- * FeeDiscountStaking.depositWithPermit(amount, deadline, v, r, s).
- */
-export async function signAndDepositWithPermit(args: DepositWithPermitArgs): Promise<Hex> {
-  const { publicClient, walletClient, token, owner, staking, value, deadline, tokenName, version } =
-    args;
-
-  // 1) Sign permit
-  const { v, r, s } = await signPermit({
-    publicClient,
-    walletClient,
-    token,
-    owner,
-    spender: staking,
-    value,
-    deadline,
-    tokenName,
-    version,
-  });
-
-  // 2) Execute depositWithPermit
-  const hash = await walletClient.writeContract({
-    address: staking,
-    abi: STAKING_ABI,
-    functionName: "depositWithPermit",
-    args: [value, deadline, v, r, s],
-    account: walletClient.account!,
-    chain: undefined,
-  });
-
-  return hash;
 }

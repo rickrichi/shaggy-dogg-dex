@@ -20,12 +20,13 @@ import { toast } from "sonner";
 import { useAccount, useWalletClient } from "wagmi";
 
 import { LaunchpadNav } from "@/components/launchpad/LaunchpadNav";
+import { StakingFeesPanel } from "@/components/launchpad/StakingFeesPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LAUNCHPAD_ARCHETYPES } from "@/lib/launchpad/constants";
+import { LAUNCHPAD_ARCHETYPES, RETIRED_ARCHETYPE_NAMES } from "@/lib/launchpad/constants";
 import { getStoredLaunchedTokens } from "@/lib/launchpad/storage";
 
 import type { LaunchedTokenRecord } from "@/lib/launchpad/types";
@@ -169,8 +170,8 @@ export default function LaunchpadExplore({ defaultTab }: LaunchpadExploreProps) 
             <ShieldCheck className="size-4 text-emerald-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-900">ERC-4626 & V2</div>
-            <p className="mt-1 text-xs text-slate-500">Isolated risk contagion models</p>
+            <div className="text-2xl font-bold text-slate-900">Aave & Compound</div>
+            <p className="mt-1 text-xs text-slate-500">Yield vault integrations</p>
           </CardContent>
         </Card>
       </div>
@@ -290,7 +291,12 @@ export default function LaunchpadExplore({ defaultTab }: LaunchpadExploreProps) 
                       <div className="flex items-center justify-between">
                         <span className="text-slate-500">Archetype</span>
                         <span className="font-bold text-purple-900">
-                          {archDef?.name || token.archetype}
+                          {archDef?.name ??
+                            (token.archetype in RETIRED_ARCHETYPE_NAMES
+                              ? RETIRED_ARCHETYPE_NAMES[
+                                  token.archetype as keyof typeof RETIRED_ARCHETYPE_NAMES
+                                ]
+                              : token.archetype)}
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
@@ -357,6 +363,13 @@ export default function LaunchpadExplore({ defaultTab }: LaunchpadExploreProps) 
                           <Wallet className="mr-1 size-3" /> Add Wallet
                         </Button>
                       </div>
+
+                      {token.stakingAddress && (
+                        <StakingFeesPanel
+                          stakingAddress={token.stakingAddress}
+                          tokenSymbol={token.tokenSymbol}
+                        />
+                      )}
 
                       {token.stakingAddress && (
                         <Link to="/stake">

@@ -17,7 +17,14 @@ import {
   Vault,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useAccount, usePublicClient, useSwitchChain, useWalletClient } from "wagmi";
+import { formatUnits } from "viem";
+import {
+  useAccount,
+  usePublicClient,
+  useReadContract,
+  useSwitchChain,
+  useWalletClient,
+} from "wagmi";
 
 import { LaunchpadNav } from "@/components/launchpad/LaunchpadNav";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -30,10 +37,24 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { WalletConnect } from "@/components/WalletConnect";
-import { DEX_VENUES, LAUNCHPAD_ARCHETYPES } from "@/lib/launchpad/constants";
+import {
+  CANONICAL_BASE_CONTRACTS,
+  DEX_VENUES,
+  LAUNCHPAD_ARCHETYPES,
+  LAUNCHPAD_FEES_ABI,
+} from "@/lib/launchpad/constants";
 import { executeLaunchpadDeployment } from "@/lib/launchpad/deployEngine";
 import { reportLaunch } from "@/lib/launchpad/reportLaunch";
 import { impliedLaunchPricing, MIN_SEED_ETH, seedingProblem } from "@/lib/launchpad/seeding";
+import {
+  deploysStaking,
+  deploysYieldVault,
+  launchSettingsProblem,
+  MAX_PERFORMANCE_FEE_BPS,
+  MAX_STAKING_LOCK_DAYS,
+  MAX_UNSTAKE_FEE_BPS,
+  STAKING_TIER_SCHEDULE,
+} from "@/lib/launchpad/settings";
 import { saveLaunchedToken } from "@/lib/launchpad/storage";
 
 import NotFound from "./NotFound";
@@ -52,6 +73,12 @@ export default function Launchpad() {
   const { address, isConnected, chainId, chain } = useAccount();
   const { data: walletClient } = useWalletClient();
   const publicClient = usePublicClient();
+  const { data: launchFee } = useReadContract({
+    address: CANONICAL_BASE_CONTRACTS.LaunchpadFees,
+    abi: LAUNCHPAD_FEES_ABI,
+    functionName: "feeAmount",
+    chainId: 8453,
+  });
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
 
   const { step } = useParams<{ step?: string }>();
@@ -80,7 +107,7 @@ export default function Launchpad() {
     decimals: 18,
     initialSupply: "",
     description: "",
-    selectedArchetype: "morpho_blue_isolated",
+    selectedArchetype: "standard_governance",
     performanceFeeBps: 1000, // 10%
     stakingLockDays: 7,
     earlyUnstakeFeeBps: 100, // 1%
@@ -95,6 +122,8 @@ export default function Launchpad() {
 
   const selectedArchetypeDef =
     LAUNCHPAD_ARCHETYPES.find((a) => a.id === form.selectedArchetype) ?? LAUNCHPAD_ARCHETYPES[0]!;
+  const showStakingSettings = deploysStaking(form.selectedArchetype);
+  const showVaultSettings = deploysYieldVault(form.selectedArchetype);
   const selectedDexDef = DEX_VENUES.find((d) => d.id === form.selectedDex) ?? DEX_VENUES[0]!;
 
   const handleLaunch = async () => {
@@ -130,6 +159,12 @@ export default function Launchpad() {
     if (seedProblem) {
       toast.error(seedProblem);
       setActiveTab("liquidity");
+      return;
+    }
+    const settingsProblem = launchSettingsProblem(form);
+    if (settingsProblem) {
+      toast.error(settingsProblem);
+      setActiveTab("archetype");
       return;
     }
     if (!walletClient || !publicClient) {
@@ -168,7 +203,7 @@ export default function Launchpad() {
       if (result.compoundVaultAddress)
         addLog(`Compound v3 vault deployed at ${result.compoundVaultAddress}`);
       if (result.borrowerAddress)
-        addLog(`Flash Loan borrower deployed at ${result.borrowerAddress}`);
+        addLog(`Flash arbitrage router deployed at ${result.borrowerAddress}`);
       if (form.enableDexSeeding && !result.liquiditySeedingError)
         addLog(`Liquidity seeded on ${selectedDexDef.name}.`);
 
@@ -233,19 +268,18 @@ export default function Launchpad() {
             </Badge>
             <Badge className="border-emerald-400/40 bg-emerald-500/30 text-emerald-200">
               <ShieldCheck className="mr-1 size-3 text-emerald-300" />
-              Open to any wallet · you sign, pay gas, and own what you deploy
+              Open to any wallet · you sign, pay gas and the launch fee, and own what you deploy
             </Badge>
             <Badge className="border-blue-400/40 bg-blue-500/30 text-blue-200">
-              ERC-4626 & Isolated Risk Ready
+              Aave v3 & Compound v3 Yield Vaults
             </Badge>
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
             Shaggy Mutt Token & Protocol Launchpad
           </h1>
           <p className="text-sm leading-relaxed text-purple-100/90 sm:text-base">
-            Create, deploy, and seed liquidity for sovereign tokens, staking ecosystems, and
-            next-generation isolated money markets (Morpho Blue, Moonwell, Silo, Aave v3) on Base in
-            one unified pipeline.
+            Create, deploy, and seed liquidity for sovereign tokens, staking ecosystems, and yield
+            vaults (Aave v3, Compound v3) on Base in one unified pipeline.
           </p>
         </div>
       </div>
@@ -405,7 +439,7 @@ export default function Launchpad() {
                 <Textarea
                   id="description"
                   rows={3}
-                  placeholder="Describe what your token is designed for (e.g. DAO governance, staking discounts, isolated lending)..."
+                  placeholder="Describe what your token is designed for (e.g. DAO governance, staking discounts, yield vaults)..."
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                 />
@@ -432,8 +466,8 @@ export default function Launchpad() {
                 Select Protocol Purpose & DeFi Money Market Archetype
               </CardTitle>
               <CardDescription>
-                Choose the smart contract architecture for your token. From standalone governance to
-                next-gen isolated risk lending (Morpho Blue, Moonwell, Silo).
+                Choose the smart contract architecture for your token. From a standalone token to
+                staking and Aave v3 or Compound v3 yield vaults.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -477,58 +511,105 @@ export default function Launchpad() {
               </div>
 
               {/* Archetype Customization Details */}
-              <div className="space-y-4 rounded-xl border border-indigo-100 bg-indigo-50/30 p-5">
-                <h4 className="flex items-center gap-2 text-sm font-semibold text-indigo-950">
-                  <Vault className="size-4 text-indigo-600" />
-                  Parameters for {selectedArchetypeDef.name}
-                </h4>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Staking Lock Duration</Label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="number"
-                        value={form.stakingLockDays}
-                        onChange={(e) =>
-                          setForm({ ...form, stakingLockDays: Number(e.target.value) })
-                        }
-                        className="bg-white"
-                      />
-                      <span className="text-xs text-gray-500">days</span>
-                    </div>
-                  </div>
+              {(showStakingSettings || showVaultSettings) && (
+                <div className="space-y-4 rounded-xl border border-indigo-100 bg-indigo-50/30 p-5">
+                  <h4 className="flex items-center gap-2 text-sm font-semibold text-indigo-950">
+                    <Vault className="size-4 text-indigo-600" />
+                    Parameters for {selectedArchetypeDef.name}
+                  </h4>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    {showStakingSettings && (
+                      <>
+                        <div className="space-y-1">
+                          <Label htmlFor="stakingLockDays" className="text-xs">
+                            Staking Lock Duration
+                          </Label>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              id="stakingLockDays"
+                              type="number"
+                              min={0}
+                              max={MAX_STAKING_LOCK_DAYS}
+                              step={1}
+                              value={form.stakingLockDays}
+                              onChange={(e) =>
+                                setForm({ ...form, stakingLockDays: Number(e.target.value) })
+                              }
+                              className="bg-white"
+                            />
+                            <span className="text-xs text-gray-500">days</span>
+                          </div>
+                          <p className="text-xs text-gray-500">No unstaking before this ends.</p>
+                        </div>
 
-                  <div className="space-y-1">
-                    <Label className="text-xs">Early Exit Penalty</Label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="number"
-                        value={form.earlyUnstakeFeeBps / 100}
-                        onChange={(e) =>
-                          setForm({ ...form, earlyUnstakeFeeBps: Number(e.target.value) * 100 })
-                        }
-                        className="bg-white"
-                      />
-                      <span className="text-xs text-gray-500">%</span>
-                    </div>
-                  </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="unstakeFee" className="text-xs">
+                            Unstake Fee
+                          </Label>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              id="unstakeFee"
+                              type="number"
+                              min={0}
+                              max={MAX_UNSTAKE_FEE_BPS / 100}
+                              step={0.01}
+                              value={form.earlyUnstakeFeeBps / 100}
+                              onChange={(e) =>
+                                setForm({
+                                  ...form,
+                                  earlyUnstakeFeeBps: Math.round(Number(e.target.value) * 100),
+                                })
+                              }
+                              className="bg-white"
+                            />
+                            <span className="text-xs text-gray-500">%</span>
+                          </div>
+                          <p className="text-xs text-gray-500">
+                            Charged on every unstake. Withdraw collected fees from My Tokens.
+                          </p>
+                        </div>
+                      </>
+                    )}
 
-                  <div className="space-y-1">
-                    <Label className="text-xs">Vault Performance Fee</Label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="number"
-                        value={form.performanceFeeBps / 100}
-                        onChange={(e) =>
-                          setForm({ ...form, performanceFeeBps: Number(e.target.value) * 100 })
-                        }
-                        className="bg-white"
-                      />
-                      <span className="text-xs text-gray-500">%</span>
-                    </div>
+                    {showVaultSettings && (
+                      <div className="space-y-1">
+                        <Label htmlFor="performanceFee" className="text-xs">
+                          Vault Performance Fee
+                        </Label>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            id="performanceFee"
+                            type="number"
+                            min={0}
+                            max={MAX_PERFORMANCE_FEE_BPS / 100}
+                            step={0.01}
+                            value={form.performanceFeeBps / 100}
+                            onChange={(e) =>
+                              setForm({
+                                ...form,
+                                performanceFeeBps: Math.round(Number(e.target.value) * 100),
+                              })
+                            }
+                            className="bg-white"
+                          />
+                          <span className="text-xs text-gray-500">%</span>
+                        </div>
+                        <p className="text-xs text-gray-500">Taken from vault yield only.</p>
+                      </div>
+                    )}
                   </div>
+                  {showStakingSettings && (
+                    <p className="text-xs text-gray-600">
+                      VIP tiers:{" "}
+                      {STAKING_TIER_SCHEDULE.map(
+                        (tier) =>
+                          `stake ${tier.supplyLabel} of supply for ${tier.discountBps / 100}% off`
+                      ).join(", ")}{" "}
+                      vault performance fees.
+                    </p>
+                  )}
                 </div>
-              </div>
+              )}
 
               <div className="flex justify-between pt-4">
                 <Button variant="outline" onClick={() => setActiveTab("identity")}>
@@ -717,12 +798,37 @@ export default function Launchpad() {
                         {selectedArchetypeDef.riskContagionModel}
                       </strong>
                     </p>
+                    {showStakingSettings && (
+                      <p className="flex justify-between">
+                        <span className="text-gray-500">Staking:</span>
+                        <strong className="text-gray-900">
+                          {form.stakingLockDays}-day lock, {form.earlyUnstakeFeeBps / 100}% unstake
+                          fee
+                        </strong>
+                      </p>
+                    )}
+                    {showVaultSettings && (
+                      <p className="flex justify-between">
+                        <span className="text-gray-500">Performance Fee:</span>
+                        <strong className="text-gray-900">{form.performanceFeeBps / 100}%</strong>
+                      </p>
+                    )}
                     <p className="flex justify-between">
                       <span className="text-gray-500">DEX Seeding:</span>
                       <strong className="text-gray-900">
                         {form.enableDexSeeding
                           ? `${selectedDexDef.name} (${form.initialEthLiquidity} ETH)`
                           : "Disabled"}
+                      </strong>
+                    </p>
+                    <p className="flex justify-between">
+                      <span className="text-gray-500">Launch Fee:</span>
+                      <strong className="text-gray-900">
+                        {launchFee === undefined
+                          ? "Checking..."
+                          : launchFee === 0n
+                            ? "None"
+                            : `${formatUnits(launchFee, 6)} USDC, paid from your wallet`}
                       </strong>
                     </p>
                     <p className="flex justify-between">

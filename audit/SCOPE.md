@@ -38,7 +38,7 @@ Source: `contracts/src/{GovernanceToken,FeeDiscountStaking,FeeDiscountMath,Yield
 
 ## Out of scope
 
-- `IsolatedLendingVault.sol`: not deployed, 0% coverage. Do not deploy before it is tested and reviewed.
+- `IsolatedLendingVault.sol`: removed from the repository on 2026-10-31 (no supported launch path deploys it). Entries about it in `SLITHER-TRIAGE.md` are historical.
 - Uniswap V2 pairs (`0xC3D1…0917`, `0x581B…6784`), the V2 factory and router: standard Uniswap V2 bytecode
   (pinned and compared by hash in `src/lib/amm/own-dex.ts`; licences in `contracts/vendor/`). Third-party code.
 - Aave V3, Compound, Aerodrome, Uniswap routers: external dependencies.
@@ -57,7 +57,7 @@ Source: `contracts/src/{GovernanceToken,FeeDiscountStaking,FeeDiscountMath,Yield
 
 - Foundry: 76 tests pass (`forge test` in `contracts/`), including Base-fork tests, fuzzing and tests that reproduce known issues.
 - Line coverage: GovernanceToken 100%, FeeDiscountStaking 100%, AaveFlashBorrower 95%, AtomicFlashArbitrageRouter 93%,
-  YieldStakingVault 91%, CompoundYieldVault 90%. `IsolatedLendingVault` and `DeployEcosystem` are 0% (out of scope / deploy helper).
+  YieldStakingVault 91%, CompoundYieldVault 90%. `DeployEcosystem` is 0% (deploy helper).
 - Slither: 41 results, every one triaged individually in `SLITHER-TRIAGE.md`.
 - Router line-by-line self-review: `ROUTER-REVIEW.md`.
 - The vault share-price fix (virtual shares) is deployed in **v3 `0x5c98f6bc9d17ba0eb02e1336bdf035938f5859e5`** (creation and

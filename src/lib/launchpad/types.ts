@@ -4,12 +4,15 @@ import type { Address } from "viem";
 export type ArchetypeId =
   | "standard_governance"
   | "staking_rewards"
+  | "aave_v3_yield"
+  | "full_defi_suite";
+
+/** No longer offered, but tokens launched from these cards still appear in saved records. */
+export type RetiredArchetypeId =
   | "moonwell_lending"
   | "morpho_blue_isolated"
   | "silo_isolated_vault"
-  | "aave_v3_yield"
-  | "fluid_hybrid_amm"
-  | "full_defi_suite";
+  | "fluid_hybrid_amm";
 
 export type DexVenueId = "uniswap_v2" | "uniswap_v3" | "pancakeswap_v2" | "aerodrome";
 
@@ -18,13 +21,13 @@ export type DeploymentExecutionMode = "metamask" | "deployer_worker";
 export interface ArchetypeDefinition {
   id: ArchetypeId;
   name: string;
-  category: "Standard" | "Staking & Loyalty" | "Next-Gen Lending" | "Isolated Risk" | "Full Suite";
+  category: "Standard" | "Staking & Loyalty" | "Next-Gen Lending" | "Full Suite";
   badge: string;
   description: string;
   architectureDetails: string;
   protocolsReferenced: string[];
   contractsDeployed: string[];
-  riskContagionModel: "Pooled" | "Isolated" | "Sovereign" | "None";
+  riskContagionModel: "Pooled" | "Sovereign" | "None";
 }
 
 export interface DexVenueDefinition {
@@ -46,7 +49,6 @@ export interface LaunchpadFormState {
 
   // Step 2 & 3: Archetype & Money Market
   selectedArchetype: ArchetypeId;
-  lendingMarketTarget?: string;
   performanceFeeBps: number;
   stakingLockDays: number;
   earlyUnstakeFeeBps: number;
@@ -83,7 +85,7 @@ export interface LaunchedTokenRecord {
   decimals: number;
   initialSupply: string;
   description: string;
-  archetype: ArchetypeId;
+  archetype: ArchetypeId | RetiredArchetypeId;
   stakingAddress?: Address | undefined;
   vaultAddress?: Address | undefined;
   borrowerAddress?: Address | undefined;
