@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircle, Droplet, Layers, Loader2, Minus, Plus, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { type Address, formatUnits, type Hash, parseUnits } from "viem";
+import { base } from "viem/chains";
 import {
   useAccount,
   useBalance,
@@ -32,6 +33,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ERC20_ABI, UNISWAP_V2_PAIR_ABI, UNISWAP_V2_ROUTER_ABI } from "@/config/abis";
 import { getUniswapV2Factory, getUniswapV2Router } from "@/config/contracts";
 import { getTokensForChain, getWrappedNativeAddress, type Token } from "@/config/tokens";
+import { isPositiveAmount, quoteForInput } from "@/lib/amm/liquidity-input";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -77,14 +79,6 @@ function quotePoolAmount(amountIn: bigint, reserveIn: bigint, reserveOut: bigint
   return (amountIn * reserveOut) / reserveIn;
 }
 
-function formatAmountForInput(amount: bigint, decimals: number, fractionDigits = 6): string {
-  const formatted = formatUnits(amount, decimals);
-  const [whole, fraction = ""] = formatted.split(".");
-  const trimmedFraction = fraction.slice(0, fractionDigits).replace(/0+$/, "");
-  const wholeAmount = whole ?? "0";
-  return trimmedFraction ? `${wholeAmount}.${trimmedFraction}` : wholeAmount;
-}
-
 function formatPercentage(numerator: bigint, denominator: bigint, fractionDigits = 4): string {
   if (denominator <= 0n || numerator <= 0n) return `0.${"0".repeat(fractionDigits)}`;
 
@@ -112,9 +106,11 @@ function resolveAddress(token: Token, chainId?: number): Address {
 // ══════════════════════════════════════════════════════════════════════════════
 
 export default function Liquidity() {
-  const { address: userAddress, chainId, isConnected, chain } = useAccount();
+  const { address: userAddress, chainId: walletChainId, isConnected, chain } = useAccount();
+  // This is a Base app: with no wallet, show Base pools rather than wagmi's first chain.
+  const chainId = walletChainId ?? base.id;
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
-  const publicClient = usePublicClient();
+  const publicClient = usePublicClient({ chainId });
   const isSupportedChain = chainId === 1 || chainId === 8453;
   const isMainnet = isSupportedChain;
 
@@ -195,6 +191,7 @@ export default function Liquidity() {
     abi: FACTORY_ABI,
     functionName: "getPair",
     args: [resolveAddress(tokenA, chainId), resolveAddress(tokenB, chainId)],
+    chainId,
     query: { enabled: tokenA.address !== tokenB.address },
   });
 
@@ -205,6 +202,7 @@ export default function Liquidity() {
     address: poolExists ? (pairAddress as Address) : undefined,
     abi: UNISWAP_V2_PAIR_ABI,
     functionName: "getReserves",
+    chainId,
     query: { enabled: !!poolExists, refetchInterval: 10_000 },
   });
 
@@ -213,6 +211,7 @@ export default function Liquidity() {
     address: poolExists ? (pairAddress as Address) : undefined,
     abi: UNISWAP_V2_PAIR_ABI,
     functionName: "totalSupply",
+    chainId,
     query: { enabled: !!poolExists },
   });
 
@@ -222,6 +221,7 @@ export default function Liquidity() {
     abi: ERC20_ABI,
     functionName: "balanceOf",
     args: userAddress ? [userAddress] : undefined,
+    chainId,
     query: { enabled: !!poolExists && !!userAddress },
   });
 
@@ -229,12 +229,14 @@ export default function Liquidity() {
   const { data: balanceA, refetch: refetchBalanceA } = useBalance({
     address: userAddress,
     token: isNative(tokenA.address) ? undefined : tokenA.address,
+    chainId,
     query: { enabled: isConnected },
   });
 
   const { data: balanceB, refetch: refetchBalanceB } = useBalance({
     address: userAddress,
     token: isNative(tokenB.address) ? undefined : tokenB.address,
+    chainId,
     query: { enabled: isConnected },
   });
 
@@ -298,7 +300,7 @@ export default function Liquidity() {
     if (!poolInfo || poolInfo.reserves[0] === 0n) return null;
     const oneTokenA = 10n ** BigInt(tokenA.decimals);
     const quote = quotePoolAmount(oneTokenA, poolInfo.reserves[0], poolInfo.reserves[1]);
-    return quote === null ? null : formatAmountForInput(quote, tokenB.decimals);
+    return quote === null ? null : quoteForInput(quote, tokenB.decimals);
   }, [poolInfo, tokenA.decimals, tokenB.decimals]);
 
   // Bidirectional calculations for adding liquidity
@@ -313,7 +315,7 @@ export default function Liquidity() {
         const parsed = parseUnits(value, tokenA.decimals);
         const quoted = quotePoolAmount(parsed, poolInfo.reserves[0], poolInfo.reserves[1]);
         if (quoted !== null) {
-          setAmountB(formatAmountForInput(quoted, tokenB.decimals));
+          setAmountB(quoteForInput(quoted, tokenB.decimals));
         }
       } catch {
         // preserve user input
@@ -333,7 +335,7 @@ export default function Liquidity() {
         const parsed = parseUnits(value, tokenB.decimals);
         const quoted = quotePoolAmount(parsed, poolInfo.reserves[1], poolInfo.reserves[0]);
         if (quoted !== null) {
-          setAmountA(formatAmountForInput(quoted, tokenA.decimals));
+          setAmountA(quoteForInput(quoted, tokenA.decimals));
         }
       } catch {
         // preserve user input
@@ -404,8 +406,15 @@ export default function Liquidity() {
   // Handlers
   // ────────────────────────────────────────────────────────────────────────────
 
+  const amountsValid =
+    isPositiveAmount(amountA, tokenA.decimals) && isPositiveAmount(amountB, tokenB.decimals);
+
   const handleAddLiquidity = useCallback(async () => {
-    if (!amountA || !amountB || !userAddress) return;
+    if (!userAddress) return;
+    if (!isPositiveAmount(amountA, tokenA.decimals) || !isPositiveAmount(amountB, tokenB.decimals)) {
+      toast.error("Enter an amount above zero for both tokens.");
+      return;
+    }
     if (!isMainnet) {
       toast.error(
         "Switch to Base or Ethereum mainnet before managing this Uniswap V2 liquidity position."
@@ -899,8 +908,7 @@ export default function Liquidity() {
                     className="w-full bg-gradient-to-r from-blue-600 to-cyan-600"
                     onClick={handleAddLiquidity}
                     disabled={
-                      !amountA ||
-                      !amountB ||
+                      !amountsValid ||
                       !isConnected ||
                       !isMainnet ||
                       isAddingLiq ||

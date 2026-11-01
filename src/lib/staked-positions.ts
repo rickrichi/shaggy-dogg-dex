@@ -1,5 +1,5 @@
 // src/lib/staked-positions.ts
-import { type Address, getAddress, parseAbi } from "viem";
+import { type Address, getAddress, parseAbi, zeroAddress } from "viem";
 
 import { USDC_ADDRESS, WETH_ADDRESS } from "@/config/dex-venues";
 import { BASE_MAINNET_TOKENS } from "@/config/tokens";
@@ -9,6 +9,7 @@ import { MRWD_V3_STAKER } from "@/lib/mrwd-staker";
 
 const NPM: Address = "0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1";
 const V3_TIMELOCK: Address = "0xB5C9BeDb57f4E348e40A5E6326c90dE474072E25";
+const V3_FACTORY: Address = "0x33128a8fC17869897dcE68Ed026d694621f6FDfD";
 /** Large enough that a few hundred reads travel in a handful of RPC requests. */
 const MULTICALL_BYTES = 32_768;
 
@@ -16,6 +17,9 @@ const npmAbi = parseAbi([
   "function balanceOf(address owner) view returns (uint256)",
   "function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)",
   "function positions(uint256 tokenId) view returns (uint96 nonce, address operator, address token0, address token1, uint24 fee, int24 tickLower, int24 tickUpper, uint128 liquidity, uint256 feeGrowthInside0LastX128, uint256 feeGrowthInside1LastX128, uint128 tokensOwed0, uint128 tokensOwed1)",
+]);
+const factoryAbi = parseAbi([
+  "function getPool(address tokenA, address tokenB, uint24 fee) view returns (address)",
 ]);
 const stakerAbi = parseAbi([
   "function deposits(uint256 tokenId) view returns (address owner, uint48 numberOfStakes, int24 tickLower, int24 tickUpper)",
@@ -53,7 +57,16 @@ export interface V3Position {
   custody: PositionCustody;
   token0: Address;
   token1: Address;
+  token0Symbol: string;
+  token1Symbol: string;
+  token0Decimals: number;
+  token1Decimals: number;
   fee: number;
+  pool: Address;
+  tickLower: number;
+  tickUpper: number;
+  /** Text, so positions stay serializable in the query cache. */
+  liquidity: string;
 }
 
 export interface StakedToken {
@@ -155,11 +168,54 @@ export async function discoverV3Positions(client: PositionReader, owner: Address
       args: [id],
     }))
   );
-  const positions = held.flatMap(({ id, custody }, index): V3Position[] => {
+  const rows = held.flatMap(({ id, custody }, index) => {
     const detail = details[index];
     if (detail?.status !== "success") return [];
-    const row = detail.result as readonly [bigint, Address, Address, Address, number];
-    return [{ tokenId: id.toString(), custody, token0: row[2], token1: row[3], fee: row[4] }];
+    const row = detail.result as readonly [
+      bigint,
+      Address,
+      Address,
+      Address,
+      number,
+      number,
+      number,
+      bigint,
+    ];
+    return [{ tokenId: id.toString(), custody, row }];
+  });
+  const [metadata, pools] = await Promise.all([
+    describeTokens(client, [...new Set(rows.flatMap(({ row }) => [row[2], row[3]]))]),
+    read(
+      client,
+      rows.map(({ row }) => ({
+        address: V3_FACTORY,
+        abi: factoryAbi,
+        functionName: "getPool",
+        args: [row[2], row[3], row[4]],
+      }))
+    ),
+  ]);
+  // A token that won't describe itself still shows, by its address, rather than vanishing.
+  const shortName = (token: Address) => `${token.slice(0, 6)}…${token.slice(-4)}`;
+  const positions = rows.map(({ tokenId, custody, row }, index): V3Position => {
+    const info0 = metadata.get(row[2].toLowerCase());
+    const info1 = metadata.get(row[3].toLowerCase());
+    const pool = pools[index];
+    return {
+      tokenId,
+      custody,
+      token0: row[2],
+      token1: row[3],
+      token0Symbol: info0?.symbol ?? shortName(row[2]),
+      token1Symbol: info1?.symbol ?? shortName(row[3]),
+      token0Decimals: info0?.decimals ?? 18,
+      token1Decimals: info1?.decimals ?? 18,
+      fee: row[4],
+      pool: pool?.status === "success" ? (pool.result as Address) : zeroAddress,
+      tickLower: row[5],
+      tickUpper: row[6],
+      liquidity: row[7].toString(),
+    };
   });
   return {
     positions,
@@ -167,7 +223,8 @@ export async function discoverV3Positions(client: PositionReader, owner: Address
       wallet.failed ||
       staker.failed ||
       timelock.failed ||
-      details.some((d) => d.status === "failure"),
+      details.some((d) => d.status === "failure") ||
+      pools.some((p) => p.status === "failure"),
   };
 }
 

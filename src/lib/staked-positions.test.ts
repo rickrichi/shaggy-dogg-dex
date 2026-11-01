@@ -45,7 +45,7 @@ function reader(chain: Chain): PositionReader {
     if (functionName === "getLock") return [chain.owners[String(args![0])], 1n, 1n, true];
     if (functionName === "positions") {
       const [token0, token1] = chain.pairs[String(args![0])]!;
-      return [0n, OTHER, token0, token1, 3000];
+      return [0n, OTHER, token0, token1, 3000, -60, 60, 1000n];
     }
     if (["stakedBalance", "stakedOf", "sharesOf"].includes(functionName)) {
       return chain.balances?.[address.toLowerCase()] ?? 0n;
@@ -54,6 +54,7 @@ function reader(chain: Chain): PositionReader {
       if (!chain.assets?.[address.toLowerCase()]) throw new Error("no such function");
       return chain.assets[address.toLowerCase()];
     }
+    if (functionName === "getPool") return "0x0000000000000000000000000000000000000B01";
     if (functionName === "symbol") return "NEW";
     if (functionName === "name") return "New Token";
     if (functionName === "decimals") return 18;
@@ -91,6 +92,19 @@ describe("discoverV3Positions", () => {
       ["4", "timelock"],
     ]);
     expect(incomplete).toBe(false);
+  });
+
+  it("returns what the panels show: symbols, decimals, pool, range and liquidity", async () => {
+    const { positions } = await discoverV3Positions(reader(chain), OWNER);
+    expect(positions[0]).toMatchObject({
+      token0Symbol: "WETH",
+      token1Symbol: "MRWD",
+      token0Decimals: 18,
+      pool: "0x0000000000000000000000000000000000000B01",
+      tickLower: -60,
+      tickUpper: 60,
+      liquidity: "1000",
+    });
   });
 
   it("finds a different wallet's positions the same way", async () => {

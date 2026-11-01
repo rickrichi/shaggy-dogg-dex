@@ -10,13 +10,39 @@ import { LpLockCard } from "./LpLockCard";
 const mocks = vi.hoisted(() => ({
   write: vi.fn(), receipt: vi.fn(), success: vi.fn(), error: vi.fn(), info: vi.fn(),
   refetch: vi.fn(),
+  positions: [] as unknown[],
   data: {} as Record<string, unknown>,
   state: { connected: true, chainId: 8453, approved: false, locked: false, expired: false },
 }));
 const owner = "0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98";
 const zero = "0x0000000000000000000000000000000000000000";
+const position = (tokenId: string, custody: string, token1Decimals = 18) => ({
+  tokenId,
+  custody,
+  token0Symbol: "AAA",
+  token1Symbol: "BBB",
+  token0Decimals: 18,
+  token1Decimals,
+  fee: 10000,
+  pool: "0x0000000000000000000000000000000000000B01",
+  tickLower: -60,
+  tickUpper: 60,
+  liquidity: "1",
+});
 const hash = `0x${"ab".repeat(32)}`;
 
+vi.mock("@/hooks/useStakedPortfolio", () => ({
+  useStakedPortfolio: () =>
+    mocks.state.connected
+      ? {
+          data: { positions: mocks.positions },
+          isPending: false,
+          isFetching: false,
+          isError: false,
+          refetch: mocks.refetch,
+        }
+      : { isPending: true, isFetching: false, isError: false, refetch: mocks.refetch },
+}));
 vi.mock("sonner", () => ({ toast: { success: mocks.success, error: mocks.error, info: mocks.info } }));
 vi.mock("wagmi", () => ({
   useAccount: () => ({ address: owner, isConnected: mocks.state.connected, chainId: mocks.state.chainId }),
@@ -46,6 +72,7 @@ const cases = [
 
 beforeEach(() => {
   Object.assign(mocks.state, { connected: true, chainId: 8453, approved: false, locked: false, expired: false });
+  mocks.positions = [position("7", "wallet")];
   mocks.write.mockResolvedValue(hash);
   mocks.receipt.mockResolvedValue({ status: "success", transactionHash: hash });
   vi.spyOn(console, "error").mockImplementation(() => {});
@@ -97,11 +124,41 @@ describe("Liquidity locker wallet flow", () => {
     expect(mocks.write).not.toHaveBeenCalled();
   });
 
-  it("disables signing controls when the wallet is disconnected", () => {
+  it("shows no positions or signing controls when the wallet is disconnected", () => {
     mocks.state.connected = false;
     renderCard();
-    expect(screen.getByRole("button", { name: /1\. Approve Sovereign Locker/ })).toBeDisabled();
-    expect(screen.getByRole("button", { name: /2\. Lock NFT/ })).toBeDisabled();
+    expect(screen.getByText(/Connect a wallet to lock a position/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Approve Sovereign Locker/ })).toBeNull();
+    expect(screen.queryByText(/NFT #/)).toBeNull();
+  });
+
+  it("offers only this wallet's positions, not staked ones or anyone else's", () => {
+    mocks.positions = [position("7", "wallet"), position("8", "timelock"), position("9", "staker")];
+    renderCard();
+    expect(screen.getByRole("button", { name: /#7 · AAA \/ BBB 1%/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /#8 · AAA \/ BBB 1%/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /#9/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /#6245990/ })).toBeNull();
+  });
+
+  it("switches the selected position", () => {
+    mocks.positions = [position("7", "wallet"), position("8", "wallet")];
+    renderCard();
+    fireEvent.click(screen.getByRole("button", { name: /#8 · AAA/ }));
+    expect(screen.getByRole("button", { name: /#8 · AAA/ }).className).toContain("bg-indigo-600");
+  });
+
+  it("says when a connected wallet has nothing to lock", () => {
+    mocks.positions = [position("9", "staker")];
+    renderCard();
+    expect(screen.getByText(/no V3 positions to lock or manage/)).toBeInTheDocument();
+  });
+
+  it("targets the selected position when approving", async () => {
+    renderCard();
+    fireEvent.click(screen.getByRole("button", { name: /1\. Approve Sovereign Locker/ }));
+    await waitFor(() => expect(mocks.write).toHaveBeenCalled());
+    expect(mocks.write.mock.calls[0]![0].args[1]).toBe(7n);
   });
 
   it("must block or explicitly target Base when the connected wallet is on Ethereum", async () => {
