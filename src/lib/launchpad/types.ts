@@ -85,7 +85,11 @@ export interface LaunchedTokenRecord {
   decimals: number;
   initialSupply: string;
   description: string;
-  archetype: ArchetypeId | RetiredArchetypeId;
+  archetype: ArchetypeId | RetiredArchetypeId | "project_token";
+  /** Describes project tokens, which did not come from a launchpad card. */
+  typeLabel?: string | undefined;
+  /** Replaces the Trade button for a token with no market to send people to. */
+  tradeNote?: string | undefined;
   stakingAddress?: Address | undefined;
   vaultAddress?: Address | undefined;
   borrowerAddress?: Address | undefined;

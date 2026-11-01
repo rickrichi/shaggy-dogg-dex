@@ -1085,6 +1085,9 @@ export function getTokensForChain(chainId?: number): readonly [Token, Token, ...
   }
 }
 
+/** EQX has no pool, and only verified wallets can hold it. Re-add it once it has a market. */
+const NOT_SWAPPABLE_SYMBOLS: readonly string[] = ["EQX"];
+
 const DROPDOWN_SYMBOL_ORDER: readonly string[] = [
   "ETH",
   "USDC",
@@ -1094,7 +1097,6 @@ const DROPDOWN_SYMBOL_ORDER: readonly string[] = [
   "WBTC",
   "SD",
   "MRWD",
-  "EQX",
   "FBA",
   "uSOL",
   "SOL",
@@ -1191,6 +1193,7 @@ export function getSwapDropdownTokens(chainId?: number): readonly [Token, Token,
       bySymbol.set(token.symbol, token);
     }
   }
+  for (const symbol of NOT_SWAPPABLE_SYMBOLS) bySymbol.delete(symbol);
   const ordered: Token[] = [];
   for (const sym of DROPDOWN_SYMBOL_ORDER) {
     const found = bySymbol.get(sym);

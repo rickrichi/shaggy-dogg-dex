@@ -18,6 +18,10 @@ vi.mock("wagmi", async () => {
   };
 });
 
+vi.mock("@/components/StakedHoldingsCard", () => ({
+  StakedHoldingsCard: () => <div data-testid="staked-holdings" />,
+}));
+
 vi.mock("@/hooks/usePortfolio", () => ({
   usePortfolio: vi.fn(),
 }));

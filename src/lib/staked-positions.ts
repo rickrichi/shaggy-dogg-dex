@@ -10,6 +10,8 @@ import { MRWD_V3_STAKER } from "@/lib/mrwd-staker";
 const NPM: Address = "0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1";
 const V3_TIMELOCK: Address = "0xB5C9BeDb57f4E348e40A5E6326c90dE474072E25";
 const V3_FACTORY: Address = "0x33128a8fC17869897dcE68Ed026d694621f6FDfD";
+const EQX: Address = "0x1aEB45Fd7B6C59B52da3e41558410F306CBaa56C";
+const EQX_VESTING: Address = "0x20FE2fde9CA8fe7cD6911770CDc28db73D996E6A";
 /** Large enough that a few hundred reads travel in a handful of RPC requests. */
 const MULTICALL_BYTES = 32_768;
 
@@ -27,6 +29,7 @@ const stakerAbi = parseAbi([
 const timelockAbi = parseAbi([
   "function getLock(uint256 tokenId) view returns (address owner, uint256 unlockTimestamp, uint256 lockedAt, bool isLockedActive)",
 ]);
+const vestingAbi = parseAbi(["function beneficiary() view returns (address)"]);
 const stakeAbi = parseAbi([
   "function stakedBalance(address user) view returns (uint256)",
   "function stakedOf(address user) view returns (uint256)",
@@ -356,9 +359,10 @@ export async function discoverStakedPortfolio(
   owner: Address,
   sources: StakingSource[]
 ): Promise<StakedPortfolio> {
-  const [{ positions, incomplete: positionsIncomplete }, stakes] = await Promise.all([
+  const [{ positions, incomplete: positionsIncomplete }, stakes, vesting] = await Promise.all([
     discoverV3Positions(client, owner),
     activeStakes(client, owner, sources),
+    read(client, [{ address: EQX_VESTING, abi: vestingAbi, functionName: "beneficiary" }]),
   ]);
   const found = new Map<string, Map<string, number>>();
   const add = (token: Address, source: string) => {
@@ -372,6 +376,10 @@ export async function discoverStakedPortfolio(
     if (position.custody === "timelock") add(stakedSideOf(position), "LP locked");
   }
   for (const { source, token } of stakes.stakes) add(token, SOURCE_LABEL[source.kind]);
+  const beneficiary = vesting[0];
+  if (beneficiary?.status === "success" && sameAddress(beneficiary.result as Address, owner)) {
+    add(EQX, "Vesting");
+  }
 
   const addresses = [...found.keys()] as Address[];
   const metadata = await describeTokens(client, addresses);
@@ -386,6 +394,10 @@ export async function discoverStakedPortfolio(
   return {
     positions,
     tokens,
-    incomplete: positionsIncomplete || stakes.incomplete || tokens.length < addresses.length,
+    incomplete:
+      positionsIncomplete ||
+      stakes.incomplete ||
+      beneficiary?.status !== "success" ||
+      tokens.length < addresses.length,
   };
 }

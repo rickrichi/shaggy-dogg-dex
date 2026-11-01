@@ -56,6 +56,7 @@ import {
   STAKING_TIER_SCHEDULE,
 } from "@/lib/launchpad/settings";
 import { saveLaunchedToken } from "@/lib/launchpad/storage";
+import { tradeLinkFor } from "@/lib/launchpad/tradeLink";
 
 import NotFound from "./NotFound";
 
@@ -1062,14 +1063,21 @@ export default function Launchpad() {
                       </p>
                     )}
                     <div className="flex gap-3 pt-3">
-                      <Link to={`/swap?input=ETH&output=${deployedResult.tokenAddress}`}>
+                      {/* A new token is not on Swap's list, so this usually opens Uniswap. */}
+                      <a
+                        href={tradeLinkFor(deployedResult.tokenAddress).href}
+                        {...(tradeLinkFor(deployedResult.tokenAddress).external
+                          ? { target: "_blank", rel: "noopener noreferrer" }
+                          : {})}
+                      >
                         <Button
                           size="sm"
                           className="bg-emerald-600 text-white hover:bg-emerald-700"
                         >
-                          Trade on DEX Swap <ExternalLink className="ml-1 size-3" />
+                          {tradeLinkFor(deployedResult.tokenAddress).label}{" "}
+                          <ExternalLink className="ml-1 size-3" />
                         </Button>
-                      </Link>
+                      </a>
                       <Link to="/liquidity">
                         <Button
                           size="sm"

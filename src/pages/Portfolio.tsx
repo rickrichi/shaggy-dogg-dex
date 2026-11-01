@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useAccount, useChainId } from "wagmi";
 
+import { StakedHoldingsCard } from "@/components/StakedHoldingsCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -411,7 +412,7 @@ export default function Portfolio() {
 
                         {/* Actions */}
                         <td className="py-4 pl-4 text-right">
-                          <Link to={`/swap?inputToken=${token.address}`}>
+                          <Link to={`/swap?input=${token.address}`}>
                             <Button
                               size="sm"
                               variant="outline"
@@ -431,6 +432,8 @@ export default function Portfolio() {
           )}
         </CardContent>
       </Card>
+
+      {address && <StakedHoldingsCard address={address} />}
     </div>
   );
 }

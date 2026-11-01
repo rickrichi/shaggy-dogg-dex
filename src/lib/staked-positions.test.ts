@@ -27,6 +27,7 @@ interface Chain {
   balances?: Record<string, bigint>;
   assets?: Record<string, string>;
   failing?: string[];
+  beneficiary?: string;
 }
 
 interface Call {
@@ -54,6 +55,7 @@ function reader(chain: Chain): PositionReader {
       if (!chain.assets?.[address.toLowerCase()]) throw new Error("no such function");
       return chain.assets[address.toLowerCase()];
     }
+    if (functionName === "beneficiary") return chain.beneficiary ?? OTHER;
     if (functionName === "getPool") return "0x0000000000000000000000000000000000000B01";
     if (functionName === "symbol") return "NEW";
     if (functionName === "name") return "New Token";
@@ -186,6 +188,22 @@ describe("discoverStakedPortfolio", () => {
       [USDC, ["Vault"]],
     ]);
     expect(result.incomplete).toBe(false);
+  });
+
+  it("shows EQX as vesting for its beneficiary, and only for them", async () => {
+    const vesting = await discoverStakedPortfolio(reader({ ...empty, beneficiary: OWNER }), OWNER, []);
+    expect(vesting.tokens).toEqual([expect.objectContaining({ symbol: "EQX", sources: ["Vesting"] })]);
+    const other = await discoverStakedPortfolio(reader(empty), OWNER, []);
+    expect(other.tokens).toEqual([]);
+  });
+
+  it("flags the list when the vesting read fails", async () => {
+    const result = await discoverStakedPortfolio(
+      reader({ ...empty, failing: ["beneficiary"] }),
+      OWNER,
+      []
+    );
+    expect(result.incomplete).toBe(true);
   });
 
   it("maps pro staking to MRWD, which it does not expose through token()", async () => {

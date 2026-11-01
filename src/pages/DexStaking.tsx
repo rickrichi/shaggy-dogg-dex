@@ -41,6 +41,7 @@ import {
   useDexPoolMatrix,
 } from "@/hooks/useDexPoolMatrix";
 import { useStakedPortfolio } from "@/hooks/useStakedPortfolio";
+import { projectTokensFor } from "@/lib/launchpad/storage";
 import { cn } from "@/lib/utils";
 
 const ERC20_ABI = [
@@ -83,6 +84,7 @@ interface WalletToken {
   balance: bigint;
   native?: boolean;
   stakedIn?: string[];
+  tradeNote?: string | undefined;
 }
 interface PortfolioTokens {
   tokens: WalletToken[];
@@ -235,8 +237,28 @@ export default function DexStaking() {
             },
       );
     }
+    for (const token of projectTokensFor(address)) {
+      const id = `erc20:${token.tokenAddress.toLowerCase()}`;
+      const held = map.get(id);
+      map.set(
+        id,
+        held
+          ? { ...held, tradeNote: token.tradeNote }
+          : {
+              id,
+              address: token.tokenAddress,
+              poolAddress: token.tokenAddress,
+              symbol: token.tokenSymbol,
+              name: token.tokenName,
+              decimals: token.decimals,
+              balance: 0n,
+              stakedIn: ["Your project"],
+              tradeNote: token.tradeNote,
+            },
+      );
+    }
     return [...map.values()];
-  }, [imports, portfolio.data, staked.data]);
+  }, [address, imports, portfolio.data, staked.data]);
   useEffect(() => {
     setImports([]);
     setSelectedId(undefined);
@@ -871,7 +893,12 @@ export default function DexStaking() {
                   ? "Rewards program · inspect contract data in controls"
                   : "Rewards not verified · expect fees only unless confirmed separately"}
               </span>
-              {poolPlanner ? (
+              {selectedToken.tradeNote ? (
+                <span className="text-amber-800 dark:text-amber-300">
+                  {selectedToken.tradeNote}: this token has restricted transfers, so it can't be
+                  added to an ordinary pool.
+                </span>
+              ) : poolPlanner ? (
                 <span className="text-cyan-800 dark:text-cyan-300">
                   Guided pool planner below
                 </span>
@@ -889,7 +916,7 @@ export default function DexStaking() {
               )}
             </div>
           </section>
-          {poolPlanner && (
+          {poolPlanner && !selectedToken.tradeNote && (
             <DexPoolPlanner
               planner={poolPlanner}
               tokenKey={selectedToken.id}

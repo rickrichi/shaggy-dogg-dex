@@ -22,6 +22,7 @@ import { useAccount, useWalletClient } from "wagmi";
 import { FlashRouterPanel } from "@/components/launchpad/FlashRouterPanel";
 import { LaunchedVaultPanel } from "@/components/launchpad/LaunchedVaultPanel";
 import { LaunchpadNav } from "@/components/launchpad/LaunchpadNav";
+import { LiveTokenSupply } from "@/components/launchpad/LiveTokenSupply";
 import { LoadContractCard } from "@/components/launchpad/LoadContractCard";
 import { StakingFeesPanel } from "@/components/launchpad/StakingFeesPanel";
 import { Badge } from "@/components/ui/badge";
@@ -31,8 +32,29 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LAUNCHPAD_ARCHETYPES, RETIRED_ARCHETYPE_NAMES } from "@/lib/launchpad/constants";
 import { getStoredLaunchedTokens } from "@/lib/launchpad/storage";
+import { tradeLinkFor } from "@/lib/launchpad/tradeLink";
 
+import type { Address } from "viem";
 import type { LaunchedTokenRecord } from "@/lib/launchpad/types";
+
+const TRADE_BUTTON_CLASS =
+  "w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-xs font-bold text-white hover:from-purple-700 hover:to-indigo-700";
+
+function TradeButton({ tokenAddress }: { tokenAddress: Address }) {
+  const { href, external, label } = tradeLinkFor(tokenAddress);
+  const button = (
+    <Button size="sm" variant="default" className={TRADE_BUTTON_CLASS}>
+      {label} <TrendingUp className="ml-1 size-3" />
+    </Button>
+  );
+  return external ? (
+    <a href={href} target="_blank" rel="noopener noreferrer">
+      {button}
+    </a>
+  ) : (
+    <Link to={href}>{button}</Link>
+  );
+}
 
 interface LaunchpadExploreProps {
   defaultTab?: "all" | "my-tokens";
@@ -127,8 +149,7 @@ export default function LaunchpadExplore({ defaultTab }: LaunchpadExploreProps) 
             <Badge className="border-purple-200 bg-purple-100 text-purple-800">Base Mainnet</Badge>
           </div>
           <p className="mt-1 text-sm text-slate-500">
-            Explore verified cryptocurrencies, yield vaults, and staking protocols launched through
-            Shaggy Mutt.
+            Project tokens, plus tokens, vaults, and staking launched from this browser.
           </p>
         </div>
 
@@ -143,27 +164,31 @@ export default function LaunchpadExplore({ defaultTab }: LaunchpadExploreProps) 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Card className="border-purple-100 bg-white shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500">Total Launches</CardTitle>
+            <CardTitle className="text-sm font-medium text-slate-500">Listed Tokens</CardTitle>
             <Compass className="size-4 text-purple-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-900">{tokens.length} Assets</div>
-            <p className="mt-1 text-xs text-slate-500">Verified sovereign & lending protocols</p>
+            <div className="text-2xl font-bold text-slate-900">
+              {tokens.length} {tokens.length === 1 ? "Token" : "Tokens"}
+            </div>
+            <p className="mt-1 text-xs text-slate-500">
+              Project tokens and this browser's launches
+            </p>
           </CardContent>
         </Card>
 
         <Card className="border-purple-100 bg-white shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500">
-              Your Deployed Tokens
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-slate-500">Your Tokens</CardTitle>
             <Coins className="size-4 text-indigo-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-indigo-600">
-              {isConnected ? `${myTokensCount} Tokens` : "Wallet Not Connected"}
+              {isConnected
+                ? `${myTokensCount} ${myTokensCount === 1 ? "Token" : "Tokens"}`
+                : "Wallet Not Connected"}
             </div>
-            <p className="mt-1 text-xs text-slate-500">Admin-controlled cryptocurrency assets</p>
+            <p className="mt-1 text-xs text-slate-500">Tokens this wallet created or runs</p>
           </CardContent>
         </Card>
 
@@ -186,7 +211,7 @@ export default function LaunchpadExplore({ defaultTab }: LaunchpadExploreProps) 
             <TabsList className="grid w-full grid-cols-2 border border-purple-100 bg-white/70 p-1 shadow-sm">
               <TabsTrigger value="all" className="flex items-center gap-2 font-semibold">
                 <Compass className="size-4 text-purple-600" />
-                All Launches ({tokens.length})
+                All Tokens ({tokens.length})
               </TabsTrigger>
               <TabsTrigger value="my-tokens" className="flex items-center gap-2 font-semibold">
                 <Coins className="size-4 text-indigo-600" />
@@ -231,16 +256,20 @@ export default function LaunchpadExplore({ defaultTab }: LaunchpadExploreProps) 
               <Rocket className="size-6" />
             </div>
             <h3 className="mt-4 text-lg font-bold text-slate-800">
-              {activeTab === "my-tokens"
-                ? "No Tokens Deployed by Your Wallet Yet"
-                : "No Launched Tokens Match Your Search"}
+              {activeTab !== "my-tokens"
+                ? "No Tokens Match Your Search"
+                : !isConnected
+                  ? "Connect a Wallet to See Your Tokens"
+                  : "No Tokens Found for This Wallet"}
             </h3>
             <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
-              {activeTab === "my-tokens"
-                ? "Launch your first custom cryptocurrency with staking, yield vaults, and DEX liquidity in just 4 simple steps."
-                : "Try clearing your search query or selecting a different archetype."}
+              {activeTab !== "my-tokens"
+                ? "Try clearing your search query or selecting a different archetype."
+                : !isConnected
+                  ? "Your tokens and launches appear here once your wallet is connected."
+                  : "Launch your first custom cryptocurrency with staking, yield vaults, and DEX liquidity in just 4 simple steps. Launched from another browser? Use Load my contract above."}
             </p>
-            {activeTab === "my-tokens" && (
+            {activeTab === "my-tokens" && isConnected && (
               <div className="mt-6">
                 <Link to="/launchpad">
                   <Button className="bg-gradient-to-r from-purple-600 to-indigo-600 font-bold text-white shadow-md">
@@ -294,9 +323,10 @@ export default function LaunchpadExplore({ defaultTab }: LaunchpadExploreProps) 
                     {/* Archetype & Supply */}
                     <div className="space-y-1.5 rounded-lg border border-purple-50 bg-purple-50/30 p-2.5 text-xs">
                       <div className="flex items-center justify-between">
-                        <span className="text-slate-500">Archetype</span>
+                        <span className="text-slate-500">Type</span>
                         <span className="font-bold text-purple-900">
-                          {archDef?.name ??
+                          {token.typeLabel ??
+                            archDef?.name ??
                             (token.archetype in RETIRED_ARCHETYPE_NAMES
                               ? RETIRED_ARCHETYPE_NAMES[
                                   token.archetype as keyof typeof RETIRED_ARCHETYPE_NAMES
@@ -305,9 +335,14 @@ export default function LaunchpadExplore({ defaultTab }: LaunchpadExploreProps) 
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-slate-500">Initial Supply</span>
+                        <span className="text-slate-500">Total Supply</span>
                         <span className="font-bold text-slate-900">
-                          {token.initialSupply} {token.tokenSymbol}
+                          <LiveTokenSupply
+                            tokenAddress={token.tokenAddress}
+                            decimals={token.decimals}
+                            fallback={token.initialSupply}
+                          />{" "}
+                          {token.tokenSymbol}
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
@@ -349,15 +384,13 @@ export default function LaunchpadExplore({ defaultTab }: LaunchpadExploreProps) 
                     {/* Action Buttons */}
                     <div className="flex flex-col gap-2 pt-1">
                       <div className="grid grid-cols-2 gap-2">
-                        <Link to={`/swap?outputCurrency=${token.tokenAddress}`}>
-                          <Button
-                            size="sm"
-                            variant="default"
-                            className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-xs font-bold text-white hover:from-purple-700 hover:to-indigo-700"
-                          >
-                            Trade Swap <TrendingUp className="ml-1 size-3" />
+                        {token.tradeNote ? (
+                          <Button size="sm" variant="outline" disabled className="w-full text-xs">
+                            {token.tradeNote}
                           </Button>
-                        </Link>
+                        ) : (
+                          <TradeButton tokenAddress={token.tokenAddress} />
+                        )}
 
                         <Button
                           size="sm"
@@ -395,15 +428,20 @@ export default function LaunchpadExplore({ defaultTab }: LaunchpadExploreProps) 
                       )}
 
                       {token.stakingAddress && (
-                        <Link to="/stake">
+                        <a
+                          href={`https://basescan.org/address/${token.stakingAddress}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
                           <Button
                             size="sm"
                             variant="ghost"
                             className="w-full text-xs text-slate-600 hover:bg-purple-50 hover:text-purple-700"
                           >
-                            <ShieldCheck className="mr-1 size-3 text-pink-600" /> VIP Staking Vault
+                            <ShieldCheck className="mr-1 size-3 text-pink-600" /> View Staking
+                            Contract
                           </Button>
-                        </Link>
+                        </a>
                       )}
                     </div>
                   </CardContent>
