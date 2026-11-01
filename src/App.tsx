@@ -233,6 +233,7 @@ export const AppRoutes = (): JSX.Element => (
         <Route path="/protocol" element={<ProtocolOps />} />
         <Route path="/launchpad/manage" element={<ProtocolOps />} />
         <Route path="/paymaster" element={<Paymaster />} />
+        <Route path="/stake/paymaster" element={<Paymaster />} />
         <Route path="/launchpad/paymaster" element={<Paymaster />} />
         <Route path="/arbitrage" element={<Arbitrage />} />
         <Route path="/arbitrage/:tab" element={<Arbitrage />} />
