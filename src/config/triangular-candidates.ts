@@ -5,7 +5,6 @@
 // requirement this route shape needs, and the exact asymmetry that made DAI unusable here: most
 // tokens pair deeply with WETH (Uniswap's default base pair) but few also pair deeply with USDC.
 import type { Address } from "viem";
-
 import type { TriangularCandidate } from "@/lib/amm/bot-market-snapshot";
 
 export const TRIANGULAR_CANDIDATES: readonly TriangularCandidate[] = [

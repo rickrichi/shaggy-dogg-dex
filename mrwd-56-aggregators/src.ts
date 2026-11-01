@@ -3,8 +3,10 @@
  * No signing, swaps, approvals, staking, or API registration.
  */
 import 'dotenv/config';
+
 import { writeFile } from 'node:fs/promises';
-import { createPublicClient, fallback, formatUnits, http, getAddress, parseAbi, parseUnits } from 'viem';
+
+import { createPublicClient, fallback, formatUnits, getAddress, http, parseAbi, parseUnits } from 'viem';
 import { base } from 'viem/chains';
 
 const CHAIN = 8453;
@@ -36,7 +38,7 @@ const client = createPublicClient({
  transport:fallback(rpcUrls.map(url=>http(url,{timeout:12000,retryCount:1})),{rank:false}),
 });
 
-type Result = {
+interface Result {
  name:string;
  status:'quote_returned'|'no_quote'|'api_error'|'requires_key'|'manual_review';
  direction?:string;
@@ -44,7 +46,7 @@ type Result = {
  detail?:string;
  exactPoolMatched?:boolean;
  testedAt:string;
-};
+}
 
 const targets = [
  '0x','1inch','KyberSwap','OKX DEX','Uniswap Auto Router','Odos','LI.FI','CoW Swap','Velora','Bebop',

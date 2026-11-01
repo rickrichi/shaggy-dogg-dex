@@ -586,7 +586,7 @@ export function PaymasterPortfolioTransfer() {
         throw new Error("Base is selected. Review your operation, then submit it again.");
       }
 
-      const calls: { to: Address; value: bigint; data: Hex }[] = [];
+      const calls: Array<{ to: Address; value: bigint; data: Hex }> = [];
 
       if (operationType === "transfer") {
         if (!token) throw new Error("Choose a portfolio token to transfer.");

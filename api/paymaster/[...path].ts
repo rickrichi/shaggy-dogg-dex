@@ -1,23 +1,23 @@
 import { Hono } from 'hono'
-import { z } from 'zod'
 import {
+  type Address,
   concat,
   createPublicClient,
   decodeAbiParameters,
   decodeFunctionData,
   encodeAbiParameters,
   getAddress,
+  type Hex,
   http,
   isAddress,
   keccak256,
   parseAbi,
   toHex,
-  type Address,
-  type Hex,
 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { base } from 'viem/chains'
 import { recoverAuthorizationAddress } from 'viem/utils'
+import { z } from 'zod'
 
 export const config = { runtime: 'edge' }
 
@@ -168,7 +168,7 @@ function extractCalls(callData: Hex): InnerCall[] {
       }
       const target = getAddress(`0x${executionCalldata.slice(2, 42)}`)
       const value = BigInt(`0x${executionCalldata.slice(42, 106)}`)
-      const data = (`0x${executionCalldata.slice(106)}` || '0x') as Hex
+      const data = `0x${executionCalldata.slice(106)}` as Hex
       return [{ target, value, data }]
     }
     if (callType === '0x01') {
@@ -204,7 +204,7 @@ function extractCalls(callData: Hex): InnerCall[] {
   throw new Error('Unsupported account execution method')
 }
 
-type ContractReader = {
+interface ContractReader {
   readContract: ReturnType<typeof createPublicClient>['readContract']
 }
 

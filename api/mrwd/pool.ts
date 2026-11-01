@@ -4,7 +4,7 @@
  * Public route: GET /api/mrwd/pool.json
  * Runtime: Vercel Edge
  */
-import { createPublicClient, fallback, getAddress, http, parseAbi, type Address } from "viem";
+import { type Address,createPublicClient, fallback, getAddress, http, parseAbi } from "viem";
 import { base } from "viem/chains";
 
 export const config = { runtime: "edge" };

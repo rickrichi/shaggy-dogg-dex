@@ -62,9 +62,10 @@ describe("Executable router plans", () => {
     expect(routeCandidates(usdc, { ...weth, chainId: 1 })).toEqual([]);
   });
 
-  it("encodes the selected router's path and preserves minimum output across venues", () => {
-    for (const route of routeCandidates(usdc, weth, SPONSORED_ROUTE_VENUES)) {
-      const call = routeSwapCall(
+  describe("encodes the selected router's path and preserves minimum output", () => {
+    const routes = routeCandidates(usdc, weth, SPONSORED_ROUTE_VENUES);
+    const swapCall = (route: (typeof routes)[number]) =>
+      routeSwapCall(
         route,
         usdc,
         weth,
@@ -73,7 +74,12 @@ describe("Executable router plans", () => {
         AERODROME_ROUTER,
         2000000000n
       );
-      if (route.venue === "Uniswap V3") {
+
+    it("on Uniswap V3", () => {
+      expect(routes.some((route) => route.venue === "Uniswap V3")).toBe(true);
+      for (const route of routes) {
+        if (route.venue !== "Uniswap V3") continue;
+        const call = swapCall(route);
         const decoded = decodeFunctionData({
           abi: UNISWAP_V3_SWAP_ROUTER_02_ABI,
           data: encodeFunctionData(call),
@@ -100,7 +106,14 @@ describe("Executable router plans", () => {
         expect(params.amountIn).toBe(1000000n);
         expect(params.amountOutMinimum).toBe(300000000000000n);
         expect(call.address).toBe(UNISWAP_V3_ROUTER_BASE);
-      } else {
+      }
+    });
+
+    it("on router-path venues", () => {
+      const pathRoutes = routes.filter((route) => route.venue !== "Uniswap V3");
+      expect(pathRoutes.length).toBeGreaterThan(0);
+      for (const route of pathRoutes) {
+        const call = swapCall(route);
         const decoded = decodeFunctionData({
           abi: route.venue === "Aerodrome" ? AERODROME_ROUTER_ABI : UNISWAP_V2_ROUTER_ABI,
           data: encodeFunctionData(call),
@@ -108,17 +121,27 @@ describe("Executable router plans", () => {
         expect(decoded.functionName).toBe("swapExactTokensForTokens");
         expect(decoded.args?.[1]).toBe(300000000000000n);
         expect(call.address).toBe(route.router);
-        if (route.venue === "Aerodrome")
-          expect(decoded.args?.[2]).toEqual([
-            {
-              from: usdc.address,
-              to: weth.address,
-              stable: route.stable[0],
-              factory: "0x420DD381b31aEf6683db6B902084cB0FFECe40Da",
-            },
-          ]);
       }
-    }
+    });
+
+    it("with Aerodrome's route struct", () => {
+      expect(routes.some((route) => route.venue === "Aerodrome")).toBe(true);
+      for (const route of routes) {
+        if (route.venue !== "Aerodrome") continue;
+        const decoded = decodeFunctionData({
+          abi: AERODROME_ROUTER_ABI,
+          data: encodeFunctionData(swapCall(route)),
+        });
+        expect(decoded.args?.[2]).toEqual([
+          {
+            from: usdc.address,
+            to: weth.address,
+            stable: route.stable[0],
+            factory: "0x420DD381b31aEf6683db6B902084cB0FFECe40Da",
+          },
+        ]);
+      }
+    });
   });
 
   it("encodes native ETH trades correctly for Uniswap V3", () => {

@@ -1,5 +1,5 @@
 // src/lib/amm/bot-market-snapshot.test.ts
-import { decodeFunctionData, type Address, parseEther, parseUnits } from "viem";
+import { type Address, decodeFunctionData, parseEther, parseUnits } from "viem";
 import { describe, expect, it, vi } from "vitest";
 
 import { UNISWAP_V3_SWAP_ROUTER_02_ABI } from "@/config/abis";

@@ -1,12 +1,12 @@
 import 'dotenv/config';
 
 import {
+  type Address,
   createPublicClient,
   fallback,
   getAddress,
   http,
   parseAbi,
-  type Address,
 } from 'viem';
 import { base } from 'viem/chains';
 
@@ -56,15 +56,15 @@ function sameAddress(left: Address, right: Address): boolean {
   return left.toLowerCase() === right.toLowerCase();
 }
 
-type ZeroXSources = { sources?: string[]; zid?: string };
+interface ZeroXSources { sources?: string[]; zid?: string }
 
-type ZeroXPrice = {
+interface ZeroXPrice {
   buyAmount?: string;
   liquidityAvailable?: boolean;
   route?: { fills?: Array<{ source?: string; proportionBps?: string }> };
   issues?: unknown;
   zid?: string;
-};
+}
 
 async function checkZeroX(apiKey: string | undefined) {
   if (!apiKey) {

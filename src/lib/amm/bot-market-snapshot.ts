@@ -131,7 +131,7 @@ function quotedAmount(
 }
 
 function bestSingleHop(
-  results: readonly ({ status: string; result?: unknown } | undefined)[],
+  results: ReadonlyArray<{ status: string; result?: unknown } | undefined>,
   offset: number
 ): { fee: number; out: bigint } | null {
   let best: { fee: number; out: bigint } | null = null;
