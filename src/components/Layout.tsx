@@ -50,13 +50,13 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
       { name: "Swap", href: "/swap", icon: ArrowLeftRight },
       { name: "Liquidity", href: "/liquidity", icon: Droplets },
       { name: "Stake", href: "/stake", icon: ShieldCheck },
-      { name: "DEX Pools", href: "/stake/dexes", icon: Waypoints },
     ],
   },
   {
     label: "Markets",
     items: [
       { name: "Markets", href: "/markets", icon: CandlestickChart },
+      { name: "DEXes", href: "/stake/dexes", icon: Waypoints },
       { name: "Market Data", href: "/market-data", icon: LineChart },
       { name: "Arbitrage", href: "/arbitrage/matrix", icon: Zap },
       { name: "Live Desk", href: "/arbitrage/live-desk", icon: Radio },
