@@ -12,6 +12,7 @@ const sushiV3 = poolPlannerForVenue("SushiSwap V3")!;
 const uniswapV2 = poolPlannerForVenue("Uniswap V2")!;
 
 const address = "0x1234567890123456789012345678901234567890" as const;
+const quote = "0x4200000000000000000000000000000000000006" as const;
 
 const renderPlanner = (
   props: Partial<React.ComponentProps<typeof DexPoolPlanner>> = {},
@@ -24,6 +25,7 @@ const renderPlanner = (
       tokenSymbol="MRWD"
       tokenAddress={address}
       quoteSymbol="WETH"
+      quoteAddress={quote}
       poolExists={false}
       {...props}
     />,
@@ -59,7 +61,7 @@ describe("DexPoolPlanner", () => {
     await user.click(checks[0]!);
     await user.click(checks[1]!);
     const link = screen.getByRole("link", { name: /continue on pancakeswap/i });
-    expect(link).toHaveAttribute("href", "https://pancakeswap.finance/liquidity/pools");
+    expect(link).toHaveAttribute("href", `https://pancakeswap.finance/add/${address}/${quote}/2500?chain=base`);
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });
@@ -88,6 +90,7 @@ describe("DexPoolPlanner", () => {
         tokenSymbol="TWO"
         tokenAddress="0x2222222222222222222222222222222222222222"
         quoteSymbol="WETH"
+        quoteAddress={quote}
         poolExists={false}
       />,
     );
@@ -107,6 +110,7 @@ describe("DexPoolPlanner", () => {
         tokenSymbol="WETH"
         tokenAddress="0x4200000000000000000000000000000000000006"
         quoteSymbol="USDC"
+        quoteAddress={quote}
         poolExists
       />,
     );
@@ -161,7 +165,7 @@ describe("DexPoolPlanner", () => {
     for (const checkbox of screen.getAllByRole("checkbox")) await user.click(checkbox);
     expect(screen.getByRole("link", { name: /continue on uniswap/i })).toHaveAttribute(
       "href",
-      "https://app.uniswap.org/positions/create/v2?chain=base",
+      `https://app.uniswap.org/positions/create/v2?currencyA=${address}&currencyB=${quote}&chain=base`,
     );
   });
 

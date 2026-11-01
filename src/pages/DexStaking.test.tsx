@@ -3,13 +3,12 @@ import { vi } from "vitest";
 
 import {
   BASE_DEX_VENUES,
-  MRWD_ADDRESS,
+  hasRewardProgram,
   MRWD_UNISWAP_V3_POOL,
 } from "@/config/dex-venues";
 import { render } from "@/test/utils";
 
 import DexStaking, {
-  isCanonicalMrwdSelection,
   isValidImportedTokenMetadata,
   reconcileSelectedTokenId,
 } from "./DexStaking";
@@ -68,19 +67,11 @@ describe("DexStaking", () => {
     );
   });
 
-  it("gates staker controls to the exact MRWD, venue, and canonical pool tuple", () => {
+  it("gates staker controls to a registered venue and pool", () => {
+    expect(hasRewardProgram("Uniswap V3", [MRWD_UNISWAP_V3_POOL])).toBe(true);
+    expect(hasRewardProgram("Aerodrome", [MRWD_UNISWAP_V3_POOL])).toBe(false);
     expect(
-      isCanonicalMrwdSelection(MRWD_ADDRESS, "Uniswap V3", [
-        MRWD_UNISWAP_V3_POOL,
-      ]),
-    ).toBe(true);
-    expect(
-      isCanonicalMrwdSelection(MRWD_ADDRESS, "Aerodrome", [
-        MRWD_UNISWAP_V3_POOL,
-      ]),
-    ).toBe(false);
-    expect(
-      isCanonicalMrwdSelection(MRWD_ADDRESS, "Uniswap V3", [
+      hasRewardProgram("Uniswap V3", [
         "0x1111111111111111111111111111111111111111",
       ]),
     ).toBe(false);

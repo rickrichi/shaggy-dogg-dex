@@ -61,6 +61,7 @@ interface DexPoolPlannerProps {
   tokenSymbol: string;
   tokenAddress: Address;
   quoteSymbol: string;
+  quoteAddress: Address;
   native?: boolean;
   poolExists: boolean;
   poolActive?: boolean;
@@ -73,6 +74,7 @@ export function DexPoolPlanner({
   tokenSymbol,
   tokenAddress,
   quoteSymbol,
+  quoteAddress,
   native = false,
   poolExists,
   poolActive = poolExists,
@@ -439,7 +441,11 @@ export function DexPoolPlanner({
           </p>
           {ready ? (
             <Button asChild className="bg-cyan-700 text-white hover:bg-cyan-800">
-              <a href={planner.liquidityUrl} target="_blank" rel="noopener noreferrer">
+              <a
+                href={planner.liquidityUrl(tokenAddress, quoteAddress, feeTier)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 Continue on {dexName}
                 <ExternalLink className="ml-2 size-4" />
               </a>

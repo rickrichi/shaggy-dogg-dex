@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { useQuery } from "@tanstack/react-query";
 import { Award, ExternalLink, Plus, RefreshCw } from "lucide-react";
@@ -16,6 +16,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { WETH_ADDRESS } from "@/config/dex-venues";
+import { useStakedPortfolio } from "@/hooks/useStakedPortfolio";
 import { MRWD } from "@/lib/mrwd-pro";
 import {
   claimBankedCalls,
@@ -25,17 +27,15 @@ import {
   unstakeCalls,
 } from "@/lib/mrwd-staker";
 
+import type { V3Position } from "@/lib/staked-positions";
+
+const sameAddress = (a: Address | undefined, b: Address | undefined) =>
+  !!a && !!b && a.toLowerCase() === b.toLowerCase();
+
 const SCHEDULER: Address = "0xCAbf284806b800d9A771B55857B9fCF735ea7109";
 const NPM: Address = "0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1";
 const POOL: Address = "0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5";
 const TIMELOCK: Address = "0xB5C9BeDb57f4E348e40A5E6326c90dE474072E25";
-const DEFAULT_TOKEN_IDS = [
-  "6383553",
-  "6383541",
-  "6383531",
-  "6367926",
-  "6351512",
-];
 const MAX_UINT128 = (1n << 128n) - 1n;
 
 const schedulerAbi = parseAbi([
@@ -61,6 +61,12 @@ const poolAbi = parseAbi([
   "function slot0() view returns (uint160 sqrtPriceX96, int24 tick, uint16 observationIndex, uint16 observationCardinality, uint16 observationCardinalityNext, uint8 feeProtocol, bool unlocked)",
 ]);
 
+/** The rewards pool is MRWD/WETH at 0.30%. */
+const isRewardPoolPosition = ({ token0, token1, fee }: V3Position) =>
+  fee === 3000 &&
+  [token0, token1].some((token) => sameAddress(token, MRWD)) &&
+  [token0, token1].some((token) => sameAddress(token, WETH_ADDRESS));
+
 const fmtMrwd = (wei: bigint) =>
   Number(formatUnits(wei, 18)).toLocaleString("en-US", {
     minimumFractionDigits: 2,
@@ -70,21 +76,25 @@ const fmtMrwd = (wei: bigint) =>
 const fmtWeth = (wei: bigint) =>
   wei === 0n ? "0 WETH" : `${Number(formatUnits(wei, 18)).toFixed(12)} WETH`;
 
-const sameAddress = (a: Address | undefined, b: Address | undefined) =>
-  !!a && !!b && a.toLowerCase() === b.toLowerCase();
-
 export function MrwdLpStakerPanel() {
   const { address, chainId } = useAccount();
   const client = usePublicClient({ chainId: 8453 });
   const { writeContractAsync } = useWriteContract();
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [confirmingUnstake, setConfirmingUnstake] = useState<string | null>(null);
-  const [tokenIds, setTokenIds] = useState<string[]>(DEFAULT_TOKEN_IDS);
+  const [addedIds, setAddedIds] = useState<string[]>([]);
   const [customId, setCustomId] = useState("");
+  const portfolio = useStakedPortfolio(address);
+  const tokenIds = useMemo(() => {
+    const owned = (portfolio.data?.positions ?? [])
+      .filter(isRewardPoolPosition)
+      .map((position) => position.tokenId);
+    return [...new Set([...owned, ...addedIds])];
+  }, [addedIds, portfolio.data]);
 
   const stakerQuery = useQuery({
     queryKey: ["mrwd-v3-staker-positions", tokenIds.join(","), address],
-    enabled: !!client && tokenIds.length > 0,
+    enabled: !!client,
     refetchInterval: 20_000,
     queryFn: async () => {
       const [block, key, incId, slot0] = await Promise.all([
@@ -126,10 +136,10 @@ export function MrwdLpStakerPanel() {
       ]);
 
       const currentTick = slot0[1];
-      const rows = await Promise.all(
+      const loadedRows = await Promise.all(
         tokenIds.map(async (idStr) => {
           const tid = BigInt(idStr);
-          const [nftHolder, pos, deposit, stake] = await Promise.all([
+          const reads = await Promise.all([
             client!.readContract({
               address: NPM,
               abi: npmAbi,
@@ -154,7 +164,9 @@ export function MrwdLpStakerPanel() {
               functionName: "stakes",
               args: [tid, incId],
             }),
-          ]);
+          ]).catch(() => null); // A burned or mistyped ID must not hide the other rows.
+          if (!reads) return null;
+          const [nftHolder, pos, deposit, stake] = reads;
 
           let accruedMrwd = 0n;
           const isStaked = stake[1] > 0n;
@@ -221,6 +233,10 @@ export function MrwdLpStakerPanel() {
         }),
       );
 
+      const rows = loadedRows.flatMap((row) => (row ? [row] : []));
+      const missingIds = tokenIds.filter(
+        (id) => !rows.some((row) => row.tokenId === id),
+      );
       const totalAccruedMrwd = rows.reduce((sum, r) => sum + r.accruedMrwd, 0n);
       const totalFeeWeth = rows.reduce((sum, r) => sum + r.feeWeth, 0n);
 
@@ -234,6 +250,7 @@ export function MrwdLpStakerPanel() {
         activeStakesCount: Number(incState[2]),
         bankedRewards,
         rows,
+        missingIds,
         totalAccruedMrwd,
         totalFeeWeth,
       };
@@ -302,7 +319,7 @@ export function MrwdLpStakerPanel() {
     const trimmed = customId.trim();
     if (!/^[1-9][0-9]*$/.test(trimmed)) return;
     if (!tokenIds.includes(trimmed)) {
-      setTokenIds((prev) => [...prev, trimmed]);
+      setAddedIds((prev) => [...prev, trimmed]);
     }
     setCustomId("");
   };
@@ -421,7 +438,29 @@ export function MrwdLpStakerPanel() {
               </div>
             )}
 
+            {portfolio.data?.incomplete && (
+              <p role="status" className="text-xs font-semibold text-amber-800">
+                Some position reads failed, so this list may be incomplete.
+              </p>
+            )}
+            {stakerQuery.data.missingIds.length > 0 && (
+              <p role="status" className="text-xs font-semibold text-amber-800">
+                No position found for #{stakerQuery.data.missingIds.join(", #")}.
+              </p>
+            )}
+
             {/* Positions Table */}
+            {stakerQuery.data.rows.length === 0 ? (
+              <p className="rounded-xl border border-slate-200 p-4 text-slate-600">
+                {!address
+                  ? "Connect a wallet to load your positions, or add a position ID below."
+                  : portfolio.isPending || portfolio.isFetching
+                    ? "Finding your positions…"
+                    : portfolio.isError
+                      ? "Could not load your positions. Refresh, or add a position ID below."
+                      : "This wallet has no positions in this pool."}
+              </p>
+            ) : (
             <div className="overflow-x-auto rounded-xl border border-slate-200">
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 text-slate-600">
@@ -559,6 +598,7 @@ export function MrwdLpStakerPanel() {
                 </tfoot>
               </table>
             </div>
+            )}
 
             {/* Inspect Additional Position ID */}
             <div className="flex flex-wrap items-center justify-between gap-2 pt-1">

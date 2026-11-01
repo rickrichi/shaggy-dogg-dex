@@ -28,9 +28,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { WalletConnect } from "@/components/WalletConnect";
 import {
+  aerodromeDepositUrl,
   BASE_DEX_VENUES,
-  MRWD_ADDRESS,
-  MRWD_UNISWAP_V3_POOL,
+  hasRewardProgram,
   poolPlannerForVenue,
   USDC_ADDRESS,
   WETH_ADDRESS,
@@ -40,6 +40,7 @@ import {
   type PoolCheckState,
   useDexPoolMatrix,
 } from "@/hooks/useDexPoolMatrix";
+import { useStakedPortfolio } from "@/hooks/useStakedPortfolio";
 import { cn } from "@/lib/utils";
 
 const ERC20_ABI = [
@@ -81,6 +82,7 @@ interface WalletToken {
   decimals: number;
   balance: bigint;
   native?: boolean;
+  stakedIn?: string[];
 }
 interface PortfolioTokens {
   tokens: WalletToken[];
@@ -103,16 +105,6 @@ export const reconcileSelectedTokenId = (
   ids: readonly string[],
 ) => (selectedId && ids.includes(selectedId) ? selectedId : ids[0]);
 
-export const isCanonicalMrwdSelection = (
-  token: Address | undefined,
-  venue: string,
-  poolAddresses: readonly Address[],
-) =>
-  token?.toLowerCase() === MRWD_ADDRESS.toLowerCase() &&
-  venue === "Uniswap V3" &&
-  poolAddresses.some(
-    (pool) => pool.toLowerCase() === MRWD_UNISWAP_V3_POOL.toLowerCase(),
-  );
 const tone: Record<PoolCheckState | "loading", string> = {
   live: "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300",
   inactive:
@@ -219,12 +211,32 @@ export default function DexStaking() {
       };
     },
   });
+  const staked = useStakedPortfolio(address);
   const tokens = useMemo(() => {
     const map = new Map<string, WalletToken>();
     for (const token of [...(portfolio.data?.tokens ?? []), ...imports])
       map.set(token.id, token);
+    for (const token of staked.data?.tokens ?? []) {
+      const id = `erc20:${token.address.toLowerCase()}`;
+      const held = map.get(id);
+      map.set(
+        id,
+        held
+          ? { ...held, stakedIn: token.sources }
+          : {
+              id,
+              address: token.address,
+              poolAddress: token.address,
+              symbol: token.symbol,
+              name: token.name,
+              decimals: token.decimals,
+              balance: 0n,
+              stakedIn: token.sources,
+            },
+      );
+    }
     return [...map.values()];
-  }, [imports, portfolio.data]);
+  }, [imports, portfolio.data, staked.data]);
   useEffect(() => {
     setImports([]);
     setSelectedId(undefined);
@@ -254,8 +266,7 @@ export default function DexStaking() {
     ? "loading"
     : (selectedResult?.state ?? "unsupported");
   const poolPlanner = poolPlannerForVenue(selectedVenue);
-  const canonical = isCanonicalMrwdSelection(
-    queryToken,
+  const rewardProgram = hasRewardProgram(
     selectedVenue,
     selectedResult?.pools.map((pool) => pool.address) ?? [],
   );
@@ -313,10 +324,6 @@ export default function DexStaking() {
         return;
       if (!isValidImportedTokenMetadata(symbol, name, decimals))
         throw new Error("invalid metadata");
-      if (balance <= 0n)
-        return setImportError(
-          "This wallet does not hold a positive balance of that token.",
-        );
       const id = `erc20:${tokenAddress.toLowerCase()}`;
       setImports((current) =>
         current.some((token) => token.id === id)
@@ -397,7 +404,7 @@ export default function DexStaking() {
             <span className="text-indigo-600">&amp; Rewards</span>
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
-            Inspect direct pools for any supported token you hold. Pool
+            Inspect direct pools for any token you hold or have staked. Pool
             existence and reward verification are separate.
           </p>
         </div>
@@ -423,7 +430,7 @@ export default function DexStaking() {
               </h2>
               <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
                 {!isConnected
-                  ? "Connect to load positive Base balances and inspect direct pools."
+                  ? "Connect to load your Base balances and stakes and inspect direct pools."
                   : "This explorer reads Base factories. Switch networks to continue."}
               </p>
               <div className="mt-4">
@@ -505,6 +512,11 @@ export default function DexStaking() {
                           maximumSignificantDigits: 6,
                         })}
                       </span>
+                      {token.stakedIn && (
+                        <span className="block text-[11px] font-semibold text-indigo-700 dark:text-indigo-300">
+                          {token.stakedIn.join(" · ")}
+                        </span>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -523,7 +535,27 @@ export default function DexStaking() {
                 <p className="mt-3 text-sm text-slate-500">
                   {portfolio.data?.failedChecks
                     ? "Some balances could not be checked. Retry before concluding this wallet is empty."
-                    : "No positive supported balances found. Import a Base ERC-20."}
+                    : "No supported balances or stakes found. Import a Base ERC-20."}
+                </p>
+              )}
+              {staked.isError && (
+                <div className="mt-3 flex items-center gap-2 text-sm text-red-700">
+                  <span>Could not load your staked tokens.</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => staked.refetch()}
+                  >
+                    Retry
+                  </Button>
+                </div>
+              )}
+              {staked.data?.incomplete && (
+                <p
+                  role="status"
+                  className="mt-3 text-xs font-semibold text-amber-900 dark:text-amber-200"
+                >
+                  Some staking reads failed, so this list may be incomplete.
                 </p>
               )}
               {!portfolio.isLoading &&
@@ -693,11 +725,15 @@ export default function DexStaking() {
                 const s = matrix.isLoading
                   ? "loading"
                   : (result?.state ?? "unsupported");
+                const rewards = hasRewardProgram(
+                  venue.name,
+                  result?.pools.map((pool) => pool.address) ?? [],
+                );
                 return (
                   <button
                     key={venue.name}
                     type="button"
-                    aria-label={`${venue.name}. Route supported; pool ${label[s].toLowerCase()}; rewards not verified.`}
+                    aria-label={`${venue.name}. Route supported; pool ${label[s].toLowerCase()}; ${rewards ? "rewards program available" : "rewards not verified"}.`}
                     aria-pressed={selectedVenue === venue.name}
                     aria-controls="venue-detail"
                     onClick={() => selectVenue(venue.name)}
@@ -759,16 +795,16 @@ export default function DexStaking() {
                   <Badge variant="outline" className={tone[state]}>
                     {label[state]}
                   </Badge>
-                  {canonical && (
+                  {rewardProgram && (
                     <Badge className="bg-indigo-600">
                       <ShieldCheck className="mr-1 size-3" />
-                      Known MRWD program
+                      Rewards program
                     </Badge>
                   )}
                 </div>
                 <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                  {canonical
-                    ? "This is the canonical MRWD incentive pool. The controls show wallet positions and contract-reported reward data; they do not independently certify the incentive's current funding or time window."
+                  {rewardProgram
+                    ? "This pool has a staking rewards program. The controls show wallet positions and contract-reported reward data; they do not independently certify the incentive's current funding or time window."
                     : (selectedResult?.venue.rewardNote ??
                       "Reward status is not verified. Pool discovery alone does not prove a rewards program.")}
                 </p>
@@ -825,34 +861,30 @@ export default function DexStaking() {
             <div
               className={cn(
                 "flex flex-wrap items-center justify-between gap-3 border-t px-6 py-4 text-sm font-semibold",
-                canonical
+                rewardProgram
                   ? "border-indigo-200 bg-indigo-50 dark:bg-indigo-950/40"
                   : "border-amber-200 bg-amber-50 dark:bg-amber-950/30",
               )}
             >
               <span>
-                {canonical
-                  ? "Known program · inspect contract data in controls"
+                {rewardProgram
+                  ? "Rewards program · inspect contract data in controls"
                   : "Rewards not verified · expect fees only unless confirmed separately"}
               </span>
               {poolPlanner ? (
                 <span className="text-cyan-800 dark:text-cyan-300">
                   Guided pool planner below
                 </span>
-              ) : selectedResult?.venue.actionHref ? (
+              ) : (
                 <Button asChild size="sm" variant="outline">
                   <a
-                    href={selectedResult.venue.actionHref}
+                    href={aerodromeDepositUrl(selectedToken.poolAddress, quote)}
                     target="_blank"
                     rel="noreferrer"
                   >
                     Open {selectedVenue}
                     <ExternalLink className="ml-2 size-3" />
                   </a>
-                </Button>
-              ) : (
-                <Button size="sm" variant="outline" disabled>
-                  Venue action unavailable
                 </Button>
               )}
             </div>
@@ -865,12 +897,13 @@ export default function DexStaking() {
               tokenSymbol={selectedToken.symbol}
               tokenAddress={selectedToken.address}
               quoteSymbol={quoteSymbol}
+              quoteAddress={quote}
               native={Boolean(selectedToken.native)}
               poolExists={Boolean(selectedResult?.pools.length)}
               poolActive={state === "live"}
             />
           )}
-          {canonical && (
+          {rewardProgram && (
             <section id="live-staking-controls">
               <MrwdLpStakerPanel />
             </section>

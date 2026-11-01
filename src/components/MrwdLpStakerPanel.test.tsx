@@ -13,6 +13,8 @@ const key = { rewardToken: zero, pool: zero, startTime: 1n, endTime: 9_999_999_9
 const mocks = vi.hoisted(() => ({
   account: { address: undefined as string | undefined, chainId: 8453 as number },
   depositOwner: "",
+  badId: "",
+  portfolio: {} as Record<string, unknown>,
   banked: 0n,
   simulate: vi.fn(),
   write: vi.fn(),
@@ -21,7 +23,8 @@ const mocks = vi.hoisted(() => ({
   toastSuccess: vi.fn(),
 }));
 
-const read = ({ functionName }: { functionName: string }) => {
+const read = ({ functionName, args }: { functionName: string; args?: readonly unknown[] }) => {
+  if (mocks.badId && String(args?.[0]) === mocks.badId) return Promise.reject(new Error("invalid id"));
   const values: Record<string, unknown> = {
     incentiveKey: key,
     incentiveId: `0x${"11".repeat(32)}`,
@@ -47,14 +50,29 @@ vi.mock("wagmi", () => ({
   }),
   useWriteContract: () => ({ writeContractAsync: mocks.write }),
 }));
+vi.mock("@/hooks/useStakedPortfolio", () => ({
+  useStakedPortfolio: () => mocks.portfolio,
+}));
 vi.mock("sonner", () => ({ toast: { error: mocks.toastError, success: mocks.toastSuccess } }));
 
-const renderPanel = async () => {
+const position = (tokenId: string, overrides: Record<string, unknown> = {}) => ({
+  tokenId,
+  custody: "staker",
+  token0: "0x4200000000000000000000000000000000000006",
+  token1: "0xC17227AAa33C54634B6cE7AD0bf33A156563c179",
+  fee: 3000,
+  ...overrides,
+});
+
+const renderBare = () =>
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <MrwdLpStakerPanel />
     </QueryClientProvider>
   );
+
+const renderPanel = async () => {
+  renderBare();
   await screen.findAllByText("#6383553", { exact: false });
 };
 
@@ -63,6 +81,13 @@ describe("MrwdLpStakerPanel actions", () => {
     vi.clearAllMocks();
     mocks.account = { address: OWNER, chainId: 8453 };
     mocks.depositOwner = OWNER;
+    mocks.badId = "";
+    mocks.portfolio = {
+      data: { positions: [position("6383553"), position("6383541")], incomplete: false },
+      isPending: false,
+      isFetching: false,
+      isError: false,
+    };
     mocks.banked = 0n;
     mocks.simulate.mockResolvedValue({ result: [0n, 0n] });
     mocks.write.mockResolvedValue("0x01");
@@ -83,10 +108,58 @@ describe("MrwdLpStakerPanel actions", () => {
     expect(screen.queryByRole("button", { name: "Unstake" })).toBeNull();
   });
 
-  it("hides actions when no wallet is connected", async () => {
+  it("shows no one else's positions when no wallet is connected", async () => {
     mocks.account = { address: undefined, chainId: 8453 };
-    await renderPanel();
+    mocks.portfolio = { isPending: true, isFetching: false, isError: false };
+    renderBare();
+    expect(
+      await screen.findByText(/Connect a wallet to load your positions/)
+    ).toBeTruthy();
+    expect(screen.queryByText(/#63/)).toBeNull();
     expect(screen.queryByRole("button", { name: "Claim" })).toBeNull();
+  });
+
+  it("lists exactly the connected wallet's discovered positions", async () => {
+    mocks.portfolio = {
+      data: { positions: [position("111")], incomplete: false },
+      isPending: false,
+      isFetching: false,
+      isError: false,
+    };
+    renderBare();
+    expect(await screen.findByText("#111", { exact: false })).toBeTruthy();
+    expect(screen.queryByText("#6383553", { exact: false })).toBeNull();
+  });
+
+  it("leaves out the wallet's positions in other pools", async () => {
+    mocks.portfolio = {
+      data: { positions: [position("111", { fee: 500 })], incomplete: false },
+      isPending: false,
+      isFetching: false,
+      isError: false,
+    };
+    renderBare();
+    expect(await screen.findByText(/no positions in this pool/)).toBeTruthy();
+  });
+
+  it("says so when a position ID does not exist, and keeps the other rows", async () => {
+    mocks.badId = "999";
+    await renderPanel();
+    fireEvent.change(screen.getByPlaceholderText(/Inspect V3 NFT/), { target: { value: "999" } });
+    fireEvent.click(screen.getByRole("button", { name: /Add Position/ }));
+    expect(await screen.findByText(/No position found for #999/)).toBeTruthy();
+    expect(screen.getAllByText("#6383553", { exact: false }).length).toBeGreaterThan(0);
+  });
+
+  it("warns when discovery could not finish", async () => {
+    mocks.portfolio = {
+      data: { positions: [position("111")], incomplete: true },
+      isPending: false,
+      isFetching: false,
+      isError: false,
+    };
+    renderBare();
+    expect(await screen.findByText(/this list may be incomplete/)).toBeTruthy();
   });
 
   it("claims through the staker after simulating", async () => {
