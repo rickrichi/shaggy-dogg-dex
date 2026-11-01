@@ -334,7 +334,7 @@ export function MrwdLpStakerPanel() {
               Uniswap V3 LP Staking Rewards &amp; Accrued Fees
             </CardTitle>
             <Badge className="border-indigo-200 bg-indigo-50 text-indigo-800">
-              Quarter 1 program · contract data
+              MRWD program · Quarter 1 · contract data
             </Badge>
           </div>
           {stakerQuery.isSuccess && (

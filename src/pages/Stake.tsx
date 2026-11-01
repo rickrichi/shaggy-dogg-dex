@@ -37,7 +37,8 @@ export default function Stake() {
             <Badge className="border-purple-200 bg-purple-100 text-purple-800">Base Mainnet</Badge>
           </div>
           <p className="mt-1 text-sm text-slate-500">
-            Stake Mutt Rewards (MRWD) for Equilnyxs Pro. Premium DEX tools are planned.
+            Earn rewards on your positions and stake to unlock Pro tools. Premium DEX tools are
+            planned.
           </p>
         </div>
       </div>
@@ -50,11 +51,10 @@ export default function Stake() {
           </div>
           <div>
             <p className="text-sm font-bold text-gray-900">
-              MRWD Protocol Hub &amp; 56-Aggregator Routing Audit
+              Protocol Hub &amp; Launchpad
             </p>
             <p className="text-xs text-gray-600">
-              View canonical MRWD Base Mainnet contracts, the 56-aggregator routing audit, or launch
-              new tokens in Token Studio.
+              View deployed contracts and routing audits, or launch new tokens in Token Studio.
             </p>
           </div>
         </div>
@@ -83,11 +83,11 @@ export default function Stake() {
               Multi-DEX venue ledger
             </p>
             <h2 className="mt-1 text-lg font-black text-slate-950">
-              Compare MRWD liquidity &amp; rewards
+              Compare liquidity &amp; rewards
             </h2>
             <p className="mt-1 text-sm text-slate-600">
-              See which of the eight Base routing venues has a pool, a rewards program, or trading
-              fees only.
+              See which Base venues have a pool for your tokens, a rewards program, or trading fees
+              only.
             </p>
           </div>
           <Button

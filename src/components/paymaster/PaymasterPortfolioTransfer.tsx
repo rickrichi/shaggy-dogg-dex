@@ -42,6 +42,7 @@ import { getSwapDropdownTokens, type Token } from "@/config/tokens";
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { quoteSmartRoutes, routeSwapCall, SPONSORED_ROUTE_VENUES } from "@/lib/amm/smart-routing";
 import { calculateMinimumAmountOut } from "@/lib/amm/swap-protection";
+import { CANONICAL_BASE_CONTRACTS } from "@/lib/launchpad/constants";
 import {
   SPONSORED_REWARD_PAYMASTER_ABI,
   SPONSORED_REWARD_PAYMASTER_BYTECODE,
@@ -128,7 +129,7 @@ export function PaymasterPortfolioTransfer() {
 
   // Swap state
   const baseSwapTokens = useMemo(() => getSwapDropdownTokens(base.id), []);
-  const [buyTokenSelection, setBuyTokenSelection] = useState<string>(MRWD_ON_BASE);
+  const [buyTokenSelection, setBuyTokenSelection] = useState<string>(CANONICAL_BASE_CONTRACTS.USDC);
   const [customBuyAddress, setCustomBuyAddress] = useState("");
   const [customBuyToken, setCustomBuyToken] = useState<TokenChoice | null>(null);
   const [slippagePct, setSlippagePct] = useState("1.0");

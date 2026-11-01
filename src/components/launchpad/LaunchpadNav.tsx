@@ -31,7 +31,7 @@ export const LaunchpadNav = () => {
       name: "Gas Paymaster",
       href: "/paymaster",
       icon: Fuel,
-      description: "Sponsored Base portfolio operations and MRWD rewards",
+      description: "Sponsored gas and rewards for Base portfolio operations",
     },
     {
       name: "Protocol Hub",

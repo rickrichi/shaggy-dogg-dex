@@ -3,13 +3,11 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Activity, AlertTriangle, BarChart3, Loader2, Search } from "lucide-react";
 
-import { MrwdAggregatorAuditCard } from "@/components/MrwdAggregatorAuditCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { MARKET_DATA_URL } from "@/config/market-data";
-import { MRWD } from "@/lib/mrwd-pro";
 
 // ───────────────────────────── wire types (shaggy-dogg-market-data/app/market_data.py) ─────────────────
 
@@ -270,8 +268,6 @@ export default function MarketData() {
         <TokenLookup />
       </div>
 
-      <MrwdAggregatorAuditCard />
-
       {coverage && <PairCoverage coverage={coverage} rows={allRows} onSelect={setSelected} />}
 
       <p className="text-center text-xs text-gray-500">
@@ -492,9 +488,11 @@ function Sparkline({ points }: { points: Array<{ ts: number; priceUsd: number }>
 
 // ───────────────────────────── Base token lookup ─────────────────────────────
 
+const EXAMPLE_TOKEN = "0x940181a94A35A4569E4529A3CDfB74e38FD98631"; // AERO
+
 function TokenLookup() {
-  const [input, setInput] = useState<string>(MRWD);
-  const [address, setAddress] = useState<string | null>(MRWD.toLowerCase());
+  const [input, setInput] = useState<string>(EXAMPLE_TOKEN);
+  const [address, setAddress] = useState<string | null>(EXAMPLE_TOKEN.toLowerCase());
   const valid = /^0x[0-9a-fA-F]{40}$/.test(input.trim());
   const token = useQuery({
     queryKey: ["md-token", address],
@@ -532,17 +530,7 @@ function TokenLookup() {
         </form>
         <p className="text-xs text-gray-500">
           Example prefilled: AERO. Priced from the deepest Uniswap V2, Uniswap V3, or Aerodrome
-          pool.{" "}
-          <button
-            type="button"
-            className="underline"
-            onClick={() => {
-              setInput(MRWD);
-              setAddress(MRWD.toLowerCase());
-            }}
-          >
-            Price MRWD
-          </button>
+          pool.
         </p>
         {token.error && <p className="text-sm text-rose-600">{(token.error as Error).message}</p>}
         {token.data && (
