@@ -69,6 +69,16 @@ const stepTabs: Record<string, string> = {
   review: "review",
 };
 
+/** What the recipient keeps after seeding, which moves part of the supply into the pool. */
+export function walletSupplyLabel(form: LaunchpadFormState) {
+  const supply = Number(form.initialSupply);
+  if (!(supply > 0)) return "—";
+  const seededPercent = form.enableDexSeeding ? form.initialTokenLiquidityPercent : 0;
+  const kept = (supply * (100 - seededPercent)) / 100;
+  const amount = `${kept.toLocaleString(undefined, { maximumFractionDigits: 6 })} ${form.tokenSymbol}`;
+  return seededPercent ? `${amount} (${seededPercent}% seeded)` : amount;
+}
+
 export default function Launchpad() {
   const { address, isConnected, chainId, chain } = useAccount();
   const { data: walletClient } = useWalletClient();
@@ -199,7 +209,7 @@ export default function Launchpad() {
 
       addLog(`Token successfully deployed at ${result.tokenAddress}`);
       if (result.stakingAddress) addLog(`Staking vault deployed at ${result.stakingAddress}`);
-      if (result.vaultAddress) addLog(`Lending vault deployed at ${result.vaultAddress}`);
+      if (result.vaultAddress) addLog(`Aave v3 vault deployed at ${result.vaultAddress}`);
       if (result.compoundVaultAddress)
         addLog(`Compound v3 vault deployed at ${result.compoundVaultAddress}`);
       if (result.borrowerAddress)
@@ -822,6 +832,10 @@ export default function Launchpad() {
                       </strong>
                     </p>
                     <p className="flex justify-between">
+                      <span className="text-gray-500">To Your Wallet:</span>
+                      <strong className="text-gray-900">{walletSupplyLabel(form)}</strong>
+                    </p>
+                    <p className="flex justify-between">
                       <span className="text-gray-500">Launch Fee:</span>
                       <strong className="text-gray-900">
                         {launchFee === undefined
@@ -997,7 +1011,7 @@ export default function Launchpad() {
                     </p>
                     {deployedResult.vaultAddress && (
                       <p>
-                        <strong>Lending Vault:</strong>{" "}
+                        <strong>Aave v3 Vault:</strong>{" "}
                         <a
                           href={`https://basescan.org/address/${deployedResult.vaultAddress}`}
                           target="_blank"
@@ -1036,7 +1050,7 @@ export default function Launchpad() {
                     )}
                     {deployedResult.borrowerAddress && (
                       <p>
-                        <strong>Flash Loan Borrower:</strong>{" "}
+                        <strong>Flash Arbitrage Router:</strong>{" "}
                         <a
                           href={`https://basescan.org/address/${deployedResult.borrowerAddress}`}
                           target="_blank"

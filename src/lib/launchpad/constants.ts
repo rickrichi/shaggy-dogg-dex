@@ -40,9 +40,9 @@ export const LAUNCHPAD_ARCHETYPES: ArchetypeDefinition[] = [
     category: "Standard",
     badge: "Lightweight",
     description:
-      "Fixed-supply standard token: the whole supply is created once at deployment, with no mint function, owner, or admin. Ready for DEX trading and wallet custody.",
+      "Fixed-supply standard token: the whole supply is created once at deployment, with no mint function, owner, or admin. It goes to your wallet, minus any share you seed as liquidity.",
     architectureDetails:
-      "Direct deployment of FixedSupplyToken.sol with 100% genesis allocation to creator.",
+      "Direct deployment of FixedSupplyToken.sol. The supply goes to your wallet, then any share you seed moves into the pool.",
     protocolsReferenced: ["ERC-20"],
     contractsDeployed: ["FixedSupplyToken.sol"],
     riskContagionModel: "None",
@@ -66,7 +66,7 @@ export const LAUNCHPAD_ARCHETYPES: ArchetypeDefinition[] = [
     category: "Next-Gen Lending",
     badge: "Deepest Liquidity",
     description:
-      "Supplies USDC reserves to Aave v3 on Base to capture institutional lending APR while streaming performance fees to treasury.",
+      "Adds a separate USDC vault that earns Aave v3 lending yield and sends performance fees to your treasury. Your token is not deposited; staking it lowers the vault fee.",
     architectureDetails:
       "Deploys FixedSupplyToken + YieldStakingVault wired directly to Aave v3 Pool (0xA238Dd...8d1c5).",
     protocolsReferenced: ["Aave v3 Base", "aToken Yield Streaming"],
@@ -79,7 +79,7 @@ export const LAUNCHPAD_ARCHETYPES: ArchetypeDefinition[] = [
     category: "Full Suite",
     badge: "Enterprise",
     description:
-      "The complete 5-contract Shaggy Dogg DeFi suite: Token + Staking + Aave Vault + Compound Vault + Aave Flash Loan Arbitrage Router.",
+      "The complete 5-contract Shaggy Dogg DeFi suite: Token + Staking + Aave Vault + Compound Vault + Aave Flash Loan Arbitrage Router. The supply goes to your wallet, minus any share you seed as liquidity.",
     architectureDetails:
       "All 5 core contracts deployed and cross-linked with 100% root ownership assigned to your wallet.",
     protocolsReferenced: ["Aave v3", "Compound v3", "Uniswap V2"],

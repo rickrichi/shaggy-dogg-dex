@@ -19,7 +19,10 @@ import {
 import { toast } from "sonner";
 import { useAccount, useWalletClient } from "wagmi";
 
+import { FlashRouterPanel } from "@/components/launchpad/FlashRouterPanel";
+import { LaunchedVaultPanel } from "@/components/launchpad/LaunchedVaultPanel";
 import { LaunchpadNav } from "@/components/launchpad/LaunchpadNav";
+import { LoadContractCard } from "@/components/launchpad/LoadContractCard";
 import { StakingFeesPanel } from "@/components/launchpad/StakingFeesPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -124,8 +127,8 @@ export default function LaunchpadExplore({ defaultTab }: LaunchpadExploreProps) 
             <Badge className="border-purple-200 bg-purple-100 text-purple-800">Base Mainnet</Badge>
           </div>
           <p className="mt-1 text-sm text-slate-500">
-            Explore verified cryptocurrencies, isolated lending vaults, and staking protocols
-            launched through Shaggy Mutt.
+            Explore verified cryptocurrencies, yield vaults, and staking protocols launched through
+            Shaggy Mutt.
           </p>
         </div>
 
@@ -219,6 +222,8 @@ export default function LaunchpadExplore({ defaultTab }: LaunchpadExploreProps) 
           </div>
         </div>
 
+        {activeTab === "my-tokens" && <LoadContractCard />}
+
         {/* Token Grid */}
         {filteredTokens.length === 0 ? (
           <Card className="border-dashed border-purple-200 bg-purple-50/20 p-12 text-center">
@@ -232,7 +237,7 @@ export default function LaunchpadExplore({ defaultTab }: LaunchpadExploreProps) 
             </h3>
             <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
               {activeTab === "my-tokens"
-                ? "Launch your first custom cryptocurrency with instant isolated lending vaults and Uniswap V2 liquidity in just 4 simple steps."
+                ? "Launch your first custom cryptocurrency with staking, yield vaults, and DEX liquidity in just 4 simple steps."
                 : "Try clearing your search query or selecting a different archetype."}
             </p>
             {activeTab === "my-tokens" && (
@@ -369,6 +374,24 @@ export default function LaunchpadExplore({ defaultTab }: LaunchpadExploreProps) 
                           stakingAddress={token.stakingAddress}
                           tokenSymbol={token.tokenSymbol}
                         />
+                      )}
+
+                      {token.vaultAddress && (
+                        <LaunchedVaultPanel
+                          vaultAddress={token.vaultAddress}
+                          label="Aave v3 vault"
+                        />
+                      )}
+
+                      {token.compoundVaultAddress && (
+                        <LaunchedVaultPanel
+                          vaultAddress={token.compoundVaultAddress}
+                          label="Compound v3 vault"
+                        />
+                      )}
+
+                      {token.borrowerAddress && (
+                        <FlashRouterPanel routerAddress={token.borrowerAddress} />
                       )}
 
                       {token.stakingAddress && (

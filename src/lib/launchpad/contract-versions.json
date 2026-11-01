@@ -1,0 +1,100 @@
+[
+  {
+    "kind": "staking",
+    "build": "37a03d1",
+    "creationHash": "0xe4a05dad1330f43f62587d3fcbf20767a4e0728e5086dbb9c07db029f408f9d6",
+    "codeHash": "0xe58f329c533e476dddde6c2ed7251aecb10501523326bf9359106e7cfdb73e86",
+    "immutables": [
+      702,
+      1445,
+      2089,
+      2555
+    ]
+  },
+  {
+    "kind": "aave-vault",
+    "build": "37a03d1",
+    "creationHash": "0x13b1a4e615420fe52c65a664b6f4c6d9f98f4f7b1c4e0f3e7bd6edf9918d0807",
+    "codeHash": "0xb14494856eebf694a3ba50ff9a019c03492323adbdb95cc81a9ebbae211fed3c",
+    "immutables": [
+      470,
+      849,
+      1862,
+      2005,
+      2153,
+      2360,
+      2560,
+      3374,
+      3606,
+      3741
+    ]
+  },
+  {
+    "kind": "compound-vault",
+    "build": "37a03d1",
+    "creationHash": "0x5c3f9c742fd828ab58484ac51da8331514d76e86750a82104ce00690892a8ecd",
+    "codeHash": "0x30fc21c4f0dae9ee64814124b1417c742d5cd1d7faba65871d490e13fd7958c7",
+    "immutables": [
+      440,
+      816,
+      1693,
+      1836,
+      1984,
+      2162,
+      2364,
+      3178,
+      3410,
+      3544
+    ]
+  },
+  {
+    "kind": "router",
+    "build": "37a03d1",
+    "creationHash": "0x2802d1b8973c7ed8f60fec4a99fd2c9cafaac515fddbe3448775147259327fa5",
+    "codeHash": "0x044ea80102a9bf4fa3d9f4abee54aea4495ba9538aae6c9af9a1ec95a96dcda1",
+    "immutables": []
+  },
+  {
+    "kind": "aave-vault",
+    "build": "cfe2bb0",
+    "creationHash": "0xaadb118cb589ecdbdf63213ad70ddf842350b48e56317409fa224fea701493f0",
+    "codeHash": "0x85c8715a3602f2d6fd86888d58d1a65cff919f039f629116f66c15cbec5acbe9",
+    "immutables": [
+      470,
+      849,
+      1862,
+      2005,
+      2153,
+      2360,
+      2560,
+      3374,
+      3606,
+      3741
+    ]
+  },
+  {
+    "kind": "compound-vault",
+    "build": "cfe2bb0",
+    "creationHash": "0x45c49a658cb1a8404bdfe50360555a9530b623780e71976fe80d2cdc125c01f5",
+    "codeHash": "0x51b492f5b79880e083b060624bf072f9a058dbcb5b8f194f22c75a9050d4c413",
+    "immutables": [
+      440,
+      816,
+      1693,
+      1836,
+      1984,
+      2162,
+      2364,
+      3178,
+      3410,
+      3544
+    ]
+  },
+  {
+    "kind": "router",
+    "build": "cfe2bb0",
+    "creationHash": "0x71815c6f2d75986f4cb8e965fe4a163930ec21881a8dbcc8382f323d89ca5ca1",
+    "codeHash": "0xf7b5487e787acb5f3c0f10c2e87a0b6ac1c4f2b45af9ca433c6316252bc1e1b0",
+    "immutables": []
+  }
+]

@@ -149,6 +149,13 @@ describe("launchpad card settings", () => {
   const config = (wallet: ReturnType<typeof clients>["wallet"]) =>
     wallet.deployContract.mock.calls[1]![0].args[0];
 
+  it("says plainly where the supply goes and what the Aave vault holds", () => {
+    const card = (id: string) => LAUNCHPAD_ARCHETYPES.find((a) => a.id === id)!.description;
+    expect(card("standard_governance")).toContain("minus any share you seed");
+    expect(card("full_defi_suite")).toContain("minus any share you seed");
+    expect(card("aave_v3_yield")).toContain("Your token is not deposited");
+  });
+
   it("offers only the four cards whose contracts do what they describe", () => {
     expect(LAUNCHPAD_ARCHETYPES.map((a) => a.id)).toEqual([
       "standard_governance",

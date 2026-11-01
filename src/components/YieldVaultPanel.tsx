@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { VaultDeploymentPanel } from "@/components/VaultDeploymentPanel";
 import { positiveAmount } from "@/lib/amm/own-dex";
+import { bufferedGas } from "@/lib/gas";
 
 const abi = parseAbi([
   "function underlyingAsset() view returns (address)",
@@ -145,16 +146,18 @@ export function YieldVaultPanel() {
             throw new Error("Approval reverted.");
         }
       }
-      const { request } = await client.simulateContract({
+      const vaultCall = {
         address: vault,
         abi,
         functionName: withdraw ? "withdraw" : "deposit",
         args: [value],
         account: address,
-      });
+      } as const;
+      const { request } = await client.simulateContract(vaultCall);
+      const gas = bufferedGas(await client.estimateContractGas(vaultCall));
       await assertWallet();
       setMessage("Confirm the vault transaction in your wallet.");
-      const tx = await wallet.writeContract({ ...request, chain: base });
+      const tx = await wallet.writeContract({ ...request, gas, chain: base });
       setHash(tx);
       setMessage("Waiting for Base confirmation.");
       if ((await client.waitForTransactionReceipt({ hash: tx })).status !== "success")
