@@ -16,6 +16,7 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
+  Waypoints,
   Zap,
 } from "lucide-react";
 
@@ -49,6 +50,7 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
       { name: "Swap", href: "/swap", icon: ArrowLeftRight },
       { name: "Liquidity", href: "/liquidity", icon: Droplets },
       { name: "Stake", href: "/stake", icon: ShieldCheck },
+      { name: "DEX Pools", href: "/stake/dexes", icon: Waypoints },
     ],
   },
   {
