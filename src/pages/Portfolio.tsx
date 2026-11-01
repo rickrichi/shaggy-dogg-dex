@@ -23,6 +23,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { getChainConfig, isSupportedChain } from "@/config/chains";
 import { type Token, usePortfolio } from "@/hooks/usePortfolio";
+import { formatUsdPrice } from "@/lib/format-price";
 
 export default function Portfolio() {
   const { address, isConnected } = useAccount();
@@ -395,9 +396,7 @@ export default function Portfolio() {
 
                         {/* Price */}
                         <td className="p-4 text-right text-gray-600">
-                          {token.priceUsd > 0
-                            ? `$${token.priceUsd.toFixed(token.priceUsd < 0.01 ? 6 : 2)}`
-                            : "—"}
+                          {token.priceUsd > 0 ? formatUsdPrice(token.priceUsd) : "—"}
                         </td>
 
                         {/* Value */}

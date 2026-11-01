@@ -294,8 +294,8 @@ export default function LaunchpadExplore({ defaultTab }: LaunchpadExploreProps) 
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-3">
-                        <div className="flex size-11 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 font-black text-white shadow-sm">
-                          {token.tokenSymbol.slice(0, 3)}
+                        <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 text-xs font-black text-white shadow-sm">
+                          {token.tokenSymbol.slice(0, 4)}
                         </div>
                         <div>
                           <CardTitle className="text-lg font-black text-slate-900">

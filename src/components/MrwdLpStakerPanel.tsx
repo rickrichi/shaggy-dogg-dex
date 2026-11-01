@@ -352,7 +352,7 @@ export function MrwdLpStakerPanel() {
             </Button>
           )}
         </div>
-        <CardDescription>
+        <CardDescription className="[overflow-wrap:anywhere]">
           Live on-chain rewards from <code>UniswapV3Staker</code> ({STAKER}) and
           uncollected LP swap fees from <code>NonfungiblePositionManager</code>{" "}
           ({NPM}).
@@ -602,12 +602,12 @@ export function MrwdLpStakerPanel() {
 
             {/* Inspect Additional Position ID */}
             <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-              <div className="flex items-center gap-2">
+              <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
                 <Input
                   value={customId}
                   onChange={(e) => setCustomId(e.currentTarget.value)}
                   placeholder="Inspect V3 NFT Token ID (e.g. 6383553)"
-                  className="h-8 w-64 font-mono text-xs"
+                  className="h-8 w-full font-mono text-xs sm:w-64"
                 />
                 <Button
                   type="button"

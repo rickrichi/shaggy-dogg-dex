@@ -358,7 +358,7 @@ export default function Launchpad() {
         activationMode="manual"
         className="space-y-6"
       >
-        <TabsList className="grid w-full grid-cols-4 border border-purple-100 bg-white/70 p-1 shadow-sm backdrop-blur">
+        <TabsList className="grid h-auto w-full grid-cols-2 border border-purple-100 bg-white/70 p-1 shadow-sm backdrop-blur sm:grid-cols-4">
           <TabsTrigger value="identity" className="flex items-center gap-2">
             <Coins className="size-4 text-purple-600" />
             <span className="font-semibold">1. Token Identity</span>

@@ -349,7 +349,7 @@ export function MrwdAggregatorAuditCard() {
           </table>
         </div>
 
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-slate-500 [overflow-wrap:anywhere]">
           Methodology: {auditReport.methodology} Canonical Base Uniswap V3 Factory:{" "}
           <span className="font-mono">{FACTORY_ADDRESS}</span>.
         </p>

@@ -151,7 +151,7 @@ export function VaultDeploymentPanel() {
       {import.meta.env.VITE_YIELD_VAULT_ADDRESS && (
         <div className="rounded-md border border-emerald-200 bg-emerald-50/80 p-2.5 text-xs text-emerald-900">
           <span className="font-semibold">Configured vault: </span>
-          <code className="font-mono">{import.meta.env.VITE_YIELD_VAULT_ADDRESS}</code>
+          <code className="break-all font-mono">{import.meta.env.VITE_YIELD_VAULT_ADDRESS}</code>
           <a
             href={`https://basescan.org/address/${import.meta.env.VITE_YIELD_VAULT_ADDRESS}`}
             target="_blank"
