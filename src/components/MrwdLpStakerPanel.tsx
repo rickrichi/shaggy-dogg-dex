@@ -2,8 +2,9 @@ import { useState } from "react";
 
 import { useQuery } from "@tanstack/react-query";
 import { Award, ExternalLink, Plus, RefreshCw } from "lucide-react";
-import { type Address, formatUnits, parseAbi } from "viem";
-import { useAccount, usePublicClient } from "wagmi";
+import { toast } from "sonner";
+import { type Address, formatUnits, type Hex, parseAbi } from "viem";
+import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,9 +17,15 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { MRWD } from "@/lib/mrwd-pro";
+import {
+  claimBankedCalls,
+  claimCalls,
+  MRWD_V3_STAKER as STAKER,
+  stakerActionsAbi,
+  unstakeCalls,
+} from "@/lib/mrwd-staker";
 
 const SCHEDULER: Address = "0xCAbf284806b800d9A771B55857B9fCF735ea7109";
-const STAKER: Address = "0x42bE4D6527829FeFA1493e1fb9F3676d2425C3C1";
 const NPM: Address = "0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1";
 const POOL: Address = "0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5";
 const TIMELOCK: Address = "0xB5C9BeDb57f4E348e40A5E6326c90dE474072E25";
@@ -63,9 +70,15 @@ const fmtMrwd = (wei: bigint) =>
 const fmtWeth = (wei: bigint) =>
   wei === 0n ? "0 WETH" : `${Number(formatUnits(wei, 18)).toFixed(12)} WETH`;
 
+const sameAddress = (a: Address | undefined, b: Address | undefined) =>
+  !!a && !!b && a.toLowerCase() === b.toLowerCase();
+
 export function MrwdLpStakerPanel() {
-  const { address } = useAccount();
+  const { address, chainId } = useAccount();
   const client = usePublicClient({ chainId: 8453 });
+  const { writeContractAsync } = useWriteContract();
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [confirmingUnstake, setConfirmingUnstake] = useState<string | null>(null);
   const [tokenIds, setTokenIds] = useState<string[]>(DEFAULT_TOKEN_IDS);
   const [customId, setCustomId] = useState("");
 
@@ -213,8 +226,10 @@ export function MrwdLpStakerPanel() {
 
       return {
         blockNumber: block.number.toString(),
+        blockTimestamp: block.timestamp,
         currentTick,
         incentiveId: incId,
+        incentiveKey: key,
         unclaimedPoolMrwd: incState[0],
         activeStakesCount: Number(incState[2]),
         bankedRewards,
@@ -224,6 +239,64 @@ export function MrwdLpStakerPanel() {
       };
     },
   });
+
+  /**
+   * Sends staker calls after re-reading the position's owner, so a stale table can't offer a
+   * signature to the wrong wallet. The staker enforces ownership itself as well.
+   */
+  const runStakerCalls = async (
+    action: string,
+    calls: Hex[],
+    success: string,
+    tokenId?: string
+  ) => {
+    if (!address || !client) {
+      toast.error("Connect the wallet that owns this position.");
+      return;
+    }
+    if (chainId !== 8453) {
+      toast.error("Please switch to Base Mainnet.");
+      return;
+    }
+    setBusyAction(action);
+    try {
+      if (tokenId) {
+        const [owner] = await client.readContract({
+          address: STAKER,
+          abi: stakerAbi,
+          functionName: "deposits",
+          args: [BigInt(tokenId)],
+        });
+        if (!sameAddress(owner, address)) {
+          throw new Error(`Only the owner of position #${tokenId} can do this.`);
+        }
+      }
+      await client.simulateContract({
+        address: STAKER,
+        abi: stakerActionsAbi,
+        functionName: "multicall",
+        args: [calls],
+        account: address,
+      });
+      const hash = await writeContractAsync({
+        address: STAKER,
+        abi: stakerActionsAbi,
+        functionName: "multicall",
+        args: [calls],
+        chainId: 8453,
+      });
+      const receipt = await client.waitForTransactionReceipt({ hash });
+      if (receipt.status !== "success") throw new Error("Transaction reverted");
+      toast.success(success);
+      await stakerQuery.refetch();
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Transaction failed");
+    } finally {
+      setBusyAction(null);
+      setConfirmingUnstake(null);
+    }
+  };
 
   const addTokenId = () => {
     const trimmed = customId.trim();
@@ -323,6 +396,31 @@ export function MrwdLpStakerPanel() {
               </div>
             </div>
 
+            {stakerQuery.data.bankedRewards > 0n && address && (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-indigo-100 bg-indigo-50/50 p-3 text-xs">
+                <span className="text-indigo-900">
+                  Ready to claim:{" "}
+                  <strong className="font-mono">
+                    {fmtMrwd(stakerQuery.data.bankedRewards)} MRWD
+                  </strong>
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={busyAction !== null}
+                  onClick={() =>
+                    void runStakerCalls(
+                      "banked",
+                      claimBankedCalls(address),
+                      "MRWD claimed to your wallet."
+                    )
+                  }
+                >
+                  {busyAction === "banked" ? "Claiming..." : "Claim to Wallet"}
+                </Button>
+              </div>
+            )}
+
             {/* Positions Table */}
             <div className="overflow-x-auto rounded-xl border border-slate-200">
               <table className="w-full text-left text-xs">
@@ -337,6 +435,9 @@ export function MrwdLpStakerPanel() {
                     </th>
                     <th className="px-3 py-2.5 text-right font-semibold">
                       Uncollected WETH Fees
+                    </th>
+                    <th className="px-3 py-2.5 text-right font-semibold">
+                      Actions
                     </th>
                   </tr>
                 </thead>
@@ -378,6 +479,67 @@ export function MrwdLpStakerPanel() {
                       <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono text-slate-800">
                         {fmtWeth(row.feeWeth)}
                       </td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-right">
+                        {address && sameAddress(row.depositOwner, address) ? (
+                          <div className="flex justify-end gap-1.5">
+                            {row.isStaked && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                className="h-7 text-xs"
+                                disabled={busyAction !== null || row.accruedMrwd === 0n}
+                                onClick={() =>
+                                  void runStakerCalls(
+                                    `claim-${row.tokenId}`,
+                                    claimCalls(
+                                      stakerQuery.data.incentiveKey,
+                                      BigInt(row.tokenId),
+                                      address,
+                                      BigInt(Math.floor(Date.now() / 1000))
+                                    ),
+                                    `MRWD claimed from #${row.tokenId}.`,
+                                    row.tokenId
+                                  )
+                                }
+                              >
+                                {busyAction === `claim-${row.tokenId}` ? "Claiming..." : "Claim"}
+                              </Button>
+                            )}
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs"
+                              disabled={busyAction !== null}
+                              onClick={() => {
+                                if (confirmingUnstake !== row.tokenId) {
+                                  setConfirmingUnstake(row.tokenId);
+                                  return;
+                                }
+                                void runStakerCalls(
+                                  `unstake-${row.tokenId}`,
+                                  unstakeCalls(
+                                    stakerQuery.data.incentiveKey,
+                                    BigInt(row.tokenId),
+                                    address,
+                                    row.isStaked
+                                  ),
+                                  `#${row.tokenId} unstaked and returned to your wallet.`,
+                                  row.tokenId
+                                );
+                              }}
+                            >
+                              {busyAction === `unstake-${row.tokenId}`
+                                ? "Unstaking..."
+                                : confirmingUnstake === row.tokenId
+                                  ? "Confirm: stops earning"
+                                  : "Unstake"}
+                            </Button>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -392,6 +554,7 @@ export function MrwdLpStakerPanel() {
                     <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono text-emerald-900">
                       {fmtWeth(stakerQuery.data.totalFeeWeth)}
                     </td>
+                    <td />
                   </tr>
                 </tfoot>
               </table>
