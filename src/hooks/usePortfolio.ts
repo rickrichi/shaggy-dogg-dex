@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { type Address, formatUnits } from "viem";
 import { useAccount, useChainId, usePublicClient } from "wagmi";
 
+import { fetchPrices } from "@/lib/api/prices";
 import { tokenWatchlistForChain } from "@/lib/tokens";
 
 /* ============ Types ============ */
@@ -19,6 +20,9 @@ export interface Token {
   balanceFormatted: string; // human readable
   usdValue: number;
   priceUsd: number;
+  /** Priced from a pool below the liquidity floor: shown on its row, left out of totals. */
+  indicative?: boolean;
+  liquidityUsd?: number;
   logo?: string; // optional; when present must be string (never undefined)
 }
 export interface PortfolioSummary {
@@ -58,6 +62,33 @@ interface SimplePrice {
 interface ApiPricesResponse {
   native: { symbol: string; usd: number; usd_24h_change?: number | undefined }; // Explicitly allow undefined
   tokens: Record<string, SimplePrice>; // keys: lowercase addresses
+}
+
+/**
+ * Thin-pool prices for held tokens with no firm price, keyed by lowercase address. These are
+ * extras: if the lookup fails the tokens simply stay unpriced.
+ */
+export async function fetchIndicativePrices(chainId: number, addresses: readonly Address[]) {
+  const quotes = new Map<string, { priceUsd: number; liquidityUsd?: number }>();
+  if (addresses.length === 0) return quotes;
+  try {
+    const { data } = await fetchPrices({
+      chainId,
+      addresses,
+      includeThin: true,
+      timeoutMs: 8000,
+    });
+    for (const row of data.prices) {
+      if (!row.indicative || !(row.priceUsd > 0)) continue;
+      quotes.set(row.address, {
+        priceUsd: row.priceUsd,
+        ...(row.liquidityUsd !== undefined ? { liquidityUsd: row.liquidityUsd } : {}),
+      });
+    }
+  } catch (e) {
+    console.info("Thin-pool prices unavailable:", e);
+  }
+  return quotes;
 }
 
 /* ============ ERC-20 ABI ============ */
@@ -285,6 +316,20 @@ export function usePortfolio(): UsePortfolioReturn {
         console.info("Price server unavailable; showing balances without USD values:", e);
       }
 
+      // Tokens held without a firm price may still have a thin pool worth showing, flagged as such.
+      const firmQuotes = prices?.tokens;
+      const indicativeQuotes = firmQuotes
+        ? await fetchIndicativePrices(
+            chainId,
+            list
+              .filter(
+                (t, i) =>
+                  (ercBalances[i] ?? 0n) > 0n && !firmQuotes[(t.address as string).toLowerCase()]
+              )
+              .map((t) => t.address as Address)
+          )
+        : new Map<string, { priceUsd: number; liquidityUsd?: number }>();
+
       // 4) Tokens array
       const rows: Token[] = [];
 
@@ -310,7 +355,8 @@ export function usePortfolio(): UsePortfolioReturn {
         const formatted = formatUnits(bal, t.decimals);
         const tokenKey = (t.address as string).toLowerCase();
         const quote = prices?.tokens[tokenKey];
-        const px = quote?.usd ?? 0;
+        const thin = indicativeQuotes.get(tokenKey);
+        const px = quote?.usd ?? thin?.priceUsd ?? 0;
 
         rows.push({
           key: `${t.symbol}:${t.address}:${chainId}`,
@@ -323,18 +369,25 @@ export function usePortfolio(): UsePortfolioReturn {
           balanceFormatted: formatted,
           usdValue: px * Number(formatted),
           priceUsd: px,
+          ...(thin
+            ? {
+                indicative: true,
+                ...(thin.liquidityUsd !== undefined ? { liquidityUsd: thin.liquidityUsd } : {}),
+              }
+            : {}),
           ...(t.logo ? { logo: t.logo } : {}), // omit when undefined (exactOptionalPropertyTypes)
         });
       }
 
       // 5) Summary & 24h %
-      const totalValue = rows.reduce((s, r) => s + r.usdValue, 0);
+      const firmRows = rows.filter((r) => !r.indicative);
+      const totalValue = firmRows.reduce((s, r) => s + r.usdValue, 0);
 
       const nativeDeltaUsd =
         ((prices?.native.usd_24h_change ?? 0) / 100) * natPrice * Number(natFormatted);
 
       const zero = "0x0000000000000000000000000000000000000000" as const;
-      const ercDeltaUsd = rows.reduce((s, r) => {
+      const ercDeltaUsd = firmRows.reduce((s, r) => {
         if (r.address === zero) return s;
         const key = (r.address as string).toLowerCase();
         const pct = (prices?.tokens[key]?.usd_24h_change ?? 0) / 100;
@@ -351,7 +404,7 @@ export function usePortfolio(): UsePortfolioReturn {
           totalValue,
           totalTokens: rows.length,
           topChain: watch.chainName,
-          biggestHolding: maxBy(rows, (r) => r.usdValue),
+          biggestHolding: maxBy(firmRows, (r) => r.usdValue),
           percentChange24h,
         },
         pricesUnavailable: prices === null,

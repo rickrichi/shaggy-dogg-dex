@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useAccount, useChainId } from "wagmi";
 
+import { IndicativeBadge } from "@/components/IndicativeBadge";
 import { StakedHoldingsCard } from "@/components/StakedHoldingsCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -396,12 +397,15 @@ export default function Portfolio() {
 
                         {/* Price */}
                         <td className="p-4 text-right text-gray-600">
-                          {token.priceUsd > 0 ? formatUsdPrice(token.priceUsd) : "—"}
+                          <div>{token.priceUsd > 0 ? formatUsdPrice(token.priceUsd) : "—"}</div>
+                          {token.indicative && <IndicativeBadge liquidityUsd={token.liquidityUsd} />}
                         </td>
 
                         {/* Value */}
                         <td className="p-4 text-right font-semibold text-gray-900">
-                          {token.usdValue > 0
+                          {token.indicative
+                            ? `≈ ${formatUsdPrice(token.usdValue)}`
+                            : token.usdValue > 0
                             ? `$${token.usdValue.toLocaleString(undefined, {
                                 minimumFractionDigits: 2,
                                 maximumFractionDigits: 2,
