@@ -58,6 +58,10 @@
   ],
   "rewrites": [
     {
+      "source": "/mrwd",
+      "destination": "/mrwd.html"
+    },
+    {
       "source": "/api/mrwd/pool.json",
       "destination": "/api/mrwd/pool"
     },
