@@ -10,7 +10,6 @@ import {
   Sparkles,
 } from "lucide-react";
 import { createSmartAccountClient } from "permissionless";
-import { to7702SimpleSmartAccount } from "permissionless/accounts";
 import {
   type Address,
   concat,
@@ -44,12 +43,16 @@ import { quoteSmartRoutes, routeSwapCall, SPONSORED_ROUTE_VENUES } from "@/lib/a
 import { calculateMinimumAmountOut } from "@/lib/amm/swap-protection";
 import { CANONICAL_BASE_CONTRACTS } from "@/lib/launchpad/constants";
 import {
+  METAMASK_DESIGNATOR,
+  sponsoredAccountProblem,
+  SPONSORSHIP_UNAVAILABLE_REASONS,
+} from "@/lib/paymaster/accounts";
+import {
   SPONSORED_REWARD_PAYMASTER_ABI,
   SPONSORED_REWARD_PAYMASTER_BYTECODE,
 } from "@/lib/paymaster/artifact";
 import {
   BASE_ENTRYPOINT_V07,
-  METAMASK_7702_DELEGATOR_ON_BASE,
   MRWD_ON_BASE,
   type PaymasterStatus,
   readPaymasterStatus,
@@ -58,7 +61,6 @@ import {
 
 const MUTT_PRO_STAKING_ON_BASE = "0x67dBC193bF510225EBf189ab25dC3b34a32c1766" as const;
 const PAYMASTER_STORAGE_KEY = "shaggy-sponsored-reward-paymaster-base-8453";
-const METAMASK_DESIGNATOR = `0xef0100${METAMASK_7702_DELEGATOR_ON_BASE.slice(2).toLowerCase()}`;
 
 const metamaskDelegatorAbi = parseAbi([
   "function execute(bytes32 mode, bytes executionCalldata) payable",
@@ -220,6 +222,10 @@ export function PaymasterPortfolioTransfer() {
   }, [refreshPaymasterStatus]);
 
   const isMetaMaskDelegator = walletBytecode === METAMASK_DESIGNATOR;
+  // Shown before the user tries. No browser wallet can currently complete a sponsored operation;
+  // see sponsoredAccountProblem for the reason per wallet type.
+  const walletAccountProblem =
+    address && walletBytecode !== null ? sponsoredAccountProblem(walletBytecode) : null;
   const needsV07PaymasterUpgrade =
     isMetaMaskDelegator &&
     !!paymasterStatus &&
@@ -766,158 +772,128 @@ export function PaymasterPortfolioTransfer() {
         }
       }
 
+      // Only MetaMask's 7702 Smart Account runs on the reward paymaster's EntryPoint (v0.7).
       const code = (await publicClient.getBytecode({ address }))?.toLowerCase();
-      const simpleExpectedCode = `0xef0100${config?.accountImplementation.slice(2).toLowerCase()}`;
-      const usingMetaMask7702 = code === METAMASK_DESIGNATOR;
+      const accountProblem = sponsoredAccountProblem(code);
+      if (accountProblem) throw new Error(accountProblem);
 
-      if (code && code !== "0x" && !usingMetaMask7702 && code !== simpleExpectedCode) {
-        throw new Error("This wallet is delegated to an unsupported smart account implementation.");
-      }
-
-      if (usingMetaMask7702 && needsV07PaymasterUpgrade) {
-        throw new Error(
-          'Your MetaMask Smart Account uses ERC-4337 EntryPoint v0.7, while the currently attached paymaster is on v0.8. Click "Upgrade & Migrate Paymaster to EntryPoint v0.7" above first.'
-        );
-      }
-
-      const authorization =
-        code && code !== "0x"
-          ? undefined
-          : await walletClient.signAuthorization({
-              account: walletClient.account,
-              address: config!.accountImplementation,
-              chainId: base.id,
-              nonce: await publicClient.getTransactionCount({ address }),
+      const account = await toSmartAccount({
+        client: publicClient,
+        entryPoint: {
+          abi: entryPoint07Abi,
+          address: entryPoint07Address,
+          version: "0.7",
+        },
+        async getAddress() {
+          return address;
+        },
+        async getFactoryArgs() {
+          return { factory: undefined, factoryData: undefined };
+        },
+        async encodeCalls(innerCalls) {
+          if (innerCalls.length === 1) {
+            const single = innerCalls[0]!;
+            const packed = encodePacked(
+              ["address", "uint256", "bytes"],
+              [single.to, single.value ?? 0n, single.data ?? "0x"]
+            );
+            return encodeFunctionData({
+              abi: metamaskDelegatorAbi,
+              functionName: "execute",
+              args: ["0x0000000000000000000000000000000000000000000000000000000000000000", packed],
             });
-
-      const account = usingMetaMask7702
-        ? await toSmartAccount({
-            client: publicClient,
-            entryPoint: {
-              abi: entryPoint07Abi,
-              address: entryPoint07Address,
-              version: "0.7",
-            },
-            async getAddress() {
-              return address;
-            },
-            async getFactoryArgs() {
-              return { factory: undefined, factoryData: undefined };
-            },
-            async encodeCalls(innerCalls) {
-              if (innerCalls.length === 1) {
-                const single = innerCalls[0]!;
-                const packed = encodePacked(
-                  ["address", "uint256", "bytes"],
-                  [single.to, single.value ?? 0n, single.data ?? "0x"]
-                );
-                return encodeFunctionData({
-                  abi: metamaskDelegatorAbi,
-                  functionName: "execute",
-                  args: [
-                    "0x0000000000000000000000000000000000000000000000000000000000000000",
-                    packed,
-                  ],
-                });
-              }
-              const batchData = encodeAbiParameters(
-                [
-                  {
-                    type: "tuple[]",
-                    components: [
-                      { name: "target", type: "address" },
-                      { name: "value", type: "uint256" },
-                      { name: "callData", type: "bytes" },
-                    ],
-                  },
+          }
+          const batchData = encodeAbiParameters(
+            [
+              {
+                type: "tuple[]",
+                components: [
+                  { name: "target", type: "address" },
+                  { name: "value", type: "uint256" },
+                  { name: "callData", type: "bytes" },
                 ],
-                [
-                  innerCalls.map((item) => ({
-                    target: item.to,
-                    value: item.value ?? 0n,
-                    callData: item.data ?? "0x",
-                  })),
-                ]
-              );
-              return encodeFunctionData({
-                abi: metamaskDelegatorAbi,
-                functionName: "execute",
-                args: [
-                  "0x0100000000000000000000000000000000000000000000000000000000000000",
-                  batchData,
-                ],
-              });
-            },
-            async getStubSignature() {
-              return "0xfffffffffffffffffffffffffffffff0000000000000000000000000000000007aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1c";
-            },
-            async signMessage({ message }) {
-              return walletClient.signMessage({ account: address, message });
-            },
-            async signTypedData(typedData) {
-              return walletClient.signTypedData({
-                ...(typedData as Parameters<typeof walletClient.signTypedData>[0]),
-                account: address,
-              });
-            },
-            async signUserOperation(parameters) {
-              const senderAddr = parameters.sender ?? address;
-              const accountGasLimits = packUints(
-                parameters.verificationGasLimit ?? 0n,
-                parameters.callGasLimit ?? 0n
-              );
-              const gasFees = packUints(
-                parameters.maxPriorityFeePerGas ?? 0n,
-                parameters.maxFeePerGas ?? 0n
-              );
-              const paymasterAndData: Hex = parameters.paymaster
-                ? concat([
-                    parameters.paymaster,
-                    toHex(parameters.paymasterVerificationGasLimit ?? 0n, { size: 16 }),
-                    toHex(parameters.paymasterPostOpGasLimit ?? 0n, { size: 16 }),
-                    parameters.paymasterData ?? "0x",
-                  ])
-                : "0x";
-              return walletClient.signTypedData({
-                account: address,
-                domain: {
-                  name: "EIP7702StatelessDeleGator",
-                  version: "1",
-                  chainId: parameters.chainId ?? base.id,
-                  verifyingContract: senderAddr,
-                },
-                types: {
-                  PackedUserOperation: [
-                    { name: "sender", type: "address" },
-                    { name: "nonce", type: "uint256" },
-                    { name: "initCode", type: "bytes" },
-                    { name: "callData", type: "bytes" },
-                    { name: "accountGasLimits", type: "bytes32" },
-                    { name: "preVerificationGas", type: "uint256" },
-                    { name: "gasFees", type: "bytes32" },
-                    { name: "paymasterAndData", type: "bytes" },
-                    { name: "entryPoint", type: "address" },
-                  ],
-                },
-                primaryType: "PackedUserOperation",
-                message: {
-                  sender: senderAddr,
-                  nonce: parameters.nonce,
-                  initCode: "0x",
-                  callData: parameters.callData,
-                  accountGasLimits,
-                  preVerificationGas: parameters.preVerificationGas ?? 0n,
-                  gasFees,
-                  paymasterAndData,
-                  entryPoint: entryPoint07Address,
-                },
-              });
-            },
-          })
-        : await to7702SimpleSmartAccount({
-            client: publicClient,
-            owner: walletClient,
+              },
+            ],
+            [
+              innerCalls.map((item) => ({
+                target: item.to,
+                value: item.value ?? 0n,
+                callData: item.data ?? "0x",
+              })),
+            ]
+          );
+          return encodeFunctionData({
+            abi: metamaskDelegatorAbi,
+            functionName: "execute",
+            args: ["0x0100000000000000000000000000000000000000000000000000000000000000", batchData],
           });
+        },
+        async getStubSignature() {
+          return "0xfffffffffffffffffffffffffffffff0000000000000000000000000000000007aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1c";
+        },
+        async signMessage({ message }) {
+          return walletClient.signMessage({ account: address, message });
+        },
+        async signTypedData(typedData) {
+          return walletClient.signTypedData({
+            ...(typedData as Parameters<typeof walletClient.signTypedData>[0]),
+            account: address,
+          });
+        },
+        async signUserOperation(parameters) {
+          const senderAddr = parameters.sender ?? address;
+          const accountGasLimits = packUints(
+            parameters.verificationGasLimit ?? 0n,
+            parameters.callGasLimit ?? 0n
+          );
+          const gasFees = packUints(
+            parameters.maxPriorityFeePerGas ?? 0n,
+            parameters.maxFeePerGas ?? 0n
+          );
+          const paymasterAndData: Hex = parameters.paymaster
+            ? concat([
+                parameters.paymaster,
+                toHex(parameters.paymasterVerificationGasLimit ?? 0n, { size: 16 }),
+                toHex(parameters.paymasterPostOpGasLimit ?? 0n, { size: 16 }),
+                parameters.paymasterData ?? "0x",
+              ])
+            : "0x";
+          return walletClient.signTypedData({
+            account: address,
+            domain: {
+              name: "EIP7702StatelessDeleGator",
+              version: "1",
+              chainId: parameters.chainId ?? base.id,
+              verifyingContract: senderAddr,
+            },
+            types: {
+              PackedUserOperation: [
+                { name: "sender", type: "address" },
+                { name: "nonce", type: "uint256" },
+                { name: "initCode", type: "bytes" },
+                { name: "callData", type: "bytes" },
+                { name: "accountGasLimits", type: "bytes32" },
+                { name: "preVerificationGas", type: "uint256" },
+                { name: "gasFees", type: "bytes32" },
+                { name: "paymasterAndData", type: "bytes" },
+                { name: "entryPoint", type: "address" },
+              ],
+            },
+            primaryType: "PackedUserOperation",
+            message: {
+              sender: senderAddr,
+              nonce: parameters.nonce,
+              initCode: "0x",
+              callData: parameters.callData,
+              accountGasLimits,
+              preVerificationGas: parameters.preVerificationGas ?? 0n,
+              gasFees,
+              paymasterAndData,
+              entryPoint: entryPoint07Address,
+            },
+          });
+        },
+      });
 
       const smartClient = createSmartAccountClient({
         account,
@@ -952,14 +928,6 @@ export function PaymasterPortfolioTransfer() {
                   operation.paymasterVerificationGasLimit ?? 140_000n
                 ),
                 paymasterPostOpGasLimit: decimal(operation.paymasterPostOpGasLimit ?? 110_000n),
-                authorization: authorization && {
-                  address: authorization.address,
-                  chainId: authorization.chainId,
-                  nonce: String(authorization.nonce),
-                  r: authorization.r,
-                  s: authorization.s,
-                  yParity: authorization.yParity,
-                },
               }),
             });
             const result = (await response.json()) as { error?: string; paymasterData?: Hex };
@@ -975,10 +943,7 @@ export function PaymasterPortfolioTransfer() {
           },
         },
       });
-      const hash = await smartClient.sendTransaction({
-        calls,
-        ...(authorization ? { authorization } : {}),
-      });
+      const hash = await smartClient.sendTransaction({ calls });
       setTxHash(hash);
       refetch();
       void refreshPaymasterStatus();
@@ -1103,6 +1068,14 @@ export function PaymasterPortfolioTransfer() {
               </span>
             </div>
           )}
+
+        <div
+          role="status"
+          className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-3.5 py-2.5 text-xs text-amber-900"
+        >
+          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-700" />
+          <span>{walletAccountProblem ?? SPONSORSHIP_UNAVAILABLE_REASONS}</span>
+        </div>
 
         <Tabs
           value={operationType}
@@ -1336,13 +1309,12 @@ export function PaymasterPortfolioTransfer() {
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
           <p className="max-w-xl text-xs text-slate-600">
             <Coins className="mr-1 inline size-3.5 text-emerald-700" />
-            Your wallet may ask you to authorize EIP-7702 account code on its first sponsored
-            operation so your existing Base portfolio address can batch approvals and receive MRWD
-            rewards directly.
+            Sponsored operations need a smart account on your existing Base address; see the notice
+            above for whether your wallet can use one today.
           </p>
           <Button
             onClick={() => void executeSponsoredOperation()}
-            disabled={!canSubmit}
+            disabled={!canSubmit || walletAccountProblem !== null}
             className="bg-indigo-700 hover:bg-indigo-800"
           >
             {pending

@@ -1,10 +1,18 @@
 # Base Portfolio Paymaster
 
-The `/launchpad/paymaster` page sponsors eligible Base ERC-20 portfolio operations (transfers, DEX swaps across Uniswap V3 / Uniswap V2 / Aerodrome, and staking in `MuttProStaking` or Launchpad `FeeDiscountStaking`) and rewards successful operations with **100 MRWD**. The paymaster pays ETH gas from its EntryPoint deposit and never charges MRWD or the user's portfolio token as a fee.
+The `/launchpad/paymaster` page is built to sponsor eligible Base ERC-20 portfolio operations (transfers, DEX swaps across Uniswap V3 / Uniswap V2 / Aerodrome, and staking in `MuttProStaking` or Launchpad `FeeDiscountStaking`) and rewards successful operations with **100 MRWD**. The paymaster pays ETH gas from its EntryPoint deposit and never charges MRWD or the user's portfolio token as a fee.
 
 Base mainnet deployment: [`0x9cD40EBa4B0793C43FdF8C5A3272073820f77CB4`](https://basescan.org/address/0x9cD40EBa4B0793C43FdF8C5A3272073820f77CB4). It uses EntryPoint v0.7 (`0x0000000071727De22E5E9d8BAf0edAc6f37da032`), rewards 100 MRWD per successful operation, caps one sponsorship at 0.0001 ETH, and enforces a 24-hour per-wallet cooldown. The earlier v0.8 paymaster `0x221A9765844511Ef01E383273b396c45372E462a` is unfunded.
 
-**Known limitation:** MetaMask refuses the signature that its EIP-7702 Smart Account requires, so sponsored operations cannot complete from those wallets. See [the 2026-10-30 session record](SWAP_ROUTING_SESSION_RECORD_2026-10-30.md#known-limitation).
+**Current status (2026-11-02): gas-free operations are unavailable from browser wallets.** The page says so to every visitor and disables the sponsored send button. The contract path itself works: real MetaMask 7702 accounts complete sponsored `handleOps` bundles against the real EntryPoint v0.7 on a Base fork (`contracts/test/SponsoredRewardPaymaster.t.sol`). Each kind of browser wallet is blocked before that:
+
+| Wallet | Why it cannot be sponsored |
+| --- | --- |
+| MetaMask with its Smart Account (`0x63c0…E32B`, EntryPoint v0.7) | MetaMask refuses to sign the EIP-712 user operation whose verifying contract is the account itself when a website asks. See [the 2026-10-30 session record](SWAP_ROUTING_SESSION_RECORD_2026-10-30.md#known-limitation). |
+| Plain browser wallet | Browser (JSON-RPC) wallets cannot sign an EIP-7702 authorization for a website (viem: "does not support JSON-RPC Accounts"), so the site cannot turn the address into a smart account. |
+| Simple 7702 account (`0xe6Ca…555B`, EntryPoint v0.8) | This paymaster answers only EntryPoint v0.7. The API refuses to sign these sponsorships, since the signature could never be used (KI-P1 in `audit/KNOWN-ISSUES.md`). |
+
+The likely route forward is `wallet_sendCalls` with the ERC-7677 `paymasterService` capability for wallets that support it; that may need a paymaster for a different EntryPoint.
 
 ## Environment Variables
 
@@ -19,7 +27,7 @@ Base mainnet deployment: [`0x9cD40EBa4B0793C43FdF8C5A3272073820f77CB4`](https://
 
 ## Supported Portfolio Operations & Policy
 
-- **EIP-7702 + EntryPoint v0.8**: Uses the connected wallet's existing Base address (`Simple 7702` implementation `0xe6Cae83BdE06E4c305530e199D7217f42808555B`). Users do not need to move portfolio tokens to a separate smart account address.
+- **Account**: An EIP-7702 MetaMask Smart Account (`0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B`) on the user's existing Base address, using EntryPoint v0.7 like the paymaster. The API refuses any account whose EntryPoint differs from the paymaster's. See the current status above.
 - **Eligible Operations**:
   1. **ERC-20 Portfolio Transfers**: Single `transfer(recipient, amount)` on any held Base ERC-20 token.
   2. **DEX Swaps**: Single `swap` or atomic `executeBatch([approve, swap])` on Base Uniswap V3 (`0x2626...e481`), Uniswap V2 (`0x4752...aD24`), or Aerodrome (`0xcF77...4E43`) for any held Base ERC-20 token.

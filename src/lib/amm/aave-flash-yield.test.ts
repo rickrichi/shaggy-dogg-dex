@@ -180,15 +180,5 @@ describe("Aave Flash Liquidity & Yield Staking Vault Integrations", () => {
         true
       );
     });
-
-    it("verifies DeployEcosystem master factory artifact compiled cleanly with bytecode", () => {
-      const artifactPath = path.resolve(process.cwd(), "contracts/out/DeployEcosystem.json");
-      expect(fs.existsSync(artifactPath)).toBe(true);
-
-      const artifact = JSON.parse(fs.readFileSync(artifactPath, "utf8"));
-      expect(artifact.contractName).toBe("DeployEcosystem");
-      expect(artifact.bytecode.length).toBeGreaterThan(1000);
-      expect(artifact.abi.some((item: { name?: string }) => item.name === "run")).toBe(true);
-    });
   });
 });

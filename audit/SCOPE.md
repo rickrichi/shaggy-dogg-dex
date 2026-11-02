@@ -57,7 +57,7 @@ Source: `contracts/src/{GovernanceToken,FeeDiscountStaking,FeeDiscountMath,Yield
 
 - Foundry: 76 tests pass (`forge test` in `contracts/`), including Base-fork tests, fuzzing and tests that reproduce known issues.
 - Line coverage: GovernanceToken 100%, FeeDiscountStaking 100%, AaveFlashBorrower 95%, AtomicFlashArbitrageRouter 93%,
-  YieldStakingVault 91%, CompoundYieldVault 90%. `DeployEcosystem` is 0% (deploy helper).
+  YieldStakingVault 91%, CompoundYieldVault 90%. `DeployEcosystem` was 0% (unused deploy helper, removed 2026-11-02).
 - Slither: 41 results, every one triaged individually in `SLITHER-TRIAGE.md`.
 - Router line-by-line self-review: `ROUTER-REVIEW.md`.
 - The vault share-price fix (virtual shares) is deployed in **v3 `0x5c98f6bc9d17ba0eb02e1336bdf035938f5859e5`** (creation and

@@ -41,6 +41,14 @@ Full line-by-line self-review: `ROUTER-REVIEW.md`. Summary:
 
 Aave-borrowed funds cannot be taken by an operator: the callback requires principal, premium and `minNetProfit` to be covered or the transaction reverts.
 
+## SponsoredRewardPaymaster (`0x9cD4…7CB4`)
+
+Tested on a Base fork against the real EntryPoint v0.7 and MetaMask's 7702 DeleGator: real delegated accounts sign real user operations submitted with `handleOps` (`SponsoredRewardPaymasterTest`).
+
+| ID | Severity | Issue | Test |
+| --- | --- | --- | --- |
+| KI-P1 | Medium (product) | `SIMPLE_7702_IMPLEMENTATION` (`0xe6Ca…555B`) is whitelisted, but that account implementation uses EntryPoint v0.8 while this paymaster answers only v0.7, so Simple 7702 accounts can never be sponsored. `docs/PAYMASTER.md` still describes the v0.8 path. MetaMask 7702 accounts (v0.7) pass on-chain, but MetaMask refuses to sign their user operations for websites (see `docs/SWAP_ROUTING_SESSION_RECORD_2026-10-30.md`), so no browser wallet can currently complete a sponsored operation through the site. **Handled in the app:** the API refuses to sign a sponsorship whose account EntryPoint differs from the paymaster's (`accountEntryPointMismatch`), and the page tells users sponsorship is unavailable and disables sending. The contract is unchanged. | `testKnownIssueSimple7702AccountsCannotBeSponsored`, `server/src/routes/paymaster.test.ts` |
+
 ## Cross-cutting
 
 - KI-X1 (High, trust): one EOA administers every contract and receives vault fees. Compromise of that key controls all admin functions above.

@@ -24,7 +24,6 @@ const files = [
   "AaveFlashBorrower.sol",
   "YieldStakingVault.sol",
   "CompoundYieldVault.sol",
-  "DeployEcosystem.sol",
   "AtomicFlashArbitrageRouter.sol",
   "LaunchpadSuiteDeployer.sol",
 ];

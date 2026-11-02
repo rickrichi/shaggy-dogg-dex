@@ -10,7 +10,6 @@ const pairs = [
   ["contracts/src/AaveFlashBorrower.sol", "shaggy-dogg-sol_files/AaveFlashBorrower.sol"],
   ["contracts/src/YieldStakingVault.sol", "shaggy-dogg-sol_files/YieldStakingVault.sol"],
   ["contracts/src/CompoundYieldVault.sol", "shaggy-dogg-sol_files/CompoundYieldVault.sol"],
-  ["contracts/src/DeployEcosystem.sol", "shaggy-dogg-sol_files/DeployEcosystem.sol"],
   ["contracts/src/Interfaces.sol", "shaggy-dogg-sol_files/Interfaces.sol"],
   ["contracts/src/AtomicFlashArbitrageRouter.sol", "shaggy-dogg-sol_files/AtomicFlashArbitrageRouter.sol"],
   ["contracts/src/V3PositionTimelock.sol", "shaggy-dogg-sol_files/V3PositionTimelock.sol"],

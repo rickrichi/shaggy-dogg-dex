@@ -53,6 +53,23 @@ const supportedImplementations = new Set([
   metamaskImplementation.toLowerCase(),
   implementation.toLowerCase(),
 ])
+/** The ERC-4337 EntryPoint each supported EIP-7702 account implementation is built for. */
+const implementationEntryPoint = new Map<string, string>([
+  [metamaskImplementation.toLowerCase(), entryPointV07.toLowerCase()],
+  [implementation.toLowerCase(), entryPointV08.toLowerCase()],
+])
+const entryPointLabel = (address: string) =>
+  address.toLowerCase() === entryPointV07.toLowerCase() ? 'v0.7' : 'v0.8'
+/** Why a wallet's account cannot use this paymaster, or null when its EntryPoints match. */
+export function accountEntryPointMismatch(accountImplementation: string, paymasterEntryPoint: string): string | null {
+  const accountEntryPoint = implementationEntryPoint.get(accountImplementation.toLowerCase())
+  if (accountEntryPoint === paymasterEntryPoint.toLowerCase()) return null
+  if (accountImplementation.toLowerCase() === metamaskImplementation.toLowerCase()) {
+    return 'Your MetaMask Smart Account uses ERC-4337 EntryPoint v0.7, while the active paymaster contract uses v0.8. Click "Upgrade Paymaster for MetaMask (v0.7)" above to deploy & attach a v0.7 paymaster.'
+  }
+  const needed = entryPointLabel(paymasterEntryPoint) === 'v0.7' ? 'a MetaMask Smart Account' : 'a Simple 7702 account'
+  return `This wallet's smart account uses ERC-4337 EntryPoint ${accountEntryPoint ? entryPointLabel(accountEntryPoint) : 'unknown'}, but the reward paymaster uses ${entryPointLabel(paymasterEntryPoint)}. Sponsored operations need ${needed}.`
+}
 const hex = z.string().regex(/^0x(?:[0-9a-fA-F]{2})*$/)
 const address = z.string().refine(isAddress, 'Invalid address')
 const uint = z.string().regex(/^(0|[1-9][0-9]*)$/)
@@ -488,7 +505,8 @@ export function mountPaymasterRoutes(app: Hono, config: PaymasterEnvConfig): voi
       entryPointV08,
       paymaster: paymaster ?? null,
       signerAddress: signer?.address ?? null,
-      accountImplementation: implementation,
+      // The account the site sets up: it must match the paymaster's EntryPoint (v0.7).
+      accountImplementation: metamaskImplementation,
       metamaskAccountImplementation: metamaskImplementation,
       muttProStaking,
       eligibilityMode,
@@ -566,6 +584,8 @@ export function mountPaymasterRoutes(app: Hono, config: PaymasterEnvConfig): voi
     try {
       const senderCode = (await client.getBytecode({ address: sender }))?.toLowerCase()
       const isDelegated = Boolean(senderCode && supportedDesignators.has(senderCode))
+      let accountImplementation: string =
+        senderCode === metamaskDesignator ? metamaskImplementation : implementation
       if (!isDelegated) {
         if (senderCode && senderCode !== '0x') {
           throw new Error('Wallet uses a different account implementation')
@@ -578,6 +598,7 @@ export function mountPaymasterRoutes(app: Hono, config: PaymasterEnvConfig): voi
         ) {
           throw new Error('Authorization targets the wrong chain or account implementation')
         }
+        accountImplementation = getAddress(auth.address)
         const recovered = await recoverAuthorizationAddress({
           authorization: {
             address: getAddress(auth.address),
@@ -657,14 +678,10 @@ export function mountPaymasterRoutes(app: Hono, config: PaymasterEnvConfig): voi
       if (!supportedEntryPoints.has(paymasterEntryPoint.toLowerCase())) {
         throw new Error('Paymaster uses an unsupported EntryPoint')
       }
-      if (
-        senderCode === metamaskDesignator &&
-        paymasterEntryPoint.toLowerCase() !== entryPointV07.toLowerCase()
-      ) {
-        throw new Error(
-          'Your MetaMask Smart Account uses ERC-4337 EntryPoint v0.7, while the active paymaster contract uses v0.8. Click "Upgrade Paymaster for MetaMask (v0.7)" above to deploy & attach a v0.7 paymaster.'
-        )
-      }
+      // A v0.8 account (Simple 7702) sends its operation to a different EntryPoint than a v0.7
+      // paymaster answers, so a signature here could never be used. Refuse before signing.
+      const mismatch = accountEntryPointMismatch(accountImplementation, paymasterEntryPoint)
+      if (mismatch) throw new Error(mismatch)
       const depositInfo = await client.readContract({
         address: paymasterEntryPoint,
         abi: parseAbi([
