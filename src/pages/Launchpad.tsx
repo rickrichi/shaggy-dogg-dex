@@ -44,6 +44,7 @@ import {
   LAUNCHPAD_FEES_ABI,
 } from "@/lib/launchpad/constants";
 import { executeLaunchpadDeployment } from "@/lib/launchpad/deployEngine";
+import { clearFormDraft, loadFormDraft, saveFormDraft } from "@/lib/launchpad/formDraft";
 import {
   isTokenIdentityValid,
   MAX_WHOLE_TOKEN_SUPPLY,
@@ -142,24 +143,28 @@ export default function Launchpad() {
   const [deploymentLog, setDeploymentLog] = useState<string[]>([]);
   const [deployedResult, setDeployedResult] = useState<DeployedEcosystemResult | null>(null);
 
-  const [form, setForm] = useState<LaunchpadFormState>({
-    tokenName: "",
-    tokenSymbol: "",
-    decimals: 18,
-    initialSupply: "",
-    description: "",
-    selectedArchetype: "standard_governance",
-    performanceFeeBps: 1000, // 10%
-    stakingLockDays: 7,
-    earlyUnstakeFeeBps: 100, // 1%
-    enableDexSeeding: true,
-    selectedDex: "uniswap_v3",
-    pairAsset: "ETH",
-    initialEthLiquidity: MIN_SEED_ETH,
-    initialTokenLiquidityPercent: 50,
-    executionMode: "metamask",
-    recipientAdminAddress: "",
-  });
+  // Kept in session storage so a reload mid-wizard does not lose what was entered.
+  const [form, setForm] = useState<LaunchpadFormState>(() =>
+    loadFormDraft({
+      tokenName: "",
+      tokenSymbol: "",
+      decimals: 18,
+      initialSupply: "",
+      description: "",
+      selectedArchetype: "standard_governance",
+      performanceFeeBps: 1000, // 10%
+      stakingLockDays: 7,
+      earlyUnstakeFeeBps: 100, // 1%
+      enableDexSeeding: true,
+      selectedDex: "uniswap_v3",
+      pairAsset: "ETH",
+      initialEthLiquidity: MIN_SEED_ETH,
+      initialTokenLiquidityPercent: 50,
+      executionMode: "metamask",
+      recipientAdminAddress: "",
+    })
+  );
+  useEffect(() => saveFormDraft(form), [form]);
 
   const selectedArchetypeDef =
     LAUNCHPAD_ARCHETYPES.find((a) => a.id === form.selectedArchetype) ?? LAUNCHPAD_ARCHETYPES[0]!;
@@ -168,6 +173,15 @@ export default function Launchpad() {
   const selectedDexDef = DEX_VENUES.find((d) => d.id === form.selectedDex) ?? DEX_VENUES[0]!;
   const identityErrors = tokenIdentityErrors(form);
   const identityValid = isTokenIdentityValid(form);
+
+  // Steps 2-4 need a valid token identity. A direct link, bookmark or reload of a later step
+  // without one goes back to step 1 instead of letting the user configure a launch with no token.
+  useEffect(() => {
+    if (step && step !== "identity" && stepTabs[step] && !identityValid) {
+      toast.info("Start with the token identity: name, ticker and supply.");
+      navigate({ pathname: "/launchpad/identity", search: location.search }, { replace: true });
+    }
+  }, [step, identityValid, navigate, location.search]);
 
   const continueFromIdentity = () => {
     const problem = tokenIdentityProblem(form);
@@ -251,6 +265,7 @@ export default function Launchpad() {
         addLog(`Liquidity seeded on ${selectedDexDef.name}.`);
 
       setDeployedResult(result);
+      clearFormDraft();
       saveLaunchedToken({
         tokenAddress: result.tokenAddress,
         tokenName: form.tokenName,
