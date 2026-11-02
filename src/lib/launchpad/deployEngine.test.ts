@@ -218,10 +218,10 @@ describe("launchpad card settings", () => {
       deployAaveVault: false,
       deployFullSuite: false,
       tiers: [
-        { stakeRequired: supply / 10_000n, discountBps: 100 },
-        { stakeRequired: supply / 1_000n, discountBps: 250 },
-        { stakeRequired: supply / 100n, discountBps: 500 },
-        { stakeRequired: supply / 10n, discountBps: 1000 },
+        { stakeRequired: supply / 10_000n, discountBps: 1000 },
+        { stakeRequired: supply / 1_000n, discountBps: 2500 },
+        { stakeRequired: supply / 100n, discountBps: 5000 },
+        { stakeRequired: supply / 10n, discountBps: 7500 },
       ],
     });
     expect(result.stakingAddress).toBe(SUITE_ADDRESSES.staking);

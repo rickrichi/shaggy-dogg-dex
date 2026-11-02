@@ -12,10 +12,10 @@ export const MAX_STAKING_LOCK_DAYS = 365;
  * scale with supply: 0.01%, 0.1%, 1% and 10%. Ascending, because getTier() keeps the last match.
  */
 export const STAKING_TIER_SCHEDULE = [
-  { supplyDivisor: 10_000n, supplyLabel: "0.01%", discountBps: 100 },
-  { supplyDivisor: 1_000n, supplyLabel: "0.1%", discountBps: 250 },
-  { supplyDivisor: 100n, supplyLabel: "1%", discountBps: 500 },
-  { supplyDivisor: 10n, supplyLabel: "10%", discountBps: 1000 },
+  { supplyDivisor: 10_000n, supplyLabel: "0.01%", discountBps: 1000 },
+  { supplyDivisor: 1_000n, supplyLabel: "0.1%", discountBps: 2500 },
+  { supplyDivisor: 100n, supplyLabel: "1%", discountBps: 5000 },
+  { supplyDivisor: 10n, supplyLabel: "10%", discountBps: 7500 },
 ] as const;
 
 export function stakingTiers(supplyUnits: bigint) {

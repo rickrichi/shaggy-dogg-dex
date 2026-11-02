@@ -52,4 +52,10 @@ describe("stakingTierSummary", () => {
   it("describes vault discounts only for an archetype that deploys a vault", () => {
     expect(stakingTierSummary("aave_v3_yield")).toContain("vault performance fees");
   });
+
+  it("lists the vault fee discount for each tier", () => {
+    const summary = stakingTierSummary("aave_v3_yield");
+    expect(summary).toContain("stake 0.01% of supply for 10% off");
+    expect(summary).toContain("stake 10% of supply for 75% off");
+  });
 });
