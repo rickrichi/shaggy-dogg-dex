@@ -48,8 +48,13 @@ const TEMPLATES = [
   {
     name: "YieldStakingVault",
     kind: "aave-vault",
-    args: [IMMUTABLE, AAVE_POOL, AUSDC, ZERO, OWNER, OWNER],
-    required: VAULT_FUNCTIONS,
+    args: [IMMUTABLE, AAVE_POOL, AUSDC, IMMUTABLE, OWNER, OWNER],
+    required: [
+      ...VAULT_FUNCTIONS,
+      "paused()",
+      "setPaused(bool)",
+      "emergencyWithdrawFromAave(uint256)",
+    ],
   },
   {
     name: "CompoundYieldVault",

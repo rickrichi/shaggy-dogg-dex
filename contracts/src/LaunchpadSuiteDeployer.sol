@@ -14,6 +14,10 @@ import "./YieldStakingVault.sol";
  *         it creates is handed to `admin` before the constructor returns.
  */
 contract LaunchpadSuiteDeployer {
+    address private constant BASE_USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
+    address private constant BASE_AAVE_V3_POOL = 0xA238Dd80C259a72e81d7e4664a9801593F98d1c5;
+    address private constant BASE_AUSDC = 0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB;
+
     struct Config {
         address token;
         address admin;
@@ -50,6 +54,9 @@ contract LaunchpadSuiteDeployer {
         address newRouter;
 
         if (config.deployAaveVault || config.deployFullSuite) {
+            require(config.usdc == BASE_USDC, "Non-canonical USDC");
+            require(config.aavePool == BASE_AAVE_V3_POOL, "Non-canonical Aave pool");
+            require(config.aUsdc == BASE_AUSDC, "Non-canonical aUSDC");
             YieldStakingVault vault = new YieldStakingVault(
                 config.usdc,
                 config.aavePool,

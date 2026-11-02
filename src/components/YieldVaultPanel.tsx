@@ -35,7 +35,9 @@ const abi = parseAbi([
 ]);
 const configured = import.meta.env.VITE_YIELD_VAULT_ADDRESS as string | undefined;
 export const CANONICAL_YIELD_VAULT: Address = "0x5c98f6bc9d17ba0eb02e1336bdf035938f5859e5";
-// The discount-staking contract this vault was deployed with (fixed at construction).
+// This remains the retired AMUTT staking address because the vault stores it at construction.
+// The staking replacement is 0x2e7458d55de45d6a9edebed710aac9b6575d3dd1; moving the vault to it
+// requires a separate vault deployment and user-share migration.
 const VAULT_DISCOUNT_STAKING: Address = "0x055BB4eD8d5464C25D71391E940ce53CA30845fC";
 const vault: Address =
   configured && isAddress(configured) ? (configured as Address) : CANONICAL_YIELD_VAULT;

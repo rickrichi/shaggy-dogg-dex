@@ -27,7 +27,8 @@ export interface ArchetypeDefinition {
   architectureDetails: string;
   protocolsReferenced: string[];
   contractsDeployed: string[];
-  riskContagionModel: "Pooled" | "Sovereign" | "None";
+  riskContagionModel: "Pooled" | "Pooled + Sovereign" | "Sovereign" | "None";
+  riskDescription?: string;
 }
 
 export interface DexVenueDefinition {

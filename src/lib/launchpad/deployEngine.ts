@@ -20,6 +20,7 @@ import {
   DEX_VENUES,
   LAUNCHPAD_FEES_ABI,
 } from "./constants";
+import { tokenIdentityProblem } from "./identity";
 import { seedingProblem } from "./seeding";
 import { deploysStaking, deploysYieldVault, launchSettingsProblem, stakingTiers } from "./settings";
 
@@ -34,7 +35,8 @@ export async function executeLaunchpadDeployment(
   if (publicClient.chain?.id !== 8453 || (await walletClient.getChainId()) !== 8453) {
     throw new Error("Launchpad deployment requires Base Mainnet");
   }
-  if (form.decimals !== 18) throw new Error("Launchpad tokens use 18 decimals");
+  const identityProblem = tokenIdentityProblem(form);
+  if (identityProblem) throw new Error(identityProblem);
   if (
     form.enableDexSeeding &&
     form.recipientAdminAddress &&

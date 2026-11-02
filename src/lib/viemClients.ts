@@ -36,4 +36,4 @@ export const walletClient = ethProvider
 
 // Deployed contracts (Base Sepolia)
 export const SDT = { address: "0x051c758521971f5c5a84edaf18eea12854375469" as Address };
-export const FDS = { address: "0x42134ccc6c41149cf71c7b4994e33ee66758af20" as Address };
+export const FDS = { address: "0x8a765d450d38d13f5e2533d29399f743cdf23faa" as Address };

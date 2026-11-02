@@ -26,18 +26,6 @@ contract MockPool {
     }
 }
 
-/// Stands in for an attacker-chosen pool: it accepts and keeps deposits.
-contract EvilPool {
-    GovernanceToken public immutable asset;
-    constructor(GovernanceToken a) { asset = a; }
-    /// Uses the approval the vault grants before supply(), exactly as a hostile pool would.
-    function supply(address, uint256 amount, address, uint16) external {
-        require(asset.transferFrom(msg.sender, address(this), amount), "pull");
-    }
-    function withdraw(address, uint256, address) external pure returns (uint256) { return 0; }
-    function balanceOf(address) external pure returns (uint256) { return 0; }
-}
-
 contract YieldStakingVaultUnitTest {
     YvVm constant vm = YvVm(address(uint160(uint256(keccak256("hevm cheat code")))));
     GovernanceToken usdc;      // 18-decimal stand-in; vault logic is decimals-agnostic
@@ -132,11 +120,36 @@ contract YieldStakingVaultUnitTest {
         vm.prank(EVE); try vault.setAdmin(EVE) { revert("x"); } catch {}
         vm.prank(EVE); try vault.setTreasury(EVE) { revert("x"); } catch {}
         vm.prank(EVE); try vault.setPerformanceFee(1) { revert("x"); } catch {}
-        vm.prank(EVE); try vault.setAavePoolAndAToken(EVE, EVE) { revert("x"); } catch {}
+        vm.prank(EVE); try vault.setPaused(true) { revert("x"); } catch {}
+        vm.prank(EVE); try vault.emergencyWithdrawFromAave(1) { revert("x"); } catch {}
         try vault.setPerformanceFee(3001) { revert("fee cap"); } catch {}
         try vault.setTreasury(address(0)) { revert("zero treasury"); } catch {}
         vault.setPerformanceFee(3000);
         require(vault.performanceFeeBps() == 3000, "set");
+    }
+
+    function testPerformanceFeeCannotIncreaseWhileSharesExist() public {
+        uint256 shares = _deposit(ALICE, 1_000 ether);
+        try vault.setPerformanceFee(1001) { revert("active fee increase"); } catch {}
+        vault.setPerformanceFee(500);
+        require(vault.performanceFeeBps() == 500, "fee did not decrease");
+        vm.prank(ALICE);
+        vault.withdraw(shares);
+        vault.setPerformanceFee(2000);
+        require(vault.performanceFeeBps() == 2000, "empty vault cannot set future fee");
+    }
+
+    function testPauseBlocksDepositsButAllowsWithdrawalAndRecovery() public {
+        uint256 shares = _deposit(ALICE, 1_000 ether);
+        vault.setPaused(true);
+        vm.prank(BOB);
+        try vault.deposit(1 ether) { revert("deposit while paused"); } catch {}
+        uint256 recovered = vault.emergencyWithdrawFromAave(400 ether);
+        require(recovered == 400 ether, "recovery amount");
+        require(usdc.balanceOf(address(vault)) == 400 ether, "recovery left vault");
+        vm.prank(ALICE);
+        vault.withdraw(shares);
+        require(vault.totalShares() == 0, "paused withdrawal failed");
     }
 
     function testFuzzWithdrawNeverExceedsAssets(uint88 dep, uint88 gain) public {
@@ -150,8 +163,6 @@ contract YieldStakingVaultUnitTest {
         uint256 got = usdc.balanceOf(ALICE) - before;
         require(got <= d + g && got >= d, "payout between principal and principal+yield");
     }
-
-    // ---- Known issues, characterised so reviewers can reproduce them (see audit/KNOWN-ISSUES.md) ----
 
     /// Regression for the former KI-V1: with virtual shares a donation attack loses money for the attacker
     /// and does not hurt the victim.
@@ -181,19 +192,4 @@ contract YieldStakingVaultUnitTest {
         try vault.deposit(1) { revert("expected zero-share revert"); } catch {}
     }
 
-    /// KI-V2: the admin can repoint the vault at an arbitrary pool; later deposits are approved and sent to it.
-    function testKnownIssueAdminCanRedirectDepositsToArbitraryPool() public {
-        EvilPool evil = new EvilPool(usdc);
-        vault.setAavePoolAndAToken(address(evil), address(evil));
-        _deposit(ALICE, 1_000 ether);
-        require(usdc.balanceOf(address(evil)) == 1_000 ether, "funds sit in the admin-chosen pool");
-        require(vault.totalAssets() == 0, "vault accounting no longer sees them");
-    }
-
-    /// KI-V3: repointing away from a pool that still holds funds hides them from totalAssets.
-    function testKnownIssueRepointingHidesExistingFunds() public {
-        _deposit(ALICE, 1_000 ether);
-        vault.setAavePoolAndAToken(address(0), address(0));
-        require(vault.totalAssets() == 0, "assets in the old pool are invisible after repointing");
-    }
 }

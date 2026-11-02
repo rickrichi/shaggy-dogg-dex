@@ -8,6 +8,7 @@ interface YieldVm {
     function envOr(string calldata,string calldata) external returns(string memory);
     function deal(address,uint256) external;
     function prank(address) external;
+    function warp(uint256) external;
 }
 interface RealToken {
     function deposit() external payable;
@@ -24,6 +25,7 @@ contract YieldVaultBaseForkTest {
     RealToken constant usdc = RealToken(0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913);
     RealToken constant weth = RealToken(0x4200000000000000000000000000000000000006);
     RealToken constant amutt = RealToken(0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7);
+    // This contract exists at the pinned block and implements the same getTier scale the vault reads.
     FeeDiscountStaking constant staking = FeeDiscountStaking(0x055BB4eD8d5464C25D71391E940ce53CA30845fC);
     address constant treasury = address(0xFEE);
     YieldStakingVault vault;
@@ -40,14 +42,33 @@ contract YieldVaultBaseForkTest {
             0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB,address(staking),address(this),treasury);
         usdc.approve(address(vault), type(uint256).max);
     }
-    function testRealAaveSupplyAndWithdraw() public {
+    function testRealAaveSupplyYieldPartialAndFullWithdraw() public {
         uint256 beforeBalance = usdc.balanceOf(address(this));
         uint256 shares = vault.deposit(100e6);
         // At this pinned block Aave rounds a 100 USDC supply down by two micro-USDC.
         require(shares == 100e6 * 1e6 && vault.totalAssets() >= 100e6-2 && vault.totalAssets() <= 100e6, "Aave deposit");
-        vault.withdraw(shares);
+        uint256 suppliedAssets = vault.totalAssets();
+        vm.warp(block.timestamp + 30 days);
+        require(vault.totalAssets() >= suppliedAssets, "Aave yield did not accrue");
+        vault.withdraw(shares / 2);
+        require(vault.sharesOf(address(this)) == shares - (shares / 2), "partial shares");
+        vault.withdraw(shares - (shares / 2));
         require(usdc.balanceOf(address(this)) >= beforeBalance-4, "Aave withdrawal");
         require(vault.totalShares() == 0, "shares remain");
+    }
+
+    function testRealAavePauseRecoveryAndFailureConditions() public {
+        uint256 shares = vault.deposit(100e6);
+        vm.prank(address(0xBAD));
+        try vault.setPaused(true) { revert("non-admin pause"); } catch {}
+        vault.setPaused(true);
+        try vault.deposit(1e6) { revert("paused deposit"); } catch {}
+        try vault.setPerformanceFee(1001) { revert("active fee increase"); } catch {}
+        uint256 cashBefore = usdc.balanceOf(address(vault));
+        uint256 recovered = vault.emergencyWithdrawFromAave(25e6);
+        require(recovered >= 25e6-2 && usdc.balanceOf(address(vault)) >= cashBefore + 25e6-2, "Aave recovery");
+        vault.withdraw(shares);
+        require(vault.totalShares() == 0, "paused exit failed");
     }
     function testRealAmuttTierDiscountOnRealUsdcYield() public {
         // Impersonation only affects the local fork. No live wallet signs or spends.

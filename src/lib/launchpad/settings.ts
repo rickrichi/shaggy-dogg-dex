@@ -4,7 +4,7 @@ import type { ArchetypeId, LaunchpadFormState } from "./types";
 /** Contract limits: FeeDiscountStaking.sol and Yield/CompoundYieldVault.sol. */
 export const MAX_PERFORMANCE_FEE_BPS = 3000;
 export const MAX_UNSTAKE_FEE_BPS = 5000;
-/** The contract has no cap. This stops a typo from locking stakers out for years. */
+/** Matches FeeDiscountStaking.MAXIMUM_STAKE_PERIOD. */
 export const MAX_STAKING_LOCK_DAYS = 365;
 
 /**

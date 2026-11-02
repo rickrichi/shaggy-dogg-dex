@@ -96,5 +96,56 @@
     "creationHash": "0x71815c6f2d75986f4cb8e965fe4a163930ec21881a8dbcc8382f323d89ca5ca1",
     "codeHash": "0xf7b5487e787acb5f3c0f10c2e87a0b6ac1c4f2b45af9ca433c6316252bc1e1b0",
     "immutables": []
+  },
+  {
+    "kind": "staking",
+    "build": "29d5e47",
+    "creationHash": "0x2ec7903ed7df98618b0385f1a592264b6dd5d8eec46fd9238f0fb4b18fefe398",
+    "codeHash": "0x6db3339041017270cfd922e97f48e71bd1f1bdae4b397f187232af24ff451e2d",
+    "immutables": [
+      766,
+      1496,
+      2248,
+      2714
+    ]
+  },
+  {
+    "kind": "aave-vault",
+    "build": "29d5e47",
+    "creationHash": "0xa50fe2e339ca5770f658eb9a82f544a3be7ff789db5ba0abbae0a7e435a92d3c",
+    "codeHash": "0x31a808806749c5745ea207d5a584d035baa28662c96fa44219eadd601f15fdc6",
+    "immutables": [
+      402,
+      541,
+      1035,
+      1792,
+      1996,
+      2130,
+      2276,
+      2514,
+      2716,
+      3381,
+      4112,
+      4358,
+      4488
+    ]
+  },
+  {
+    "kind": "compound-vault",
+    "build": "29d5e47",
+    "creationHash": "0xe3dc19879c4b370ecafaa21e88721f767b561eb73fc055ab41f20f4779314c53",
+    "codeHash": "0x6bc0c0666af04dd1a34170c2c6ae882ed40626e522baa4b58a4205dbf5049d4b",
+    "immutables": [
+      440,
+      816,
+      1693,
+      1836,
+      1984,
+      2162,
+      2364,
+      3178,
+      3410,
+      3544
+    ]
   }
 ]

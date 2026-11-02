@@ -76,6 +76,7 @@ contract FeeDiscountStakingTest {
         vm.prank(EVE);
         try staking.setTiers(none) { revert("x"); } catch {}
         try staking.setWithdrawalFee(5001) { revert("fee cap"); } catch {}
+        try staking.setMinimumStakePeriod(365 days + 1) { revert("lock cap"); } catch {}
         try staking.setAdmin(address(0)) { revert("zero"); } catch {}
     }
 
@@ -89,25 +90,28 @@ contract FeeDiscountStakingTest {
         require(token.balanceOf(USER) - before <= a, "overpaid");
     }
 
-    // ---- Known issues, characterised so reviewers can reproduce them (see audit/KNOWN-ISSUES.md) ----
-
-    /// KI-S1: admin can brick every unstake; a period near uint256 max overflows the lock check.
-    function testKnownIssueAdminCanLockAllStakersForever() public {
+    function testAdminLockChangeDoesNotRelockExistingPosition() public {
+        staking.setMinimumStakePeriod(7 days);
         _stake(1_000 ether);
-        staking.setMinimumStakePeriod(type(uint256).max);
-        vm.warp(block.timestamp + 3650 days);
+        uint256 originalUnlock = staking.unlockTimestamp(USER);
+
+        staking.setMinimumStakePeriod(365 days);
+        require(staking.unlockTimestamp(USER) == originalUnlock, "existing unlock changed");
+
+        vm.warp(originalUnlock);
         vm.prank(USER);
-        try staking.unstake(1_000 ether) { revert("expected permanent lock"); } catch {}
+        staking.unstake(1_000 ether);
+        require(staking.stakedBalance(USER) == 0, "position remained locked");
     }
 
-    /// KI-S2: the withdrawal fee (up to 50%) applies to existing positions, and collected fees have no sweep function.
-    function testKnownIssueRetroactiveFeeAndStuckFees() public {
+    function testWithdrawalFeeChangesApplyToExistingAndAccrueCollectibleFees() public {
         _stake(1_000 ether);
         staking.setWithdrawalFee(5000);
         vm.prank(USER);
         staking.unstake(1_000 ether);
         require(token.balanceOf(address(staking)) == 500 ether, "half of the position stays in the contract");
-        require(staking.stakedBalance(USER) == 0, "position cleared; the retained fee is unaccounted");
+        require(staking.accruedFees() == 500 ether, "fee not accounted");
+        require(staking.stakedBalance(USER) == 0, "position not cleared");
     }
 
     /// KI-S3: getTier assumes ascending tiers; unsorted tiers silently reduce discounts.

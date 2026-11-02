@@ -46,6 +46,8 @@ export const LAUNCHPAD_ARCHETYPES: ArchetypeDefinition[] = [
     protocolsReferenced: ["ERC-20"],
     contractsDeployed: ["FixedSupplyToken.sol"],
     riskContagionModel: "None",
+    riskDescription:
+      "No privileged token controls or additional protocol contracts. Market, liquidity, and ordinary smart-contract risks still apply.",
   },
   {
     id: "staking_rewards",
@@ -53,12 +55,14 @@ export const LAUNCHPAD_ARCHETYPES: ArchetypeDefinition[] = [
     category: "Staking & Loyalty",
     badge: "Community Driven",
     description:
-      "Bundles your token with a single-sided staking vault featuring 4 VIP fee discount tiers and time-lock dump protection.",
+      "Adds single-sided token staking with a configurable lock and unstake fee. Four on-chain tier signals are created for compatible integrations; this staking-only package does not itself apply discounts or pay staking rewards.",
     architectureDetails:
-      "Deploys FixedSupplyToken.sol + FeeDiscountStaking.sol linked together with your lock duration, unstake fee, and four discount tiers.",
+      "Deploys FixedSupplyToken.sol + FeeDiscountStaking.sol with your initial lock, unstake fee, and four tier signals. The recipient wallet controls the staking administrator and tier administrator roles.",
     protocolsReferenced: ["Shaggy Mutt VIP Staking", "Uniswap V2 Fee Tier"],
     contractsDeployed: ["FixedSupplyToken.sol", "FeeDiscountStaking.sol"],
     riskContagionModel: "Sovereign",
+    riskDescription:
+      "Your administrator can change tiers, the lock for future stakes (hard-capped at 365 days), and the unstake fee (up to 50%, including for existing stakes), and can withdraw collected fees. Existing unlock times cannot be extended by an admin change. Adding stake resets the lock for the user's entire position.",
   },
   {
     id: "aave_v3_yield",
@@ -66,12 +70,14 @@ export const LAUNCHPAD_ARCHETYPES: ArchetypeDefinition[] = [
     category: "Next-Gen Lending",
     badge: "Deepest Liquidity",
     description:
-      "Adds a separate USDC vault that earns Aave v3 lending yield and sends performance fees to your treasury. Your token is not deposited; staking it lowers the vault fee.",
+      "Adds a pooled USDC vault that supplies deposits to Aave v3. Your token is not deposited. Performance fees are realized on withdrawal and sent to your treasury; staking your token reduces that fee.",
     architectureDetails:
-      "Deploys FixedSupplyToken + YieldStakingVault wired directly to Aave v3 Pool (0xA238Dd...8d1c5).",
+      "Deploys FixedSupplyToken + FeeDiscountStaking + YieldStakingVault with immutable Base USDC, Aave v3 Pool, and aUSDC addresses.",
     protocolsReferenced: ["Aave v3 Base", "aToken Yield Streaming"],
     contractsDeployed: ["FixedSupplyToken.sol", "YieldStakingVault.sol", "FeeDiscountStaking.sol"],
-    riskContagionModel: "Pooled",
+    riskContagionModel: "Pooled + Sovereign",
+    riskDescription:
+      "Depositors share Aave v3, USDC, smart-contract, liquidity, and pooled-accounting risks. The administrator can pause new deposits and lower the performance fee while shares exist, but cannot raise it until the vault is empty. The administrator can also change the treasury and recover Aave assets only back into the paused vault for withdrawals. Withdrawals stay available while paused.",
   },
   {
     id: "full_defi_suite",

@@ -22,6 +22,19 @@
   },
   {
     "type": "function",
+    "name": "MAXIMUM_STAKE_PERIOD",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "accruedFees",
     "inputs": [],
     "outputs": [
@@ -265,6 +278,25 @@
         "name": "",
         "type": "address",
         "internalType": "contract GovernanceToken"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "unlockTimestamp",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"

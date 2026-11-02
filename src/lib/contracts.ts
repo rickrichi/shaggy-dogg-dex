@@ -6,6 +6,7 @@ import type { Address } from "viem";
 export interface DeployedContracts {
   GovernanceToken: Address;
   FeeDiscountStaking: Address;
+  LegacyFeeDiscountStaking?: Address;
   AaveFlashBorrower?: Address;
   YieldStakingVault?: Address;
   CompoundYieldVault?: Address;
@@ -17,7 +18,8 @@ export interface DeployedContracts {
 export const CONTRACTS: Record<number, DeployedContracts> = {
   "8453": {
     GovernanceToken: "0x051c758521971f5c5a84edaf18eea12854375469",
-    FeeDiscountStaking: "0x42134ccc6c41149cf71c7b4994e33ee66758af20",
+    FeeDiscountStaking: "0x8a765d450d38d13f5e2533d29399f743cdf23faa",
+    LegacyFeeDiscountStaking: "0x42134ccc6c41149cf71c7b4994e33ee66758af20",
     AaveFlashBorrower: "0xa5b50037a8d2fda22805f750252268adaeb36480",
     YieldStakingVault: "0x8531807ef36560cd7db230c95db85791aa586dda",
     CompoundYieldVault: "0x38cccafb4ae96a8ef187f07fb17d18eb63e43782",

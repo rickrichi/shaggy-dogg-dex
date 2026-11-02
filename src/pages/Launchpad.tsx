@@ -44,6 +44,12 @@ import {
   LAUNCHPAD_FEES_ABI,
 } from "@/lib/launchpad/constants";
 import { executeLaunchpadDeployment } from "@/lib/launchpad/deployEngine";
+import {
+  isTokenIdentityValid,
+  MAX_WHOLE_TOKEN_SUPPLY,
+  tokenIdentityErrors,
+  tokenIdentityProblem,
+} from "@/lib/launchpad/identity";
 import { reportLaunch } from "@/lib/launchpad/reportLaunch";
 import { impliedLaunchPricing, MIN_SEED_ETH, seedingProblem } from "@/lib/launchpad/seeding";
 import {
@@ -61,7 +67,11 @@ import { tradeLinkFor } from "@/lib/launchpad/tradeLink";
 import NotFound from "./NotFound";
 
 import type { Hash } from "viem";
-import type { DeployedEcosystemResult, LaunchpadFormState } from "@/lib/launchpad/types";
+import type {
+  DeployedEcosystemResult,
+  DexVenueId,
+  LaunchpadFormState,
+} from "@/lib/launchpad/types";
 
 const stepTabs: Record<string, string> = {
   identity: "identity",
@@ -78,6 +88,26 @@ export function walletSupplyLabel(form: LaunchpadFormState) {
   const kept = (supply * (100 - seededPercent)) / 100;
   const amount = `${kept.toLocaleString(undefined, { maximumFractionDigits: 6 })} ${form.tokenSymbol}`;
   return seededPercent ? `${amount} (${seededPercent}% seeded)` : amount;
+}
+
+export function liquidityOwnershipLabel(selectedDex: DexVenueId) {
+  return selectedDex === "uniswap_v3"
+    ? "Immediately pair your new token with ETH and mint the Uniswap V3 NFT liquidity position into your wallet."
+    : "Immediately pair your new token with ETH and mint 100% of the initial fungible LP tokens into your wallet.";
+}
+
+export function stakingTierSummary(archetype: LaunchpadFormState["selectedArchetype"]) {
+  const tiers = STAKING_TIER_SCHEDULE.map(
+    (tier) => `stake ${tier.supplyLabel} of supply for a ${tier.discountBps / 100}% tier signal`
+  ).join(", ");
+
+  if (archetype === "staking_rewards") {
+    return `On-chain tiers: ${tiers}. Compatible integrations may read these signals; this staking-only package does not apply a discount by itself.`;
+  }
+
+  return `VIP tiers: ${STAKING_TIER_SCHEDULE.map(
+    (tier) => `stake ${tier.supplyLabel} of supply for ${tier.discountBps / 100}% off`
+  ).join(", ")} vault performance fees.`;
 }
 
 export default function Launchpad() {
@@ -136,6 +166,17 @@ export default function Launchpad() {
   const showStakingSettings = deploysStaking(form.selectedArchetype);
   const showVaultSettings = deploysYieldVault(form.selectedArchetype);
   const selectedDexDef = DEX_VENUES.find((d) => d.id === form.selectedDex) ?? DEX_VENUES[0]!;
+  const identityErrors = tokenIdentityErrors(form);
+  const identityValid = isTokenIdentityValid(form);
+
+  const continueFromIdentity = () => {
+    const problem = tokenIdentityProblem(form);
+    if (problem) {
+      toast.error(problem);
+      return;
+    }
+    setActiveTab("archetype");
+  };
 
   const handleLaunch = async () => {
     if (!isConnected || !address) {
@@ -151,18 +192,9 @@ export default function Launchpad() {
       }
       return;
     }
-    if (!form.tokenName.trim()) {
-      toast.error("Please enter a Token Name in Step 1 (Token Identity).");
-      setActiveTab("identity");
-      return;
-    }
-    if (!form.tokenSymbol.trim()) {
-      toast.error("Please enter a Token Symbol in Step 1 (Token Identity).");
-      setActiveTab("identity");
-      return;
-    }
-    if (!form.initialSupply.trim() || Number(form.initialSupply) <= 0) {
-      toast.error("Please enter a valid Total Supply in Step 1 (Token Identity).");
+    const identityProblem = tokenIdentityProblem(form);
+    if (identityProblem) {
+      toast.error(identityProblem);
       setActiveTab("identity");
       return;
     }
@@ -363,15 +395,23 @@ export default function Launchpad() {
             <Coins className="size-4 text-purple-600" />
             <span className="font-semibold">1. Token Identity</span>
           </TabsTrigger>
-          <TabsTrigger value="archetype" className="flex items-center gap-2">
+          <TabsTrigger
+            value="archetype"
+            disabled={!identityValid}
+            className="flex items-center gap-2"
+          >
             <Layers className="size-4 text-indigo-600" />
             <span className="font-semibold">2. Purpose & Lending</span>
           </TabsTrigger>
-          <TabsTrigger value="liquidity" className="flex items-center gap-2">
+          <TabsTrigger
+            value="liquidity"
+            disabled={!identityValid}
+            className="flex items-center gap-2"
+          >
             <Rocket className="size-4 text-blue-600" />
             <span className="font-semibold">3. Multi-DEX Seeder</span>
           </TabsTrigger>
-          <TabsTrigger value="review" className="flex items-center gap-2">
+          <TabsTrigger value="review" disabled={!identityValid} className="flex items-center gap-2">
             <ShieldCheck className="size-4 text-emerald-600" />
             <span className="font-semibold">4. Review & Deploy</span>
           </TabsTrigger>
@@ -399,7 +439,14 @@ export default function Launchpad() {
                     placeholder="e.g. My Token"
                     value={form.tokenName}
                     onChange={(e) => setForm({ ...form, tokenName: e.target.value })}
+                    aria-invalid={Boolean(identityErrors.tokenName)}
+                    aria-describedby={identityErrors.tokenName ? "tokenName-error" : undefined}
                   />
+                  {identityErrors.tokenName && (
+                    <p id="tokenName-error" className="text-xs font-medium text-red-600">
+                      {identityErrors.tokenName}
+                    </p>
+                  )}
                   <p className="text-xs text-gray-500">
                     The public descriptive name of your token.
                   </p>
@@ -410,11 +457,19 @@ export default function Launchpad() {
                   <Input
                     id="tokenSymbol"
                     placeholder="e.g. MYTKN"
+                    maxLength={6}
                     value={form.tokenSymbol}
                     onChange={(e) =>
                       setForm({ ...form, tokenSymbol: e.target.value.toUpperCase() })
                     }
+                    aria-invalid={Boolean(identityErrors.tokenSymbol)}
+                    aria-describedby={identityErrors.tokenSymbol ? "tokenSymbol-error" : undefined}
                   />
+                  {identityErrors.tokenSymbol && (
+                    <p id="tokenSymbol-error" className="text-xs font-medium text-red-600">
+                      {identityErrors.tokenSymbol}
+                    </p>
+                  )}
                   <p className="text-xs text-gray-500">
                     Short 2–6 character uppercase exchange ticker.
                   </p>
@@ -426,13 +481,25 @@ export default function Launchpad() {
                   <Label htmlFor="initialSupply">Total Hard-Capped Supply</Label>
                   <Input
                     id="initialSupply"
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     placeholder="e.g. 1000000"
                     value={form.initialSupply}
                     onChange={(e) => setForm({ ...form, initialSupply: e.target.value })}
+                    aria-invalid={Boolean(identityErrors.initialSupply)}
+                    aria-describedby={
+                      identityErrors.initialSupply ? "initialSupply-error" : undefined
+                    }
                   />
+                  {identityErrors.initialSupply && (
+                    <p id="initialSupply-error" className="text-xs font-medium text-red-600">
+                      {identityErrors.initialSupply}
+                    </p>
+                  )}
                   <p className="text-xs text-gray-500">
-                    100% of this supply will be minted on deployment.
+                    100% of this positive whole-number supply will be minted on deployment. Maximum:{" "}
+                    {MAX_WHOLE_TOKEN_SUPPLY.toString()}.
                   </p>
                 </div>
 
@@ -454,11 +521,16 @@ export default function Launchpad() {
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                 />
+                <p className="text-xs text-gray-500">
+                  Not stored on-chain. After launch, this text is saved in this browser and shown on
+                  Explore Launches on this device.
+                </p>
               </div>
 
               <div className="flex justify-end pt-4">
                 <Button
-                  onClick={() => setActiveTab("archetype")}
+                  onClick={continueFromIdentity}
+                  disabled={!identityValid}
                   className="bg-purple-600 text-white hover:bg-purple-700"
                 >
                   Continue to Purpose & Lending <ArrowRight className="ml-2 size-4" />
@@ -490,6 +562,7 @@ export default function Launchpad() {
                       type="button"
                       key={arch.id}
                       onClick={() => setForm({ ...form, selectedArchetype: arch.id })}
+                      aria-pressed={isSelected}
                       className={`rounded-xl border p-4 text-left transition-all duration-200 ${
                         isSelected
                           ? "border-indigo-600 bg-indigo-50/50 shadow-md ring-2 ring-indigo-500/20"
@@ -516,6 +589,11 @@ export default function Launchpad() {
                         </span>
                         <span className="text-gray-400">{arch.contractsDeployed.join(" + ")}</span>
                       </div>
+                      {arch.riskDescription && (
+                        <p className="mt-2 text-[11px] leading-relaxed text-gray-500">
+                          {arch.riskDescription}
+                        </p>
+                      )}
                     </button>
                   );
                 })}
@@ -576,7 +654,8 @@ export default function Launchpad() {
                             <span className="text-xs text-gray-500">%</span>
                           </div>
                           <p className="text-xs text-gray-500">
-                            Charged on every unstake. Withdraw collected fees from My Tokens.
+                            Charged on every unstake, including existing positions if the admin
+                            changes it later. The admin can withdraw collected fees from My Tokens.
                           </p>
                         </div>
                       </>
@@ -605,19 +684,24 @@ export default function Launchpad() {
                           />
                           <span className="text-xs text-gray-500">%</span>
                         </div>
-                        <p className="text-xs text-gray-500">Taken from vault yield only.</p>
+                        <p className="text-xs text-gray-500">
+                          Taken from vault yield on withdrawal. While shares exist, the admin may
+                          lower this fee but cannot raise it; a higher fee can be set only after the
+                          vault is empty. The admin can change the receiving treasury.
+                        </p>
                       </div>
                     )}
                   </div>
                   {showStakingSettings && (
-                    <p className="text-xs text-gray-600">
-                      VIP tiers:{" "}
-                      {STAKING_TIER_SCHEDULE.map(
-                        (tier) =>
-                          `stake ${tier.supplyLabel} of supply for ${tier.discountBps / 100}% off`
-                      ).join(", ")}{" "}
-                      vault performance fees.
-                    </p>
+                    <div className="space-y-2 text-xs text-gray-600">
+                      <p>{stakingTierSummary(form.selectedArchetype)}</p>
+                      <p>
+                        Sovereign controls: the recipient wallet can change tiers, the lock for
+                        future stakes (maximum 365 days), and the unstake fee after launch. Admin
+                        changes cannot extend an existing unlock time. Adding stake resets the lock
+                        for the entire position.
+                      </p>
+                    </div>
                   )}
                 </div>
               )}
@@ -646,8 +730,8 @@ export default function Launchpad() {
                 Multi-DEX Automated Liquidity Seeder
               </CardTitle>
               <CardDescription>
-                Optionally seed public trading liquidity on Base DEXs (Uniswap V2, PancakeSwap V2,
-                Aerodrome) right as the token is created.
+                Optionally seed public trading liquidity on Base DEXs (Uniswap V3, Uniswap V2,
+                PancakeSwap V2, Aerodrome) right as the token is created.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -657,8 +741,7 @@ export default function Launchpad() {
                     Enable Automated Liquidity Seeding
                   </h4>
                   <p className="text-xs text-gray-600">
-                    Immediately pair your new token with ETH and mint 100% of the initial LP tokens
-                    into your wallet.
+                    {liquidityOwnershipLabel(form.selectedDex)}
                   </p>
                 </div>
                 <Switch
@@ -679,6 +762,7 @@ export default function Launchpad() {
                             type="button"
                             key={venue.id}
                             onClick={() => setForm({ ...form, selectedDex: venue.id })}
+                            aria-pressed={isSelected}
                             className={`rounded-lg border p-3 text-left transition-all ${
                               isSelected
                                 ? "border-blue-600 bg-blue-50/50 shadow-sm ring-2 ring-blue-500/20"
@@ -792,6 +876,16 @@ export default function Launchpad() {
                       <strong className="font-semibold text-blue-600">Base Mainnet (8453)</strong>
                     </p>
                   </div>
+                  <div className="border-t border-gray-200 pt-3">
+                    <p className="text-xs text-gray-500">Purpose & Mission:</p>
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-gray-900">
+                      {form.description.trim() || "Not provided"}
+                    </p>
+                    <p className="mt-2 text-[11px] leading-relaxed text-gray-500">
+                      This is not stored on-chain. After launch, it is saved in this browser and
+                      displayed on Explore Launches on this device.
+                    </p>
+                  </div>
                 </div>
 
                 <div className="space-y-3 rounded-xl border border-gray-200 bg-gray-50/50 p-4">
@@ -809,6 +903,11 @@ export default function Launchpad() {
                         {selectedArchetypeDef.riskContagionModel}
                       </strong>
                     </p>
+                    {selectedArchetypeDef.riskDescription && (
+                      <p className="pt-1 text-xs leading-relaxed text-gray-500">
+                        {selectedArchetypeDef.riskDescription}
+                      </p>
+                    )}
                     {showStakingSettings && (
                       <p className="flex justify-between">
                         <span className="text-gray-500">Staking:</span>
@@ -908,15 +1007,15 @@ export default function Launchpad() {
                   </div>
 
                   <div className="flex items-center space-x-2">
-                    {form.tokenName.trim() &&
-                    form.tokenSymbol.trim() &&
-                    form.initialSupply.trim() ? (
+                    {identityValid ? (
                       <CheckCircle2 className="size-4 shrink-0 text-emerald-600" />
                     ) : (
                       <AlertCircle className="size-4 shrink-0 text-amber-500" />
                     )}
-                    <span className="font-medium text-gray-900">
-                      {form.tokenSymbol ? `${form.tokenSymbol} Configured` : "Identity Incomplete"}
+                    <span
+                      className={identityValid ? "font-medium text-gray-900" : "text-amber-800"}
+                    >
+                      {identityValid ? `${form.tokenSymbol} Configured` : "Identity Invalid"}
                     </span>
                   </div>
                 </div>
@@ -932,7 +1031,14 @@ export default function Launchpad() {
                   Back
                 </Button>
 
-                {!isConnected ? (
+                {!identityValid ? (
+                  <Button
+                    onClick={() => setActiveTab("identity")}
+                    className="w-full bg-amber-600 px-6 font-bold text-white hover:bg-amber-700 sm:w-auto"
+                  >
+                    Fix Token Identity
+                  </Button>
+                ) : !isConnected ? (
                   <div className="flex flex-col items-center gap-3 sm:flex-row">
                     <p className="text-xs font-medium text-amber-700">
                       Connect your wallet to deploy on Base:
@@ -960,7 +1066,7 @@ export default function Launchpad() {
                 ) : (
                   <Button
                     onClick={handleLaunch}
-                    disabled={isDeploying}
+                    disabled={isDeploying || !identityValid}
                     className="w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 px-8 font-bold text-white shadow-lg hover:from-purple-700 hover:to-blue-700 sm:w-auto"
                   >
                     {isDeploying ? (

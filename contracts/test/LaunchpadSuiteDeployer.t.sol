@@ -30,8 +30,9 @@ contract LaunchpadSuiteDeployerTest {
     address constant ADMIN = address(0xA);
     address constant STAKER = address(0xB);
     address constant OTHER = address(0xC);
-    address constant ASSET = address(0x1);
-    address constant POOL = address(0x2);
+    address constant ASSET = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
+    address constant POOL = 0xA238Dd80C259a72e81d7e4664a9801593F98d1c5;
+    address constant AUSDC = 0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB;
 
     FixedSupplyToken token;
 
@@ -52,7 +53,7 @@ contract LaunchpadSuiteDeployerTest {
         c.deployFullSuite = full;
         c.usdc = ASSET;
         c.aavePool = POOL;
-        c.aUsdc = address(0x3);
+        c.aUsdc = AUSDC;
         c.comet = address(0x4);
     }
 
@@ -103,6 +104,16 @@ contract LaunchpadSuiteDeployerTest {
         c = config(true, false);
         c.performanceFeeBps = 3001;
         vm.expectRevert(bytes("Max 30% fee"));
+        new LaunchpadSuiteDeployer(c);
+
+        c = config(false, false);
+        c.lockSeconds = 365 days + 1;
+        vm.expectRevert(bytes("Lock exceeds maximum"));
+        new LaunchpadSuiteDeployer(c);
+
+        c = config(true, false);
+        c.aavePool = address(0xBAD);
+        vm.expectRevert(bytes("Non-canonical Aave pool"));
         new LaunchpadSuiteDeployer(c);
     }
 

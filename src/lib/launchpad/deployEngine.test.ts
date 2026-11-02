@@ -77,6 +77,17 @@ function clients(revertWrap = false, launchFee = 0n, usdcBalance = launchFee) {
   return { wallet, publicClient, run };
 }
 describe("V3 launchpad safety", () => {
+  it("rejects invalid token identities before reading fees or deploying", async () => {
+    const { wallet, publicClient, run } = clients();
+    await expect(run({ ...form, tokenName: "" })).rejects.toThrow("Token name is required");
+    await expect(run({ ...form, tokenSymbol: "BAD-SYMBOL" })).rejects.toThrow(
+      "2–6 uppercase letters or numbers"
+    );
+    await expect(run({ ...form, initialSupply: "-100" })).rejects.toThrow("positive whole number");
+    expect(publicClient.readContract).not.toHaveBeenCalled();
+    expect(wallet.deployContract).not.toHaveBeenCalled();
+  });
+
   it("rejects a wrong chain or unsupported decimals before deploying", async () => {
     const { wallet, run } = clients();
     wallet.getChainId.mockResolvedValueOnce(1);
@@ -154,6 +165,28 @@ describe("launchpad card settings", () => {
     expect(card("standard_governance")).toContain("minus any share you seed");
     expect(card("full_defi_suite")).toContain("minus any share you seed");
     expect(card("aave_v3_yield")).toContain("Your token is not deposited");
+    const aave = LAUNCHPAD_ARCHETYPES.find((a) => a.id === "aave_v3_yield")!;
+    expect(aave.riskContagionModel).toBe("Pooled + Sovereign");
+    expect(aave.riskDescription).toContain("cannot raise");
+    expect(aave.architectureDetails).toContain("immutable Base USDC");
+  });
+
+  it("explains that the Lightweight risk label excludes privileged protocol controls", () => {
+    const lightweight = LAUNCHPAD_ARCHETYPES.find((a) => a.id === "standard_governance")!;
+    expect(lightweight.riskContagionModel).toBe("None");
+    expect(lightweight.riskDescription).toContain("No privileged token controls");
+    expect(lightweight.riskDescription).toContain("smart-contract risks still apply");
+  });
+
+  it("accurately discloses the staking-only economics and sovereign controls", () => {
+    const staking = LAUNCHPAD_ARCHETYPES.find((a) => a.id === "staking_rewards")!;
+    expect(staking.description).toContain("does not itself apply discounts");
+    expect(staking.description).toContain("does not").and.toContain("pay staking rewards");
+    expect(staking.riskContagionModel).toBe("Sovereign");
+    expect(staking.riskDescription).toContain("change tiers");
+    expect(staking.riskDescription).toContain("up to 50%");
+    expect(staking.riskDescription).toContain("Existing unlock times cannot be extended");
+    expect(staking.riskDescription).toContain("resets the lock");
   });
 
   it("offers only the four cards whose contracts do what they describe", () => {
