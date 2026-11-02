@@ -43,7 +43,12 @@ describe("LoadContractCard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.account = { address: OWNER };
-    mocks.load.mockResolvedValue({ kind: "vault", address: VAULT, label: "Aave v3 vault" });
+    mocks.load.mockResolvedValue({
+      kind: "vault",
+      address: VAULT,
+      label: "Aave v3 vault",
+      market: "aave",
+    });
   });
 
   it("asks for a wallet before offering the box", () => {

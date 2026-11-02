@@ -413,6 +413,7 @@ export default function LaunchpadExplore({ defaultTab }: LaunchpadExploreProps) 
                         <LaunchedVaultPanel
                           vaultAddress={token.vaultAddress}
                           label="Aave v3 vault"
+                          market="aave"
                         />
                       )}
 
@@ -420,6 +421,7 @@ export default function LaunchpadExplore({ defaultTab }: LaunchpadExploreProps) 
                         <LaunchedVaultPanel
                           vaultAddress={token.compoundVaultAddress}
                           label="Compound v3 vault"
+                          market="compound"
                         />
                       )}
 

@@ -169,6 +169,12 @@ describe("launchpad card settings", () => {
     expect(aave.riskContagionModel).toBe("Pooled + Sovereign");
     expect(aave.riskDescription).toContain("cannot raise");
     expect(aave.architectureDetails).toContain("immutable Base USDC");
+    const suite = LAUNCHPAD_ARCHETYPES.find((a) => a.id === "full_defi_suite")!;
+    expect(suite.riskContagionModel).toBe("Pooled + Sovereign");
+    expect(suite.riskDescription).toContain("In both vaults");
+    expect(suite.riskDescription).toContain("cannot raise");
+    expect(suite.architectureDetails).toContain("USDC Comet");
+    expect(suite.description).toContain("lowers the fee in both vaults");
   });
 
   it("explains that the Lightweight risk label excludes privileged protocol controls", () => {

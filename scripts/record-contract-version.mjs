@@ -16,7 +16,6 @@ import { base } from "viem/chains";
 
 const REGISTRY = "src/lib/launchpad/contract-versions.json";
 const OWNER = "0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98";
-const ZERO = "0x0000000000000000000000000000000000000000";
 const USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 const AAVE_POOL = "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5";
 const AUSDC = "0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB";
@@ -59,8 +58,13 @@ const TEMPLATES = [
   {
     name: "CompoundYieldVault",
     kind: "compound-vault",
-    args: [IMMUTABLE, COMET, ZERO, OWNER, OWNER],
-    required: VAULT_FUNCTIONS,
+    args: [IMMUTABLE, COMET, IMMUTABLE, OWNER, OWNER],
+    required: [
+      ...VAULT_FUNCTIONS,
+      "paused()",
+      "setPaused(bool)",
+      "emergencyWithdrawFromComet(uint256)",
+    ],
   },
   {
     name: "AtomicFlashArbitrageRouter",

@@ -85,9 +85,9 @@ export const LAUNCHPAD_ARCHETYPES: ArchetypeDefinition[] = [
     category: "Full Suite",
     badge: "Enterprise",
     description:
-      "The complete 5-contract Shaggy Dogg DeFi suite: Token + Staking + Aave Vault + Compound Vault + Aave Flash Loan Arbitrage Router. The supply goes to your wallet, minus any share you seed as liquidity.",
+      "The complete 5-contract Shaggy Dogg DeFi suite: Token + Staking + Aave Vault + Compound Vault + Aave Flash Loan Arbitrage Router. Staking your token lowers the fee in both vaults. The supply goes to your wallet, minus any share you seed as liquidity.",
     architectureDetails:
-      "All 5 core contracts deployed and cross-linked with 100% root ownership assigned to your wallet.",
+      "Deploys FixedSupplyToken + FeeDiscountStaking + an Aave v3 USDC vault and a Compound v3 USDC vault, both with immutable Base USDC, Aave v3 Pool, aUSDC and USDC Comet addresses and both discounted by the same staking tiers, + AtomicFlashArbitrageRouter. Every admin role goes to your wallet; the deployer keeps none.",
     protocolsReferenced: ["Aave v3", "Compound v3", "Uniswap V2"],
     contractsDeployed: [
       "FixedSupplyToken.sol",
@@ -96,7 +96,9 @@ export const LAUNCHPAD_ARCHETYPES: ArchetypeDefinition[] = [
       "CompoundYieldVault.sol",
       "AtomicFlashArbitrageRouter.sol",
     ],
-    riskContagionModel: "Sovereign",
+    riskContagionModel: "Pooled + Sovereign",
+    riskDescription:
+      "Each vault's depositors share its lending market (Aave v3 or Compound v3), USDC, smart-contract, liquidity, and pooled-accounting risks; the two vaults keep separate books. In both vaults the administrator can pause new deposits and lower the performance fee while shares exist, but cannot raise it until that vault is empty. The administrator can also change the treasury and recover market funds only back into the paused vault for withdrawals. Withdrawals stay available while paused. The flash arbitrage router holds no depositor funds: only the administrator and operators it approves can run it, every flash loan reverts unless Aave is repaid, and operators can move any other token the router holds.",
   },
 ];
 

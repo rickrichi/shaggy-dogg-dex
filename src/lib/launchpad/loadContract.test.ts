@@ -69,9 +69,11 @@ describe("loadManagedContract", () => {
       kind: "vault",
       address: TARGET,
       label: "Aave v3 vault",
+      market: "aave",
     });
     await expect(load({ code: codeWith(stored, "aa02") })).resolves.toMatchObject({
       label: "Compound v3 vault",
+      market: "compound",
     });
     await expect(load({ code: codeWith(stored, "aa03") })).resolves.toEqual({
       kind: "staking",

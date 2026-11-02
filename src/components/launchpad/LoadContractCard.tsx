@@ -133,7 +133,11 @@ export function LoadContractCard() {
             <div key={contract.address} className="space-y-1">
               <p className="truncate font-mono text-[11px] text-slate-500">{contract.address}</p>
               {contract.kind === "vault" ? (
-                <LaunchedVaultPanel vaultAddress={contract.address} label={contract.label} />
+                <LaunchedVaultPanel
+                  vaultAddress={contract.address}
+                  label={contract.label}
+                  market={contract.market}
+                />
               ) : contract.kind === "router" ? (
                 <FlashRouterPanel routerAddress={contract.address} />
               ) : (

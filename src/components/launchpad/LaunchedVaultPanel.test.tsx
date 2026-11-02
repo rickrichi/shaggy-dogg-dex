@@ -33,16 +33,32 @@ vi.mock("wagmi", () => ({
   useReadContracts: () => ({ data: mocks.reads, refetch: mocks.refetch }),
 }));
 
-const state = (shares: bigint, balance = 2_000_000_000n) => [
+const ADMIN = "0x00000000000000000000000000000000000ad317";
+
+const state = (
+  shares: bigint,
+  balance = 2_000_000_000n,
+  pause: { paused: boolean; admin: string } | null = null
+) => [
   { result: USDC },
   { result: 2_000_000_000n }, // totalAssets
   { result: 2_000_000_000_000_000n }, // totalShares
   { result: shares },
   { result: 1500 },
   { result: balance },
+  // Builds without a pause fail these reads.
+  pause ? { result: pause.paused } : { error: new Error("no paused()") },
+  pause ? { result: pause.admin } : { error: new Error("no admin()") },
 ];
 
-const panel = () => render(<LaunchedVaultPanel vaultAddress={VAULT} label="Aave v3 vault" />);
+const panel = (market: "aave" | "compound" = "aave") =>
+  render(
+    <LaunchedVaultPanel
+      vaultAddress={VAULT}
+      label={market === "aave" ? "Aave v3 vault" : "Compound v3 vault"}
+      market={market}
+    />
+  );
 const typeAmount = (value: string) =>
   fireEvent.change(screen.getByLabelText(/Deposit USDC/), { target: { value } });
 const click = (name: string) => fireEvent.click(screen.getByRole("button", { name }));
@@ -154,6 +170,59 @@ describe("LaunchedVaultPanel", () => {
     typeAmount("1");
     expect(disabled("Deposit")).toBe(false);
   });
+
+  it("shows no pause or admin controls for a vault build without a pause", () => {
+    panel();
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.queryByText("Vault admin")).toBeNull();
+  });
+
+  it("tells depositors when deposits are paused and blocks Deposit but not Withdraw", () => {
+    mocks.reads = state(1_000_000_000_000_000n, 2_000_000_000n, { paused: true, admin: ADMIN });
+    panel();
+    expect(screen.getByRole("status").textContent).toContain("Withdrawals still work");
+    typeAmount("10");
+    expect((screen.getByRole("button", { name: "Deposit" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Withdraw all" }) as HTMLButtonElement).disabled).toBe(
+      false
+    );
+    expect(screen.queryByText("Vault admin")).toBeNull(); // the connected wallet is not the admin
+  });
+
+  it("lets the vault admin pause deposits", async () => {
+    mocks.account = { address: ADMIN, chainId: 8453 };
+    mocks.reads = state(0n, 0n, { paused: false, admin: ADMIN });
+    panel();
+    expect(screen.queryByRole("button", { name: /Move all funds/ })).toBeNull();
+    click("Pause deposits");
+    await waitFor(() => expect(mocks.write).toHaveBeenCalledTimes(1));
+    expect(mocks.simulate.mock.calls[0]![0]).toMatchObject({
+      address: VAULT,
+      functionName: "setPaused",
+      args: [true],
+      account: ADMIN,
+    });
+  });
+
+  it.each([
+    ["aave", "Aave", "emergencyWithdrawFromAave"],
+    ["compound", "Compound", "emergencyWithdrawFromComet"],
+  ] as const)(
+    "recovers a paused %s vault's whole market position into the vault",
+    async (market, name, functionName) => {
+      mocks.account = { address: ADMIN, chainId: 8453 };
+      mocks.reads = state(0n, 0n, { paused: true, admin: ADMIN });
+      panel(market);
+      click(`Move all funds from ${name} into the vault`);
+      await waitFor(() => expect(mocks.write).toHaveBeenCalledTimes(1));
+      expect(mocks.simulate.mock.calls[0]![0]).toMatchObject({
+        address: VAULT,
+        functionName,
+        args: [2n ** 256n - 1n],
+      });
+      expect(screen.getByRole("button", { name: "Resume deposits" })).toBeTruthy();
+    }
+  );
 
   it("refuses to send from the wrong chain", async () => {
     mocks.account = { address: USER, chainId: 1 };

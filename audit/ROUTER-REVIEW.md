@@ -2,8 +2,8 @@
 
 Contract: `contracts/src/AtomicFlashArbitrageRouter.sol` (491 lines), deployed at
 `0x70315019D12A11556C837970675cDC8Fa54d186b` (admin `0x9dC0…47C98`, Aave pool `0xA238…d1c5`).
-This is a pre-audit review, not an audit. Tests: `contracts/test/AtomicFlashArbitrageRouter.t.sol` (12) and
-`contracts/test/AtomicFlashArbitrageRouterSecurity.t.sol` (new).
+This is a pre-audit review, not an audit. Tests: `contracts/test/FlashRouterBaseFork.t.sol` (12), run on a Base
+mainnet fork with real Aave v3 flash loans, Uniswap V2 and Aerodrome; no mock contracts.
 
 ## Verdict
 
@@ -30,15 +30,15 @@ more power than its name suggests. Both are trust and operations issues rather t
 
 | ID | Severity | Finding | Test |
 | --- | --- | --- | --- |
-| R1 | High (operations) | The constructor adds the **deployer** as an operator. On-chain, the only `OperatorUpdated` event ever emitted is `0xc1c3…f42B` approved at block 52,071,572, and `isOperator(0xc1c3…) == true` today. That wallet is not the admin and its key lives on a developer machine. Recommended: the admin calls `setOperator(0xc1c3…, false)` after moving the daemon to a dedicated, low-balance operator wallet. | `testKnownIssueDeployerIsOperatorFromConstructor` |
+| R1 | High (operations) | The constructor adds the **deployer** as an operator. On-chain, the only `OperatorUpdated` event ever emitted is `0xc1c3…f42B` approved at block 52,071,572, and `isOperator(0xc1c3…) == true` today. That wallet is not the admin and its key lives on a developer machine. Recommended: the admin calls `setOperator(0xc1c3…, false)` after moving the daemon to a dedicated, low-balance operator wallet. | `testInitialisationAndKnownIssueDeployerIsOperator` |
 | R2 | High (trust) | An operator can run generic steps: `target.call(callData)` with approvals for any token the router holds. It can move **any non-borrowed token balance out of the router** (the guard only checks the borrowed asset), and can pick any `profitRecipient`. The router must hold no balances between runs. | `testKnownIssueOperatorCanMoveOtherTokensHeldByRouter` |
 | R3 | Medium | Profit is `finalBalance - totalDebt`, which counts any **pre-existing balance** of the borrowed asset. Stray funds are paid to the recipient as "profit". | `testKnownIssueExistingBalanceIsPaidOutAsProfit` |
-| R4 | Medium (MEV) | Every swap uses `amountOutMin = 0`. Only the final guard protects the run, so a sandwiched run reverts or earns less, costing gas but not principal. Set `minNetProfit` above the premium and submit privately. | `testFlashLoanWithoutProfitReverts` |
+| R4 | Medium (MEV) | Every swap uses `amountOutMin = 0`. Only the final guard protects the run, so a sandwiched run reverts or earns less, costing gas but not principal. Set `minNetProfit` above the premium and submit privately. | `testAntiLossGuardRevertsALosingRouteAndAnUnmetTarget` |
 | R5 | Low | `minNetProfit` is caller-supplied and may be zero: a zero-profit run is allowed and only costs gas and premium. | n/a |
 | R6 | Low (hardening) | `tokenBBal` uses the router's return value, not a balance delta. A dishonest or fee-on-transfer router makes the later step revert; it cannot cause an overspend. | n/a |
 | R7 | Low | `setAavePool` can point at any contract; `executeOperation` trusts `msg.sender == aavePool`. A hostile pool set by the admin could call the callback directly. No escalation beyond admin power. | `testOnlyAdminControlsRolesPoolAndRescue` |
 | R8 | Low | Generic-step approvals (up to `spend`) can remain unused, leaving an allowance to a caller-chosen target. | n/a |
-| R9 | Info | `executeOperation` is not itself `nonReentrant`; it is protected because Aave calls it inside a guarded dispatcher. | `testCallbackRejectsStrangersAndWrongInitiator` |
+| R9 | Info | `executeOperation` is not itself `nonReentrant`; it is protected because Aave calls it inside a guarded dispatcher. | `testStrangersCannotDispatchOrCallTheCallback` |
 | R10 | Info | Admin transfer is single-step (a mistyped address would be permanent). Same pattern in every contract here. | n/a |
 
 ## Recommended operational changes (no redeploy needed)

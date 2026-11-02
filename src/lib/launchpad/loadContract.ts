@@ -23,7 +23,7 @@ export interface ContractVersion {
 }
 
 export type LoadedContract =
-  | { kind: "vault"; address: Address; label: string }
+  | { kind: "vault"; address: Address; label: string; market: "aave" | "compound" }
   | { kind: "staking"; address: Address; tokenSymbol: string }
   | { kind: "router"; address: Address };
 
@@ -81,8 +81,9 @@ export async function loadManagedContract(
     // Masking hides the stored asset, and the vault panels only handle USDC.
     const asset = await read<Address>(client, address, "underlyingAsset");
     if (!sameAddress(asset, BASE.USDC)) throw new LoadContractError(NOT_SUPPORTED);
-    const label = match.kind === "aave-vault" ? "Aave v3 vault" : "Compound v3 vault";
-    loaded = { kind: "vault", address, label };
+    const market = match.kind === "aave-vault" ? "aave" : "compound";
+    const label = market === "aave" ? "Aave v3 vault" : "Compound v3 vault";
+    loaded = { kind: "vault", address, label, market };
   }
 
   const admin = await read<Address>(client, address, "admin");

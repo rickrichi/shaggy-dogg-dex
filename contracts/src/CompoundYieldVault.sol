@@ -17,8 +17,8 @@ contract CompoundYieldVault {
     uint256 private constant _ENTERED = 2;
 
     IERC20 public immutable underlyingAsset;
-    IComet public comet;
-    FeeDiscountStaking public discountStaking;
+    IComet public immutable comet;
+    FeeDiscountStaking public immutable discountStaking;
 
     address public admin;
     address public treasury;
@@ -36,6 +36,7 @@ contract CompoundYieldVault {
     uint256 public totalShares;
     mapping(address => uint256) public sharesOf;
     mapping(address => uint256) public principalDeposited;
+    bool public paused;
 
     uint256 private _reentrancyStatus = _NOT_ENTERED;
 
@@ -44,7 +45,8 @@ contract CompoundYieldVault {
     event PerformanceFeeUpdated(uint16 newFeeBps);
     event AdminChanged(address indexed newAdmin);
     event TreasuryChanged(address indexed newTreasury);
-    event CometUpdated(address indexed newComet);
+    event PauseUpdated(bool paused);
+    event EmergencyCometWithdrawal(uint256 amountWithdrawn);
 
     modifier onlyAdmin() {
         require(msg.sender == admin, "Not admin");
@@ -66,16 +68,14 @@ contract CompoundYieldVault {
         address _treasury
     ) {
         require(_underlyingAsset != address(0), "Invalid asset");
+        require(_comet != address(0), "Invalid comet");
+        require(_discountStaking != address(0), "Invalid staking");
         require(_admin != address(0), "Invalid admin");
         require(_treasury != address(0), "Invalid treasury");
 
         underlyingAsset = IERC20(_underlyingAsset);
-        if (_comet != address(0)) {
-            comet = IComet(_comet);
-        }
-        if (_discountStaking != address(0)) {
-            discountStaking = FeeDiscountStaking(_discountStaking);
-        }
+        comet = IComet(_comet);
+        discountStaking = FeeDiscountStaking(_discountStaking);
         admin = _admin;
         treasury = _treasury;
     }
@@ -94,40 +94,49 @@ contract CompoundYieldVault {
 
     function setPerformanceFee(uint16 newFeeBps) external onlyAdmin {
         require(newFeeBps <= 3000, "Max 30% fee");
+        require(totalShares == 0 || newFeeBps <= performanceFeeBps, "Active fee increase");
         performanceFeeBps = newFeeBps;
         emit PerformanceFeeUpdated(newFeeBps);
     }
 
-    function setComet(address newComet) external onlyAdmin {
-        comet = IComet(newComet);
-        emit CometUpdated(newComet);
+    function setPaused(bool newPaused) external onlyAdmin {
+        paused = newPaused;
+        emit PauseUpdated(newPaused);
+    }
+
+    /// @notice While paused, pulls assets from the immutable Comet market back into this vault.
+    ///         Assets remain reserved for share withdrawals and cannot be sent to the administrator.
+    ///         Pass type(uint256).max to withdraw the vault's whole Comet balance.
+    function emergencyWithdrawFromComet(uint256 amount) external onlyAdmin nonReentrant returns (uint256 withdrawn) {
+        require(paused, "Not paused");
+        require(amount > 0, "Zero amount");
+        uint256 cashBefore = underlyingAsset.balanceOf(address(this));
+        comet.withdraw(address(underlyingAsset), amount);
+        withdrawn = underlyingAsset.balanceOf(address(this)) - cashBefore;
+        emit EmergencyCometWithdrawal(withdrawn);
     }
 
     /**
      * @notice Total underlying assets managed by vault (held in contract + supplied to Compound)
      */
     function totalAssets() public view returns (uint256) {
-        uint256 cometBalance = 0;
-        if (address(comet) != address(0)) {
-            cometBalance = comet.balanceOf(address(this));
-        }
-        return underlyingAsset.balanceOf(address(this)) + cometBalance;
+        return underlyingAsset.balanceOf(address(this)) + comet.balanceOf(address(this));
     }
 
     /**
      * @notice Deposit underlying tokens, supply to Compound v3 Comet, receive vault shares
      */
     function deposit(uint256 amount) external nonReentrant returns (uint256 shares) {
+        require(!paused, "Deposits paused");
         require(amount > 0, "Zero amount");
 
         uint256 assetsBefore = totalAssets();
 
         require(underlyingAsset.transferFrom(msg.sender, address(this), amount), "Transfer failed");
 
-        if (address(comet) != address(0)) {
-            underlyingAsset.approve(address(comet), amount);
-            comet.supply(address(underlyingAsset), amount);
-        }
+        // Supply to the immutable canonical Compound v3 market.
+        underlyingAsset.approve(address(comet), amount);
+        comet.supply(address(underlyingAsset), amount);
 
         // Virtual shares/assets (decimals offset) make a first-depositor donation unprofitable.
         shares = (amount * (totalShares + VIRTUAL_SHARES)) / (assetsBefore + VIRTUAL_ASSETS);
@@ -164,24 +173,21 @@ contract CompoundYieldVault {
         uint256 fee = 0;
         if (grossAmount > principalPortion) {
             uint256 yieldProfit = grossAmount - principalPortion;
-            uint16 effectiveFeeBps = performanceFeeBps;
-
-            if (address(discountStaking) != address(0)) {
-                uint16 discountBps = discountStaking.getTier(msg.sender);
-                effectiveFeeBps = FeeDiscountMath.discountedFee(effectiveFeeBps, discountBps);
-            }
+            // Apply the linked launch-token staking discount.
+            uint16 discountBps = discountStaking.getTier(msg.sender);
+            uint16 effectiveFeeBps = FeeDiscountMath.discountedFee(performanceFeeBps, discountBps);
 
             fee = (yieldProfit * effectiveFeeBps) / 10_000;
         }
 
         netPayout = grossAmount - fee;
 
-        if (address(comet) != address(0) && underlyingAsset.balanceOf(address(this)) < grossAmount) {
+        if (underlyingAsset.balanceOf(address(this)) < grossAmount) {
             uint256 deficit = grossAmount - underlyingAsset.balanceOf(address(this));
             comet.withdraw(address(underlyingAsset), deficit);
         }
 
-        if (fee > 0 && treasury != address(0)) {
+        if (fee > 0) {
             require(underlyingAsset.transfer(treasury, fee), "Fee transfer failed");
         }
 

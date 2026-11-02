@@ -33,6 +33,7 @@ contract LaunchpadSuiteDeployerTest {
     address constant ASSET = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
     address constant POOL = 0xA238Dd80C259a72e81d7e4664a9801593F98d1c5;
     address constant AUSDC = 0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB;
+    address constant COMET = 0xb125E6687d4313864e53df431d5425969c15Eb2F;
 
     FixedSupplyToken token;
 
@@ -54,7 +55,7 @@ contract LaunchpadSuiteDeployerTest {
         c.usdc = ASSET;
         c.aavePool = POOL;
         c.aUsdc = AUSDC;
-        c.comet = address(0x4);
+        c.comet = COMET;
     }
 
     function stakeAndExit(FeeDiscountStaking staking, uint256 amount) internal {
@@ -91,30 +92,60 @@ contract LaunchpadSuiteDeployerTest {
         assertEq(aave.treasury(), ADMIN);
         assertEq(comp.treasury(), ADMIN);
         assertEq(address(aave.discountStaking()), d.staking());
+        assertEq(address(comp.discountStaking()), d.staking());
+        assertEq(address(comp.comet()), COMET);
         assertEq(router.admin(), ADMIN);
         assertFalse(router.isOperator(address(d)));
+    }
+
+    /// External so a reverting constructor can be caught; `vm.expectRevert` before `new` ends the
+    /// test at the first revert, silently skipping every later case.
+    function deploySuite(LaunchpadSuiteDeployer.Config memory c) external returns (address) {
+        return address(new LaunchpadSuiteDeployer(c));
+    }
+
+    function expectDeployRevert(LaunchpadSuiteDeployer.Config memory c, string memory reason) internal {
+        try this.deploySuite(c) {
+            revert(string.concat("deployed despite: ", reason));
+        } catch Error(string memory actual) {
+            require(keccak256(bytes(actual)) == keccak256(bytes(reason)), actual);
+        }
     }
 
     function testInvalidSettingRevertsEverything() public {
         LaunchpadSuiteDeployer.Config memory c = config(false, false);
         c.unstakeFeeBps = 5001;
-        vm.expectRevert(bytes("Too high"));
-        new LaunchpadSuiteDeployer(c);
+        expectDeployRevert(c, "Too high");
 
         c = config(true, false);
         c.performanceFeeBps = 3001;
-        vm.expectRevert(bytes("Max 30% fee"));
-        new LaunchpadSuiteDeployer(c);
+        expectDeployRevert(c, "Max 30% fee");
 
         c = config(false, false);
         c.lockSeconds = 365 days + 1;
-        vm.expectRevert(bytes("Lock exceeds maximum"));
-        new LaunchpadSuiteDeployer(c);
+        expectDeployRevert(c, "Lock exceeds maximum");
 
         c = config(true, false);
         c.aavePool = address(0xBAD);
-        vm.expectRevert(bytes("Non-canonical Aave pool"));
-        new LaunchpadSuiteDeployer(c);
+        expectDeployRevert(c, "Non-canonical Aave pool");
+
+        c = config(true, false);
+        c.usdc = address(0xBAD);
+        expectDeployRevert(c, "Non-canonical USDC");
+
+        c = config(true, false);
+        c.aUsdc = address(0xBAD);
+        expectDeployRevert(c, "Non-canonical aUSDC");
+
+        c = config(false, true);
+        c.comet = address(0xBAD);
+        expectDeployRevert(c, "Non-canonical Comet");
+
+        c = config(false, false);
+        c.admin = address(0);
+        expectDeployRevert(c, "Invalid admin");
+
+        require(this.deploySuite(config(false, true)) != address(0), "valid full suite deploys");
     }
 
     function testAdminWithdrawsExactlyTheCollectedFees() public {

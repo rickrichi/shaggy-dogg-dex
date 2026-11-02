@@ -10,6 +10,7 @@ import "./GovernanceToken.sol";
 contract FeeDiscountStaking {
     uint256 private constant _NOT_ENTERED = 1;
     uint256 private constant _ENTERED = 2;
+    uint256 public constant MAXIMUM_STAKE_PERIOD = 365 days;
 
     // --- Structs ---
     struct Tier {
@@ -29,6 +30,7 @@ contract FeeDiscountStaking {
 
     mapping(address => uint256) public stakedBalance;
     mapping(address => uint256) public stakeTimestamp;
+    mapping(address => uint256) public unlockTimestamp;
 
     Tier[] public tiers;
     uint256 private _reentrancyStatus = _NOT_ENTERED;
@@ -92,6 +94,7 @@ contract FeeDiscountStaking {
     }
 
     function setMinimumStakePeriod(uint256 period) external onlyAdmin {
+        require(period <= MAXIMUM_STAKE_PERIOD, "Lock exceeds maximum");
         minimumStakePeriod = period;
         emit MinimumStakePeriodUpdated(period);
     }
@@ -132,6 +135,10 @@ contract FeeDiscountStaking {
         stakedBalance[msg.sender] += amount;
         // forge-lint: disable-next-line(missing-events-access-control)
         stakeTimestamp[msg.sender] = block.timestamp;
+        // Snapshot the unlock time so later admin changes only affect future stakes. Adding to an
+        // existing position intentionally resets the lock for the whole position.
+        // forge-lint: disable-next-line(missing-events-access-control)
+        unlockTimestamp[msg.sender] = block.timestamp + minimumStakePeriod;
         emit Staked(msg.sender, amount);
 
         // Guarded by nonReentrant; the linter does not model modifier state.
@@ -145,11 +152,8 @@ contract FeeDiscountStaking {
 
         // A timestamp is the intended clock for a multi-day stake lock. Miner
         // drift is negligible relative to the configured seven-day period.
-        require(
-            // forge-lint: disable-next-line(block-timestamp)
-            block.timestamp >= stakeTimestamp[msg.sender] + minimumStakePeriod,
-            "Stake locked"
-        );
+        // forge-lint: disable-next-line(block-timestamp)
+        require(block.timestamp >= unlockTimestamp[msg.sender], "Stake locked");
 
         // forge-lint: disable-next-line(missing-events-access-control)
         stakedBalance[msg.sender] -= amount;

@@ -8,8 +8,8 @@ export const MAX_UNSTAKE_FEE_BPS = 5000;
 export const MAX_STAKING_LOCK_DAYS = 365;
 
 /**
- * Same discounts as DeployEcosystem.sol. Its thresholds are fixed token amounts, so here they
- * scale with supply: 0.01%, 0.1%, 1% and 10%. Ascending, because getTier() keeps the last match.
+ * Vault fee discounts of 10%, 25%, 50% and 75% for staking 0.01%, 0.1%, 1% and 10% of supply.
+ * Thresholds scale with supply. Ascending, because getTier() keeps the last match.
  */
 export const STAKING_TIER_SCHEDULE = [
   { supplyDivisor: 10_000n, supplyLabel: "0.01%", discountBps: 1000 },
