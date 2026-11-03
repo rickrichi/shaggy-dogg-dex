@@ -1,5 +1,5 @@
 // src/pages/Liquidity.tsx - Add/Remove Liquidity
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { AlertCircle, Droplet, Layers, Loader2, Minus, Plus, Sparkles } from "lucide-react";
 import { toast } from "sonner";
@@ -34,6 +34,7 @@ import { ERC20_ABI, UNISWAP_V2_PAIR_ABI, UNISWAP_V2_ROUTER_ABI } from "@/config/
 import { getUniswapV2Factory, getUniswapV2Router } from "@/config/contracts";
 import { getTokensForChain, getWrappedNativeAddress, type Token } from "@/config/tokens";
 import { isPositiveAmount, quoteForInput } from "@/lib/amm/liquidity-input";
+import { approvalSequence } from "@/lib/approvals";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -111,8 +112,11 @@ export default function Liquidity() {
   const chainId = walletChainId ?? base.id;
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
   const publicClient = usePublicClient({ chainId });
+  // Classic V2 add/remove works on Base and Ethereum. Migration, V3 positions and LP locks are Base-only.
   const isSupportedChain = chainId === 1 || chainId === 8453;
   const isMainnet = isSupportedChain;
+  const onBase = chainId === base.id;
+  const showBaseOnlyNotice = isConnected && !onBase;
 
   const availableTokens = useMemo(() => getTokensForChain(chainId), [chainId]);
   const factoryAddress = useMemo(() => getUniswapV2Factory(chainId), [chainId]);
@@ -122,6 +126,10 @@ export default function Liquidity() {
   // State
   // ────────────────────────────────────────────────────────────────────────────
 
+  const versionFromLink = useRef(
+    typeof window !== "undefined" &&
+      ["version", "v"].some((key) => new URLSearchParams(window.location.search).has(key))
+  );
   const [protocolVersion, setProtocolVersion] = useState<ProtocolVersion>(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
@@ -132,6 +140,36 @@ export default function Liquidity() {
     }
     return "migrate";
   });
+
+  // On Ethereum only classic V2 works here, so open on it unless a link asked for another tab.
+  useEffect(() => {
+    if (chainId === 1 && !versionFromLink.current) {
+      setProtocolVersion((current) => (current === "migrate" ? "v2" : current));
+    }
+  }, [chainId]);
+
+  const baseOnlyNotice = showBaseOnlyNotice && (
+    <Alert className="border-amber-300 bg-amber-50 text-amber-900">
+      <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="font-semibold text-amber-950">Base only</p>
+          <p className="text-xs text-amber-800">
+            V2 → V3 migration, Uniswap V3 positions and LP locks run on Base. You are on{" "}
+            {chain?.name || `Chain ${chainId}`}.
+            {isSupportedChain && " Classic V2 add and remove liquidity works here."}
+          </p>
+        </div>
+        <Button
+          size="sm"
+          onClick={() => switchChain({ chainId: base.id })}
+          disabled={isSwitchingChain}
+          className="bg-amber-600 text-xs font-semibold text-white hover:bg-amber-700"
+        >
+          {isSwitchingChain ? "Switching..." : "Switch to Base"}
+        </Button>
+      </AlertDescription>
+    </Alert>
+  );
 
   const [mode, setMode] = useState<LiquidityMode>(() => {
     if (typeof window !== "undefined") {
@@ -435,36 +473,38 @@ export default function Liquidity() {
 
       // Wait for every required approval before requesting the liquidity transaction.
       if (!isNative(tokenA.address) && publicClient) {
-        const currentAllowanceA = await publicClient.readContract({
-          address: tokenA.address,
-          abi: ERC20_ABI,
-          functionName: "allowance",
-          args: [userAddress, routerAddress],
+        // A leftover allowance is reset to 0 first only for tokens (e.g. USDT) that require it.
+        const approvals = await approvalSequence(publicClient, {
+          token: tokenA.address,
+          owner: userAddress,
+          spender: routerAddress,
+          amount: amountADesired,
         });
-        if (currentAllowanceA < amountADesired) {
+        for (const value of approvals) {
           const approvalHash = await approveA({
             address: tokenA.address,
             abi: ERC20_ABI,
             functionName: "approve",
-            args: [routerAddress, amountADesired],
+            args: [routerAddress, value],
           });
           await waitForConfirmation(approvalHash);
         }
       }
 
       if (!isNative(tokenB.address) && publicClient) {
-        const currentAllowanceB = await publicClient.readContract({
-          address: tokenB.address,
-          abi: ERC20_ABI,
-          functionName: "allowance",
-          args: [userAddress, routerAddress],
+        // A leftover allowance is reset to 0 first only for tokens (e.g. USDT) that require it.
+        const approvals = await approvalSequence(publicClient, {
+          token: tokenB.address,
+          owner: userAddress,
+          spender: routerAddress,
+          amount: amountBDesired,
         });
-        if (currentAllowanceB < amountBDesired) {
+        for (const value of approvals) {
           const approvalHash = await approveB({
             address: tokenB.address,
             abi: ERC20_ABI,
             functionName: "approve",
-            args: [routerAddress, amountBDesired],
+            args: [routerAddress, value],
           });
           await waitForConfirmation(approvalHash);
         }
@@ -706,6 +746,7 @@ export default function Liquidity() {
 
       {protocolVersion === "migrate" && (
         <div className="space-y-6">
+          {baseOnlyNotice}
           <V2ToV3MigrationWizard />
           <V3LiquidityManager />
         </div>
@@ -713,6 +754,7 @@ export default function Liquidity() {
 
       {protocolVersion === "v3" && (
         <div className="space-y-6">
+          {baseOnlyNotice}
           <V3LiquidityManager />
           <V2ToV3MigrationWizard />
         </div>
@@ -993,14 +1035,14 @@ export default function Liquidity() {
                   </AlertDescription>
                 </Alert>
               )}
-              {isConnected && chainId !== 8453 && (
+              {isConnected && !isSupportedChain && (
                 <Alert className="border-blue-300 bg-blue-50 text-blue-900">
                   <AlertDescription className="flex items-center justify-between">
                     <div>
-                      <p className="font-semibold text-blue-950">Switch to Base Mainnet</p>
+                      <p className="font-semibold text-blue-950">Switch network</p>
                       <p className="text-xs text-blue-800">
-                        You are currently on {chain?.name || `Chain ${chainId}`}. Switch to Base to
-                        seed Shaggy Dogg (SD) liquidity.
+                        Classic V2 liquidity here works on Base and Ethereum. You are currently on{" "}
+                        {chain?.name || `Chain ${chainId}`}.
                       </p>
                     </div>
                     <Button
@@ -1021,7 +1063,8 @@ export default function Liquidity() {
       )}
 
       {/* ── Lock LP Tokens ─────────────────────────────────────────────────── */}
-      <div className="pt-2">
+      <div className="space-y-3 pt-2">
+        {protocolVersion === "v2" && baseOnlyNotice}
         <LpLockCard />
       </div>
     </div>

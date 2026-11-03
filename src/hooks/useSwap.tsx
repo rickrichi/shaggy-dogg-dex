@@ -19,6 +19,7 @@ import {
   v3RouteFees,
 } from "@/lib/amm/smart-routing";
 import { calculateMinimumAmountOut } from "@/lib/amm/swap-protection";
+import { approvalSequence } from "@/lib/approvals";
 
 type QuoteStatus = "IDLE" | "LOADING" | "SUCCESS" | "NO_ROUTE" | "ERROR";
 export interface BalanceData {
@@ -235,18 +236,32 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
       await assertWallet();
       if (operation === "approve") {
         if (state.sellToken.address === "native") return;
-        const { request } = await client.simulateContract({
-          address: state.sellToken.address,
-          abi: erc20Abi,
-          functionName: "approve",
-          args: [best.route.router, amount],
-          account: address,
+        // A leftover allowance is reset to 0 first only for tokens (e.g. USDT) that require it.
+        const approvals = await approvalSequence(client, {
+          token: state.sellToken.address,
+          owner: address,
+          spender: best.route.router,
+          amount,
         });
-        await assertWallet();
-        const hash = await wallet.writeContract({ ...request, chain: client.chain });
-        toast.loading(`Approval submitted: ${hash}`, { id: "smart-swap" });
-        const receipt = await client.waitForTransactionReceipt({ hash });
-        if (receipt.status !== "success") throw new Error("Approval reverted.");
+        for (const value of approvals) {
+          const { request } = await client.simulateContract({
+            address: state.sellToken.address,
+            abi: erc20Abi,
+            functionName: "approve",
+            args: [best.route.router, value],
+            account: address,
+          });
+          await assertWallet();
+          const hash = await wallet.writeContract({ ...request, chain: client.chain });
+          toast.loading(
+            value === 0n
+              ? `This token requires clearing the old allowance first: ${hash}`
+              : `Approval submitted: ${hash}`,
+            { id: "smart-swap" }
+          );
+          const receipt = await client.waitForTransactionReceipt({ hash });
+          if (receipt.status !== "success") throw new Error("Approval reverted.");
+        }
         await allowance.refetch();
       } else {
         if (!canSwap) throw new Error("Review your allowance, balance, and quote first.");
