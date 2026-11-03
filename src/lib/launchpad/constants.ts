@@ -58,7 +58,7 @@ export const LAUNCHPAD_ARCHETYPES: ArchetypeDefinition[] = [
       "Adds single-sided token staking with a configurable lock and unstake fee. Four on-chain tier signals are created for compatible integrations; this staking-only package does not itself apply discounts or pay staking rewards.",
     architectureDetails:
       "Deploys FixedSupplyToken.sol + FeeDiscountStaking.sol with your initial lock, unstake fee, and four tier signals. The recipient wallet controls the staking administrator and tier administrator roles.",
-    protocolsReferenced: ["Shaggy Mutt VIP Staking", "Uniswap V2 Fee Tier"],
+    protocolsReferenced: ["Shaggy Mutt VIP Staking"],
     contractsDeployed: ["FixedSupplyToken.sol", "FeeDiscountStaking.sol"],
     riskContagionModel: "Sovereign",
     riskDescription:

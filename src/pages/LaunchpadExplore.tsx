@@ -22,6 +22,7 @@ import { useAccount, useWalletClient } from "wagmi";
 import { FlashRouterPanel } from "@/components/launchpad/FlashRouterPanel";
 import { LaunchedVaultPanel } from "@/components/launchpad/LaunchedVaultPanel";
 import { LaunchpadNav } from "@/components/launchpad/LaunchpadNav";
+import { LaunchStakingPanel } from "@/components/launchpad/LaunchStakingPanel";
 import { LiveTokenSupply } from "@/components/launchpad/LiveTokenSupply";
 import { LoadContractCard } from "@/components/launchpad/LoadContractCard";
 import { StakingFeesPanel } from "@/components/launchpad/StakingFeesPanel";
@@ -401,6 +402,10 @@ export default function LaunchpadExplore({ defaultTab }: LaunchpadExploreProps) 
                           <Wallet className="mr-1 size-3" /> Add Wallet
                         </Button>
                       </div>
+
+                      {token.stakingAddress && (
+                        <LaunchStakingPanel stakingAddress={token.stakingAddress} />
+                      )}
 
                       {token.stakingAddress && (
                         <StakingFeesPanel

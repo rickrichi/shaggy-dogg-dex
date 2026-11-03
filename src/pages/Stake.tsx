@@ -1,9 +1,11 @@
 // src/pages/Stake.tsx
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { ArrowRight, Award, Sparkles } from "lucide-react";
+import { isAddress } from "viem";
 
 import { LaunchpadNav } from "@/components/launchpad/LaunchpadNav";
+import { LaunchStakingPanel } from "@/components/launchpad/LaunchStakingPanel";
 import { MrwdLpStakerPanel } from "@/components/MrwdLpStakerPanel";
 import { MrwdProStakingPanel } from "@/components/MrwdProStakingPanel";
 import { RouterOperatorPanel } from "@/components/RouterOperatorPanel";
@@ -21,7 +23,33 @@ const PLANNED_FEATURES = [
   "Liquidity monitoring and alerts",
 ];
 
+/** A launched token's staking contract, opened from a link its creator shared. */
+function SharedLaunchStaking({ contract }: { contract: string }) {
+  return (
+    <Card className="border-purple-200 shadow-sm">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg">Launched token staking</CardTitle>
+        <CardDescription>
+          A token launched on the Shaggy Dogg launchpad. Staking uses ordinary Base transactions
+          from your wallet.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isAddress(contract, { strict: false }) ? (
+          <LaunchStakingPanel stakingAddress={contract} variant="page" />
+        ) : (
+          <p role="status" className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+            This link does not contain a valid contract address.
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function Stake() {
+  const [searchParams] = useSearchParams();
+  const sharedContract = searchParams.get("contract");
   return (
     <div className="min-h-[calc(100vh-80px)] space-y-6 p-4 duration-500 animate-in fade-in md:p-8">
       {/* Sub-Navigation Bar */}
@@ -42,6 +70,8 @@ export default function Stake() {
           </p>
         </div>
       </div>
+
+      {sharedContract !== null && <SharedLaunchStaking contract={sharedContract} />}
 
       {/* Cross-Link Banner */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-indigo-200 bg-gradient-to-r from-indigo-50/80 via-purple-50/60 to-white p-4 shadow-sm">

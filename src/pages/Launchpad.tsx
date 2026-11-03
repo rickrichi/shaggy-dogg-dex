@@ -62,6 +62,7 @@ import {
   MAX_UNSTAKE_FEE_BPS,
   STAKING_TIER_SCHEDULE,
 } from "@/lib/launchpad/settings";
+import { launchStakingLink } from "@/lib/launchpad/stakingContract";
 import { saveLaunchedToken } from "@/lib/launchpad/storage";
 import { tradeLinkFor } from "@/lib/launchpad/tradeLink";
 
@@ -1154,6 +1155,16 @@ export default function Launchpad() {
                           className="font-mono text-emerald-700 underline"
                         >
                           {deployedResult.stakingAddress}
+                        </a>
+                        <br />
+                        <strong>Staking page for holders:</strong>{" "}
+                        <a
+                          href={launchStakingLink(deployedResult.stakingAddress)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="break-all font-mono text-emerald-700 underline"
+                        >
+                          {launchStakingLink(deployedResult.stakingAddress)}
                         </a>
                       </p>
                     )}
