@@ -1,5 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
-
+/* Inter and JetBrains Mono are bundled with the site (src/main.tsx), so no request goes to Google. */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

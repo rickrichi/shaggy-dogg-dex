@@ -308,7 +308,9 @@ export function useCeFiMatrixFeeds() {
 
     const connectBinance = () => {
       try {
-        ws = new WebSocket("wss://stream.binance.com:9443/ws");
+        // Binance's market-data-only stream: same prices as stream.binance.com, which refuses
+        // connections from restricted regions such as the US (HTTP 451).
+        ws = new WebSocket("wss://data-stream.binance.vision/ws");
 
         ws.onopen = () => {
           if (disposed) return;
