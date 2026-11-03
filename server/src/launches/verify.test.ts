@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+
 import { keccak256, size, zeroAddress, type Hex } from 'viem'
 import { describe, expect, it } from 'vitest'
 
@@ -6,6 +8,7 @@ import {
   BASE_V3_FACTORY,
   BASE_WETH,
   FIXED_SUPPLY_TOKEN_CREATION,
+  FIXED_SUPPLY_TOKEN_TEMPLATES,
   LAUNCH_POOL_FEE,
   LaunchVerificationError,
   verifyLaunch,
@@ -15,6 +18,18 @@ describe('launch verification', () => {
   it('pins the template to the compiled FixedSupplyToken creation bytecode', () => {
     expect(size(TEMPLATE)).toBe(FIXED_SUPPLY_TOKEN_CREATION.size)
     expect(keccak256(TEMPLATE)).toBe(FIXED_SUPPLY_TOKEN_CREATION.keccak256)
+  })
+
+  it('still counts a launch from the previous template build', async () => {
+    const previous = (
+      JSON.parse(readFileSync(new URL('./fixedSupplyToken.v1.json', import.meta.url), 'utf8')) as { bytecode: Hex }
+    ).bytecode
+    expect(FIXED_SUPPLY_TOKEN_TEMPLATES[0]).toEqual(FIXED_SUPPLY_TOKEN_CREATION)
+    expect(FIXED_SUPPLY_TOKEN_TEMPLATES[1]).toEqual({ size: size(previous), keccak256: keccak256(previous) })
+    await expect(verifyLaunch(chain({ input: creationInput(previous) }).client, HASH)).resolves.toMatchObject({
+      tokenAddress: TOKEN,
+      symbol: 'MTT',
+    })
   })
 
   it('reads a launch of the template from the chain, including its 1% WETH pool', async () => {

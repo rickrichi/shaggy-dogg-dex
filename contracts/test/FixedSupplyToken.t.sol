@@ -49,6 +49,20 @@ contract FixedSupplyTokenTest {
         try new FixedSupplyToken("x", "x", address(0), 1) { revert("zero recipient"); } catch {}
         try new FixedSupplyToken("x", "x", address(1), 0) { revert("zero supply"); } catch {}
     }
+    function testRejectsSendingTokensToTheTokenContract() public {
+        bytes32 reason = keccak256("Transfer to token contract");
+        try token.transfer(address(token), 1 ether) { revert("transfer to self accepted"); }
+        catch Error(string memory r) { require(keccak256(bytes(r)) == reason, r); }
+
+        token.approve(BOB, 5 ether);
+        vm.prank(BOB);
+        try token.transferFrom(address(this), address(token), 1 ether) { revert("transferFrom to self accepted"); }
+        catch Error(string memory r) { require(keccak256(bytes(r)) == reason, r); }
+
+        require(token.balanceOf(address(token)) == 0, "nothing stuck in the token");
+        require(token.balanceOf(address(this)) == SUPPLY, "sender kept everything");
+        require(token.allowance(address(this), BOB) == 5 ether, "failed transferFrom spent no allowance");
+    }
     function testFuzzTransferConservesSupply(uint96 amount) public {
         uint256 a = uint256(amount) % SUPPLY;
         require(token.transfer(BOB, a), "t");
