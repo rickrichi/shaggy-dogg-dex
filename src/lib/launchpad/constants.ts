@@ -1,16 +1,13 @@
 // src/lib/launchpad/constants.ts
-import type { Address } from "viem";
-import type { ArchetypeDefinition, DexVenueDefinition } from "./types";
+import { type Address, parseAbi } from "viem";
+
+import type { ArchetypeDefinition, DexVenueDefinition, RetiredArchetypeId } from "./types";
 
 export const CANONICAL_BASE_CONTRACTS = {
   WETH: "0x4200000000000000000000000000000000000006" as Address,
   USDC: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as Address,
   AaveV3Pool: "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5" as Address,
   aUSDC: "0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB" as Address,
-  MoonwellComptroller: "0xFbb21d0380bee3312b33C4353c7936a0F13ef26C" as Address,
-  MoonwellWethMarket: "0x628ff693426583D9a7FB391E54366292F509D457" as Address,
-  MoonwellUsdcMarket: "0xeDC817a28e8B93Ca120334C48696d70d740E7D2B" as Address,
-  MorphoBlue: "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb" as Address,
   UniswapV2Router: "0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24" as Address,
   UniswapV2Factory: "0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6" as Address,
   UniswapV3Router: "0x2626664c2603336E57B271c5C0b26F421741e481" as Address,
@@ -21,10 +18,20 @@ export const CANONICAL_BASE_CONTRACTS = {
   PancakeSwapV2Factory: "0x02a84c1b3BBD7401a5f7fa98a384EBC70bB5749E" as Address,
   AerodromeRouter: "0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43" as Address,
   AerodromeFactory: "0x420DD381b31aEf6683db6B902084cB0FFECe40Da" as Address,
-  AtomicFlashArbitrageRouter: "0x70315019d12a11556c837970675cdc8fa54d186b" as Address,
+  AtomicFlashArbitrageRouter: "0xdF77eBFB6e0468aE4e94b13Fc9881427B82178Fd" as Address,
   CompoundComet: "0xb125E6687d4313864e53df431d5425969c15Eb2F" as Address,
   DeployerAdminWallet: "0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98" as Address,
+  LaunchpadFees: "0x2443C90eB4eA63b74383a5f0dB36c95A1091b68b" as Address,
 };
+
+export const LAUNCHPAD_FEES_ABI = parseAbi([
+  "function feeAmount() view returns (uint256)",
+  "function payLaunchFee(address project) external",
+]);
+
+export const AERODROME_ROUTER_ABI = parseAbi([
+  "function addLiquidityETH(address token, bool stable, uint256 amountTokenDesired, uint256 amountTokenMin, uint256 amountETHMin, address to, uint256 deadline) payable returns (uint256, uint256, uint256)",
+]);
 
 export const LAUNCHPAD_ARCHETYPES: ArchetypeDefinition[] = [
   {
@@ -33,12 +40,14 @@ export const LAUNCHPAD_ARCHETYPES: ArchetypeDefinition[] = [
     category: "Standard",
     badge: "Lightweight",
     description:
-      "Fixed-supply standard token: the whole supply is created once at deployment, with no mint function, owner, or admin. Ready for DEX trading and wallet custody.",
+      "Fixed-supply standard token: the whole supply is created once at deployment, with no mint function, owner, or admin. It goes to your wallet, minus any share you seed as liquidity.",
     architectureDetails:
-      "Direct deployment of FixedSupplyToken.sol with 100% genesis allocation to creator.",
+      "Direct deployment of FixedSupplyToken.sol. The supply goes to your wallet, then any share you seed moves into the pool.",
     protocolsReferenced: ["ERC-20"],
     contractsDeployed: ["FixedSupplyToken.sol"],
     riskContagionModel: "None",
+    riskDescription:
+      "No privileged token controls or additional protocol contracts. Market, liquidity, and ordinary smart-contract risks still apply.",
   },
   {
     id: "staking_rewards",
@@ -46,59 +55,14 @@ export const LAUNCHPAD_ARCHETYPES: ArchetypeDefinition[] = [
     category: "Staking & Loyalty",
     badge: "Community Driven",
     description:
-      "Bundles your token with a single-sided staking vault featuring 4 VIP fee discount tiers and time-lock dump protection.",
+      "Adds single-sided token staking with a configurable lock and unstake fee. Four on-chain tier signals are created for compatible integrations; this staking-only package does not itself apply discounts or pay staking rewards.",
     architectureDetails:
-      "Deploys FixedSupplyToken.sol + FeeDiscountStaking.sol linked together with configurable lock duration and early exit fees.",
+      "Deploys FixedSupplyToken.sol + FeeDiscountStaking.sol with your initial lock, unstake fee, and four tier signals. The recipient wallet controls the staking administrator and tier administrator roles.",
     protocolsReferenced: ["Shaggy Mutt VIP Staking", "Uniswap V2 Fee Tier"],
     contractsDeployed: ["FixedSupplyToken.sol", "FeeDiscountStaking.sol"],
     riskContagionModel: "Sovereign",
-  },
-  {
-    id: "moonwell_lending",
-    name: "Moonwell Base Flagship Money Market",
-    category: "Next-Gen Lending",
-    badge: "Base Native Flagship",
-    description:
-      "Connects your token to Moonwell—the dominant native lending protocol on Base Layer 2. Enables high-speed, sub-cent lending.",
-    architectureDetails:
-      "Deploys FixedSupplyToken + IsolatedLendingVault wired to Moonwell mToken markets with creator treasury fee streaming.",
-    protocolsReferenced: ["Moonwell Finance", "Compound v2/v3 Architecture", "Base L2"],
-    contractsDeployed: [
-      "FixedSupplyToken.sol",
-      "IsolatedLendingVault.sol",
-      "FeeDiscountStaking.sol",
-    ],
-    riskContagionModel: "Pooled",
-  },
-  {
-    id: "morpho_blue_isolated",
-    name: "Morpho Blue Isolated Risk Primitive",
-    category: "Isolated Risk",
-    badge: "Zero Contagion",
-    description:
-      "Next-generation isolated market architecture. Prevents bad-debt spillover by decoupling collateral into independent 2-asset markets.",
-    architectureDetails:
-      "Deploys FixedSupplyToken + IsolatedLendingVault with custom LLTV (Liquidation Loan-to-Value) parameters targeting Morpho Blue.",
-    protocolsReferenced: ["Morpho Blue", "ERC-4626 Vault Standard", "Base L2"],
-    contractsDeployed: ["FixedSupplyToken.sol", "IsolatedLendingVault.sol"],
-    riskContagionModel: "Isolated",
-  },
-  {
-    id: "silo_isolated_vault",
-    name: "Silo / Sovereign ERC-4626 Vault",
-    category: "Isolated Risk",
-    badge: "Risk Isolated",
-    description:
-      "Autonomous dual-asset bridge market (Token + USDC or Token + ETH). Localized liquidations guarantee zero systemic contagion.",
-    architectureDetails:
-      "Deploys FixedSupplyToken + IsolatedLendingVault acting as a sovereign standalone lending pool for your token.",
-    protocolsReferenced: ["Silo Finance Concept", "ERC-4626 Tokenized Vaults"],
-    contractsDeployed: [
-      "FixedSupplyToken.sol",
-      "IsolatedLendingVault.sol",
-      "FeeDiscountStaking.sol",
-    ],
-    riskContagionModel: "Isolated",
+    riskDescription:
+      "Your administrator can change tiers, the lock for future stakes (hard-capped at 365 days), and the unstake fee (up to 50%, including for existing stakes), and can withdraw collected fees. Existing unlock times cannot be extended by an admin change. Adding stake resets the lock for the user's entire position.",
   },
   {
     id: "aave_v3_yield",
@@ -106,25 +70,14 @@ export const LAUNCHPAD_ARCHETYPES: ArchetypeDefinition[] = [
     category: "Next-Gen Lending",
     badge: "Deepest Liquidity",
     description:
-      "Supplies stablecoin/ETH reserves to Aave v3 on Base to capture institutional lending APR while streaming performance fees to treasury.",
+      "Adds a pooled USDC vault that supplies deposits to Aave v3. Your token is not deposited. Performance fees are realized on withdrawal and sent to your treasury; staking your token reduces that fee.",
     architectureDetails:
-      "Deploys FixedSupplyToken + YieldStakingVault wired directly to Aave v3 Pool (0xA238Dd...8d1c5).",
+      "Deploys FixedSupplyToken + FeeDiscountStaking + YieldStakingVault with immutable Base USDC, Aave v3 Pool, and aUSDC addresses.",
     protocolsReferenced: ["Aave v3 Base", "aToken Yield Streaming"],
     contractsDeployed: ["FixedSupplyToken.sol", "YieldStakingVault.sol", "FeeDiscountStaking.sol"],
-    riskContagionModel: "Pooled",
-  },
-  {
-    id: "fluid_hybrid_amm",
-    name: "Fluid AMM-Lending Hybrid Engine",
-    category: "Next-Gen Lending",
-    badge: "Capital Efficient",
-    description:
-      "Merges automated market making with lending. LP positions simultaneously capture DEX swap fees while acting as collateral.",
-    architectureDetails:
-      "Deploys FixedSupplyToken + FeeDiscountStaking + Uniswap V2 LP Yield Vault.",
-    protocolsReferenced: ["Fluid Concept", "Uniswap V2 LP", "Dual Yield Engine"],
-    contractsDeployed: ["FixedSupplyToken.sol", "IsolatedLendingVault.sol", "Uniswap V2 Pair"],
-    riskContagionModel: "Sovereign",
+    riskContagionModel: "Pooled + Sovereign",
+    riskDescription:
+      "Depositors share Aave v3, USDC, smart-contract, liquidity, and pooled-accounting risks. The administrator can pause new deposits and lower the performance fee while shares exist, but cannot raise it until the vault is empty. The administrator can also change the treasury and recover Aave assets only back into the paused vault for withdrawals. Withdrawals stay available while paused.",
   },
   {
     id: "full_defi_suite",
@@ -132,20 +85,30 @@ export const LAUNCHPAD_ARCHETYPES: ArchetypeDefinition[] = [
     category: "Full Suite",
     badge: "Enterprise",
     description:
-      "The complete 5-contract Shaggy Dogg DeFi suite: Token + Staking + Aave Vault + Compound Vault + Uncollateralized Flash Loan Arbitrageur.",
+      "The complete 5-contract Shaggy Dogg DeFi suite: Token + Staking + Aave Vault + Compound Vault + Aave Flash Loan Arbitrage Router. Staking your token lowers the fee in both vaults. The supply goes to your wallet, minus any share you seed as liquidity.",
     architectureDetails:
-      "All 5 core contracts deployed and cross-linked with 100% root ownership assigned to your wallet.",
-    protocolsReferenced: ["Aave v3", "Compound v3", "Uniswap V2", "Moonwell"],
+      "Deploys FixedSupplyToken + FeeDiscountStaking + an Aave v3 USDC vault and a Compound v3 USDC vault, both with immutable Base USDC, Aave v3 Pool, aUSDC and USDC Comet addresses and both discounted by the same staking tiers, + AtomicFlashArbitrageRouter. Every admin role goes to your wallet; the deployer keeps none.",
+    protocolsReferenced: ["Aave v3", "Compound v3", "Uniswap V2"],
     contractsDeployed: [
       "FixedSupplyToken.sol",
       "FeeDiscountStaking.sol",
       "YieldStakingVault.sol",
       "CompoundYieldVault.sol",
-      "AaveFlashBorrower.sol",
+      "AtomicFlashArbitrageRouter.sol",
     ],
-    riskContagionModel: "Sovereign",
+    riskContagionModel: "Pooled + Sovereign",
+    riskDescription:
+      "Each vault's depositors share its lending market (Aave v3 or Compound v3), USDC, smart-contract, liquidity, and pooled-accounting risks; the two vaults keep separate books. In both vaults the administrator can pause new deposits and lower the performance fee while shares exist, but cannot raise it until that vault is empty. The administrator can also change the treasury and recover market funds only back into the paused vault for withdrawals. Withdrawals stay available while paused. The flash arbitrage router holds no depositor funds: only the administrator and operators it approves can run it, every flash loan reverts unless Aave is repaid, and operators can move any other token the router holds.",
   },
 ];
+
+/** Display names for tokens launched before these cards were retired. */
+export const RETIRED_ARCHETYPE_NAMES: Record<RetiredArchetypeId, string> = {
+  moonwell_lending: "Isolated Vault (retired)",
+  morpho_blue_isolated: "Isolated Vault (retired)",
+  silo_isolated_vault: "Isolated Vault (retired)",
+  fluid_hybrid_amm: "Isolated Vault (retired)",
+};
 
 export const DEX_VENUES: DexVenueDefinition[] = [
   {

@@ -20,6 +20,7 @@ import { mountFallback } from './routes/fallback.js'
 import { mountHealth } from './routes/health.js'
 import { mountLaunchRoutes } from './routes/launches.js'
 import { mountPriceRoutes } from './routes/prices.js'
+import { mountPaymasterRoutes } from './routes/paymaster.js'
 import { mountQuoteRoutes } from './routes/quotes.js'
 import { mountSupabaseDbWebhook } from './routes/webhooks/supabase_db.js'
 import { normalizeIp } from './utils/ip.js'
@@ -75,6 +76,13 @@ mountQuoteRoutes(app) // POST /api/quote
 
 // ----- CeDeFi Bridge Routes -----
 mountCeDeFiRoutes(app) // GET /api/cedefi/status, GET /api/cedefi/quote
+
+app.use('/api/paymaster/*', rateLimit({
+  windowMs: 60_000,
+  max: 20,
+  identify: (ip) => `paymaster:${normalizeIp(ip)}`,
+}))
+mountPaymasterRoutes(app, env)
 
 // ----- Admin panel (wallet sign-in, local SQLite) -----
 mountAdminRoutes(app, {

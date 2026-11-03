@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   AlertCircle,
@@ -70,8 +70,31 @@ export const WalletConnect = () => {
     };
   }, [metaMaskConnector, isOpen]);
 
+  // If the WalletConnect/Reown modal never appears (e.g. its remote config fetch is blocked or
+  // rejected), wagmi's own onError doesn't fire — the connector is still "pending" as far as
+  // wagmi knows. Without this, closing our modal below leaves the user on a disabled
+  // "Connecting..." button with nothing else visible, forever.
+  //
+  // The fallback timer is cleared the moment Reown's own modal (<w3m-modal> / <appkit-modal>)
+  // actually appears in the DOM — not when the connection completes. Scanning a QR code
+  // legitimately takes people well over 15 seconds; this only fires when NO modal ever showed.
+  const walletConnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const walletConnectObserverRef = useRef<MutationObserver | null>(null);
+  const clearWalletConnectWatch = () => {
+    if (walletConnectTimeoutRef.current) {
+      clearTimeout(walletConnectTimeoutRef.current);
+      walletConnectTimeoutRef.current = null;
+    }
+    if (walletConnectObserverRef.current) {
+      walletConnectObserverRef.current.disconnect();
+      walletConnectObserverRef.current = null;
+    }
+  };
+  useEffect(() => clearWalletConnectWatch, []);
+
   useEffect(() => {
     if (isConnected) {
+      clearWalletConnectWatch();
       setIsOpen(false);
       setConnectError(null);
       setShowExtensionHelp(false);
@@ -92,10 +115,38 @@ export const WalletConnect = () => {
     }
 
     setIsOpen(false);
+    clearWalletConnectWatch();
+
+    // Reown mounts <w3m-modal>/<appkit-modal> into the DOM at init time regardless of whether
+    // it's showing anything — it only adds the "open" class when actually visible. Checking for
+    // the element's mere presence (rather than .open) would clear this watch immediately and
+    // defeat the whole fallback.
+    const modalAppeared = () =>
+      Boolean(document.querySelector("w3m-modal.open, appkit-modal.open"));
+
+    if (!modalAppeared()) {
+      const observer = new MutationObserver(() => {
+        if (modalAppeared()) clearWalletConnectWatch();
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+      walletConnectObserverRef.current = observer;
+
+      walletConnectTimeoutRef.current = setTimeout(() => {
+        clearWalletConnectWatch();
+        setConnectError(
+          "The WalletConnect QR code didn't load in time. This usually means its configuration " +
+            "couldn't be fetched (network or browser restriction). Try again, or use MetaMask " +
+            "Browser Extension / Coinbase Wallet instead."
+        );
+        setIsOpen(true);
+      }, 15000);
+    }
+
     connect(
       { connector: target },
       {
         onError: (err) => {
+          clearWalletConnectWatch();
           setConnectError(err.message || "Failed to start WalletConnect pairing.");
           setIsOpen(true);
         },

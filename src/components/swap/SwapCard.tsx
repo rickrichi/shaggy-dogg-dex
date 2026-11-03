@@ -1,11 +1,11 @@
 // src/components/swap/SwapCard.tsx
-import { memo, useState } from "react";
+import { memo, useEffect, useState } from "react";
 
 import { ArrowUpDown, CheckCircle2, ExternalLink, Loader2, Settings } from "lucide-react";
 import { formatUnits } from "viem";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -23,8 +23,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { getUniswapV3Deployment } from "@/config/contracts";
 import { HIGH_PRICE_IMPACT, SEVERE_PRICE_IMPACT } from "@/lib/amm/price-impact";
+import { routeVenuesForChain, type SmartRouteVenue } from "@/lib/amm/smart-routing";
 import { formatSwapAmount } from "@/lib/format-swap-amount";
 
 import type { Token } from "@/config/tokens";
@@ -42,6 +42,8 @@ interface SwapCardProps {
   onSettingsChange: (open: boolean) => void;
 }
 
+const BEST_PRICE = "best-price";
+
 export const SwapCard = memo<SwapCardProps>(
   ({
     swap,
@@ -56,6 +58,11 @@ export const SwapCard = memo<SwapCardProps>(
   }) => {
     const { state, balances, approval, swap: swapActions, actions, quote } = swap;
     const [reviewId, setReviewId] = useState<string | null>(null);
+    const [clock, setClock] = useState(Date.now);
+    useEffect(() => {
+      const timer = window.setInterval(() => setClock(Date.now()), 1_000);
+      return () => window.clearInterval(timer);
+    }, []);
     const highImpact = quote.priceImpact !== null && quote.priceImpact >= HIGH_PRICE_IMPACT;
     const severeImpact = quote.priceImpact !== null && quote.priceImpact >= SEVERE_PRICE_IMPACT;
     const reviewIsCurrent = reviewId === quote.id && quote.status === "SUCCESS";
@@ -76,11 +83,14 @@ export const SwapCard = memo<SwapCardProps>(
       if (swapActions.isSwapping) return "Swapping...";
       if (!state.sellAmount) return "Enter amount";
       if (quote.status === "LOADING") return "Fetching best price...";
+      if (quote.status === "NO_ROUTE" && quote.preferredVenue)
+        return `No route on ${quote.preferredVenue}`;
       if (quote.status === "NO_ROUTE" || quote.status === "ERROR") return "Route unavailable";
       if (quote.status === "SUCCESS" && quote.priceImpact === null) return "Impact unavailable";
       if (approval.needed) return "Approve token first";
       if (!swapActions.canSwap) return "Insufficient balance";
-      return highImpact ? "Review high-impact swap" : "Swap";
+      if (highImpact) return "Review high-impact swap";
+      return quote.preferredVenue ? `Swap on ${quote.preferredVenue}` : "Swap";
     })();
 
     const handlePrimaryAction = () => {
@@ -152,7 +162,7 @@ export const SwapCard = memo<SwapCardProps>(
         </Dialog>
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg font-bold">Swap</CardTitle>
+            <h2 className="text-lg font-bold leading-none tracking-tight text-foreground">Swap</h2>
             <Dialog open={showSettings} onOpenChange={onSettingsChange}>
               <DialogTrigger asChild>
                 <Button
@@ -167,6 +177,9 @@ export const SwapCard = memo<SwapCardProps>(
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Swap Settings</DialogTitle>
+                  <DialogDescription>
+                    Choose how much price movement you will accept before this swap reverts.
+                  </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div>
@@ -323,40 +336,71 @@ export const SwapCard = memo<SwapCardProps>(
             </div>
           </div>
 
+          {/* Route Choice */}
+          <div className="space-y-2">
+            <Label htmlFor="swap-route" className="text-sm font-medium text-gray-700">
+              Route
+            </Label>
+            <Select
+              value={quote.preferredVenue ?? BEST_PRICE}
+              onValueChange={(value) =>
+                actions.setPreferredVenue(value === BEST_PRICE ? null : (value as SmartRouteVenue))
+              }
+            >
+              <SelectTrigger id="swap-route" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={BEST_PRICE}>Best price (automatic)</SelectItem>
+                {routeVenuesForChain(state.sellToken.chainId).map((venue) => {
+                  const unavailable = !!quote.routedVenues && !quote.routedVenues.includes(venue);
+                  const unsafe = quote.excludedVenues?.includes(venue);
+                  return (
+                    <SelectItem key={venue} value={venue} disabled={unavailable}>
+                      {venue}
+                      {unsafe ? " (excluded: unsafe deviation)" : unavailable ? " (no route)" : ""}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+            {quote.status === "NO_ROUTE" && quote.preferredVenue && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => actions.setPreferredVenue(null)}
+              >
+                Switch to best price
+              </Button>
+            )}
+          </div>
+
           {/* Quote Information */}
           {quote.comparisonText && (
-            <p className="text-sm text-purple-800">{quote.comparisonText}</p>
+            <p
+              className={`text-sm ${(quote.venueShortfallPercent ?? 0) >= 1 ? "font-medium text-orange-700" : "text-purple-800"}`}
+            >
+              {quote.comparisonText}
+            </p>
           )}
-          {quote.bestVenue && (
-            <div className="text-xs text-slate-600">
-              <p>
-                {getUniswapV3Deployment(state.sellToken.chainId) && (
-                  <>
-                    Uniswap V3:{" "}
-                    {quote.uniswapV3AmountOut
-                      ? formatSwapAmount(quote.uniswapV3AmountOut)
-                      : "No route"}{" "}
-                    ·{" "}
-                  </>
-                )}
-                Uniswap V2:{" "}
-                {quote.uniswapAmountOut ? formatSwapAmount(quote.uniswapAmountOut) : "No route"}
-                {state.sellToken.chainId === 8453 && (
-                  <>
-                    {" "}
-                    · Aerodrome:{" "}
-                    {quote.aerodromeAmountOut
-                      ? formatSwapAmount(quote.aerodromeAmountOut)
-                      : "No route"}
-                  </>
-                )}{" "}
-                {state.buyToken.symbol}
-              </p>
-              <p>
-                Pool fees are included. Network fees are separate. Submission uses your wallet’s
-                RPC; private routing is unverified.
+          {!!quote.excludedVenues?.length && (
+            <div
+              role="status"
+              className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900"
+            >
+              <p className="font-semibold">Route health: outlier quote excluded</p>
+              <p className="mt-1">
+                {quote.excludedVenues.join(", ")} deviated more than 35% from the cross-venue median
+                and cannot be selected or executed.
               </p>
             </div>
+          )}
+          {quote.bestVenue && (
+            <p className="text-xs leading-relaxed text-slate-600">
+              Eligible quotes are compared in the venue panel. Pool fees are included; network fees
+              are separate. Private routing is unverified.
+            </p>
           )}
           {quote.rate !== null && state.sellAmount && state.buyAmount && (
             <Card className="border-purple-200 bg-gradient-to-r from-purple-50 to-pink-50">
@@ -368,6 +412,36 @@ export const SwapCard = memo<SwapCardProps>(
                     {state.buyToken.symbol}
                   </span>
                 </div>
+                <div className="flex justify-between gap-3 text-sm">
+                  <span className="text-gray-600">Route</span>
+                  <span className="text-right font-medium">
+                    {quote.routeDescription ?? "Pending"}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-3 text-sm">
+                  <span className="text-gray-600">Quote freshness</span>
+                  <span className="text-right font-medium">
+                    {quote.observedAt
+                      ? `${Math.max(0, Math.floor((clock - quote.observedAt) / 1_000))}s old · expires in ${Math.max(0, 30 - Math.floor((clock - quote.observedAt) / 1_000))}s`
+                      : "Pending"}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-3 text-sm">
+                  <span className="text-gray-600">Quoted block</span>
+                  <span className="text-right font-mono font-medium">
+                    {quote.blockNumber ? `#${quote.blockNumber.toLocaleString()}` : "Pending"}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-3 text-sm">
+                  <span className="text-gray-600">Estimated network fee</span>
+                  <span className="text-right font-medium">
+                    {quote.estimatedNetworkFee ?? "Available in wallet"}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Net value is not calculated because a reliable fee estimate is not available
+                  before wallet simulation.
+                </p>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Slippage</span>
                   <span className="font-medium">{state.slippage}%</span>

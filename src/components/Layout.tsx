@@ -7,6 +7,7 @@ import {
   CandlestickChart,
   ChevronDown,
   Droplets,
+  Fuel,
   LineChart,
   Menu,
   PieChart,
@@ -15,6 +16,7 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
+  Waypoints,
   Zap,
 } from "lucide-react";
 
@@ -54,6 +56,7 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
     label: "Markets",
     items: [
       { name: "Markets", href: "/markets", icon: CandlestickChart },
+      { name: "DEXes", href: "/stake/dexes", icon: Waypoints },
       { name: "Market Data", href: "/market-data", icon: LineChart },
       { name: "Arbitrage", href: "/arbitrage/matrix", icon: Zap },
       { name: "Live Desk", href: "/arbitrage/live-desk", icon: Radio },
@@ -64,6 +67,8 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
     items: [
       { name: "Token Studio", href: "/launchpad", icon: Rocket },
       { name: "Protocol Hub", href: "/protocol", icon: Sparkles },
+      { name: "Gas Paymaster", href: "/paymaster", icon: Fuel },
+      { name: "Portfolio Paymaster", href: "/stake/paymaster", icon: Fuel },
     ],
   },
   {

@@ -1,0 +1,1 @@
+{"name":"mrwd-aggregator-audit","version":"1.0.0","private":true,"type":"module","scripts":{"audit":"tsx src.ts","check":"tsc --noEmit"},"dependencies":{"dotenv":"^16.4.7","viem":"^2.37.0"},"devDependencies":{"tsx":"^4.20.0","typescript":"^5.9.0","@types/node":"^22.18.0"}}

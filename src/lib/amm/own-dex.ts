@@ -8,7 +8,9 @@ import type { DexDeployment } from "@/config/dex/deployment";
 
 export const DEX_FACTORY_ABI = parseAbi([
   "function getPair(address,address) view returns (address)",
+  "function feeTo() view returns (address)",
   "function feeToSetter() view returns (address)",
+  "function setFeeTo(address _feeTo)",
   "function allPairsLength() view returns (uint256)",
 ]);
 export const DEX_ROUTER_METADATA_ABI = parseAbi([

@@ -88,11 +88,19 @@
   },
   "0x70315019D12a11556c837970675cdC8fa54d186b": {
     "ecosystem": "Arbitrage",
-    "role": "AtomicFlashArbitrageRouter (Aave flash loan arbitrage)",
+    "role": "AtomicFlashArbitrageRouter v1 (Aave flash loan arbitrage)",
+    "usedBy": [
+      "src/components/RouterOperatorPanel.tsx"
+    ]
+  },
+  "0xdF77eBFB6e0468aE4e94b13Fc9881427B82178Fd": {
+    "ecosystem": "Arbitrage",
+    "role": "AtomicFlashArbitrageRouter (Active Aave v3 flash loan arbitrage router, admin 0x9dC0...7C98)",
+    "deploymentTx": "0xa672e521807cf11bb1c857337d8a54126eab13b7feb3b632012f1f6c32f3705c",
     "usedBy": [
       "src/pages/Arbitrage.tsx",
-      "scripts/arbitrage-bot-daemon.ts",
-      "src/lib/launchpad/constants.ts"
+      "src/lib/launchpad/constants.ts",
+      "src/lib/amm/ai-arbitrage-bot.ts"
     ]
   },
   "0xb8f3D5143ffddB99688BB31E7c2c3894a1E17263": {

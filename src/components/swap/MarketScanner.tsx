@@ -5,6 +5,7 @@ import { Activity, Play, RefreshCw, Square } from "lucide-react";
 import { type Address, formatUnits } from "viem";
 import { useAccount, usePublicClient } from "wagmi";
 
+import { IndicativeBadge } from "@/components/IndicativeBadge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getTokensForChain, isErc20Token, type Token } from "@/config/tokens";
@@ -101,18 +102,6 @@ function describeScannerError(error: unknown): string {
     return "Price data unavailable: the price service is not responding. Retrying every 15 seconds.";
   }
   return `Price data unavailable${message ? ` (${message})` : ""}. Retrying every 15 seconds.`;
-}
-
-function IndicativeBadge({ liquidityUsd }: { readonly liquidityUsd: number | undefined }) {
-  return (
-    <span
-      className="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700"
-      title="Priced from a pool too small to trust: a small trade can move this price a lot."
-    >
-      indicative
-      {liquidityUsd !== undefined ? ` · ${formatUsd(liquidityUsd)} pool` : ""}
-    </span>
-  );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

@@ -5,6 +5,7 @@ import { ArrowLeftRight, Layers, ShieldCheck, Trophy, Wallet } from "lucide-reac
 import { useAccount } from "wagmi";
 
 import { Card, CardContent } from "@/components/ui/card";
+import { BASE_SWAP_VENUE_NAMES } from "@/config/dex-venues";
 import { useUserActivity } from "@/hooks/useUserActivity";
 
 // The networks the swap screen supports, each with its own verified Uniswap V2 router.
@@ -15,7 +16,7 @@ const FEATURES = [
     icon: Trophy,
     title: "Best quote on Base",
     description:
-      "Every Base swap is quoted on Uniswap V3, Uniswap V2 and Aerodrome, and the best quote is the one you get.",
+      "Every Base swap checks all eight supported venues, excludes unsafe outliers, then selects the best eligible quote.",
   },
   {
     icon: Layers,
@@ -57,8 +58,8 @@ export default function Home() {
             </span>
           </h1>
           <p className="mx-auto max-w-xl text-lg text-gray-600 lg:mx-0">
-            A friendly, non-custodial DEX. Trade straight from your own wallet, and on Base get the best of Uniswap
-            and Aerodrome in one swap.
+            A friendly, non-custodial DEX. Trade straight from your own wallet, and on Base get the
+            best safe quote across eight supported Base venues in one swap.
           </p>
           <div className="flex flex-wrap justify-center gap-3 lg:justify-start">
             <Link
@@ -97,15 +98,22 @@ export default function Home() {
               className="mx-auto size-32 rounded-full shadow-lg ring-4 ring-white"
             />
             <h2 className="mt-5 text-2xl font-extrabold text-gray-900">Shaggy Mutt DEX</h2>
-            <p className="text-sm font-semibold tracking-wide text-purple-600">Non-custodial · Base</p>
-            <dl className="mt-5 grid grid-cols-2 gap-3 text-left">
+            <p className="text-sm font-semibold tracking-wide text-purple-600">
+              Non-custodial · Base
+            </p>
+            <dl className="mt-5 space-y-3 text-left">
               <div className="rounded-xl bg-purple-50 p-3">
                 <dt className="text-xs text-gray-500">Base venues compared</dt>
-                <dd className="font-bold text-gray-900">Uniswap V3, V2, Aerodrome</dd>
-              </div>
-              <div className="rounded-xl bg-pink-50 p-3">
-                <dt className="text-xs text-gray-500">Networks</dt>
-                <dd className="font-bold text-gray-900">{NETWORKS.length}</dd>
+                <dd className="mt-2 flex flex-wrap gap-1.5">
+                  {BASE_SWAP_VENUE_NAMES.map((venue) => (
+                    <span
+                      key={venue}
+                      className="rounded-md border border-purple-100 bg-white px-2 py-1 text-xs font-semibold text-purple-900"
+                    >
+                      {venue}
+                    </span>
+                  ))}
+                </dd>
               </div>
             </dl>
             <div className="mt-5 flex gap-2">
@@ -158,7 +166,9 @@ export default function Home() {
             </div>
             <Link to="/activity" className="group block">
               <div className="text-3xl font-bold">{stats.totalSwaps}</div>
-              <div className="text-purple-100 underline-offset-4 group-hover:underline">Your swaps</div>
+              <div className="text-purple-100 underline-offset-4 group-hover:underline">
+                Your swaps
+              </div>
             </Link>
             <div>
               <div className="text-3xl font-bold">{stats.activeChains}</div>

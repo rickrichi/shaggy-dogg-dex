@@ -18,7 +18,6 @@ import { type BotQuoteVenues, encodeV3Path } from "./bot-market-snapshot";
 import { V3_FEE_TIERS } from "./uniswap-v3";
 
 const ALL_TIERS: readonly number[] = V3_FEE_TIERS.map((tier) => tier.fee);
-const STABLE_TIERS: readonly number[] = [100, 500];
 
 const AAVE_POOL_PREMIUM_ABI = [
   {
@@ -83,19 +82,16 @@ export const flashPremium = (amount: bigint, premiumBps: number) =>
   (amount * BigInt(premiumBps)) / 10_000n;
 
 /**
- * Best Uniswap V3 cycle through `tokens` (first == last) over every fee-tier combination; hops
- * listed in `stableHops` only try the stable tiers. Null when no combination has liquidity.
+ * Best Uniswap V3 cycle through `tokens` (first == last) over every fee-tier combination.
+ * Null when no combination has liquidity.
  */
 export async function bestV3Cycle(
   client: Quoter,
   quoter: Address,
   tokens: readonly Address[],
-  stableHops: readonly number[],
   amountIn: bigint
 ): Promise<V3Cycle | null> {
-  const hopTiers = tokens
-    .slice(1)
-    .map((_, hop) => (stableHops.includes(hop) ? STABLE_TIERS : ALL_TIERS));
+  const hopTiers = tokens.slice(1).map(() => ALL_TIERS);
   const combos = hopTiers.reduce<number[][]>(
     (acc, tiers) => acc.flatMap((prefix) => tiers.map((fee) => [...prefix, fee])),
     [[]]
@@ -123,12 +119,20 @@ export async function bestV3Cycle(
   return best;
 }
 
-/** The flash triangle for a borrowed asset: USDC -> DAI -> WETH -> USDC, or WETH -> USDC -> DAI -> WETH. */
-export function flashTriangleTokens(asset: "USDC" | "WETH", venues: BotQuoteVenues) {
-  const { weth, usdc, dai } = venues;
+/**
+ * The flash triangle for a borrowed asset: USDC -> midAsset -> WETH -> USDC, or
+ * WETH -> USDC -> midAsset -> WETH. `midAsset` is the caller's choice (typically the top result
+ * from rankMidAssetCandidates) since `venues` no longer carries one fixed middle asset.
+ */
+export function flashTriangleTokens(
+  asset: "USDC" | "WETH",
+  venues: BotQuoteVenues,
+  midAsset: Address
+) {
+  const { weth, usdc } = venues;
   return asset === "USDC"
-    ? { tokens: [usdc, dai, weth, usdc] as const, stableHops: [0] }
-    : { tokens: [weth, usdc, dai, weth] as const, stableHops: [1] };
+    ? { tokens: [usdc, midAsset, weth, usdc] as const }
+    : { tokens: [weth, usdc, midAsset, weth] as const };
 }
 
 /**

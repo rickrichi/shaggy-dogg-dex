@@ -18,6 +18,10 @@ vi.mock("wagmi", async () => {
   };
 });
 
+vi.mock("@/components/StakedHoldingsCard", () => ({
+  StakedHoldingsCard: () => <div data-testid="staked-holdings" />,
+}));
+
 vi.mock("@/hooks/usePortfolio", () => ({
   usePortfolio: vi.fn(),
 }));
@@ -137,6 +141,51 @@ describe("Portfolio Page - Permanent On-Chain Flow", () => {
     expect(screen.getByText("FBA Token")).toBeInTheDocument();
     expect(screen.getByText("0.0103")).toBeInTheDocument();
     expect(screen.getByText("500,000")).toBeInTheDocument();
+  });
+
+  it("flags a thin-pool price on its row", () => {
+    vi.mocked(wagmi.useAccount).mockReturnValue({
+      address: "0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98",
+      isConnected: true,
+    } as unknown as ReturnType<typeof wagmi.useAccount>);
+    vi.mocked(usePortfolioModule.usePortfolio).mockReturnValue({
+      tokens: [
+        {
+          key: "SD:0x051c758521971f5c5a84edaf18eea12854375469:8453",
+          symbol: "SD",
+          name: "Shaggy Dogg",
+          address: "0x051c758521971f5c5a84edaf18eea12854375469",
+          decimals: 18,
+          chainId: 8453,
+          balance: "28022420000000000000",
+          balanceFormatted: "28.02242",
+          usdValue: 0.0000634,
+          priceUsd: 0.00000226,
+          indicative: true,
+          liquidityUsd: 4.51,
+        },
+      ],
+      summary: {
+        totalValue: 0,
+        totalTokens: 1,
+        topChain: "Base",
+        biggestHolding: null,
+        percentChange24h: 0,
+      },
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(
+      <BrowserRouter>
+        <Portfolio />
+      </BrowserRouter>
+    );
+
+    expect(screen.getByText("$0.00000226")).toBeInTheDocument();
+    expect(screen.getByText("≈ $0.0000634")).toBeInTheDocument();
+    expect(screen.getByText("indicative · $4.51 pool")).toBeInTheDocument();
   });
 
   it("says prices are unavailable instead of showing a made-up value", () => {

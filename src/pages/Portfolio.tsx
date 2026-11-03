@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { useAccount, useChainId } from "wagmi";
 
+import { IndicativeBadge } from "@/components/IndicativeBadge";
+import { StakedHoldingsCard } from "@/components/StakedHoldingsCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +24,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { getChainConfig, isSupportedChain } from "@/config/chains";
 import { type Token, usePortfolio } from "@/hooks/usePortfolio";
+import { formatUsdPrice } from "@/lib/format-price";
 
 export default function Portfolio() {
   const { address, isConnected } = useAccount();
@@ -394,14 +397,15 @@ export default function Portfolio() {
 
                         {/* Price */}
                         <td className="p-4 text-right text-gray-600">
-                          {token.priceUsd > 0
-                            ? `$${token.priceUsd.toFixed(token.priceUsd < 0.01 ? 6 : 2)}`
-                            : "—"}
+                          <div>{token.priceUsd > 0 ? formatUsdPrice(token.priceUsd) : "—"}</div>
+                          {token.indicative && <IndicativeBadge liquidityUsd={token.liquidityUsd} />}
                         </td>
 
                         {/* Value */}
                         <td className="p-4 text-right font-semibold text-gray-900">
-                          {token.usdValue > 0
+                          {token.indicative
+                            ? `≈ ${formatUsdPrice(token.usdValue)}`
+                            : token.usdValue > 0
                             ? `$${token.usdValue.toLocaleString(undefined, {
                                 minimumFractionDigits: 2,
                                 maximumFractionDigits: 2,
@@ -411,7 +415,7 @@ export default function Portfolio() {
 
                         {/* Actions */}
                         <td className="py-4 pl-4 text-right">
-                          <Link to={`/swap?inputToken=${token.address}`}>
+                          <Link to={`/swap?input=${token.address}`}>
                             <Button
                               size="sm"
                               variant="outline"
@@ -431,6 +435,8 @@ export default function Portfolio() {
           )}
         </CardContent>
       </Card>
+
+      {address && <StakedHoldingsCard address={address} />}
     </div>
   );
 }

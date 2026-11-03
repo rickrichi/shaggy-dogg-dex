@@ -77,11 +77,9 @@ export function getV2WrappedNative(chainId?: number): Address {
   return v2(chainId).wrappedNative;
 }
 
-export const UNISWAP_V3_QUOTER_V2_BASE: Address =
-  "0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a";
+export const UNISWAP_V3_QUOTER_V2_BASE: Address = "0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a";
 
-export const UNISWAP_V3_ROUTER_BASE: Address =
-  "0x2626664c2603336E57B271c5C0b26F421741e481";
+export const UNISWAP_V3_ROUTER_BASE: Address = "0x2626664c2603336E57B271c5C0b26F421741e481";
 
 export interface V3Deployment {
   readonly factory: Address;
@@ -105,6 +103,43 @@ export const UNISWAP_V3: Readonly<Record<number, V3Deployment>> = {
 export function getUniswapV3Deployment(chainId?: number): V3Deployment | undefined {
   return chainId !== undefined ? UNISWAP_V3[chainId] : undefined;
 }
+
+/** Base-only V2 forks, checked on-chain 2026-10-30: router.factory(), router.WETH(), live quote. */
+export const BASE_V2_VENUES = {
+  "PancakeSwap V2": {
+    router: "0x8cFe327CEc66d1C090Dd72bd0FF11d690C33a2Eb",
+    factory: "0x02a84c1b3BBD7401a5f7fa98a384EBC70bB5749E",
+  },
+  "SushiSwap V2": {
+    router: "0x6BDED42c6DA8FBf0d2bA55B2fa120C5e0c8D7891",
+    factory: "0x71524B4f93c58fcbF659783284E38825f0622859",
+  },
+  BaseSwap: {
+    router: "0x327Df1E6de05895d2ab08513aaDD9313Fe505d86",
+    factory: "0xFDa619b6d20975be80A10332cD39b9a4b0FAa8BB",
+  },
+} as const;
+
+/**
+ * Base-only V3 forks, checked on-chain 2026-10-30: router and quoter factory(), live quotes.
+ * `hopFees` limits two-hop candidates so each swap does not add dozens of RPC reads.
+ */
+export const BASE_V3_VENUES = {
+  "PancakeSwap V3": {
+    router: "0x678Aa4bF4E210cf2166753e054d5b7c31cc7fa86",
+    quoter: "0xB048Bbc1Ee6b733FFfCFb9e9CeF7375518e25997",
+    factory: "0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865",
+    fees: [100, 500, 2500, 10000],
+    hopFees: [500, 2500],
+  },
+  "SushiSwap V3": {
+    router: "0xFB7eF66a7e61224DD6FcD0D7d9C3be5C8B049b9f",
+    quoter: "0xb1E835Dc2785b52265711e17fCCb0fd018226a6e",
+    factory: "0xc35DADB65012eC5796536bD9864eD8773aBc74C4",
+    fees: [100, 500, 3000, 10000],
+    hopFees: [500, 3000],
+  },
+} as const;
 
 export const CHAIN_USDC: Readonly<Record<number, Address>> = {
   1: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",

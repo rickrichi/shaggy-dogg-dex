@@ -4,6 +4,7 @@
   "directories": { "app": "desktop", "output": "release/desktop" },
   "files": ["*.cjs", "!*.test.cjs", "package.json", "!node_modules/**/*"],
   "extraResources": [
+    { "from": "desktop/backend.env.example", "to": "backend.env.example" },
     { "from": "dist", "to": "dist" },
     { "from": ".desktop-build/dist", "to": "backend" },
     { "from": ".desktop-build/daemon", "to": "daemon" }

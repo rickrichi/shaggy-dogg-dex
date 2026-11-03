@@ -14,9 +14,9 @@ const contracts = [
   "FeeDiscountStaking",
   "YieldStakingVault",
   "CompoundYieldVault",
-  "IsolatedLendingVault",
   "AaveFlashBorrower",
   "AtomicFlashArbitrageRouter",
+  "LaunchpadSuiteDeployer",
 ];
 
 const contractData = {};
@@ -63,10 +63,6 @@ export const LAUNCHPAD_ARTIFACTS = {
     abi: ${JSON.stringify(contractData.CompoundYieldVault.abi)} as unknown as Abi,
     bytecode: "${contractData.CompoundYieldVault.bytecode}" as Hex,
   },
-  IsolatedLendingVault: {
-    abi: ${JSON.stringify(contractData.IsolatedLendingVault.abi)} as unknown as Abi,
-    bytecode: "${contractData.IsolatedLendingVault.bytecode}" as Hex,
-  },
   AaveFlashBorrower: {
     abi: ${JSON.stringify(contractData.AaveFlashBorrower.abi)} as unknown as Abi,
     bytecode: "${contractData.AaveFlashBorrower.bytecode}" as Hex,
@@ -74,6 +70,10 @@ export const LAUNCHPAD_ARTIFACTS = {
   AtomicFlashArbitrageRouter: {
     abi: ${JSON.stringify(contractData.AtomicFlashArbitrageRouter.abi)} as unknown as Abi,
     bytecode: "${contractData.AtomicFlashArbitrageRouter.bytecode}" as Hex,
+  },
+  LaunchpadSuiteDeployer: {
+    abi: ${JSON.stringify(contractData.LaunchpadSuiteDeployer.abi)} as unknown as Abi,
+    bytecode: "${contractData.LaunchpadSuiteDeployer.bytecode}" as Hex,
   },
 } as const;
 `;

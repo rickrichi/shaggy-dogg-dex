@@ -24,14 +24,12 @@ describe("Base Sepolia Deployment & Artifacts Verification", () => {
   it("verifies Base Sepolia (Chain ID 84532) contract registration", () => {
     expect(isDeployedOnChain(84532)).toBe(true);
     const contracts = getContracts(84532);
-    expect(contracts).toBeDefined();
+    if (!contracts) throw new Error("Base Sepolia contracts are not registered");
 
-    if (contracts) {
-      expect(isAddress(contracts.GovernanceToken)).toBe(true);
-      expect(isAddress(contracts.FeeDiscountStaking)).toBe(true);
-      expect(isAddress(contracts.deployer)).toBe(true);
-      expect(contracts.deployedAt).toBeGreaterThan(0);
-    }
+    expect(isAddress(contracts.GovernanceToken)).toBe(true);
+    expect(isAddress(contracts.FeeDiscountStaking)).toBe(true);
+    expect(isAddress(contracts.deployer)).toBe(true);
+    expect(contracts.deployedAt).toBeGreaterThan(0);
   });
 
   it("verifies deployment record structure in deployments/base-sepolia.json", () => {

@@ -131,8 +131,20 @@ const tokenWatchlist: Record<number, ChainConfig> = {
       },
       {
         address: "0xb8f3d5143ffddb99688bb31e7c2c3894a1e17263",
-        name: "FBA Token",
+        name: "Foundational Black American",
         symbol: "FBA",
+        decimals: 18,
+      },
+      {
+        address: "0xc17227aaa33c54634b6ce7ad0bf33a156563c179",
+        name: "Mutt Rewards",
+        symbol: "MRWD",
+        decimals: 18,
+      },
+      {
+        address: "0x1aeb45fd7b6c59b52da3e41558410f306cbaa56c",
+        name: "Equilnyxs",
+        symbol: "EQX",
         decimals: 18,
       },
       {

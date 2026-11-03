@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, Award, Sparkles } from "lucide-react";
 
 import { LaunchpadNav } from "@/components/launchpad/LaunchpadNav";
+import { MrwdLpStakerPanel } from "@/components/MrwdLpStakerPanel";
 import { MrwdProStakingPanel } from "@/components/MrwdProStakingPanel";
 import { RouterOperatorPanel } from "@/components/RouterOperatorPanel";
 import { Badge } from "@/components/ui/badge";
@@ -36,7 +37,8 @@ export default function Stake() {
             <Badge className="border-purple-200 bg-purple-100 text-purple-800">Base Mainnet</Badge>
           </div>
           <p className="mt-1 text-sm text-slate-500">
-            Stake Mutt Rewards (MRWD) for Equilnyxs Pro. Premium DEX tools are planned.
+            Earn rewards on your positions and stake to unlock Pro tools. Premium DEX tools are
+            planned.
           </p>
         </div>
       </div>
@@ -48,9 +50,11 @@ export default function Stake() {
             <Sparkles className="size-5" />
           </div>
           <div>
-            <p className="text-sm font-bold text-gray-900">Need to create or seed new tokens?</p>
+            <p className="text-sm font-bold text-gray-900">
+              Protocol Hub &amp; Launchpad
+            </p>
             <p className="text-xs text-gray-600">
-              Launch new tokens or manage protocol parameters in the Token Studio & Protocol Hub.
+              View deployed contracts and routing audits, or launch new tokens in Token Studio.
             </p>
           </div>
         </div>
@@ -71,6 +75,31 @@ export default function Stake() {
         </div>
       </div>
 
+      <MrwdLpStakerPanel />
+      <Card className="overflow-hidden border-indigo-200 shadow-sm">
+        <CardContent className="flex flex-col items-start justify-between gap-4 bg-gradient-to-r from-indigo-50 via-purple-50/60 to-white p-5 sm:flex-row sm:items-center">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-indigo-600">
+              Multi-DEX venue ledger
+            </p>
+            <h2 className="mt-1 text-lg font-black text-slate-950">
+              Compare liquidity &amp; rewards
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">
+              See which Base venues have a pool for your tokens, a rewards program, or trading fees
+              only.
+            </p>
+          </div>
+          <Button
+            asChild
+            className="shrink-0 bg-indigo-600 font-semibold text-white hover:bg-indigo-700"
+          >
+            <Link to="/stake/dexes">
+              Compare venues <ArrowRight className="ml-2 size-4" />
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
       <YieldVaultPanel />
       <RouterOperatorPanel />
 

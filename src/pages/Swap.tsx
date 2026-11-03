@@ -2,41 +2,25 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import { Activity, Fuel } from "lucide-react";
+import { Activity, ExternalLink, Fuel, ShieldCheck } from "lucide-react";
 import { formatGwei } from "viem";
 import { useAccount, useBlockNumber, useGasPrice, useSwitchChain } from "wagmi";
 
-import { LimitOrderCard } from "@/components/swap/LimitOrderCard";
 import { MarketScanner } from "@/components/swap/MarketScanner";
 import { PriceChart } from "@/components/swap/PriceChart";
 import { SwapCard } from "@/components/swap/SwapCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { isSwapChain } from "@/config/contracts";
-import { getSwapDropdownTokens, getTokensForChain, type Token } from "@/config/tokens";
+import { getUniswapV2Router, isSwapChain } from "@/config/contracts";
+import { getSwapDropdownTokens, type Token } from "@/config/tokens";
 import { useSwap } from "@/hooks/useSwap";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // TYPES
 // ══════════════════════════════════════════════════════════════════════════════
 
-type TradeMode = "swap" | "buy" | "limit" | "sell";
-
-type StableSymbol = "USDC" | "USDT" | "DAI";
-
-interface SwapModeConfig {
-  readonly mode: TradeMode;
-  readonly label: string;
-  readonly sellToken: Token;
-  readonly buyToken: Token;
-}
-
 // ══════════════════════════════════════════════════════════════════════════════
 // CONSTANTS
 // ══════════════════════════════════════════════════════════════════════════════
-
-const STABLE_SYMBOLS: ReadonlySet<StableSymbol> = new Set(["USDC", "USDT", "DAI"]);
-
-const TRADE_MODES: readonly TradeMode[] = ["swap", "buy", "limit", "sell"] as const;
 
 // Swap and Limit open on ETH -> USDC (never a project token); a URL ?output= still picks another.
 const DEFAULT_BUY_SYMBOL = "USDC";
@@ -44,23 +28,6 @@ const DEFAULT_BUY_SYMBOL = "USDC";
 // ══════════════════════════════════════════════════════════════════════════════
 // HELPER FUNCTIONS (Pure, no side effects)
 // ══════════════════════════════════════════════════════════════════════════════
-
-/**
- * Type guard to check if a symbol is a known stablecoin
- */
-function isStableSymbol(symbol: string): symbol is StableSymbol {
-  return STABLE_SYMBOLS.has(symbol as StableSymbol);
-}
-
-/**
- * Safely parse and validate trade mode from URL parameter
- */
-function parseTradeMode(param: string | null): TradeMode {
-  if (param && TRADE_MODES.includes(param as TradeMode)) {
-    return param as TradeMode;
-  }
-  return "swap";
-}
 
 /**
  * Get initial token from URL param or fall back to a symbol (or list position when the chain lacks it)
@@ -111,21 +78,6 @@ function getInitialToken(
 /**
  * Find first stablecoin in token list (type-safe, no `as any`)
  */
-function getFirstStable(fallback: Token, chainId?: number): Token {
-  const chainTokens = getTokensForChain(chainId);
-  const stable = chainTokens.find((t) => isStableSymbol(t.symbol));
-  return stable ?? fallback;
-}
-
-/**
- * Find first non-stablecoin in token list (type-safe, no `as any`)
- */
-function getFirstNonStable(fallback: Token, chainId?: number): Token {
-  const chainTokens = getTokensForChain(chainId);
-  const nonStable = chainTokens.find((t) => !isStableSymbol(t.symbol));
-  return nonStable ?? fallback;
-}
-
 // ══════════════════════════════════════════════════════════════════════════════
 // COMPONENT
 // ══════════════════════════════════════════════════════════════════════════════
@@ -149,7 +101,6 @@ export default function Swap() {
     () => ({
       input: searchParams.get("input"),
       output: searchParams.get("output"),
-      mode: parseTradeMode(searchParams.get("mode")),
     }),
     [searchParams]
   );
@@ -159,36 +110,29 @@ export default function Swap() {
   // ────────────────────────────────────────────────────────────────────────────
 
   const [showSettings, setShowSettings] = useState(false);
-  const [mode, setMode] = useState<TradeMode>(urlParams.mode);
-
   // Sync mode with URL on navigation
-  useEffect(() => {
-    if (urlParams.mode !== mode) {
-      setMode(urlParams.mode);
-    }
-  }, [urlParams.mode]); // Intentionally excluding `mode` to avoid infinite loop
-
   // ────────────────────────────────────────────────────────────────────────────
   // Token Selection Logic
   // ────────────────────────────────────────────────────────────────────────────
 
   const chainTokens = useMemo(() => getSwapDropdownTokens(chain?.id ?? 8453), [chain?.id]);
 
-  const baseTokens = useMemo(
-    () => ({
-      initialSell: getInitialToken(urlParams.input, 0, chain?.id ?? 8453),
-      initialBuy: getInitialToken(urlParams.output, 1, chain?.id ?? 8453, DEFAULT_BUY_SYMBOL),
-    }),
-    [urlParams.input, urlParams.output, chain?.id]
-  );
-
-  const specialTokens = useMemo(
-    () => ({
-      stable: getFirstStable(baseTokens.initialSell, chain?.id ?? 8453),
-      nonStable: getFirstNonStable(baseTokens.initialBuy, chain?.id ?? 8453),
-    }),
-    [baseTokens.initialSell, baseTokens.initialBuy, chain?.id]
-  );
+  const baseTokens = useMemo(() => {
+    const initialSell = getInitialToken(urlParams.input, 0, chain?.id ?? 8453);
+    const requestedBuy = getInitialToken(
+      urlParams.output,
+      1,
+      chain?.id ?? 8453,
+      DEFAULT_BUY_SYMBOL
+    );
+    const initialBuy =
+      requestedBuy.address.toLowerCase() !== initialSell.address.toLowerCase()
+        ? requestedBuy
+        : (chainTokens.find(
+            (token) => token.address.toLowerCase() !== initialSell.address.toLowerCase()
+          ) ?? requestedBuy);
+    return { initialSell, initialBuy };
+  }, [urlParams.input, urlParams.output, chain?.id, chainTokens]);
 
   // ────────────────────────────────────────────────────────────────────────────
   // Swap Hook Instances
@@ -199,15 +143,7 @@ export default function Swap() {
   // Performance impact is minimal as hooks are lightweight until actively used.
   // ────────────────────────────────────────────────────────────────────────────
 
-  const swapInstances = {
-    swap: useSwap(baseTokens.initialSell, baseTokens.initialBuy),
-    buy: useSwap(specialTokens.stable, specialTokens.nonStable),
-    limit: useSwap(baseTokens.initialSell, baseTokens.initialBuy),
-    sell: useSwap(specialTokens.nonStable, specialTokens.stable),
-  } as const;
-
-  // Select active swap based on mode
-  const activeSwap = swapInstances[mode];
+  const activeSwap = useSwap(baseTokens.initialSell, baseTokens.initialBuy);
   const { sellToken, buyToken } = activeSwap.state;
 
   // ────────────────────────────────────────────────────────────────────────────
@@ -224,10 +160,6 @@ export default function Swap() {
     if (buyToken.address !== "native") {
       params.set("output", buyToken.address);
     }
-    if (mode !== "swap") {
-      params.set("mode", mode);
-    }
-
     const newParams = params.toString();
     const currentParams = searchParams.toString();
 
@@ -235,7 +167,7 @@ export default function Swap() {
     if (newParams !== currentParams) {
       setSearchParams(params, { replace: true });
     }
-  }, [sellToken.address, buyToken.address, mode, searchParams, setSearchParams]);
+  }, [sellToken.address, buyToken.address, searchParams, setSearchParams]);
 
   useEffect(() => {
     updateURL();
@@ -249,28 +181,9 @@ export default function Swap() {
   // Tab Configuration (DRY - eliminates repetitive TabsContent)
   // ────────────────────────────────────────────────────────────────────────────
 
-  const tabConfigs: readonly SwapModeConfig[] = useMemo(
-    () => [
-      { mode: "swap", label: "Swap", ...swapInstances.swap.state },
-      { mode: "buy", label: "Buy", ...swapInstances.buy.state },
-      { mode: "limit", label: "Limit", ...swapInstances.limit.state },
-      { mode: "sell", label: "Sell", ...swapInstances.sell.state },
-    ],
-    [
-      swapInstances.swap.state,
-      swapInstances.buy.state,
-      swapInstances.limit.state,
-      swapInstances.sell.state,
-    ]
-  );
-
   // ────────────────────────────────────────────────────────────────────────────
   // Event Handlers
   // ────────────────────────────────────────────────────────────────────────────
-
-  const handleModeChange = useCallback((newMode: string) => {
-    setMode(newMode as TradeMode);
-  }, []);
 
   // ────────────────────────────────────────────────────────────────────────────
   // Render
@@ -304,49 +217,65 @@ export default function Swap() {
       </div>
 
       {/* Main Grid Layout */}
-      <div className="mx-auto grid max-w-7xl grid-cols-1 items-start gap-6 lg:grid-cols-3 lg:gap-8">
+      <div className="mx-auto grid max-w-7xl grid-cols-1 items-start gap-6 lg:grid-cols-5 lg:gap-8">
         {/* Swap comes first in both reading order and mobile layout. */}
-        <div className="order-1 min-w-0 lg:col-span-1">
+        <div className="order-1 min-w-0 lg:col-span-2">
           <div className="relative space-y-3">
-            <Tabs value={mode} onValueChange={handleModeChange}>
-              <TabsList className="mb-3 grid w-full grid-cols-4">
-                {tabConfigs.map(({ mode: tabMode, label }) => (
-                  <TabsTrigger key={tabMode} value={tabMode}>
-                    {label}
-                  </TabsTrigger>
-                ))}
+            <Tabs value="swap">
+              <TabsList className="mb-3 grid w-full grid-cols-2">
+                <TabsTrigger value="swap">Swap</TabsTrigger>
+                <TabsTrigger value="limit" disabled aria-label="Limit orders coming soon">
+                  Limit · Soon
+                </TabsTrigger>
               </TabsList>
-
-              {/* DRY: Map over config instead of duplicating TabsContent */}
-              {tabConfigs.map(({ mode: tabMode }) => (
-                <TabsContent key={tabMode} value={tabMode} className="mt-0">
-                  {tabMode === "limit" ? (
-                    <LimitOrderCard
-                      swap={swapInstances[tabMode]}
-                      tokens={chainTokens}
-                      showSettings={showSettings}
-                      onSettingsChange={setShowSettings}
-                    />
-                  ) : (
-                    <SwapCard
-                      swap={swapInstances[tabMode]}
-                      tokens={chainTokens}
-                      isCorrectNetwork={
-                        !isConnected ||
-                        (isSwapChain(chain?.id) &&
-                          chain?.id === swapInstances[tabMode].state.sellToken.chainId)
-                      }
-                      isSwitchingNetwork={isSwitchingChain}
-                      onSwitchNetwork={() =>
-                        switchChain({ chainId: swapInstances[tabMode].state.sellToken.chainId })
-                      }
-                      showSettings={showSettings}
-                      onSettingsChange={setShowSettings}
-                    />
-                  )}
-                </TabsContent>
-              ))}
+              <TabsContent value="swap" className="mt-0">
+                <SwapCard
+                  swap={activeSwap}
+                  tokens={chainTokens}
+                  isCorrectNetwork={
+                    !isConnected ||
+                    (isSwapChain(chain?.id) && chain?.id === activeSwap.state.sellToken.chainId)
+                  }
+                  isSwitchingNetwork={isSwitchingChain}
+                  onSwitchNetwork={() =>
+                    switchChain({ chainId: activeSwap.state.sellToken.chainId })
+                  }
+                  showSettings={showSettings}
+                  onSettingsChange={setShowSettings}
+                />
+              </TabsContent>
             </Tabs>
+
+            <aside
+              aria-label="Trade safety and contract information"
+              className="rounded-xl border border-emerald-200 bg-white/90 p-3 shadow-sm"
+            >
+              <div className="flex items-center gap-2 text-sm font-semibold text-emerald-800">
+                <ShieldCheck className="size-4" /> Base · Non-custodial
+              </div>
+              <p className="mt-1 text-xs text-slate-600">
+                Trades and approvals are signed in your wallet. Contracts have not received an
+                independent third-party audit.
+              </p>
+              <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                <a
+                  className="inline-flex items-center gap-1 text-purple-700 underline-offset-2 hover:underline"
+                  href={`https://basescan.org/address/${getUniswapV2Router(8453)}#code`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Configured router <ExternalLink className="size-3" />
+                </a>
+                <a
+                  className="inline-flex items-center gap-1 text-purple-700 underline-offset-2 hover:underline"
+                  href="https://revoke.cash/"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Review/revoke approvals <ExternalLink className="size-3" />
+                </a>
+              </div>
+            </aside>
 
             {!isConnected && (
               <div className="mt-1 rounded-lg border border-amber-100 bg-amber-50/50 p-4 text-center text-sm text-amber-800">
@@ -356,7 +285,7 @@ export default function Swap() {
           </div>
         </div>
         {/* Trade comparison and market tools */}
-        <div className="order-2 min-w-0 lg:col-span-2">
+        <div className="order-2 min-w-0 lg:col-span-3">
           <PriceChart swap={activeSwap} />
 
           <MarketScanner />

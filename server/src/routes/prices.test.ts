@@ -67,7 +67,7 @@ describe('POST /api/prices', () => {
     stubMarketData({
       ETH,
       [PRICED]: { status: 200, body: { symbol: 'TKN', priceUsd: 0.5, change24hPercent: 2 } },
-      [NO_POOL]: { status: 404, body: { detail: 'No Uniswap V2 / Aerodrome pool with at least $25,000 liquidity' } },
+      [NO_POOL]: { status: 404, body: { detail: 'No Uniswap V2 / Aerodrome pool with at least $100 liquidity' } },
       [LIMITED]: { status: 429 },
     });
     const res = await scan(await freshApp(), 8453, [PRICED, NO_POOL, LIMITED]);

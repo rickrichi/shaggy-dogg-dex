@@ -10,6 +10,7 @@ import "./GovernanceToken.sol";
 contract FeeDiscountStaking {
     uint256 private constant _NOT_ENTERED = 1;
     uint256 private constant _ENTERED = 2;
+    uint256 public constant MAXIMUM_STAKE_PERIOD = 365 days;
 
     // --- Structs ---
     struct Tier {
@@ -25,9 +26,11 @@ contract FeeDiscountStaking {
 
     uint256 public minimumStakePeriod;
     uint16 public withdrawalFeeBps;
+    uint256 public accruedFees; // unstake fees held here, withdrawable by admin
 
     mapping(address => uint256) public stakedBalance;
     mapping(address => uint256) public stakeTimestamp;
+    mapping(address => uint256) public unlockTimestamp;
 
     Tier[] public tiers;
     uint256 private _reentrancyStatus = _NOT_ENTERED;
@@ -40,6 +43,7 @@ contract FeeDiscountStaking {
     event MinimumStakePeriodUpdated(uint256 period);
     event AdminChanged(address newAdmin);
     event TierAdminChanged(address newTierAdmin);
+    event FeesWithdrawn(address indexed recipient, uint256 amount);
 
     constructor(
         address tokenAddress,
@@ -90,6 +94,7 @@ contract FeeDiscountStaking {
     }
 
     function setMinimumStakePeriod(uint256 period) external onlyAdmin {
+        require(period <= MAXIMUM_STAKE_PERIOD, "Lock exceeds maximum");
         minimumStakePeriod = period;
         emit MinimumStakePeriodUpdated(period);
     }
@@ -106,6 +111,19 @@ contract FeeDiscountStaking {
         emit TierAdminChanged(newTierAdmin);
     }
 
+    /// @notice Pays out collected unstake fees. Bounded by accruedFees, so stakes are out of reach.
+    function withdrawFees(address to, uint256 amount) external onlyAdmin nonReentrant {
+        require(to != address(0), "Invalid");
+        require(amount > 0 && amount <= accruedFees, "Exceeds fees");
+
+        accruedFees -= amount;
+        emit FeesWithdrawn(to, amount);
+
+        // Guarded by nonReentrant; the linter does not model modifier state.
+        // forge-lint: disable-next-line(reentrancy-no-eth)
+        require(token.transfer(to, amount), "Transfer failed");
+    }
+
     // --- Staking Logic ---
 
     function stake(uint256 amount) external nonReentrant {
@@ -117,6 +135,10 @@ contract FeeDiscountStaking {
         stakedBalance[msg.sender] += amount;
         // forge-lint: disable-next-line(missing-events-access-control)
         stakeTimestamp[msg.sender] = block.timestamp;
+        // Snapshot the unlock time so later admin changes only affect future stakes. Adding to an
+        // existing position intentionally resets the lock for the whole position.
+        // forge-lint: disable-next-line(missing-events-access-control)
+        unlockTimestamp[msg.sender] = block.timestamp + minimumStakePeriod;
         emit Staked(msg.sender, amount);
 
         // Guarded by nonReentrant; the linter does not model modifier state.
@@ -130,17 +152,15 @@ contract FeeDiscountStaking {
 
         // A timestamp is the intended clock for a multi-day stake lock. Miner
         // drift is negligible relative to the configured seven-day period.
-        require(
-            // forge-lint: disable-next-line(block-timestamp)
-            block.timestamp >= stakeTimestamp[msg.sender] + minimumStakePeriod,
-            "Stake locked"
-        );
+        // forge-lint: disable-next-line(block-timestamp)
+        require(block.timestamp >= unlockTimestamp[msg.sender], "Stake locked");
 
         // forge-lint: disable-next-line(missing-events-access-control)
         stakedBalance[msg.sender] -= amount;
 
         uint256 fee = (amount * withdrawalFeeBps) / 10_000;
         uint256 payout = amount - fee;
+        accruedFees += fee;
 
         emit Unstaked(msg.sender, amount, fee);
 

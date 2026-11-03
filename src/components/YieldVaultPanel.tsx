@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { VaultDeploymentPanel } from "@/components/VaultDeploymentPanel";
 import { positiveAmount } from "@/lib/amm/own-dex";
+import { bufferedGas } from "@/lib/gas";
 
 const abi = parseAbi([
   "function underlyingAsset() view returns (address)",
@@ -34,7 +35,9 @@ const abi = parseAbi([
 ]);
 const configured = import.meta.env.VITE_YIELD_VAULT_ADDRESS as string | undefined;
 export const CANONICAL_YIELD_VAULT: Address = "0x5c98f6bc9d17ba0eb02e1336bdf035938f5859e5";
-// The discount-staking contract this vault was deployed with (fixed at construction).
+// This remains the retired AMUTT staking address because the vault stores it at construction.
+// The staking replacement is 0x2e7458d55de45d6a9edebed710aac9b6575d3dd1; moving the vault to it
+// requires a separate vault deployment and user-share migration.
 const VAULT_DISCOUNT_STAKING: Address = "0x055BB4eD8d5464C25D71391E940ce53CA30845fC";
 const vault: Address =
   configured && isAddress(configured) ? (configured as Address) : CANONICAL_YIELD_VAULT;
@@ -145,16 +148,18 @@ export function YieldVaultPanel() {
             throw new Error("Approval reverted.");
         }
       }
-      const { request } = await client.simulateContract({
+      const vaultCall = {
         address: vault,
         abi,
         functionName: withdraw ? "withdraw" : "deposit",
         args: [value],
         account: address,
-      });
+      } as const;
+      const { request } = await client.simulateContract(vaultCall);
+      const gas = bufferedGas(await client.estimateContractGas(vaultCall));
       await assertWallet();
       setMessage("Confirm the vault transaction in your wallet.");
-      const tx = await wallet.writeContract({ ...request, chain: base });
+      const tx = await wallet.writeContract({ ...request, gas, chain: base });
       setHash(tx);
       setMessage("Waiting for Base confirmation.");
       if ((await client.waitForTransactionReceipt({ hash: tx })).status !== "success")

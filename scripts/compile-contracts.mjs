@@ -24,9 +24,8 @@ const files = [
   "AaveFlashBorrower.sol",
   "YieldStakingVault.sol",
   "CompoundYieldVault.sol",
-  "IsolatedLendingVault.sol",
-  "DeployEcosystem.sol",
   "AtomicFlashArbitrageRouter.sol",
+  "LaunchpadSuiteDeployer.sol",
 ];
 const sources = {};
 

@@ -11,19 +11,41 @@ const origin = 'http://127.0.0.1:5174';
 if (!app.requestSingleInstanceLock()) app.quit();
 else app.whenReady().then(async () => {
   const root = app.isPackaged ? process.resourcesPath : path.resolve(__dirname, '..');
+  const configFile = path.join(app.getPath('userData'), 'backend.env');
+  fs.mkdirSync(app.getPath('userData'), { recursive: true });
+  if (!fs.existsSync(configFile)) {
+    fs.copyFileSync(path.join(app.isPackaged ? root : __dirname, 'backend.env.example'), configFile);
+  }
   const executable = app.isPackaged
     ? path.join(root, 'backend', 'shaggy-arb', 'shaggy-arb.exe')
     : path.join(root, '.desktop-build', 'dist', 'shaggy-arb', 'shaggy-arb.exe');
   try {
     const response = await fetch('http://127.0.0.1:8000/api/config', { signal: AbortSignal.timeout(1500) });
     if (!response.ok) throw new Error('Backend unavailable');
+    const config = await response.json();
+    if (config.service !== 'shaggy-arb' || config.version !== '2.1.0') {
+      dialog.showErrorBox('Older backend is running', 'Close the service on port 8000, then reopen this app to start the updated backend.');
+      app.quit(); return;
+    }
   } catch {
     if (fs.existsSync(executable)) {
       backend = spawn(executable, [], { cwd: app.getPath('userData'), windowsHide: true,
-        env: { ...process.env, ARB_CORS_ORIGINS: JSON.stringify([origin, 'http://localhost:5173']), ARB_DESKTOP_ENV: path.join(app.getPath('userData'), 'backend.env') }, stdio: 'ignore' });
+        env: { ...process.env, ARB_CORS_ORIGINS: JSON.stringify([origin, 'http://localhost:5173']),
+          ARB_DESKTOP_ENV: configFile, ARB_DATA_PATH: path.join(app.getPath('userData'), 'data', 'arb.sqlite') }, stdio: 'ignore' });
       backend.on('error', () => dialog.showErrorBox('Backend could not start', 'Check your desktop backend installation.'));
     } else dialog.showErrorBox('Backend not bundled', 'Run the desktop backend build or start crypto-arb on port 8000.');
   }
+  let ready = false;
+  for (let attempt = 0; attempt < 60; attempt++) {
+    try {
+      const response = await fetch('http://127.0.0.1:8000/api/config', { signal: AbortSignal.timeout(1000) });
+      const config = response.ok ? await response.json() : {};
+      if (config.service === 'shaggy-arb' && config.version === '2.1.0') { ready = true; break; }
+    } catch {}
+    if (backend && backend.exitCode !== null) break;
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+  if (!ready) { dialog.showErrorBox('Backend unavailable', 'The local desk could not start. Check backend.env in the configuration folder.'); app.quit(); return; }
   try { server = await startUiServer(path.join(root, 'dist')); }
   catch { dialog.showErrorBox('Desktop port unavailable', 'Port 5174 is already in use. Close the other process and reopen the app.'); app.quit(); return; }
   window = new BrowserWindow({ width: 1440, height: 960, webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true } });
@@ -40,6 +62,7 @@ else app.whenReady().then(async () => {
   Menu.setApplicationMenu(Menu.buildFromTemplate([{ label: 'Shaggy-Dogg-Dex', submenu: [
     { label: 'Open wallet browser', click: () => shell.openExternal(origin + '/swap') },
     { label: 'Configuration folder', click: () => shell.openPath(app.getPath('userData')) },
+    { label: 'Edit exchange settings (restart to apply)', click: () => shell.openPath(configFile) },
     { label: 'Start Base scanner (quotes only)', click: () => {
       if (scanner) return;
       const scannerPath = app.isPackaged ? path.join(root, 'daemon', 'scanner.cjs') : path.join(root, '.desktop-build', 'daemon', 'scanner.cjs');

@@ -17,9 +17,9 @@ contract YieldStakingVault {
     uint256 private constant _ENTERED = 2;
 
     IERC20 public immutable underlyingAsset;
-    address public aavePool;
-    address public aToken;
-    FeeDiscountStaking public discountStaking;
+    address public immutable aavePool;
+    address public immutable aToken;
+    FeeDiscountStaking public immutable discountStaking;
 
     address public admin;
     address public treasury;
@@ -37,6 +37,7 @@ contract YieldStakingVault {
     uint256 public totalShares;
     mapping(address => uint256) public sharesOf;
     mapping(address => uint256) public principalDeposited;
+    bool public paused;
 
     uint256 private _reentrancyStatus = _NOT_ENTERED;
 
@@ -45,7 +46,8 @@ contract YieldStakingVault {
     event PerformanceFeeUpdated(uint16 newFeeBps);
     event AdminChanged(address indexed newAdmin);
     event TreasuryChanged(address indexed newTreasury);
-    event AavePoolUpdated(address indexed newPool, address indexed newAToken);
+    event PauseUpdated(bool paused);
+    event EmergencyAaveWithdrawal(uint256 amountWithdrawn);
 
     modifier onlyAdmin() {
         require(msg.sender == admin, "Not admin");
@@ -68,15 +70,16 @@ contract YieldStakingVault {
         address _treasury
     ) {
         require(_underlyingAsset != address(0), "Invalid asset");
+        require(_aavePool != address(0), "Invalid Aave pool");
+        require(_aToken != address(0), "Invalid aToken");
+        require(_discountStaking != address(0), "Invalid staking");
         require(_admin != address(0), "Invalid admin");
         require(_treasury != address(0), "Invalid treasury");
 
         underlyingAsset = IERC20(_underlyingAsset);
         aavePool = _aavePool;
         aToken = _aToken;
-        if (_discountStaking != address(0)) {
-            discountStaking = FeeDiscountStaking(_discountStaking);
-        }
+        discountStaking = FeeDiscountStaking(_discountStaking);
         admin = _admin;
         treasury = _treasury;
     }
@@ -95,14 +98,23 @@ contract YieldStakingVault {
 
     function setPerformanceFee(uint16 newFeeBps) external onlyAdmin {
         require(newFeeBps <= 3000, "Max 30% fee");
+        require(totalShares == 0 || newFeeBps <= performanceFeeBps, "Active fee increase");
         performanceFeeBps = newFeeBps;
         emit PerformanceFeeUpdated(newFeeBps);
     }
 
-    function setAavePoolAndAToken(address newPool, address newAToken) external onlyAdmin {
-        aavePool = newPool;
-        aToken = newAToken;
-        emit AavePoolUpdated(newPool, newAToken);
+    function setPaused(bool newPaused) external onlyAdmin {
+        paused = newPaused;
+        emit PauseUpdated(newPaused);
+    }
+
+    /// @notice While paused, pulls assets from the immutable Aave market back into this vault.
+    ///         Assets remain reserved for share withdrawals and cannot be sent to the administrator.
+    function emergencyWithdrawFromAave(uint256 amount) external onlyAdmin nonReentrant returns (uint256 withdrawn) {
+        require(paused, "Not paused");
+        require(amount > 0, "Zero amount");
+        withdrawn = IPool(aavePool).withdraw(address(underlyingAsset), amount, address(this));
+        emit EmergencyAaveWithdrawal(withdrawn);
     }
 
     /**
@@ -120,6 +132,7 @@ contract YieldStakingVault {
      * @notice Deposit underlying tokens, supply to Aave, and receive vault shares
      */
     function deposit(uint256 amount) external nonReentrant returns (uint256 shares) {
+        require(!paused, "Deposits paused");
         require(amount > 0, "Zero amount");
 
         uint256 assetsBefore = totalAssets();
@@ -127,11 +140,9 @@ contract YieldStakingVault {
         // Transfer tokens from user to vault
         require(underlyingAsset.transferFrom(msg.sender, address(this), amount), "Transfer failed");
 
-        // Supply to Aave if pool is set
-        if (aavePool != address(0)) {
-            underlyingAsset.approve(aavePool, amount);
-            IPool(aavePool).supply(address(underlyingAsset), amount, address(this), 0);
-        }
+        // Supply to the immutable canonical Aave market.
+        underlyingAsset.approve(aavePool, amount);
+        IPool(aavePool).supply(address(underlyingAsset), amount, address(this), 0);
 
         // Virtual shares/assets (decimals offset) make a first-depositor donation unprofitable.
         shares = (amount * (totalShares + VIRTUAL_SHARES)) / (assetsBefore + VIRTUAL_ASSETS);
@@ -171,11 +182,9 @@ contract YieldStakingVault {
             uint256 yieldProfit = grossAmount - principalPortion;
             uint16 effectiveFeeBps = performanceFeeBps;
 
-            // Apply SD staker discount if discountStaking is configured
-            if (address(discountStaking) != address(0)) {
-                uint16 discountBps = discountStaking.getTier(msg.sender);
-                effectiveFeeBps = FeeDiscountMath.discountedFee(effectiveFeeBps, discountBps);
-            }
+            // Apply the linked launch-token staking discount.
+            uint16 discountBps = discountStaking.getTier(msg.sender);
+            effectiveFeeBps = FeeDiscountMath.discountedFee(effectiveFeeBps, discountBps);
 
             fee = (yieldProfit * effectiveFeeBps) / 10_000;
         }
@@ -183,7 +192,7 @@ contract YieldStakingVault {
         netPayout = grossAmount - fee;
 
         // Withdraw from Aave if needed
-        if (aavePool != address(0) && underlyingAsset.balanceOf(address(this)) < grossAmount) {
+        if (underlyingAsset.balanceOf(address(this)) < grossAmount) {
             uint256 deficit = grossAmount - underlyingAsset.balanceOf(address(this));
             IPool(aavePool).withdraw(address(underlyingAsset), deficit, address(this));
         }

@@ -60,6 +60,8 @@ contract FixedSupplyToken {
 
     function _transfer(address from, address to, uint256 amount) internal {
         require(to != address(0), "Zero address");
+        // Tokens sent to the token contract itself could never be recovered (it has no owner).
+        require(to != address(this), "Transfer to token contract");
         require(_balances[from] >= amount, "Balance too low");
 
         unchecked {

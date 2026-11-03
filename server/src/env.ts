@@ -44,6 +44,20 @@ const EnvSchema = z.object({
 
   // Launchpad launch tracking: Base RPC used to verify reported launches, and its SQLite file.
   BASE_RPC_URL: z.url().default('https://mainnet.base.org'),
+  PAYMASTER_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
+  PAYMASTER_SIGNER_PRIVATE_KEY: z.string().regex(/^0x[0-9a-fA-F]{64}$/).optional(),
+  PAYMASTER_BUNDLER_URL: z.url().optional(),
+  PAYMASTER_ELIGIBILITY_MODE: z.enum(['open_portfolio', 'allowlist']).default('open_portfolio'),
+  // Optional wallet allowlist (always eligible in open_portfolio mode, or required in allowlist mode).
+  PAYMASTER_ALLOWED_WALLETS: z.string().default('').transform((raw, ctx) => {
+    const wallets = raw.split(',').map((address) => address.trim().toLowerCase()).filter(Boolean)
+    for (const wallet of wallets) {
+      if (!/^0x[0-9a-f]{40}$/.test(wallet)) {
+        ctx.addIssue({ code: 'custom', message: `Invalid PAYMASTER_ALLOWED_WALLETS address: ${wallet}` })
+      }
+    }
+    return wallets
+  }),
   LAUNCH_DB_PATH: z.string().default('data/launches.sqlite'),
   // Set both to keep launch records in Supabase instead (survives restarts of ephemeral hosts).
   // The service key is server-only; never expose it through a VITE_ variable.

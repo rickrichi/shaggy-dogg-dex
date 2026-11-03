@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { ARB_API_URL } from "@/config/crypto-arb";
+import { ARB_API_URL, ARB_PRIVATE_API } from "@/config/crypto-arb";
 
 export interface LiveAccount {
   configured: boolean;
-  mode: "live";
+  mode: "live" | "paper";
   endpointVerified?: boolean;
   endpoint?: string;
   inventoryVerified: boolean;
@@ -31,6 +31,8 @@ export function useLiveAccounts() {
   const [now, setNow] = useState(Date.now);
 
   const refresh = useCallback(async () => {
+    // Accounts live only in the local crypto-arb backend; the public site has none to ask.
+    if (!ARB_PRIVATE_API) return;
     const results = await Promise.allSettled(
       (["alpaca", "kraken"] as const).map(async (venue) => {
         const response = await fetch(`${ARB_API_URL}/api/${venue}/account`, {
@@ -50,6 +52,7 @@ export function useLiveAccounts() {
   }, []);
 
   useEffect(() => {
+    if (!ARB_PRIVATE_API) return;
     const source = new EventSource(`${ARB_API_URL}/api/accounts/stream`);
     source.onmessage = (event) => {
       try {
@@ -77,7 +80,12 @@ export function useLiveAccounts() {
     return {
       ...value,
       configured: value.configured && value.mode === "live" && !stale,
-      error: stale ? "Balance update is stale; reconnecting" : value.error,
+      error:
+        value.mode === "paper"
+          ? "Alpaca paper account: unavailable for live cross-venue trading"
+          : stale
+            ? "Balance update is stale; reconnecting"
+            : value.error,
     };
   };
 

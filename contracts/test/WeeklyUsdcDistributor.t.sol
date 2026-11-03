@@ -2,63 +2,19 @@
 pragma solidity 0.8.28;
 
 import "../src/WeeklyUsdcDistributor.sol";
+import {BaseForkSupport, ForkToken} from "./BaseForkSupport.sol";
 
-interface Vm {
-    function warp(uint256) external;
-    function prank(address) external;
-    function expectRevert(bytes calldata) external;
+interface FiatTokenAdmin {
+    function blacklister() external view returns (address);
+    function blacklist(address account) external;
 }
 
-contract MockUsdc {
-    uint8 public decimals = 6;
-    uint256 public transferFeeBps;
-    mapping(address => uint256) public balanceOf;
-    mapping(address => mapping(address => uint256)) public allowance;
-
-    constructor(uint8 tokenDecimals) {
-        decimals = tokenDecimals;
-    }
-
-    function mint(address to, uint256 amount) external {
-        balanceOf[to] += amount;
-    }
-
-    function setTransferFee(uint256 feeBps) external {
-        transferFeeBps = feeBps;
-    }
-
-    function approve(address spender, uint256 amount) external returns (bool) {
-        allowance[msg.sender][spender] = amount;
-        return true;
-    }
-
-    function transfer(address to, uint256 amount) external returns (bool) {
-        _move(msg.sender, to, amount);
-        return true;
-    }
-
-    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
-        require(allowance[from][msg.sender] >= amount, "Allowance");
-        allowance[from][msg.sender] -= amount;
-        _move(from, to, amount);
-        return true;
-    }
-
-    function _move(address from, address to, uint256 amount) private {
-        require(balanceOf[from] >= amount, "Balance");
-        uint256 fee = (amount * transferFeeBps) / 10_000;
-        balanceOf[from] -= amount;
-        balanceOf[to] += amount - fee;
-    }
-}
-
-contract WeeklyUsdcDistributorTest {
-    Vm constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
-
-    uint64 constant ORIGIN = 1_000_000;
+/// WeeklyUsdcDistributor against real Base USDC on a mainnet fork. The owner buys its USDC on
+/// Aerodrome; no mock token, minting or storage edits.
+contract WeeklyUsdcDistributorTest is BaseForkSupport {
     uint256 constant WEEK = 7 days;
 
-    MockUsdc usdc;
+    uint64 origin;
     WeeklyUsdcDistributor distributor;
 
     address owner = address(0x0A11);
@@ -74,12 +30,16 @@ contract WeeklyUsdcDistributorTest {
     bytes32 constant LEDGER = keccak256("epoch ledger");
 
     function setUp() public {
-        vm.warp(ORIGIN);
-        usdc = new MockUsdc(6);
-        distributor = new WeeklyUsdcDistributor(address(usdc), owner, ORIGIN);
-        usdc.mint(owner, 1_000e6);
+        _fork();
+        origin = uint64(block.timestamp);
+        distributor = new WeeklyUsdcDistributor(USDC, owner, origin);
+        require(_buyUsdc(owner, 1 ether) >= 1_000e6, "owner funded with real USDC");
         vm.prank(owner);
-        usdc.approve(address(distributor), type(uint256).max);
+        ForkToken(USDC).approve(address(distributor), type(uint256).max);
+    }
+
+    function _usdc(address who) internal view returns (uint256) {
+        return ForkToken(USDC).balanceOf(who);
     }
 
     // --- Merkle helpers: same leaf and sorted-pair rules as src/lib/rewards.ts ---
@@ -116,43 +76,59 @@ contract WeeklyUsdcDistributorTest {
     }
 
     function _publish(uint256 epochId, bytes32 root, uint256 allocation) internal {
-        vm.warp(uint256(ORIGIN) + epochId * WEEK);
+        vm.warp(uint256(origin) + epochId * WEEK);
         vm.prank(owner);
         distributor.publishEpoch(epochId, root, LEDGER, allocation);
     }
 
     // --- Construction ---
 
-    function test_ConstructorRejectsNonSixDecimalToken() public {
-        MockUsdc wrong = new MockUsdc(18);
-        vm.expectRevert(bytes("Expected 6 decimals"));
-        new WeeklyUsdcDistributor(address(wrong), owner, ORIGIN);
+    /// External so each reverting constructor is caught; `vm.expectRevert` before `new` would end
+    /// the test at the first revert and skip the remaining cases.
+    function deploy(address token, address initialOwner, uint64 epochOrigin) external returns (address) {
+        return address(new WeeklyUsdcDistributor(token, initialOwner, epochOrigin));
     }
 
-    function test_ConstructorRejectsZeroOwnerAndOrigin() public {
-        vm.expectRevert(bytes("Invalid address"));
-        new WeeklyUsdcDistributor(address(usdc), address(0), ORIGIN);
-        vm.expectRevert(bytes("Invalid origin"));
-        new WeeklyUsdcDistributor(address(usdc), owner, 0);
+    function _expectDeployRevert(address token, address initialOwner, uint64 epochOrigin, string memory reason)
+        internal
+    {
+        try this.deploy(token, initialOwner, epochOrigin) {
+            revert(string.concat("deployed despite: ", reason));
+        } catch Error(string memory actual) {
+            require(keccak256(bytes(actual)) == keccak256(bytes(reason)), actual);
+        }
+    }
+
+    function test_ConstructorRejectsNonSixDecimalToken() public {
+        _expectDeployRevert(WETH, owner, origin, "Expected 6 decimals"); // real WETH has 18
+    }
+
+    function test_ConstructorRejectsZeroOwnerOriginAndNonContractToken() public {
+        _expectDeployRevert(USDC, address(0), origin, "Invalid address");
+        _expectDeployRevert(USDC, owner, 0, "Invalid origin");
+        _expectDeployRevert(alice, owner, origin, "Invalid address"); // a wallet, not a token
+        require(this.deploy(USDC, owner, origin) != address(0), "real USDC accepted");
     }
 
     // --- Publication ---
 
     function test_PublishFundsAllocationAtomically() public {
         (bytes32 root,,,) = _tree(1);
+        uint256 ownerBefore = _usdc(owner);
         _publish(1, root, TOTAL);
 
         (bytes32 storedRoot, bytes32 ledgerHash, uint256 allocated, uint256 claimed) = distributor.epochs(1);
         require(storedRoot == root && ledgerHash == LEDGER, "Epoch identity");
         require(allocated == TOTAL && claimed == 0, "Epoch amounts");
-        require(usdc.balanceOf(address(distributor)) == TOTAL, "Not funded");
+        require(_usdc(address(distributor)) == TOTAL, "Not funded");
+        require(ownerBefore - _usdc(owner) == TOTAL, "Pulled exactly the allocation");
         require(distributor.totalReserved() == TOTAL, "Reserve");
         require(distributor.lastPublishedEpoch() == 1, "Sequence");
     }
 
     function test_OnlyOwnerPublishes() public {
         (bytes32 root,,,) = _tree(1);
-        vm.warp(uint256(ORIGIN) + WEEK);
+        vm.warp(uint256(origin) + WEEK);
         vm.prank(alice);
         vm.expectRevert(bytes("Not owner"));
         distributor.publishEpoch(1, root, LEDGER, TOTAL);
@@ -160,7 +136,7 @@ contract WeeklyUsdcDistributorTest {
 
     function test_CannotPublishBeforeEpochEnds() public {
         (bytes32 root,,,) = _tree(1);
-        vm.warp(uint256(ORIGIN) + WEEK - 1);
+        vm.warp(uint256(origin) + WEEK - 1);
         vm.prank(owner);
         vm.expectRevert(bytes("Epoch not ended"));
         distributor.publishEpoch(1, root, LEDGER, TOTAL);
@@ -168,7 +144,7 @@ contract WeeklyUsdcDistributorTest {
 
     function test_EpochsMustBeSequentialAndNotReused() public {
         (bytes32 root,,,) = _tree(2);
-        vm.warp(uint256(ORIGIN) + 2 * WEEK);
+        vm.warp(uint256(origin) + 2 * WEEK);
         vm.prank(owner);
         vm.expectRevert(bytes("Epoch out of sequence"));
         distributor.publishEpoch(2, root, LEDGER, TOTAL);
@@ -180,7 +156,7 @@ contract WeeklyUsdcDistributorTest {
     }
 
     function test_EmptyEpochRequiresZeroRootAndLedgerHash() public {
-        vm.warp(uint256(ORIGIN) + WEEK);
+        vm.warp(uint256(origin) + WEEK);
         vm.prank(owner);
         vm.expectRevert(bytes("Invalid allocation root"));
         distributor.publishEpoch(1, bytes32(0), LEDGER, 1);
@@ -190,16 +166,16 @@ contract WeeklyUsdcDistributorTest {
         distributor.publishEpoch(1, bytes32(0), bytes32(0), 0);
 
         _publish(1, bytes32(0), 0);
-        require(usdc.balanceOf(address(distributor)) == 0, "Empty epoch moved funds");
+        require(_usdc(address(distributor)) == 0, "Empty epoch moved funds");
     }
 
-    function test_FeeOnTransferFundingReverts() public {
+    function test_PublishRevertsWhenOwnerCannotFundIt() public {
         (bytes32 root,,,) = _tree(1);
-        usdc.setTransferFee(1);
-        vm.warp(uint256(ORIGIN) + WEEK);
+        vm.warp(uint256(origin) + WEEK);
+        uint256 held = _usdc(owner);
         vm.prank(owner);
-        vm.expectRevert(bytes("Funding mismatch"));
-        distributor.publishEpoch(1, root, LEDGER, TOTAL);
+        try distributor.publishEpoch(1, root, LEDGER, held + 1) { revert("published unfunded"); } catch {}
+        require(distributor.lastPublishedEpoch() == 0 && _usdc(owner) == held, "nothing moved");
     }
 
     // --- Claims ---
@@ -216,10 +192,10 @@ contract WeeklyUsdcDistributorTest {
         vm.prank(carol);
         distributor.claim(1, carol, CAROL_AMOUNT, carolProof);
 
-        require(usdc.balanceOf(alice) == ALICE_AMOUNT, "Alice payout");
-        require(usdc.balanceOf(bob) == BOB_AMOUNT, "Bob payout");
-        require(usdc.balanceOf(carol) == CAROL_AMOUNT, "Carol payout");
-        require(usdc.balanceOf(address(distributor)) == 0, "Residual balance");
+        require(_usdc(alice) == ALICE_AMOUNT, "Alice payout");
+        require(_usdc(bob) == BOB_AMOUNT, "Bob payout");
+        require(_usdc(carol) == CAROL_AMOUNT, "Carol payout");
+        require(_usdc(address(distributor)) == 0, "Residual balance");
         require(distributor.totalReserved() == 0, "Residual reserve");
         (,,, uint256 claimed) = distributor.epochs(1);
         require(claimed == TOTAL, "Claimed total");
@@ -235,8 +211,8 @@ contract WeeklyUsdcDistributorTest {
 
         vm.prank(relayer);
         distributor.claim(1, alice, ALICE_AMOUNT, aliceProof);
-        require(usdc.balanceOf(alice) == ALICE_AMOUNT, "Alice not paid");
-        require(usdc.balanceOf(relayer) == 0, "Relayer paid");
+        require(_usdc(alice) == ALICE_AMOUNT, "Alice not paid");
+        require(_usdc(relayer) == 0, "Relayer paid");
         require(distributor.hasClaimed(1, alice), "Claim not recorded");
     }
 
@@ -290,6 +266,21 @@ contract WeeklyUsdcDistributorTest {
         // Epoch 1 funds remain intact for its recipients.
         distributor.claim(1, carol, CAROL_AMOUNT, carolProof1);
         require(distributor.totalReserved() == ALICE_AMOUNT + BOB_AMOUNT, "Epoch 1 reserve");
+    }
+
+    /// Real USDC can freeze an address. A frozen recipient's claim fails; everyone else is unaffected
+    /// and the frozen share stays reserved rather than leaking to other claims.
+    function test_BlocklistedRecipientCannotClaimAndOthersAreUnaffected() public {
+        (bytes32 root, bytes32[] memory aliceProof, bytes32[] memory bobProof,) = _tree(1);
+        _publish(1, root, TOTAL);
+        vm.prank(FiatTokenAdmin(USDC).blacklister());
+        FiatTokenAdmin(USDC).blacklist(alice);
+
+        try distributor.claim(1, alice, ALICE_AMOUNT, aliceProof) { revert("paid a frozen address"); } catch {}
+        require(!distributor.hasClaimed(1, alice), "failed claim not recorded");
+        distributor.claim(1, bob, BOB_AMOUNT, bobProof);
+        require(_usdc(bob) == BOB_AMOUNT, "Bob still paid");
+        require(distributor.totalReserved() == ALICE_AMOUNT + CAROL_AMOUNT, "Alice's share stays reserved");
     }
 
     // --- Ownership ---

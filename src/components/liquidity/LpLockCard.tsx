@@ -28,19 +28,24 @@ import {
   SOVEREIGN_V3_TIMELOCK_ADDRESS,
   V3_POSITION_MANAGER_ABI,
 } from "@/config/dex/v3TimelockAbi";
+import { useStakedPortfolio } from "@/hooks/useStakedPortfolio";
 import { CANONICAL_BASE_CONTRACTS } from "@/lib/launchpad/constants";
+
+import type { V3Position } from "@/lib/staked-positions";
 
 export const LOCKER_PLATFORMS = [
   {
     name: "UNCX Network",
-    description: "Premier decentralized LP locker. Direct native support for Uniswap V3 position NFTs on Base.",
+    description:
+      "Premier decentralized LP locker. Direct native support for Uniswap V3 position NFTs on Base.",
     url: "https://app.uncx.network/lockers/manage/lockers-v3",
     badge: "Official Base Partner",
     fee: "0.1 ETH",
   },
   {
     name: "FlokiFi Locker",
-    description: "Multi-chain digital asset and NFT locker by Floki supporting Base liquidity locking.",
+    description:
+      "Multi-chain digital asset and NFT locker by Floki supporting Base liquidity locking.",
     url: "https://www.flokifi.com/",
     badge: "Audited by CertiK",
     fee: "$100 USDT",
@@ -54,18 +59,76 @@ export const LOCKER_PLATFORMS = [
   },
 ] as const;
 
-// Base Mainnet Contracts & Position
-const SD_V3_POOL: Address = "0x449730674404a29856c6b1e5941549d73c5b8f10";
-const SD_V3_NFT_TOKEN_ID = 6245990n;
 const V3_POSITION_MANAGER: Address = CANONICAL_BASE_CONTRACTS.UniswapV3PositionManager;
 
 type LockDuration = 3 | 12;
 
+const pairLabel = (position: V3Position) =>
+  `${position.token0Symbol} / ${position.token1Symbol} ${position.fee / 10_000}%`;
+
+/**
+ * The locker for the connected wallet's own positions: those it can lock, and those it has locked.
+ * Staked positions are left out, because the staker holds them until they are withdrawn.
+ */
 export function LpLockCard() {
+  const { address, isConnected } = useAccount();
+  const portfolio = useStakedPortfolio(address);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const positions = useMemo(
+    () => (portfolio.data?.positions ?? []).filter((p) => p.custody !== "staker"),
+    [portfolio.data]
+  );
+  const selected = positions.find((p) => p.tokenId === selectedId) ?? positions[0];
+
+  if (!selected) {
+    return (
+      <Card className="border-indigo-200/80 bg-white shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-lg font-bold text-gray-900">
+            Sovereign V3 Liquidity Locker
+          </CardTitle>
+          <CardDescription className="text-xs text-gray-500">
+            Non-custodial timelock for your own Uniswap V3 positions on Base Mainnet.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="text-sm text-gray-600">
+          {!isConnected
+            ? "Connect a wallet to lock a position or manage your locks."
+            : portfolio.isError
+              ? "Could not load your positions. Please refresh."
+              : portfolio.isPending || portfolio.isFetching
+                ? "Finding your positions…"
+                : "This wallet has no V3 positions to lock or manage."}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <LockerControls
+      key={selected.tokenId}
+      position={selected}
+      positions={positions}
+      onSelect={setSelectedId}
+      onChanged={() => void portfolio.refetch()}
+    />
+  );
+}
+
+interface LockerControlsProps {
+  position: V3Position;
+  positions: readonly V3Position[];
+  onSelect: (tokenId: string) => void;
+  onChanged: () => void;
+}
+
+function LockerControls({ position, positions, onSelect, onChanged }: LockerControlsProps) {
   const { address: userAddress, isConnected } = useAccount();
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
 
+  const selectedTokenId = BigInt(position.tokenId);
   const [selectedDuration, setSelectedDuration] = useState<LockDuration>(12);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [isApproving, setIsApproving] = useState(false);
@@ -73,6 +136,19 @@ export function LpLockCard() {
   const [isHarvesting, setIsHarvesting] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [showExternalLockers, setShowExternalLockers] = useState(false);
+  const [simulatedFees, setSimulatedFees] = useState<{ amount0: bigint; amount1: bigint } | null>(
+    null
+  );
+
+  const selectedPreset = useMemo(
+    () => ({
+      label: `NFT #${position.tokenId} (${pairLabel(position)})`,
+      pool: position.pool,
+      token0Symbol: position.token0Symbol,
+      token1Symbol: position.token1Symbol,
+    }),
+    [position]
+  );
 
   // Live countdown state
   const [timeLeft, setTimeLeft] = useState<{
@@ -84,14 +160,11 @@ export function LpLockCard() {
   } | null>(null);
 
   // 1. Check Owner of the Position NFT
-  const {
-    data: nftOwner,
-    refetch: refetchNftOwner,
-  } = useReadContract({
+  const { data: nftOwner, refetch: refetchNftOwner } = useReadContract({
     address: V3_POSITION_MANAGER,
     abi: V3_POSITION_MANAGER_ABI,
     functionName: "ownerOf",
-    args: [SD_V3_NFT_TOKEN_ID],
+    args: [selectedTokenId],
     chainId: 8453,
     query: {
       refetchInterval: 5_000,
@@ -99,14 +172,11 @@ export function LpLockCard() {
   });
 
   // 2. Check Timelock Details from Sovereign Contract
-  const {
-    data: lockData,
-    refetch: refetchLock,
-  } = useReadContract({
+  const { data: lockData, refetch: refetchLock } = useReadContract({
     address: SOVEREIGN_V3_TIMELOCK_ADDRESS,
     abi: SOVEREIGN_V3_TIMELOCK_ABI,
     functionName: "getLock",
-    args: [SD_V3_NFT_TOKEN_ID],
+    args: [selectedTokenId],
     chainId: 8453,
     query: {
       refetchInterval: 5_000,
@@ -114,28 +184,25 @@ export function LpLockCard() {
   });
 
   // 3. Check Approval for Timelock Contract
-  const {
-    data: approvedAddress,
-    refetch: refetchApproval,
-  } = useReadContract({
+  const { data: approvedAddress, refetch: refetchApproval } = useReadContract({
     address: V3_POSITION_MANAGER,
     abi: V3_POSITION_MANAGER_ABI,
     functionName: "getApproved",
-    args: [SD_V3_NFT_TOKEN_ID],
+    args: [selectedTokenId],
     chainId: 8453,
     query: {
       refetchInterval: 5_000,
     },
   });
 
-  const {
-    data: isApprovedForAll,
-    refetch: refetchApprovalAll,
-  } = useReadContract({
+  const { data: isApprovedForAll, refetch: refetchApprovalAll } = useReadContract({
     address: V3_POSITION_MANAGER,
     abi: V3_POSITION_MANAGER_ABI,
     functionName: "isApprovedForAll",
-    args: [userAddress ?? "0x0000000000000000000000000000000000000000", SOVEREIGN_V3_TIMELOCK_ADDRESS],
+    args: [
+      userAddress ?? "0x0000000000000000000000000000000000000000",
+      SOVEREIGN_V3_TIMELOCK_ADDRESS,
+    ],
     chainId: 8453,
     query: {
       refetchInterval: 10_000,
@@ -143,14 +210,11 @@ export function LpLockCard() {
   });
 
   // 4. Query Accrued Trading Fees from Position Manager
-  const {
-    data: positionInfo,
-    refetch: refetchPositionInfo,
-  } = useReadContract({
+  const { data: positionInfo, refetch: refetchPositionInfo } = useReadContract({
     address: V3_POSITION_MANAGER,
     abi: V3_POSITION_MANAGER_ABI,
     functionName: "positions",
-    args: [SD_V3_NFT_TOKEN_ID],
+    args: [selectedTokenId],
     chainId: 8453,
     query: {
       refetchInterval: 10_000,
@@ -170,14 +234,19 @@ export function LpLockCard() {
   }, [lockData]);
 
   const isPositionInTimelock = useMemo(() => {
-    if (lockInfo?.owner && !isAddressEqual(lockInfo.owner, "0x0000000000000000000000000000000000000000")) return true;
+    if (
+      lockInfo?.owner &&
+      !isAddressEqual(lockInfo.owner, "0x0000000000000000000000000000000000000000")
+    )
+      return true;
     if (nftOwner && isAddressEqual(nftOwner, SOVEREIGN_V3_TIMELOCK_ADDRESS)) return true;
     return false;
   }, [nftOwner, lockInfo]);
 
   const isApproved = useMemo(() => {
     if (isApprovedForAll) return true;
-    if (approvedAddress && isAddressEqual(approvedAddress, SOVEREIGN_V3_TIMELOCK_ADDRESS)) return true;
+    if (approvedAddress && isAddressEqual(approvedAddress, SOVEREIGN_V3_TIMELOCK_ADDRESS))
+      return true;
     return false;
   }, [isApprovedForAll, approvedAddress]);
 
@@ -225,6 +294,43 @@ export function LpLockCard() {
     return () => clearInterval(interval);
   }, [isPositionInTimelock, lockInfo]);
 
+  // Simulate harvestTradingFees on-chain so live uncollected fees (from feeGrowthInside) display accurately
+  const refreshSimulatedFees = useCallback(async () => {
+    const caller =
+      lockInfo?.owner &&
+      !isAddressEqual(lockInfo.owner, "0x0000000000000000000000000000000000000000")
+        ? lockInfo.owner
+        : userAddress;
+    if (
+      !isPositionInTimelock ||
+      !caller ||
+      !publicClient ||
+      typeof (publicClient as { simulateContract?: unknown }).simulateContract !== "function"
+    ) {
+      setSimulatedFees(null);
+      return;
+    }
+    try {
+      const sim = await publicClient.simulateContract({
+        account: caller,
+        address: SOVEREIGN_V3_TIMELOCK_ADDRESS,
+        abi: SOVEREIGN_V3_TIMELOCK_ABI,
+        functionName: "harvestTradingFees",
+        args: [selectedTokenId],
+      });
+      const [amount0, amount1] = sim.result;
+      setSimulatedFees({ amount0, amount1 });
+    } catch {
+      setSimulatedFees(null);
+    }
+  }, [isPositionInTimelock, lockInfo?.owner, publicClient, selectedTokenId, userAddress]);
+
+  useEffect(() => {
+    void refreshSimulatedFees();
+    const timer = setInterval(() => void refreshSimulatedFees(), 10_000);
+    return () => clearInterval(timer);
+  }, [refreshSimulatedFees]);
+
   // Handlers
   const handleCopy = (text: string, key: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -239,8 +345,18 @@ export function LpLockCard() {
     refetchApproval();
     refetchApprovalAll();
     refetchPositionInfo();
+    void refreshSimulatedFees();
+    onChanged();
     toast.info("Refreshed on-chain lock status from Base");
-  }, [refetchNftOwner, refetchLock, refetchApproval, refetchApprovalAll, refetchPositionInfo]);
+  }, [
+    refetchNftOwner,
+    refetchLock,
+    refetchApproval,
+    refetchApprovalAll,
+    refetchPositionInfo,
+    refreshSimulatedFees,
+    onChanged,
+  ]);
 
   // 1. Approve Sovereign Timelock to take custody of NFT
   const handleApprove = async () => {
@@ -252,7 +368,7 @@ export function LpLockCard() {
         address: V3_POSITION_MANAGER,
         abi: V3_POSITION_MANAGER_ABI,
         functionName: "approve",
-        args: [SOVEREIGN_V3_TIMELOCK_ADDRESS, SD_V3_NFT_TOKEN_ID],
+        args: [SOVEREIGN_V3_TIMELOCK_ADDRESS, selectedTokenId],
         chainId: 8453,
       });
 
@@ -278,13 +394,13 @@ export function LpLockCard() {
     setIsLocking(true);
     try {
       const unlockTimestamp = BigInt(previewUnlock.unlockTimestamp);
-      toast.info(`Locking NFT #${SD_V3_NFT_TOKEN_ID} for ${selectedDuration} Months...`);
+      toast.info(`Locking NFT #${selectedTokenId} for ${selectedDuration} Months...`);
 
       const hash = await writeContractAsync({
         address: SOVEREIGN_V3_TIMELOCK_ADDRESS,
         abi: SOVEREIGN_V3_TIMELOCK_ABI,
         functionName: "lockPosition",
-        args: [SD_V3_NFT_TOKEN_ID, unlockTimestamp],
+        args: [selectedTokenId, unlockTimestamp],
         chainId: 8453,
       });
 
@@ -309,13 +425,15 @@ export function LpLockCard() {
     if (!userAddress) return;
     setIsHarvesting(true);
     try {
-      toast.info("Harvesting 100% of accumulated trading fees...");
+      toast.info(
+        `Harvesting 100% of accumulated trading fees from NFT #${selectedTokenId.toString()}...`
+      );
 
       const hash = await writeContractAsync({
         address: SOVEREIGN_V3_TIMELOCK_ADDRESS,
         abi: SOVEREIGN_V3_TIMELOCK_ABI,
         functionName: "harvestTradingFees",
-        args: [SD_V3_NFT_TOKEN_ID],
+        args: [selectedTokenId],
         chainId: 8453,
       });
 
@@ -346,7 +464,7 @@ export function LpLockCard() {
         address: SOVEREIGN_V3_TIMELOCK_ADDRESS,
         abi: SOVEREIGN_V3_TIMELOCK_ABI,
         functionName: "withdraw",
-        args: [SD_V3_NFT_TOKEN_ID],
+        args: [selectedTokenId],
         chainId: 8453,
       });
 
@@ -366,9 +484,11 @@ export function LpLockCard() {
     }
   };
 
-  // Unclaimed fees display
-  const tokensOwed0 = positionInfo ? formatUnits(positionInfo[10] ?? 0n, 18) : "0.00";
-  const tokensOwed1 = positionInfo ? formatUnits(positionInfo[11] ?? 0n, 18) : "0.00";
+  // Unclaimed fees display (uses live on-chain collect simulation when available, falling back to positions.tokensOwed)
+  const rawOwed0 = simulatedFees ? simulatedFees.amount0 : (positionInfo?.[10] ?? 0n);
+  const rawOwed1 = simulatedFees ? simulatedFees.amount1 : (positionInfo?.[11] ?? 0n);
+  const tokensOwed0 = formatUnits(rawOwed0, position.token0Decimals);
+  const tokensOwed1 = formatUnits(rawOwed1, position.token1Decimals);
 
   const formattedUnlockDate = lockInfo?.unlockTimestamp
     ? new Date(lockInfo.unlockTimestamp * 1000).toLocaleDateString(undefined, {
@@ -406,7 +526,8 @@ export function LpLockCard() {
                 )}
               </div>
               <CardDescription className="text-xs text-gray-500">
-                Cryptographically verified, non-custodial timelock. $0 middleman fees, 100% trading fee harvesting, and zero owner backdoors.
+                Cryptographically verified, non-custodial timelock. $0 middleman fees, 100% trading
+                fee harvesting, and zero owner backdoors.
               </CardDescription>
             </div>
           </div>
@@ -434,20 +555,41 @@ export function LpLockCard() {
       </CardHeader>
 
       <CardContent className="space-y-6 p-5">
+        {/* ── Position Switcher ── */}
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-indigo-100 bg-white/90 p-2.5">
+          <span className="text-xs font-bold text-slate-700">Select V3 Position:</span>
+          <div className="flex flex-wrap gap-2">
+            {positions.map((pos) => (
+              <Button
+                key={pos.tokenId}
+                type="button"
+                size="sm"
+                variant={position.tokenId === pos.tokenId ? "default" : "outline"}
+                onClick={() => onSelect(pos.tokenId)}
+                className={
+                  position.tokenId === pos.tokenId
+                    ? "bg-indigo-600 text-xs font-bold text-white hover:bg-indigo-700"
+                    : "text-xs font-semibold"
+                }
+              >
+                #{pos.tokenId} · {pairLabel(pos)}
+              </Button>
+            ))}
+          </div>
+        </div>
+
         {/* ── Active Lock Dashboard (If Position is Locked in Contract) ─────── */}
         {isPositionInTimelock ? (
           <div className="space-y-5">
             {/* Lock Status Banner */}
-            <div className="rounded-2xl border-2 border-emerald-300 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50/40 p-5 shadow-xs">
+            <div className="shadow-xs rounded-2xl border-2 border-emerald-300 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50/40 p-5">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <div className="flex items-center gap-2 text-xs font-bold text-emerald-900 uppercase tracking-wider">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-900">
                     <CheckCircle2 className="size-4 text-emerald-600" />
                     <span>Active Cryptographic Timelock</span>
                   </div>
-                  <h3 className="mt-1 text-xl font-black text-gray-900">
-                    NFT #{SD_V3_NFT_TOKEN_ID.toString()} (SD / WETH 1.0%)
-                  </h3>
+                  <h3 className="mt-1 text-xl font-black text-gray-900">{selectedPreset.label}</h3>
                   <p className="mt-1 text-xs text-gray-600">
                     Position is safely locked in your sovereign smart contract. Unlocks on{" "}
                     <span className="font-bold text-gray-900">
@@ -467,25 +609,25 @@ export function LpLockCard() {
 
                 {/* Countdown Display */}
                 {timeLeft && !timeLeft.isExpired ? (
-                  <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-white/90 p-3 text-center shadow-xs">
+                  <div className="shadow-xs flex items-center gap-2 rounded-xl border border-emerald-200 bg-white/90 p-3 text-center">
                     <div className="px-2">
                       <div className="text-xl font-black text-emerald-700">{timeLeft.days}</div>
-                      <div className="text-[10px] font-bold text-gray-500 uppercase">Days</div>
+                      <div className="text-[10px] font-bold uppercase text-gray-500">Days</div>
                     </div>
                     <div className="text-gray-300">:</div>
                     <div className="px-2">
                       <div className="text-xl font-black text-emerald-700">{timeLeft.hours}</div>
-                      <div className="text-[10px] font-bold text-gray-500 uppercase">Hours</div>
+                      <div className="text-[10px] font-bold uppercase text-gray-500">Hours</div>
                     </div>
                     <div className="text-gray-300">:</div>
                     <div className="px-2">
                       <div className="text-xl font-black text-emerald-700">{timeLeft.minutes}</div>
-                      <div className="text-[10px] font-bold text-gray-500 uppercase">Mins</div>
+                      <div className="text-[10px] font-bold uppercase text-gray-500">Mins</div>
                     </div>
                     <div className="text-gray-300">:</div>
                     <div className="px-2">
                       <div className="text-xl font-black text-emerald-700">{timeLeft.seconds}</div>
-                      <div className="text-[10px] font-bold text-gray-500 uppercase">Secs</div>
+                      <div className="text-[10px] font-bold uppercase text-gray-500">Secs</div>
                     </div>
                   </div>
                 ) : (
@@ -502,28 +644,41 @@ export function LpLockCard() {
                 <div>
                   <div className="flex items-center gap-2">
                     <Coins className="size-4 text-purple-600" />
-                    <span className="text-xs font-bold text-gray-900 uppercase tracking-wide">
+                    <span className="text-xs font-bold uppercase tracking-wide text-gray-900">
                       Trading Fees Accrued While Locked
                     </span>
-                    <Badge variant="outline" className="border-purple-300 bg-white text-[10px] text-purple-700">
+                    <Badge
+                      variant="outline"
+                      className="border-purple-300 bg-white text-[10px] text-purple-700"
+                    >
                       100% Retained by You
                     </Badge>
                   </div>
                   <p className="mt-1 text-xs text-gray-600">
-                    Whenever swaps occur on your pool, trading fees accumulate. Harvest 100% of accumulated fees anytime without touching your locked principal.
+                    Whenever swaps occur on your pool, trading fees accumulate. Harvest 100% of
+                    accumulated fees anytime without touching your locked principal.
                   </p>
-                  <p className="mt-1 text-[11px] text-gray-500 italic">
-                    Note: Uncollected fee growth is computed and settled on-chain upon harvest.
+                  <p className="mt-1 text-[11px] italic text-gray-500">
+                    Note: Uncollected fee growth is simulated live from Uniswap V3 and settled
+                    on-chain upon harvest.
                   </p>
 
                   <div className="mt-3 flex items-center gap-6">
                     <div>
-                      <span className="text-[11px] text-gray-500">Unclaimed SD:</span>
-                      <div className="font-mono text-base font-bold text-gray-900">{tokensOwed0} SD</div>
+                      <span className="text-[11px] text-gray-500">
+                        Unclaimed {selectedPreset.token0Symbol}:
+                      </span>
+                      <div className="font-mono text-base font-bold text-gray-900">
+                        {tokensOwed0} {selectedPreset.token0Symbol}
+                      </div>
                     </div>
                     <div>
-                      <span className="text-[11px] text-gray-500">Unclaimed WETH:</span>
-                      <div className="font-mono text-base font-bold text-gray-900">{tokensOwed1} WETH</div>
+                      <span className="text-[11px] text-gray-500">
+                        Unclaimed {selectedPreset.token1Symbol}:
+                      </span>
+                      <div className="font-mono text-base font-bold text-gray-900">
+                        {tokensOwed1} {selectedPreset.token1Symbol}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -540,7 +695,7 @@ export function LpLockCard() {
             </div>
 
             {/* Withdrawal & Management */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <span className="block text-xs font-bold text-gray-900">Principal Withdrawal</span>
                 <span className="text-xs text-gray-500">
@@ -556,7 +711,7 @@ export function LpLockCard() {
                 disabled={Boolean(timeLeft && !timeLeft.isExpired) || isWithdrawing || !isConnected}
                 className={`gap-2 ${
                   timeLeft && !timeLeft.isExpired
-                    ? "cursor-not-allowed opacity-60 text-gray-400"
+                    ? "cursor-not-allowed text-gray-400 opacity-60"
                     : "border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700"
                 }`}
               >
@@ -578,10 +733,12 @@ export function LpLockCard() {
             {/* Step 1: Duration Selector */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-gray-800 uppercase tracking-wide">
+                <span className="text-xs font-bold uppercase tracking-wide text-gray-800">
                   Step 1: Choose Your Lock Duration
                 </span>
-                <span className="text-[11px] text-gray-500">Manual choice: 3 Months vs 12 Months</span>
+                <span className="text-[11px] text-gray-500">
+                  Manual choice: 3 Months vs 12 Months
+                </span>
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -596,17 +753,24 @@ export function LpLockCard() {
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Clock className={`size-4 ${selectedDuration === 3 ? "text-indigo-600" : "text-gray-400"}`} />
-                      <span className="text-sm font-bold text-gray-900">3 Month Lock (Quarterly)</span>
+                      <Clock
+                        className={`size-4 ${selectedDuration === 3 ? "text-indigo-600" : "text-gray-400"}`}
+                      />
+                      <span className="text-sm font-bold text-gray-900">
+                        3 Month Lock (Quarterly)
+                      </span>
                     </div>
                     {selectedDuration === 3 ? (
                       <Badge className="bg-indigo-600 text-white">Active Choice</Badge>
                     ) : (
-                      <Badge variant="outline" className="text-gray-500">Select</Badge>
+                      <Badge variant="outline" className="text-gray-500">
+                        Select
+                      </Badge>
                     )}
                   </div>
                   <p className="mt-2 text-xs leading-relaxed text-gray-600">
-                    90-day time lock. Offers agility while establishing proof of liquidity locking on Base.
+                    90-day time lock. Offers agility while establishing proof of liquidity locking
+                    on Base.
                   </p>
                   <div className="mt-3 flex items-center justify-between border-t border-indigo-100/60 pt-2 text-[11px] text-gray-500">
                     <span>Unlock Target:</span>
@@ -625,17 +789,24 @@ export function LpLockCard() {
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Calendar className={`size-4 ${selectedDuration === 12 ? "text-purple-600" : "text-gray-400"}`} />
-                      <span className="text-sm font-bold text-gray-900">12 Month Lock (Annual Standard)</span>
+                      <Calendar
+                        className={`size-4 ${selectedDuration === 12 ? "text-purple-600" : "text-gray-400"}`}
+                      />
+                      <span className="text-sm font-bold text-gray-900">
+                        12 Month Lock (Annual Standard)
+                      </span>
                     </div>
                     {selectedDuration === 12 ? (
                       <Badge className="bg-purple-600 text-white">Active Choice</Badge>
                     ) : (
-                      <Badge variant="outline" className="text-gray-500">Select</Badge>
+                      <Badge variant="outline" className="text-gray-500">
+                        Select
+                      </Badge>
                     )}
                   </div>
                   <p className="mt-2 text-xs leading-relaxed text-gray-600">
-                    365-day time lock. The gold standard for community trust. Proves mathematical security to investors.
+                    365-day time lock. The gold standard for community trust. Proves mathematical
+                    security to investors.
                   </p>
                   <div className="mt-3 flex items-center justify-between border-t border-purple-100/60 pt-2 text-[11px] text-gray-500">
                     <span>Unlock Target:</span>
@@ -646,7 +817,7 @@ export function LpLockCard() {
             </div>
 
             {/* Position NFT Summary Card */}
-            <div className="rounded-xl border border-indigo-200/90 bg-white p-4 shadow-xs">
+            <div className="shadow-xs rounded-xl border border-indigo-200/90 bg-white p-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <div className="flex items-center gap-1.5 text-xs font-semibold text-indigo-950">
@@ -654,15 +825,23 @@ export function LpLockCard() {
                     <span>Target Uniswap V3 Position NFT</span>
                   </div>
                   <div className="mt-1 flex items-center gap-2">
-                    <span className="font-mono text-base font-bold text-gray-900">#{SD_V3_NFT_TOKEN_ID.toString()}</span>
-                    <Badge variant="outline" className="text-[10px] text-slate-600">SD / WETH (1.0%)</Badge>
-                    <span className="text-xs text-slate-500">Unlocks: <strong className="text-slate-900">{previewUnlock.unlockDate}</strong></span>
+                    <span className="font-mono text-base font-bold text-gray-900">
+                      #{selectedTokenId.toString()}
+                    </span>
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] text-slate-600"
+                    >{`${position.token0Symbol} / ${position.token1Symbol}`}</Badge>
+                    <span className="text-xs text-slate-500">
+                      Unlocks:{" "}
+                      <strong className="text-slate-900">{previewUnlock.unlockDate}</strong>
+                    </span>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
                   <a
-                    href={`https://base.blockscout.com/token/${V3_POSITION_MANAGER}/instance/${SD_V3_NFT_TOKEN_ID}`}
+                    href={`https://base.blockscout.com/token/${V3_POSITION_MANAGER}/instance/${selectedTokenId}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs text-slate-600 hover:text-indigo-600"
@@ -677,10 +856,12 @@ export function LpLockCard() {
             {/* Step 2: Action Buttons */}
             <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
               <div className="flex items-center justify-between pb-3">
-                <span className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+                <span className="text-xs font-bold uppercase tracking-wide text-slate-800">
                   Step 2: Deposit into Sovereign Locker
                 </span>
-                <span className="text-[11px] text-slate-500">Total cost: ~$0.01 Base network gas (0% middleman fees)</span>
+                <span className="text-[11px] text-slate-500">
+                  Total cost: ~$0.01 Base network gas (0% middleman fees)
+                </span>
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -730,7 +911,7 @@ export function LpLockCard() {
         {/* ── Key Contract Addresses Grid ─────────────────────────────────── */}
         <div className="rounded-xl border border-slate-200 bg-white p-4">
           <div className="flex items-center justify-between pb-2">
-            <span className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+            <span className="text-xs font-bold uppercase tracking-wide text-slate-800">
               On-Chain Contract Addresses (Base Mainnet)
             </span>
             <span className="text-[11px] text-slate-500">Verified cryptographic references</span>
@@ -742,34 +923,47 @@ export function LpLockCard() {
               <div>
                 <span className="block font-semibold text-purple-950">Sovereign Timelock</span>
                 <span className="font-mono text-[11px] text-purple-700">
-                  {SOVEREIGN_V3_TIMELOCK_ADDRESS.slice(0, 8)}...{SOVEREIGN_V3_TIMELOCK_ADDRESS.slice(-6)}
+                  {SOVEREIGN_V3_TIMELOCK_ADDRESS.slice(0, 8)}...
+                  {SOVEREIGN_V3_TIMELOCK_ADDRESS.slice(-6)}
                 </span>
               </div>
               <Button
                 variant="outline"
                 size="sm"
                 className="h-7 gap-1 bg-white text-[11px]"
-                onClick={() => handleCopy(SOVEREIGN_V3_TIMELOCK_ADDRESS, "timelock", "Timelock Address")}
+                onClick={() =>
+                  handleCopy(SOVEREIGN_V3_TIMELOCK_ADDRESS, "timelock", "Timelock Address")
+                }
               >
-                {copiedKey === "timelock" ? <Check className="size-3 text-emerald-600" /> : <Copy className="size-3" />}
+                {copiedKey === "timelock" ? (
+                  <Check className="size-3 text-emerald-600" />
+                ) : (
+                  <Copy className="size-3" />
+                )}
               </Button>
             </div>
 
-            {/* SD / WETH V3 Pool */}
+            {/* Active V3 Pool */}
             <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs">
               <div>
-                <span className="block font-semibold text-slate-700">SD / WETH V3 Pool (1.0%)</span>
+                <span className="block font-semibold text-slate-700">
+                  {selectedPreset.token0Symbol} / {selectedPreset.token1Symbol} V3 Pool
+                </span>
                 <span className="font-mono text-[11px] text-slate-500">
-                  {SD_V3_POOL.slice(0, 8)}...{SD_V3_POOL.slice(-6)}
+                  {selectedPreset.pool.slice(0, 8)}...{selectedPreset.pool.slice(-6)}
                 </span>
               </div>
               <Button
                 variant="outline"
                 size="sm"
                 className="h-7 gap-1 bg-white text-[11px]"
-                onClick={() => handleCopy(SD_V3_POOL, "pool", "V3 Pool Address")}
+                onClick={() => handleCopy(selectedPreset.pool, "pool", "V3 Pool Address")}
               >
-                {copiedKey === "pool" ? <Check className="size-3 text-emerald-600" /> : <Copy className="size-3" />}
+                {copiedKey === "pool" ? (
+                  <Check className="size-3 text-emerald-600" />
+                ) : (
+                  <Copy className="size-3" />
+                )}
               </Button>
             </div>
 
@@ -787,7 +981,11 @@ export function LpLockCard() {
                 className="h-7 gap-1 bg-white text-[11px]"
                 onClick={() => handleCopy(V3_POSITION_MANAGER, "mgr", "Position Manager Address")}
               >
-                {copiedKey === "mgr" ? <Check className="size-3 text-emerald-600" /> : <Copy className="size-3" />}
+                {copiedKey === "mgr" ? (
+                  <Check className="size-3 text-emerald-600" />
+                ) : (
+                  <Copy className="size-3" />
+                )}
               </Button>
             </div>
           </div>
@@ -821,10 +1019,16 @@ export function LpLockCard() {
                 >
                   <div>
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-gray-900 group-hover:text-indigo-600">{locker.name}</span>
-                      <Badge variant="secondary" className="text-[10px]">{locker.fee}</Badge>
+                      <span className="font-bold text-gray-900 group-hover:text-indigo-600">
+                        {locker.name}
+                      </span>
+                      <Badge variant="secondary" className="text-[10px]">
+                        {locker.fee}
+                      </Badge>
                     </div>
-                    <p className="mt-1.5 text-[11px] leading-relaxed text-gray-500">{locker.description}</p>
+                    <p className="mt-1.5 text-[11px] leading-relaxed text-gray-500">
+                      {locker.description}
+                    </p>
                   </div>
                   <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2 text-xs font-semibold text-indigo-600 group-hover:underline">
                     <span>Open External Locker</span>
@@ -840,7 +1044,10 @@ export function LpLockCard() {
         <Alert className="border-indigo-200 bg-indigo-50/60 text-indigo-950">
           <ShieldCheck className="size-4 text-indigo-700" />
           <AlertDescription className="text-xs leading-relaxed text-indigo-900">
-            <strong>Sovereign Guarantee:</strong> Your liquidity is secured by smart contract logic on Base Mainnet. You retain 100% of trading fees generated by trades on your pool, you never surrender protocol authority, and only your wallet address can claim fees or withdraw the NFT when the lock timer expires.
+            <strong>Sovereign Guarantee:</strong> Your liquidity is secured by smart contract logic
+            on Base Mainnet. You retain 100% of trading fees generated by trades on your pool, you
+            never surrender protocol authority, and only your wallet address can claim fees or
+            withdraw the NFT when the lock timer expires.
           </AlertDescription>
         </Alert>
       </CardContent>

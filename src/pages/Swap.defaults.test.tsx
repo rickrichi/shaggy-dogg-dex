@@ -1,7 +1,7 @@
 // src/pages/Swap.defaults.test.tsx
 import { MemoryRouter } from "react-router-dom";
 
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as wagmi from "wagmi";
 
@@ -39,10 +39,9 @@ function openSwap(chainId: number, url = "/swap") {
       <Swap />
     </MemoryRouter>
   );
-  // Swap, Buy, Limit and Sell each start a useSwap(sell, buy) instance.
   return vi
     .mocked(swapHook.useSwap)
-    .mock.calls.slice(0, 4)
+    .mock.calls.slice(0, 1)
     .map(([sell, buy]) => [(sell as Token).symbol, (buy as Token).symbol]);
 }
 
@@ -51,19 +50,29 @@ describe("Swap page defaults", () => {
     vi.clearAllMocks();
   });
 
-  it.each([8453, 1])(
-    "opens on ETH and stablecoins only on chain %i: Swap and Limit start ETH -> USDC",
-    (chainId) => {
-      const pairs = openSwap(chainId);
+  it.each([8453, 1])("opens on ETH -> USDC with one swap hook on chain %i", (chainId) => {
+    const pairs = openSwap(chainId);
 
-      expect(pairs.flat().every((symbol) => ["ETH", "USDC"].includes(symbol))).toBe(true);
-      expect(pairs[0]).toEqual(["ETH", "USDC"]); // Swap
-      expect(pairs[2]).toEqual(["ETH", "USDC"]); // Limit
-    }
-  );
+    expect(pairs).toEqual([["ETH", "USDC"]]);
+  });
 
   it("still honours an explicit ?output= link", () => {
     const pairs = openSwap(8453, "/swap?output=0x051c758521971f5c5a84edaf18eea12854375469");
     expect(pairs[0]).toEqual(["ETH", "SD"]);
+  });
+
+  it("never initializes the same token on both sides", () => {
+    const pairs = openSwap(8453, "/swap?input=USDC&output=USDC&mode=limit");
+    expect(pairs[0]?.[0]).not.toBe(pairs[0]?.[1]);
+  });
+
+  it("shows one active mode and a disabled limit preview", () => {
+    openSwap(8453);
+    const swapTab = screen.getByRole("tab", { name: "Swap" });
+    expect(swapTab).toHaveAttribute("aria-selected", "true");
+    expect(document.getElementById(swapTab.getAttribute("aria-controls")!)).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Limit orders coming soon" })).toBeDisabled();
+    expect(screen.queryByRole("tab", { name: "Buy" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Sell" })).not.toBeInTheDocument();
   });
 });

@@ -10,12 +10,16 @@ import { matchTokenOnChain, type Token } from "@/config/tokens";
 import { positiveAmount } from "@/lib/amm/own-dex";
 import { getRoutePriceImpact, HIGH_PRICE_IMPACT } from "@/lib/amm/price-impact";
 import {
+  BASE_EXTRA_VENUES,
+  isV3Route,
   quoteSmartRoutes,
   routeQuoteCall,
   routeSwapCall,
+  type SmartRouteVenue,
   v3RouteFees,
 } from "@/lib/amm/smart-routing";
 import { calculateMinimumAmountOut } from "@/lib/amm/swap-protection";
+import { approvalSequence } from "@/lib/approvals";
 
 type QuoteStatus = "IDLE" | "LOADING" | "SUCCESS" | "NO_ROUTE" | "ERROR";
 export interface BalanceData {
@@ -57,6 +61,7 @@ export interface UseSwapReturn {
     setBuyToken: (token: Token) => void;
     setSlippage: (slippage: number) => void;
     reverseTokens: () => void;
+    setPreferredVenue: (venue: SmartRouteVenue | null) => void;
     setMaxSellAmount: () => void;
   };
   quote: {
@@ -67,12 +72,25 @@ export interface UseSwapReturn {
     refresh: () => void;
     isRefreshing: boolean;
     status: QuoteStatus;
-    bestVenue?: "Uniswap V3" | "Uniswap V2" | "Aerodrome";
+    bestVenue?: SmartRouteVenue;
     spreadPercent?: number;
     comparisonText?: string;
     uniswapV3AmountOut?: string;
     uniswapAmountOut?: string;
     aerodromeAmountOut?: string;
+    /** Best output per Base venue beyond Uniswap and Aerodrome; venues with no route are absent. */
+    extraVenueQuotes?: Array<{ name: SmartRouteVenue; amount: string }>;
+    /** The venue the user picked; null means the best quote is used automatically. */
+    preferredVenue?: SmartRouteVenue | null;
+    /** Venues with a live quote for this trade; absent until quotes arrive. */
+    routedVenues?: SmartRouteVenue[];
+    /** How far the picked venue's output is below the best quote, in percent. */
+    venueShortfallPercent?: number;
+    observedAt?: number;
+    blockNumber?: bigint;
+    routeDescription?: string;
+    excludedVenues?: SmartRouteVenue[];
+    estimatedNetworkFee?: string;
   };
 }
 
@@ -89,6 +107,7 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
   });
   const client = usePublicClient({ chainId: state.sellToken.chainId });
   const [busy, setBusy] = useState<"approve" | "swap" | null>(null);
+  const [preferredVenue, setPreferredVenue] = useState<SmartRouteVenue | null>(null);
   const lock = useRef(false);
   const scope = useRef("");
   const [now, setNow] = useState(Date.now);
@@ -110,6 +129,8 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
     initialBuyToken.address,
     initialBuyToken.chainId,
   ]);
+  // Venues differ per chain, so a pick never carries over to another network.
+  useEffect(() => setPreferredVenue(null), [state.sellToken.chainId]);
   const amount = positiveAmount(state.sellAmount, state.sellToken.decimals)
     ? parseUnits(state.sellAmount, state.sellToken.decimals)
     : 0n;
@@ -128,28 +149,34 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
     query: { enabled: !!address },
   });
   const quotes = useQuery({
-    queryKey: ["smart-routes", key],
+    queryKey: ["smart-routes", key, preferredVenue],
     queryFn: async () => {
       const result = await quoteSmartRoutes(client!, state.sellToken, state.buyToken, amount);
-      const priceImpact = result.best
+      const selected = preferredVenue
+        ? (result.quotes.find((q) => q.route.venue === preferredVenue) ?? null)
+        : result.best;
+      const priceImpact = selected
         ? await getRoutePriceImpact(
             client!,
             state.sellToken.chainId,
-            result.best.route,
+            selected.route,
             amount,
-            result.best.output,
+            selected.output,
             result.blockNumber
           )
         : null;
-      return { ...result, priceImpact };
+      return { ...result, selected, priceImpact };
     },
     enabled: !!client && amount > 0n,
     refetchInterval: 10_000,
     staleTime: 5_000,
     retry: 1,
   });
-  const best = quotes.data?.best;
-  const fresh = !!best && !quotes.isError && now - quotes.data!.observedAt < 30_000;
+  // `best` is the route this swap uses: the top quote, or the venue the user picked.
+  const best = quotes.data?.selected;
+  const topQuote = quotes.data?.best;
+  const compared = !!topQuote && !quotes.isError && now - quotes.data!.observedAt < 30_000;
+  const fresh = compared && !!best;
   const buyAmount = fresh ? formatUnits(best.output, state.buyToken.decimals) : "";
   const priceImpact = fresh ? (quotes.data?.priceImpact ?? null) : null;
   // Confirmation survives identical refreshes, but never a changed trade, wallet,
@@ -209,18 +236,32 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
       await assertWallet();
       if (operation === "approve") {
         if (state.sellToken.address === "native") return;
-        const { request } = await client.simulateContract({
-          address: state.sellToken.address,
-          abi: erc20Abi,
-          functionName: "approve",
-          args: [best.route.router, amount],
-          account: address,
+        // A leftover allowance is reset to 0 first only for tokens (e.g. USDT) that require it.
+        const approvals = await approvalSequence(client, {
+          token: state.sellToken.address,
+          owner: address,
+          spender: best.route.router,
+          amount,
         });
-        await assertWallet();
-        const hash = await wallet.writeContract({ ...request, chain: client.chain });
-        toast.loading(`Approval submitted: ${hash}`, { id: "smart-swap" });
-        const receipt = await client.waitForTransactionReceipt({ hash });
-        if (receipt.status !== "success") throw new Error("Approval reverted.");
+        for (const value of approvals) {
+          const { request } = await client.simulateContract({
+            address: state.sellToken.address,
+            abi: erc20Abi,
+            functionName: "approve",
+            args: [best.route.router, value],
+            account: address,
+          });
+          await assertWallet();
+          const hash = await wallet.writeContract({ ...request, chain: client.chain });
+          toast.loading(
+            value === 0n
+              ? `This token requires clearing the old allowance first: ${hash}`
+              : `Approval submitted: ${hash}`,
+            { id: "smart-swap" }
+          );
+          const receipt = await client.waitForTransactionReceipt({ hash });
+          if (receipt.status !== "success") throw new Error("Approval reverted.");
+        }
         await allowance.refetch();
       } else {
         if (!canSwap) throw new Error("Review your allowance, balance, and quote first.");
@@ -237,12 +278,11 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
           ...routeQuoteCall(best.route, amount),
           blockNumber,
         });
-        const currentOut =
-          best.route.venue === "Uniswap V3"
-            ? Array.isArray(current)
-              ? (current[0] as bigint)
-              : 0n
-            : ((current as readonly bigint[]).at(-1) ?? 0n);
+        const currentOut = isV3Route(best.route)
+          ? Array.isArray(current)
+            ? (current[0] as bigint)
+            : 0n
+          : ((current as readonly bigint[]).at(-1) ?? 0n);
         if (currentOut < minimum)
           throw new Error("Price moved beyond your minimum. Review a new quote.");
         const currentImpact = await getRoutePriceImpact(
@@ -297,8 +337,16 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
   const uniV3 = quotes.data?.quotes.find((q) => q.route.venue === "Uniswap V3");
   const uni = quotes.data?.quotes.find((q) => q.route.venue === "Uniswap V2");
   const aero = quotes.data?.quotes.find((q) => q.route.venue === "Aerodrome");
+  const extraVenueQuotes = BASE_EXTRA_VENUES.flatMap((name) => {
+    const found = quotes.data?.quotes.find((q) => q.route.venue === name);
+    return found ? [{ name, amount: formatUnits(found.output, state.buyToken.decimals) }] : [];
+  });
   const improvement =
     best && uni ? Number(((best.output - uni.output) * 1_000_000n) / uni.output) / 10_000 : 0;
+  const venueShortfallPercent =
+    preferredVenue && best && topQuote
+      ? Number(((topQuote.output - best.output) * 1_000_000n) / topQuote.output) / 10_000
+      : 0;
   return {
     state: { ...state, buyAmount, isQuoteLoading: quotes.isFetching },
     balances: { sell: normalize(sellBalance.data), buy: normalize(buyBalance.data) },
@@ -337,6 +385,7 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
       },
       reverseTokens: () =>
         setState((s) => ({ ...s, sellToken: s.buyToken, buyToken: s.sellToken, sellAmount: "" })),
+      setPreferredVenue,
       setMaxSellAmount: () => {
         if (sellBalance.data)
           setState((s) => ({
@@ -364,24 +413,46 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
         void quotes.refetch();
       },
       isRefreshing: quotes.isFetching,
-      ...(fresh
+      ...(quotes.data?.observedAt !== undefined ? { observedAt: quotes.data.observedAt } : {}),
+      ...(quotes.data?.blockNumber !== undefined ? { blockNumber: quotes.data.blockNumber } : {}),
+      ...(best
         ? {
-            bestVenue: best.route.venue,
+            routeDescription: `${best.route.venue} · ${best.route.path.length - 1} ${best.route.path.length === 2 ? "pool" : "pools"}${
+              isV3Route(best.route)
+                ? ` · ${v3RouteFees(best.route)
+                    .map((fee) => `${fee / 10_000}%`)
+                    .join(" → ")}`
+                : ""
+            }`,
+          }
+        : {}),
+      excludedVenues: [...new Set((quotes.data?.excluded ?? []).map((item) => item.route.venue))],
+      preferredVenue,
+      ...(compared
+        ? {
+            bestVenue: topQuote.route.venue,
+            routedVenues: [...new Set(quotes.data!.quotes.map((q) => q.route.venue))],
             spreadPercent: improvement,
-            comparisonText:
-              best.route.venue === "Uniswap V3"
-                ? `Routed via Uniswap V3 (${v3RouteFees(best.route)
-                    .map((fee) => `${fee / 10000}%`)
-                    .join(
-                      " → "
-                    )}${best.route.path.length > 2 ? `, ${best.route.path.length - 1} hops` : ""})${
-                    uni && improvement > 0
-                      ? ` for +${improvement.toFixed(2)}% more tokens than V2`
-                      : ""
-                  } (before gas).`
-                : uni && best.route.venue === "Aerodrome"
-                  ? `Routed via Aerodrome for +${improvement.toFixed(2)}% more tokens than Uniswap V2 (before gas).`
-                  : `Best quoted output via ${best.route.venue} (before gas).`,
+            venueShortfallPercent,
+            comparisonText: !best
+              ? `${preferredVenue} has no route for this trade. Choose another venue or Best price.`
+              : preferredVenue
+                ? venueShortfallPercent > 0
+                  ? `You chose ${preferredVenue}: ${venueShortfallPercent.toFixed(2)}% fewer tokens than ${topQuote.route.venue}, the best quote (before gas).`
+                  : `You chose ${preferredVenue}, which matches the best quote (before gas).`
+                : isV3Route(best.route)
+                  ? `Routed via ${best.route.venue} (${v3RouteFees(best.route)
+                      .map((fee) => `${fee / 10000}%`)
+                      .join(
+                        " → "
+                      )}${best.route.path.length > 2 ? `, ${best.route.path.length - 1} hops` : ""})${
+                      uni && improvement > 0
+                        ? ` for +${improvement.toFixed(2)}% more tokens than Uniswap V2`
+                        : ""
+                    } (before gas).`
+                  : uni && best.route.venue === "Aerodrome"
+                    ? `Routed via Aerodrome for +${improvement.toFixed(2)}% more tokens than Uniswap V2 (before gas).`
+                    : `Best quoted output via ${best.route.venue} (before gas).`,
             ...(uniV3
               ? { uniswapV3AmountOut: formatUnits(uniV3.output, state.buyToken.decimals) }
               : {}),
@@ -389,6 +460,7 @@ export function useSwap(initialSellToken: Token, initialBuyToken: Token): UseSwa
             ...(aero
               ? { aerodromeAmountOut: formatUnits(aero.output, state.buyToken.decimals) }
               : {}),
+            extraVenueQuotes,
           }
         : {}),
     },
