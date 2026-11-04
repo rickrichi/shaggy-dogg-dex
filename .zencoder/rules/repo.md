@@ -89,4 +89,4 @@ npm run start  # Run production server
 
 ## Core Rules & Architecture Invariants
 - **On-Chain Portfolio Flow**: `usePortfolio` and `Portfolio.tsx` must ALWAYS query token balances directly on-chain via Wagmi/Viem multicall and RPC. Portfolio rendering MUST NEVER block on or fail due to external price API cold-starts or timeouts. Pricing is non-blocking with local fallbacks.
-- **Ecosystem Watchlist Tokens**: The Base mainnet watchlist in `src/lib/tokens.ts` permanently tracks Shaggy Dogg (SD), Alpha Mutt (AMUTT), FBA Token (FBA), Wrapped Ether (WETH), and USD Coin (USDC).
+- **Ecosystem Watchlist Tokens**: The Base mainnet watchlist in `src/config/tokens.ts` permanently tracks Mutt Rewards (MRWD), Shaggy Dogg (SD), FBA Token (FBA), Equilnyxs (EQX), Wrapped Ether (WETH), and USD Coin (USDC).

@@ -141,7 +141,7 @@ plus realized profit from the arbitrage desk, which has not yet run with real fu
 - Frontend: 106 tests pass, one existing TODO. Server: 15 tests pass.
 - Hedge journal/reconciliation/receipt validation: three Python tests pass.
 - Corrected vault: two Base mainnet fork tests pass at block 52,144,242 using real
-  WETH, USDC, AMUTT, Aave and staking contracts. No mock token contracts.
+  WETH, USDC, SD, Aave and staking contracts. No mock token contracts.
   Aave supply/withdrawal and the actual 5% staking discount were exercised.
   The pinned Aave supply rounds down by two micro-USDC; the test accounts for it.
 - Production frontend build passes; packaged backend returns HTTP 200 and its

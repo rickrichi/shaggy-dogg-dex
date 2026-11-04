@@ -145,7 +145,7 @@ verification, or manual review.
 - Deployment record: `deployments/mrwd-base-mainnet.json`
 - Token contract: `contracts/src/MuttRewards.sol`
 - Launch record: `docs/MRWD_LAUNCH_SESSION_RECORD_2026-10-26.md`
-- White paper: `docs/WHITEPAPER-v2.0-DRAFT.md`
+- White paper: `docs/WHITEPAPER.md` (`https://dex.lumsian.com/whitepaper`)
 - Pro staking implementation: `contracts/src/MuttProStaking.sol`
 - Paymaster behavior: `docs/PAYMASTER.md`
 

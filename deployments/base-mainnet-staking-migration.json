@@ -9,19 +9,6 @@
       "replacement": "0x8a765d450d38d13f5e2533d29399f743cdf23faa",
       "deployHash": "0x1cc6444e86b9cf968f6c0f3d6c06b79121c5f74361174e9807f8bf18cd852fca",
       "unlockHash": "0x3a1a0a00bc341068972800718bda8891b3af57e0f3d182aad7f108c381f8851a"
-    },
-    {
-      "ecosystem": "AMUTT",
-      "legacy": "0x055BB4eD8d5464C25D71391E940ce53CA30845fC",
-      "replacement": "0x2e7458d55de45d6a9edebed710aac9b6575d3dd1",
-      "deployHash": "0x042ce8c32a0ad37c03785630b10e7ef660ab52ce6b742dd043241dcb8fea8262",
-      "unlockHash": "0xc1ed7e18bc2714d0af74fe0dfcd1426a8099898ae6096efb03f528e2e442890c",
-      "positionMigration": {
-        "amount": "5000000000000000000000",
-        "unstakeHash": "0xa8aa5ca4f62c84224ea31543620bc2227cf3f26241830224637888cd849c1ae8",
-        "approveHash": "0x618e50cd245237cae925ae4248dbe313dab6a359213d707ae232d4c1e3e895f4",
-        "stakeHash": "0x8eda80f15a9e163f2f47fd3a742406c40c9560d855be9767d8df0858d224d21a"
-      }
     }
   ]
 }

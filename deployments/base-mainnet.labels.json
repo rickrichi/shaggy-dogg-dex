@@ -1,121 +1,5 @@
 {
-  "note": "Human-assigned roles only. Facts (code, admin, verification) come from chain reads in base-mainnet.manifest.json.",
-  "0x051c758521971f5c5a84eDaF18EEA12854375469": {
-    "ecosystem": "SD",
-    "role": "GovernanceToken (SD)",
-    "usedBy": [
-      "src/lib/contracts.ts"
-    ]
-  },
-  "0x42134CcC6c41149cF71C7b4994E33Ee66758aF20": {
-    "ecosystem": "SD",
-    "role": "FeeDiscountStaking",
-    "usedBy": [
-      "src/lib/contracts.ts"
-    ]
-  },
-  "0x8531807Ef36560CD7Db230c95DB85791aA586Dda": {
-    "ecosystem": "SD",
-    "role": "YieldStakingVault (legacy discount scale)",
-    "usedBy": [
-      "src/lib/contracts.ts"
-    ]
-  },
-  "0x38cccAFb4ae96A8ef187F07fB17D18eb63E43782": {
-    "ecosystem": "SD",
-    "role": "CompoundYieldVault (legacy discount scale)",
-    "usedBy": [
-      "src/lib/contracts.ts"
-    ]
-  },
-  "0xA5b50037A8D2Fda22805F750252268AdAEB36480": {
-    "ecosystem": "SD",
-    "role": "AaveFlashBorrower",
-    "usedBy": [
-      "src/lib/contracts.ts"
-    ]
-  },
-  "0xC3D1e0b1CD05081bD7Af4cf87f681512E3E90917": {
-    "ecosystem": "SD",
-    "role": "Uniswap V2 pair SD/WETH",
-    "usedBy": [
-      "src/lib/contracts.ts"
-    ]
-  },
-  "0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7": {
-    "ecosystem": "AMUTT",
-    "role": "GovernanceToken (AMUTT)",
-    "usedBy": [
-      "src/lib/staking.ts"
-    ]
-  },
-  "0x055BB4eD8d5464C25D71391E940ce53CA30845fC": {
-    "ecosystem": "AMUTT",
-    "role": "FeeDiscountStaking",
-    "usedBy": [
-      "src/lib/staking.ts"
-    ]
-  },
-  "0x16a1E9c10B913912b7B7df4649D9596D95ce33E6": {
-    "ecosystem": "AMUTT",
-    "role": "YieldStakingVault v1 (legacy discount scale; superseded by 0xC29c\u20264981; zero assets)",
-    "usedBy": [
-      "src/components/YieldVaultPanel.tsx"
-    ]
-  },
-  "0x581B294FeC1A4332f17cf18B49D68087c09b6784": {
-    "ecosystem": "AMUTT",
-    "role": "Uniswap V2 pair AMUTT/WETH"
-  },
-  "0x936a3D52c3037848879F3641dfBc9132aAe51bDF": {
-    "ecosystem": "AMUTT",
-    "role": "AaveFlashBorrower"
-  },
-  "0xC29c4b5aF82F6c1469bc47Cfa167386f93514981": {
-    "ecosystem": "AMUTT",
-    "role": "YieldStakingVault v2 (10000-bps discount scale; superseded by v3 0x5c98...59e5; zero assets)",
-    "deploymentTx": "0x342b72fc23fe2505d9e07ef28d350cac009d160291dd093a1db8e7c2d2d71ab5",
-    "sourceCommit": "2b20a00"
-  },
-  "0x5c98f6bc9d17ba0eb02e1336bdf035938f5859e5": {
-    "ecosystem": "AMUTT",
-    "role": "YieldStakingVault v3 (share-price protection with 1e6 virtual shares + 10000-bps scale, active)",
-    "usedBy": [
-      "src/components/YieldVaultPanel.tsx (VITE_YIELD_VAULT_ADDRESS)"
-    ],
-    "deploymentTx": "0x1f6acc736b603dd2259afdb285bf715802fab1ef4fd9988bdac195fdf2cdb2fc",
-    "sourceCommit": "99365d4"
-  },
-  "0x70315019D12a11556c837970675cdC8fa54d186b": {
-    "ecosystem": "Arbitrage",
-    "role": "AtomicFlashArbitrageRouter v1 (Aave flash loan arbitrage)",
-    "usedBy": [
-      "src/components/RouterOperatorPanel.tsx"
-    ]
-  },
-  "0xdF77eBFB6e0468aE4e94b13Fc9881427B82178Fd": {
-    "ecosystem": "Arbitrage",
-    "role": "AtomicFlashArbitrageRouter (Active Aave v3 flash loan arbitrage router, admin 0x9dC0...7C98)",
-    "deploymentTx": "0xa672e521807cf11bb1c857337d8a54126eab13b7feb3b632012f1f6c32f3705c",
-    "usedBy": [
-      "src/pages/Arbitrage.tsx",
-      "src/lib/launchpad/constants.ts",
-      "src/lib/amm/ai-arbitrage-bot.ts"
-    ]
-  },
-  "0xb8f3D5143ffddB99688BB31E7c2c3894a1E17263": {
-    "ecosystem": "FBA",
-    "role": "GovernanceToken (FBA - Foundational Black American)",
-    "usedBy": [
-      "src/config/tokens.ts",
-      "src/lib/tokens.ts",
-      "src/pages/Portfolio.tsx"
-    ]
-  },
-  "0x916ed75C0636Ddd7404DB79B7dc5CF80e8446c47": {
-    "ecosystem": "FBA",
-    "role": "Uniswap V2 pair FBA/WETH"
-  },
+  "note": "Human-assigned roles only. Facts (code, admin, verification) come from chain reads in base-mainnet.manifest.json and mrwd-base-mainnet.json.",
   "0xC17227AAa33C54634B6cE7AD0bf33A156563c179": {
     "ecosystem": "MRWD",
     "role": "MuttRewards (MRWD) token",
@@ -156,6 +40,88 @@
     "role": "MuttProStaking (Equilnyxs Pro)",
     "usedBy": [
       "deployments/mrwd-base-mainnet.json"
+    ]
+  },
+  "0x9cD40EBa4B0793C43FdF8C5A3272073820f77CB4": {
+    "ecosystem": "MRWD",
+    "role": "SponsoredRewardPaymaster (ERC-4337 EntryPoint v0.7)",
+    "usedBy": [
+      "src/pages/Paymaster.tsx"
+    ]
+  },
+  "0x2443C90eB4eA63b74383a5f0dB36c95A1091b68b": {
+    "ecosystem": "Launchpad",
+    "role": "LaunchpadFees (live feeAmount: 10 USDC)",
+    "usedBy": [
+      "src/lib/launchpad/constants.ts"
+    ]
+  },
+  "0xb5c9bedb57f4e348e40a5e6326c90de474072e25": {
+    "ecosystem": "Liquidity",
+    "role": "V3PositionTimelock (sovereign V3 NFT locker)",
+    "usedBy": [
+      "src/config/dex/timelock-deployment.json"
+    ]
+  },
+  "0x051c758521971f5c5a84eDaF18EEA12854375469": {
+    "ecosystem": "SD",
+    "role": "GovernanceToken (SD)",
+    "usedBy": [
+      "src/config/tokens.ts"
+    ]
+  },
+  "0x8a765d450d38d13f5e2533d29399f743cdf23faa": {
+    "ecosystem": "SD",
+    "role": "FeeDiscountStaking (SD active staking)",
+    "usedBy": [
+      "src/config/tokens.ts",
+      "deployments/base-mainnet.json"
+    ]
+  },
+  "0xC3D1e0b1CD05081bD7Af4cf87f681512E3E90917": {
+    "ecosystem": "SD",
+    "role": "Uniswap V2 pair SD/WETH",
+    "usedBy": [
+      "deployments/base-mainnet.json"
+    ]
+  },
+  "0x5c98f6bc9d17ba0eb02e1336bdf035938f5859e5": {
+    "ecosystem": "Vaults",
+    "role": "YieldStakingVault v3 (share-price protection with 1e6 virtual shares + 10000-bps scale, active)",
+    "usedBy": [
+      "src/components/YieldVaultPanel.tsx (VITE_YIELD_VAULT_ADDRESS)"
+    ],
+    "deploymentTx": "0x1f6acc736b603dd2259afdb285bf715802fab1ef4fd9988bdac195fdf2cdb2fc",
+    "sourceCommit": "99365d4"
+  },
+  "0xdF77eBFB6e0468aE4e94b13Fc9881427B82178Fd": {
+    "ecosystem": "Arbitrage",
+    "role": "AtomicFlashArbitrageRouter (Active Aave v3 flash loan arbitrage router, admin 0x9dC0...7C98)",
+    "deploymentTx": "0xa672e521807cf11bb1c857337d8a54126eab13b7feb3b632012f1f6c32f3705c",
+    "usedBy": [
+      "src/pages/Arbitrage.tsx",
+      "src/lib/launchpad/constants.ts",
+      "src/lib/amm/ai-arbitrage-bot.ts"
+    ]
+  },
+  "0xb8f3D5143ffddB99688BB31E7c2c3894a1E17263": {
+    "ecosystem": "FBA",
+    "role": "GovernanceToken (FBA - Foundational Black American)",
+    "usedBy": [
+      "src/config/tokens.ts",
+      "src/pages/Portfolio.tsx"
+    ]
+  },
+  "0x916ed75C0636Ddd7404DB79B7dc5CF80e8446c47": {
+    "ecosystem": "FBA",
+    "role": "Uniswap V2 pair FBA/WETH"
+  },
+  "0x1aEB45Fd7B6C59B52da3e41558410F306CBaa56C": {
+    "ecosystem": "EQX",
+    "role": "Equilnyxs Shares (transfer-restricted via IdentityRegistry)",
+    "usedBy": [
+      "src/config/tokens.ts",
+      "src/pages/Portfolio.tsx"
     ]
   }
 }

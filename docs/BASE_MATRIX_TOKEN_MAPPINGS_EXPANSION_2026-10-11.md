@@ -37,7 +37,7 @@ This update permanently resolves and activates Base token mappings by:
 | **LINK** | Chainlink Token | `0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C6e196` | 18 | Chainlink Base Deployment |
 | **SNX** | Synthetix Network Token | `0x22e6966B799c4D5B13BE962E1D117b56327FDa66` | 18 | Synthetix Base Deployment |
 | **SD** | Shaggy Dogg | `0x051c758521971f5c5a84edaf18eea12854375469` | 18 | Sovereign DEX Protocol Token |
-| **AMUTT** | Astro Mutt | `0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7` | 18 | Sovereign DEX Utility Token |
+| **MRWD** | Mutt Rewards | `0xC17227AAa33C54634B6cE7AD0bf33A156563c179` | 18 | Ecosystem Liquidity & Utility Token |
 
 ---
 

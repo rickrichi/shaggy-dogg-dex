@@ -312,9 +312,9 @@ describe("Aerodrome seeding", () => {
 
 describe("launchpad fee", () => {
   it("refuses a wallet short of the fee before deploying anything", async () => {
-    const { wallet, run } = clients(false, 500_000_000n, 499_000_000n);
+    const { wallet, run } = clients(false, 10_000_000n, 9_000_000n);
     await expect(run({ ...form, enableDexSeeding: false })).rejects.toThrow(
-      "The launch fee is 500 USDC and this wallet holds 499 USDC. Nothing was deployed."
+      "The launch fee is 10 USDC and this wallet holds 9 USDC. Nothing was deployed."
     );
     expect(wallet.deployContract).not.toHaveBeenCalled();
     expect(wallet.writeContract).not.toHaveBeenCalled();
@@ -330,14 +330,14 @@ describe("launchpad fee", () => {
   });
 
   it("approves and pays the live launch fee, tagging the deployed token", async () => {
-    const { wallet, run } = clients(false, 500_000_000n);
+    const { wallet, run } = clients(false, 10_000_000n);
     await run({ ...form, enableDexSeeding: false });
     expect(wallet.writeContract).toHaveBeenCalledTimes(2);
 
     const approveCall = wallet.writeContract.mock.calls[0]![0];
     expect(approveCall.functionName).toBe("approve");
     expect(approveCall.address).toBe(CANONICAL_BASE_CONTRACTS.USDC);
-    expect(approveCall.args).toEqual([CANONICAL_BASE_CONTRACTS.LaunchpadFees, 500_000_000n]);
+    expect(approveCall.args).toEqual([CANONICAL_BASE_CONTRACTS.LaunchpadFees, 10_000_000n]);
 
     const payCall = wallet.writeContract.mock.calls[1]![0];
     expect(payCall.functionName).toBe("payLaunchFee");

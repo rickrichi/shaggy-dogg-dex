@@ -26,18 +26,18 @@ The Markets page in Shaggy Mutt DEX is permanently decoupled from local develope
   * Rolling 14-point mini sparklines rendered via non-scaling SVG vectors.
 * **Auto-Reconnection & Backoff:** Socket disconnects trigger exponential backoff retry algorithms (1s to 15s) with automatic subscription re-establishment.
 
-### B. Enterprise Sovereign DeFi Token Feeds (SD & AMUTT)
-* **On-Chain Reserve Coupling:** Real-time pricing for **Shaggy Dogg (`SD`)** and **Astro Mutt (`AMUTT`)** is derived from live streaming ETH prices and the Base Uniswap V2 reserve ratio (`1 ETH = 988,132,706.168 SD`).
+### B. Ecosystem DeFi Token Feeds (MRWD & SD)
+* **On-Chain Reserve Coupling:** Real-time pricing for **Mutt Rewards (`MRWD`)** and **Shaggy Dogg (`SD`)** is derived from live streaming ETH prices and their Base Uniswap V3 / V2 pool state.
 * **Canonical Registry Binding:**
-  * **SD Governance Token:** [`0x051c758521971f5c5a84edaf18eea12854375469`](https://basescan.org/address/0x051c758521971f5c5a84edaf18eea12854375469)
+  * **MRWD Token:** [`0xC17227AAa33C54634B6cE7AD0bf33A156563c179`](https://basescan.org/token/0xC17227AAa33C54634B6cE7AD0bf33A156563c179)
+  * **MRWD / WETH 0.30% Uniswap V3 Pool:** [`0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5`](https://basescan.org/address/0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5)
+  * **SD Token:** [`0x051c758521971f5c5a84edaf18eea12854375469`](https://basescan.org/address/0x051c758521971f5c5a84edaf18eea12854375469)
   * **SD / WETH Uniswap V2 Pair:** [`0xC3D1e0b1CD05081bD7Af4cf87f681512E3E90917`](https://basescan.org/address/0xC3D1e0b1CD05081bD7Af4cf87f681512E3E90917)
-  * **AMUTT Governance Token:** [`0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7`](https://basescan.org/address/0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7)
-  * **AMUTT / WETH Uniswap V2 Pair:** [`0x581B294FeC1A4332f17cf18B49D68087c09b6784`](https://basescan.org/address/0x581B294FeC1A4332f17cf18B49D68087c09b6784)
-* **Direct Explorer Verification:** `PairDetail` provides one-click links to BaseScan for both the Governance Token contracts and the Uniswap V2 liquidity pool contracts.
+* **Direct Explorer Verification:** `PairDetail` provides one-click links to BaseScan for the token and pool contracts.
 
 ### C. Live Public Trade Fetcher (`fetchCoinbaseTrades`)
 * **Direct CORS REST API:** Queries `https://api.exchange.coinbase.com/products/{id}/trades?limit=15` with AbortSignal timeouts and graceful error boundaries.
-* **Verified Settlement Records:** For SD & AMUTT, displays authentic mainnet liquidity settlement records (Tx: `0xade88f38806d2f7be1c295eba954568b9ae7334352186316733fc9a7f0316533`).
+* **Verified Settlement Records:** Displays authentic mainnet liquidity settlement records.
 
 ### D. Security & Content Security Policy (CSP)
 * **Production `vercel.json` & Dev `vite.config.ts`:**

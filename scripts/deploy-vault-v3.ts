@@ -175,7 +175,7 @@ async function main() {
   if (fs.existsSync(labelsPath)) {
     const labels = JSON.parse(fs.readFileSync(labelsPath, "utf8"));
     labels[deployedAddress] = {
-      ecosystem: "AMUTT",
+      ecosystem: "Vaults",
       role: "YieldStakingVault v3 (share-price protection + 10000-bps scale, active)",
       usedBy: ["src/components/YieldVaultPanel.tsx (VITE_YIELD_VAULT_ADDRESS)"],
       deploymentTx: hash,

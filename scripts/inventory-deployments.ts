@@ -1,4 +1,4 @@
-// Read-only on-chain inventory of every Shaggy/AMUTT address referenced in the repo.
+// Read-only on-chain inventory of every Base mainnet contract address referenced in the repo.
 // Writes deployments/base-mainnet.manifest.json from chain state + Blockscout, never from docs.
 import { existsSync,readFileSync, writeFileSync } from "node:fs";
 

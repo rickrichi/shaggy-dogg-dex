@@ -1,8 +1,8 @@
   Let's get you liquified! 🌊
 
   When you add liquidity to an Automated Market Maker (AMM) pool, you deposit two tokens simultaneously (e.g. ETH + SD, or ETH +
-  AMUTT) into the Uniswap V2 smart contract. In exchange, the pool mints LP (Liquidity Provider) tokens directly to your wallet,
-  which earn a share of every 0.30% swap fee generated on the DEX.
+  MRWD) into the Uniswap smart contract. In exchange, the pool mints LP positions directly to your wallet,
+  which earn a share of swap fees generated on the DEX.
   ──────
   ### Your Live Balances & Pools on Base Mainnet
 
@@ -10,14 +10,14 @@
 
   • ETH: 0.01025 ETH (~$25.70)
   • SD (Shaggy Dogg): 499,999.99 SD
-  • AMUTT (Alpha Mutt): 54,528,054 AMUTT
+  • MRWD (Mutt Rewards): 0xC17227AAa33C54634B6cE7AD0bf33A156563c179
 
   #### Current Live Pool Reserves:
 
   1. SD / ETH Pool (0xc3d1e0b1cd05081bd7af4cf87f681512e3e90917):
       • Current Ratio: ~98,800 SD per 0.0001 ETH
-  2. AMUTT / ETH Pool (0x581b294fec1a4332f17cf18b49d68087c09b6784):
-      • Current Ratio: ~8,266,700 AMUTT per 0.0001 ETH
+  2. MRWD / WETH 0.30% V3 Pool (0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5):
+      • Canonical Uniswap V3 pool on Base
 
   ──────
   ### Step-by-Step: How to Add Liquidity
@@ -28,7 +28,7 @@
   2. Ensure MetaMask is connected to Base.
   3. Select your pair:
       • Token A: ETH
-      • Token B: SD (or AMUTT)
+      • Token B: SD (or MRWD)
   4. Type in a small amount of ETH to seed—for example:
       • 0.0001 ETH (about $0.25 USD).
       • The DEX will automatically calculate the matching proportional token amount (e.g., ~98,800 SD).
@@ -46,7 +46,7 @@
   #### Option B: Programmatically via Script
 
   If you prefer to run it directly from your terminal using a script (similar to add-fba-liquidity.ts), let me know which pair
-  (SD/ETH or AMUTT/ETH) and how much ETH you'd like to supply, and I can run a simulation and broadcast it for you!
+  (SD/ETH or MRWD/ETH) and how much ETH you'd like to supply, and I can run a simulation and broadcast it for you!
 
   The latest liquidity update is live on https://dex.lumsian.com/liquidity! 🚀
 
@@ -54,8 +54,8 @@
 
   1. ETH + SD (Shaggy Dogg)
       • Example: 0.0001 ETH paired with ~98,800 SD
-  2. ETH + AMUTT (Alpha Mutt)
-      • Example: 0.00005 ETH paired with ~4,133,000 AMUTT
+  2. ETH + MRWD (Mutt Rewards)
+      • Canonical V3 0.30% pool on Base
 
   ──────
   ### How to do it right now:

@@ -138,17 +138,14 @@ The Base Sepolia rehearsal (`script/RehearseMrwd.s.sol`, four phases, 2026-10-25
 - **MRWD's price:** with `allowThin=true` the service returns an indicative price for pools under the $100 liquidity floor. MRWD currently prices at about $3.5e-11 from its roughly $14 pool, and becomes a firm price once the pool holds $100 or more.
 - **Status:** commit `48c1b54`. 27 tests pass. Render auto-deployed it, and it was **verified live**.
 
-### White paper (`docs/WHITEPAPER-v2.0-DRAFT.md`)
-Updated to 25 October 2026:
+### White paper (`docs/WHITEPAPER.md`)
+Published Version 2.0 (3 November 2026):
 - the launch paragraph;
 - deployed addresses;
 - the Equilnyxs Pro staking terms;
 - scheduler status;
 - vesting addresses;
-- resolved decisions struck through;
 - §4 on the V3 price feed.
-
-The draft remains unpublished. The live paper is v1.4.
 
 ---
 

@@ -4,8 +4,8 @@
   ──────
   ### What is Already 100% Identical Right Now
 
-  • Smart Contracts & Network: Both your local machine and dex.lumsian.com interact with the exact same Base Mainnet contracts (SD,
-  AMUTT, Uniswap V2 LP pools, Staking, Vaults).
+  • Smart Contracts & Network: Both your local machine and dex.lumsian.com interact with the exact same Base Mainnet contracts (MRWD, SD,
+  Uniswap V3/V2 LP pools, Staking, Vaults).
   • Live Exchange Streaming: The Markets page connects directly from your browser to Coinbase’s global WebSocket (wss://ws-feed.
   exchange.coinbase.com) whether you run it locally on http://localhost:5173 or online at https://dex.lumsian.com.
   • Build Artifacts & Codebase: Your local code and test suite (all 27 Vitest suites) match the deployed production build bit-for-

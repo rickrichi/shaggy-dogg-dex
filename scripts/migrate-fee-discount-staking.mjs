@@ -15,7 +15,6 @@ import { base } from "viem/chains";
 
 const LEGACY_STAKING = [
   { ecosystem: "SD", address: "0x42134ccc6c41149cf71c7b4994e33ee66758af20" },
-  { ecosystem: "AMUTT", address: "0x055BB4eD8d5464C25D71391E940ce53CA30845fC" },
 ];
 
 const legacyAbi = parseAbi([

@@ -40,8 +40,8 @@ To eliminate these risks, the application copy has been sanitized, and an explic
 Added a responsive footer displayed across all pages of [dex.lumsian.com](https://dex.lumsian.com) containing:
 
 1. **Direct Blockchain Explorer Links:**
+   * Mutt Rewards (MRWD) Contract on BaseScan / Sourcify: `0xC17227AAa33C54634B6cE7AD0bf33A156563c179`
    * Shaggy Dogg (SD) Contract on Base Blockscout: `0x051c758521971f5c5a84edaf18eea12854375469`
-   * Astro Mutt (AMUTT) Contract on Base Blockscout: `0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7`
    * BaseScan Explorer link
 
 2. **Standard DeFi Risk & As-Is Disclosure Banner:**

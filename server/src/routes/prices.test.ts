@@ -141,7 +141,7 @@ describe('POST /api/prices', () => {
         status: 200,
         body: {
           tokens: {
-            [NO_POOL]: { symbol: 'AMUTT', priceUsd: 3e-8, change24hPercent: null, indicative: true, pool: { liquidityUsd: 3 } },
+            [NO_POOL]: { symbol: 'MRWD', priceUsd: 3e-8, change24hPercent: null, indicative: true, pool: { liquidityUsd: 3 } },
           },
           errors: {},
         },
@@ -156,7 +156,7 @@ describe('POST /api/prices', () => {
     const thin = await thinRes.json();
 
     expect(thin.data.prices).toContainEqual(
-      expect.objectContaining({ address: NO_POOL, symbol: 'AMUTT', indicative: true, liquidityUsd: 3 }),
+      expect.objectContaining({ address: NO_POOL, symbol: 'MRWD', indicative: true, liquidityUsd: 3 }),
     );
     const batchUrls = fetchMock.mock.calls.map(([url]) => String(url)).filter((url) => url.includes('/tokens/base?'));
     expect(batchUrls[0]).toContain('allowThin=true');
