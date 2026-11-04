@@ -1,8 +1,8 @@
 // src/pages/Swap.tsx - Refactored to Production Standards
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
-import { Activity, ExternalLink, Fuel, ShieldCheck } from "lucide-react";
+import { Activity, ArrowRight, ExternalLink, Fuel, ShieldCheck, Sparkles } from "lucide-react";
 import { formatGwei } from "viem";
 import { useAccount, useBlockNumber, useGasPrice, useSwitchChain } from "wagmi";
 
@@ -146,6 +146,24 @@ export default function Swap() {
   const activeSwap = useSwap(baseTokens.initialSell, baseTokens.initialBuy);
   const { sellToken, buyToken } = activeSwap.state;
 
+  const mrwdToken = useMemo(
+    () => chainTokens.find((t) => t.symbol.toUpperCase() === "MRWD"),
+    [chainTokens]
+  );
+  const nativeEthToken = useMemo(
+    () => chainTokens.find((t) => t.kind === "native"),
+    [chainTokens]
+  );
+  const isBuyingMrwd = buyToken.symbol.toUpperCase() === "MRWD";
+
+  const handleSelectBuyMrwd = useCallback(() => {
+    if (!mrwdToken) return;
+    if (nativeEthToken && sellToken.symbol.toUpperCase() === "MRWD") {
+      activeSwap.actions?.setSellToken(nativeEthToken);
+    }
+    activeSwap.actions?.setBuyToken(mrwdToken);
+  }, [activeSwap.actions, mrwdToken, nativeEthToken, sellToken.symbol]);
+
   // ────────────────────────────────────────────────────────────────────────────
   // URL Synchronization
   // ────────────────────────────────────────────────────────────────────────────
@@ -200,7 +218,32 @@ export default function Swap() {
           <p className="text-sm text-slate-500">Advanced Swaps &amp; Liquidity</p>
         </div>
 
-        <div className="flex items-center gap-4 font-mono text-xs md:text-sm">
+        <div className="flex flex-wrap items-center gap-3 font-mono text-xs md:text-sm">
+          {mrwdToken && (
+            <div className="flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50/90 px-3 py-1.5 font-sans text-xs font-semibold text-emerald-900 shadow-sm">
+              <Sparkles className="size-3.5 text-emerald-600" />
+              <span>Mutt Rewards ($MRWD): 1B unlocks Equilnyxs Pro · Q1 LP rewards live</span>
+              {!isBuyingMrwd ? (
+                <button
+                  type="button"
+                  onClick={handleSelectBuyMrwd}
+                  className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-0.5 text-xs font-bold text-white transition hover:bg-emerald-700"
+                >
+                  Buy $MRWD <ArrowRight className="size-3" />
+                </button>
+              ) : (
+                <span className="rounded-full bg-emerald-200/80 px-2 py-0.5 text-[11px] font-bold text-emerald-900">
+                  ETH → MRWD active
+                </span>
+              )}
+              <Link
+                to="/stake"
+                className="text-emerald-700 underline underline-offset-2 hover:text-emerald-900"
+              >
+                Stake
+              </Link>
+            </div>
+          )}
           {gasPrice && (
             <div className="flex items-center gap-2 rounded-full border border-amber-100 bg-amber-50 px-3 py-1.5 text-amber-700">
               <Fuel className="size-4" />

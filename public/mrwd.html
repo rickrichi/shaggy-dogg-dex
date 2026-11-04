@@ -99,7 +99,11 @@
       dd { margin: 0; overflow-wrap: anywhere; }
       code { color: #bae6fd; font-size: .94em; }
       .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
-      .button { padding: 10px 16px; border-radius: 999px; background: #0e7490; color: #fff; font-weight: 750; text-decoration: none; }
+      .button { padding: 10px 16px; border-radius: 999px; background: #0e7490; color: #fff; font-weight: 750; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+      .button-primary { background: linear-gradient(135deg, #10b981, #059669); color: #fff; box-shadow: 0 4px 18px rgba(16, 185, 129, 0.35); }
+      .button-secondary { background: #1e293b; border: 1px solid #334155; color: #e2e8f0; }
+      .highlight-box { margin: 28px 0; padding: 22px; border: 1px solid #059669; border-radius: 16px; background: linear-gradient(145deg, rgba(6, 78, 59, 0.55), rgba(13, 26, 44, 0.9)); }
+      .highlight-box h2 { margin-top: 0; color: #6ee7b7; font-size: 1.35rem; }
       footer { margin-top: 54px; padding-top: 22px; border-top: 1px solid #25344a; color: #94a3b8; font-size: .92rem; }
       @media (max-width: 560px) { main { padding-top: 38px; } dl { grid-template-columns: 1fr; gap: 2px; } dd { margin-bottom: 10px; } }
     </style>
@@ -107,14 +111,52 @@
   <body>
     <main>
       <header>
-        <div class="eyebrow">Official token information</div>
+        <div class="eyebrow">Official token information · Base Mainnet (8453)</div>
         <h1>Mutt Rewards <span aria-label="symbol">(MRWD)</span></h1>
         <p class="lead">
-          MRWD is a utility and liquidity-incentive token on Base. It rewards liquidity providers,
-          enables staking-based access to Equilnyxs Pro, and supports rewards for sponsored
-          operations in the Shaggy Mutt DEX ecosystem.
+          MRWD is a fixed-supply utility and liquidity-incentive token on Base. It rewards liquidity
+          providers across a 16-quarter (600B MRWD) schedule, unlocks Equilnyxs Pro via 30-day
+          principal-protected staking, and supports sponsored-operation rewards in the Shaggy Mutt DEX
+          ecosystem.
         </p>
+        <nav class="actions" aria-label="Primary MRWD actions">
+          <a class="button button-primary" href="/swap?input=ETH&output=MRWD">Buy MRWD on Shaggy DEX (ETH → MRWD)</a>
+          <a class="button" href="https://app.uniswap.org/swap?chain=base&inputCurrency=ETH&outputCurrency=0xC17227AAa33C54634B6cE7AD0bf33A156563c179" target="_blank" rel="noreferrer">Buy on Uniswap (Base)</a>
+          <a class="button" href="/stake">Stake &amp; Earn Rewards</a>
+          <a class="button button-secondary" href="https://www.geckoterminal.com/base/pools/0xa7d4d975988daa77b46c5d637717e2dfe07fbdb5" target="_blank" rel="noreferrer">Live Chart (GeckoTerminal)</a>
+          <a class="button button-secondary" href="https://dexscreener.com/base/0xa7d4d975988daa77b46c5d637717e2dfe07fbdb5" target="_blank" rel="noreferrer">DexScreener</a>
+        </nav>
       </header>
+
+      <section class="highlight-box" aria-labelledby="why-acquire">
+        <h2 id="why-acquire">Why acquire &amp; stake MRWD on Base?</h2>
+        <div class="grid">
+          <article class="card">
+            <h3>Unlock Equilnyxs Pro (1B MRWD)</h3>
+            <p>
+              Lock <strong>1,000,000,000 MRWD</strong> for 30 days in ownerless
+              <code>MuttProStaking</code> to unlock an Equilnyxs Pro license (normally $12/month or
+              $99/year in USDC) with 0% withdrawal fee after maturity.
+            </p>
+          </article>
+          <article class="card">
+            <h3>600B MRWD LP Rewards (Quarter 1 Live)</h3>
+            <p>
+              Provide liquidity in the canonical <strong>MRWD/WETH 0.30% Uniswap V3 pool</strong>
+              (<code>0xa7D4…bDB5</code>) and stake your V3 NFT in <code>UniswapV3Staker</code> to earn
+              a share of 55.45B MRWD in Quarter 1.
+            </p>
+          </article>
+          <article class="card">
+            <h3>100% Immutable &amp; Ownerless</h3>
+            <p>
+              1T fixed supply minted once, 0% transfer tax, no mint/admin/pause keys, 24-month locked
+              launch position (<code>#6351512</code>), and Sourcify <code>exact_match</code> verified
+              contracts.
+            </p>
+          </article>
+        </div>
+      </section>
 
       <aside class="notice">
         <strong>Identity notice:</strong> Mutt Rewards is plural, its symbol is MRWD, and its only
