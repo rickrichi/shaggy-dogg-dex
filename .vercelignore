@@ -13,6 +13,7 @@ shaggyimages/
 shaggy-dogg-sol_files/
 
 # Not part of the web build
+node_modules/
 contracts/
 deploy/
 deployments/
