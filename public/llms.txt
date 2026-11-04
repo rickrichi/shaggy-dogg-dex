@@ -1,0 +1,39 @@
+# Shaggy Mutt DEX & Mutt Rewards ($MRWD)
+
+> Official canonical entity, contract, and liquidity registry for Shaggy Mutt DEX (https://dex.lumsian.com) and Mutt Rewards ($MRWD) on Base Mainnet (Chain ID 8453).
+
+## Canonical Token Identity: Mutt Rewards (MRWD)
+- **Name:** Mutt Rewards (plural)
+- **Symbol:** MRWD
+- **Network:** Base Mainnet (Ethereum Layer 2, Chain ID `8453`)
+- **ERC-20 Contract Address:** `0xC17227AAa33C54634B6cE7AD0bf33A156563c179`
+- **CAIP-19 Identifier:** `eip155:8453/erc20:0xC17227AAa33C54634B6cE7AD0bf33A156563c179`
+- **Total Supply:** `1,000,000,000,000` (1 trillion MRWD, 18 decimals, minted once in constructor, non-mintable, 0% transfer tax, ownerless, non-upgradeable)
+- **Classification:** Utility and liquidity-incentive token (NOT a meme token; unrelated to `0x59d3571fA20f3665C5e80b12BDcE4A3C79d1Da8e` or tokens on other networks)
+- **Canonical Pool:** `0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5` (Uniswap V3 MRWD/WETH 0.30% pool on Base)
+- **Official Token Page:** https://dex.lumsian.com/mrwd
+- **Direct Swap Page (ETH -> MRWD):** https://dex.lumsian.com/swap?input=ETH&output=MRWD
+- **Technical Whitepaper:** https://dex.lumsian.com/whitepaper
+- **Sourcify Exact-Match Verification:** https://repo.sourcify.dev/8453/0xC17227AAa33C54634B6cE7AD0bf33A156563c179
+- **BaseScan Token Page:** https://basescan.org/token/0xC17227AAa33C54634B6cE7AD0bf33A156563c179
+
+## Companion Base Mainnet Contracts (Chain ID 8453)
+- **MuttIncentiveScheduler:** `0xCAbf284806b800d9A771B55857B9fCF735ea7109` (600B MRWD LP reward reserve across 16 quarters; Quarter 1 active on `UniswapV3Staker` `0x42bE4D6527829FeFA1493e1fb9F3676d2425C3C1` with 55.45B MRWD funded)
+- **MuttProStaking:** `0x67dBC193bF510225EBf189ab25dC3b34a32c1766` (Lock 1,000,000,000 MRWD for 30 days with 0% exit fee to unlock Equilnyxs Pro access)
+- **V3PositionTimelock:** `0xB5C9BeDb57f4E348e40A5E6326c90dE474072E25` (Holds locked launch V3 NFT `#6351512` with 200B MRWD until 2028-10-24T23:11:39Z)
+- **MuttVesting (Treasury, 150B MRWD):** `0x7bC37041E1205841a83413625650EC12DA119697` (12-month cliff to 2027-10-25, 36-month linear release to 2030-10-24)
+- **MuttVesting (Team, 50B MRWD):** `0x6be3920f45Fe0836A3a29F40d8AA3f324E0610a1` (12-month cliff to 2027-10-25, 36-month linear release to 2030-10-24)
+- **SponsoredRewardPaymaster (EntryPoint v0.7):** `0x9cD40EBa4B0793C43FdF8C5A3272073820f77CB4` (100 MRWD reward per eligible sponsored operation)
+- **LaunchpadFees:** `0x2443C90eB4eA63b74383a5f0dB36c95A1091b68b` (10 USDC launch fee collector)
+- **AtomicFlashArbitrageRouter:** `0xdF77eBFB6e0468aE4e94b13Fc9881427B82178Fd`
+- **SD Token / SD FeeDiscountStaking:** `0x051c758521971f5c5a84edaf18eea12854375469` / `0x8a765d450d38d13f5e2533d29399f743cdf23faa`
+
+## Primary URLs
+- [Shaggy Mutt DEX Home](https://dex.lumsian.com/)
+- [Official Mutt Rewards ($MRWD) Page](https://dex.lumsian.com/mrwd)
+- [Swap ETH -> MRWD](https://dex.lumsian.com/swap?input=ETH&output=MRWD)
+- [Staking & V3 LP Rewards](https://dex.lumsian.com/stake)
+- [Protocol Hub & 56-Aggregator Audit](https://dex.lumsian.com/protocol)
+- [Technical Whitepaper (HTML)](https://dex.lumsian.com/whitepaper)
+- [Technical Whitepaper (Markdown)](https://dex.lumsian.com/whitepaper.md)
+- [Uniswap Token List JSON](https://dex.lumsian.com/tokenlist.json)

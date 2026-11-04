@@ -59,7 +59,12 @@
             "url": "https://dex.lumsian.com/mrwd",
             "sameAs": [
               "https://basescan.org/token/0xC17227AAa33C54634B6cE7AD0bf33A156563c179",
-              "https://repo.sourcify.dev/8453/0xC17227AAa33C54634B6cE7AD0bf33A156563c179"
+              "https://repo.sourcify.dev/8453/0xC17227AAa33C54634B6cE7AD0bf33A156563c179",
+              "https://basescan.org/address/0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5",
+              "https://www.geckoterminal.com/base/pools/0xa7d4d975988daa77b46c5d637717e2dfe07fbdb5",
+              "https://dexscreener.com/base/0xa7d4d975988daa77b46c5d637717e2dfe07fbdb5",
+              "https://app.uniswap.org/swap?chain=base&inputCurrency=ETH&outputCurrency=0xC17227AAa33C54634B6cE7AD0bf33A156563c179",
+              "https://github.com/rickrichi/shaggy-dogg-dex"
             ],
             "additionalProperty": [
               { "@type": "PropertyValue", "name": "Symbol", "value": "MRWD" },
@@ -72,8 +77,53 @@
               },
               {
                 "@type": "PropertyValue",
+                "name": "Canonical Uniswap V3 Pool (0.30%)",
+                "value": "0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "MuttIncentiveScheduler",
+                "value": "0xCAbf284806b800d9A771B55857B9fCF735ea7109"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "MuttProStaking",
+                "value": "0x67dBC193bF510225EBf189ab25dC3b34a32c1766"
+              },
+              {
+                "@type": "PropertyValue",
                 "name": "Classification",
                 "value": "Utility and liquidity-incentive token"
+              }
+            ]
+          },
+          {
+            "@type": "FAQPage",
+            "@id": "https://dex.lumsian.com/mrwd#faq",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "What is the official Mutt Rewards (MRWD) contract address on Base?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "The only official Mutt Rewards (MRWD) ERC-20 contract address on Base Mainnet (Chain ID 8453) is 0xC17227AAa33C54634B6cE7AD0bf33A156563c179. Its canonical MRWD/WETH 0.30% Uniswap V3 pool is 0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Where can I buy and stake Mutt Rewards (MRWD)?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "You can swap ETH for MRWD on Shaggy Mutt DEX at https://dex.lumsian.com/swap?input=ETH&output=MRWD or on Uniswap V3 (Base) via pool 0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5, and stake MRWD or V3 LP positions at https://dex.lumsian.com/stake."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "What is Mutt Rewards (MRWD) used for?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "MRWD is a utility and liquidity-incentive token on Base with four ecosystem functions: (1) 600 billion MRWD in 16-quarter Uniswap V3 liquidity-provider rewards, (2) locking 1 billion MRWD for 30 days in MuttProStaking (0x67dBC193bF510225EBf189ab25dC3b34a32c1766) to unlock Equilnyxs Pro without subscription fees, (3) sponsored-operation rewards via SponsoredRewardPaymaster, and (4) serving as a planned optional launchpad quote asset."
+                }
               }
             ]
           }

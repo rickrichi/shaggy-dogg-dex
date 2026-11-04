@@ -1,0 +1,48 @@
+{
+  "name": "Shaggy Mutt DEX Official Token List",
+  "timestamp": "2026-11-04T09:00:00.000Z",
+  "version": {
+    "major": 2,
+    "minor": 0,
+    "patch": 0
+  },
+  "keywords": ["shaggy", "mutt", "mrwd", "base", "defi", "utility"],
+  "logoURI": "https://dex.lumsian.com/android-chrome-192x192.png",
+  "tokens": [
+    {
+      "chainId": 8453,
+      "address": "0xC17227AAa33C54634B6cE7AD0bf33A156563c179",
+      "name": "Mutt Rewards",
+      "symbol": "MRWD",
+      "decimals": 18,
+      "logoURI": "https://dex.lumsian.com/android-chrome-192x192.png",
+      "extensions": {
+        "website": "https://dex.lumsian.com/mrwd",
+        "description": "Mutt Rewards (MRWD) is a fixed-supply utility and liquidity-incentive token on Base. It rewards liquidity providers in the canonical MRWD/WETH 0.30% Uniswap V3 pool (0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5), unlocks Equilnyxs Pro via MuttProStaking, and powers sponsored-operation rewards.",
+        "canonicalPool": "0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5"
+      }
+    },
+    {
+      "chainId": 8453,
+      "address": "0x051c758521971f5c5a84edaf18eea12854375469",
+      "name": "Shaggy Dogg",
+      "symbol": "SD",
+      "decimals": 18,
+      "logoURI": "https://dex.lumsian.com/sd-logo.png"
+    },
+    {
+      "chainId": 8453,
+      "address": "0x4200000000000000000000000000000000000006",
+      "name": "Wrapped Ether",
+      "symbol": "WETH",
+      "decimals": 18
+    },
+    {
+      "chainId": 8453,
+      "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "name": "USD Coin",
+      "symbol": "USDC",
+      "decimals": 6
+    }
+  ]
+}

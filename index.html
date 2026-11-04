@@ -4,8 +4,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Shaggy Mutt DEX · Swap and liquidity on Base</title>
-    <meta name="description" content="Shaggy Mutt DEX on Base: swap tokens at the best quote across eight Base DEX venues, launch tokens and DeFi suites, manage liquidity, and follow markets straight from your wallet." />
+    <title>Shaggy Mutt DEX · Swap, Launchpad &amp; Mutt Rewards (MRWD) on Base</title>
+    <meta name="description" content="Shaggy Mutt DEX on Base: swap tokens across eight Base DEX venues, launch tokens and DeFi suites, and trade or stake Mutt Rewards (MRWD, 0xC17227AAa33C54634B6cE7AD0bf33A156563c179)." />
+    <meta name="keywords" content="Shaggy Mutt DEX, Mutt Rewards, MRWD, 0xC17227AAa33C54634B6cE7AD0bf33A156563c179, Base DEX, Uniswap V3 Base, Equilnyxs Pro" />
+    <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1" />
     <link rel="canonical" href="https://dex.lumsian.com/" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico?v=sd2026" />
     <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=sd2026" />
@@ -14,14 +16,45 @@
     <link rel="icon" type="image/svg+xml" href="/placeholder.svg?v=sd2026" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=sd2026" />
 
-    <meta property="og:title" content="Shaggy Mutt DEX · Swap and liquidity on Base" />
-    <meta property="og:description" content="Shaggy Mutt DEX on Base: swap tokens at the best quote across eight Base DEX venues, launch tokens and DeFi suites, manage liquidity, and follow markets straight from your wallet." />
+    <meta property="og:title" content="Shaggy Mutt DEX · Swap, Launchpad &amp; Mutt Rewards (MRWD) on Base" />
+    <meta property="og:description" content="Swap tokens across eight Base DEX venues, launch tokens and DeFi suites, and trade or stake Mutt Rewards (MRWD, 0xC17227AAa33C54634B6cE7AD0bf33A156563c179)." />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://dex.lumsian.com/" />
     <meta property="og:image" content="https://dex.lumsian.com/og.jpg" />
 
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="https://dex.lumsian.com/og.jpg" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://dex.lumsian.com/#website",
+            "url": "https://dex.lumsian.com/",
+            "name": "Shaggy Mutt DEX",
+            "description": "Multi-venue decentralized exchange, token launchpad, and Mutt Rewards (MRWD) ecosystem on Base mainnet (Chain ID 8453).",
+            "about": { "@id": "https://dex.lumsian.com/mrwd#token" }
+          },
+          {
+            "@type": "Thing",
+            "@id": "https://dex.lumsian.com/mrwd#token",
+            "name": "Mutt Rewards",
+            "alternateName": ["MRWD", "$MRWD", "Mutt Rewards token", "Mutt Rewards utility token"],
+            "description": "Mutt Rewards (MRWD) is a fixed-supply utility and liquidity-incentive token on Base mainnet (Chain ID 8453) at contract address 0xC17227AAa33C54634B6cE7AD0bf33A156563c179, paired in the canonical MRWD/WETH 0.30% Uniswap V3 pool 0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5.",
+            "identifier": "eip155:8453/erc20:0xC17227AAa33C54634B6cE7AD0bf33A156563c179",
+            "url": "https://dex.lumsian.com/mrwd",
+            "sameAs": [
+              "https://basescan.org/token/0xC17227AAa33C54634B6cE7AD0bf33A156563c179",
+              "https://repo.sourcify.dev/8453/0xC17227AAa33C54634B6cE7AD0bf33A156563c179",
+              "https://www.geckoterminal.com/base/pools/0xa7d4d975988daa77b46c5d637717e2dfe07fbdb5",
+              "https://dexscreener.com/base/0xa7d4d975988daa77b46c5d637717e2dfe07fbdb5",
+              "https://github.com/rickrichi/shaggy-dogg-dex"
+            ]
+          }
+        ]
+      }
+    </script>
   </head>
 
   <body>
@@ -30,8 +63,21 @@
     <div id="root" role="presentation">
       <main style="max-width:44rem;margin:3rem auto;padding:0 1rem;font-family:system-ui,sans-serif;line-height:1.5">
         <h1>Shaggy Mutt DEX</h1>
-        <p>A decentralized exchange interface on Base for swapping tokens, adding liquidity and following markets.</p>
-        <noscript><p>The exchange itself needs JavaScript and a wallet such as MetaMask.</p></noscript>
+        <p>A decentralized exchange interface on Base (Chain ID 8453) for swapping tokens across eight DEX venues, launching tokens and DeFi suites, and managing Uniswap V2/V3 liquidity.</p>
+        <p>
+          <strong>Official Mutt Rewards (MRWD) Token on Base:</strong>
+          <code>0xC17227AAa33C54634B6cE7AD0bf33A156563c179</code> ·
+          Canonical MRWD/WETH 0.30% Uniswap V3 Pool:
+          <code>0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5</code>
+        </p>
+        <nav aria-label="Primary links">
+          <a href="https://dex.lumsian.com/mrwd">Official Mutt Rewards (MRWD) Token Page</a> ·
+          <a href="https://dex.lumsian.com/swap?input=ETH&amp;output=MRWD">Buy MRWD (ETH → MRWD)</a> ·
+          <a href="https://dex.lumsian.com/stake">Stake MRWD &amp; Claim V3 Rewards</a> ·
+          <a href="https://dex.lumsian.com/protocol">Protocol Hub</a> ·
+          <a href="https://dex.lumsian.com/whitepaper">Technical Whitepaper</a>
+        </nav>
+        <noscript><p>The interactive exchange requires JavaScript and a Web3 wallet such as MetaMask.</p></noscript>
       </main>
     </div>
     <script type="module" src="/src/main.tsx"></script>
