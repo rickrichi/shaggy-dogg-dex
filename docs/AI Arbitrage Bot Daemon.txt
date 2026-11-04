@@ -29,7 +29,7 @@
      Min Net Profit Hurdle: $5 USD
      Max Gas Fee Ceiling:   0.01 Gwei
      Max Slippage Cap:      0.20%
-     Aave Borrower Hook:    0x936a3D52c3037848879F3641dfBc9132aAe51bDF
+     Aave Borrower Hook:    0xa5b50037a8d2fda22805f750252268adaeb36480
     ══════════════════════════════════════════════════════════════════════════
 
     [INFO] Operator Wallet Loaded: 0xc1c3d6552231DB22A22Bdf513C0833024FF3f42B

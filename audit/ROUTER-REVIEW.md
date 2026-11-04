@@ -1,7 +1,7 @@
 # AtomicFlashArbitrageRouter: line-by-line review (maintainers' self-review)
 
 Contract: `contracts/src/AtomicFlashArbitrageRouter.sol` (491 lines), deployed at
-`0x70315019D12A11556C837970675cDC8Fa54d186b` (admin `0x9dC0…47C98`, Aave pool `0xA238…d1c5`).
+`0xdF77eBFB6e0468aE4e94b13Fc9881427B82178Fd` (admin `0x9dC0…47C98`, Aave pool `0xA238…d1c5`).
 This is a pre-audit review, not an audit. Tests: `contracts/test/FlashRouterBaseFork.t.sol` (12), run on a Base
 mainnet fork with real Aave v3 flash loans, Uniswap V2 and Aerodrome; no mock contracts.
 

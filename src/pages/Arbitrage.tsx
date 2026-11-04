@@ -119,7 +119,7 @@ const BASE_AERODROME_FACTORY: Address =
 const BASE_AAVE_POOL: Address =
   (import.meta.env.VITE_AAVE_POOL_ADDRESS as Address) ||
   "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5";
-const DEFAULT_AAVE_BORROWER: Address = "0x936a3D52c3037848879F3641dfBc9132aAe51bDF";
+const DEFAULT_AAVE_BORROWER: Address = "0xa5b50037a8d2fda22805f750252268adaeb36480";
 const DEPLOYED_ATOMIC_ROUTER: Address =
   (import.meta.env.VITE_ATOMIC_ROUTER_ADDRESS as Address) ||
   "0xdF77eBFB6e0468aE4e94b13Fc9881427B82178Fd";
@@ -2421,7 +2421,7 @@ export default function Arbitrage() {
                   rel="noreferrer"
                   className="text-slate-300 underline"
                 >
-                  0x7031...186b ↗
+                  0xdF77...78Fd ↗
                 </a>
               </div>
             </div>
