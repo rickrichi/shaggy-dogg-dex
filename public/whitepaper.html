@@ -9,7 +9,7 @@
   <link rel="canonical" href="https://dex.lumsian.com/whitepaper" />
   <link rel="icon" type="image/png" href="/favicon-32x32.png" />
   <meta property="og:title" content="Shaggy Dogg DEX — Technical Whitepaper" />
-  <meta property="og:description" content="Version 2.0 · 3 November 2026. Architecture, implementation status, and deployment evidence." />
+  <meta property="og:description" content="Version 2.0 · 4 November 2026. Architecture, implementation status, and deployment evidence." />
   <meta property="og:type" content="article" />
   <meta property="og:url" content="https://dex.lumsian.com/whitepaper" />
   <style>
@@ -81,8 +81,8 @@
 <li><a href="#21-evidence-and-references">21. Evidence and references</a></li></ol></nav>
     <main id="document"><h1 id="shaggy-dogg-dex">Shaggy Dogg DEX</h1>
 <h2 id="technical-whitepaper">Technical whitepaper</h2>
-<p><strong>Version 2.0 · 3 November 2026</strong><br><strong>Multi-chain trading, liquidity infrastructure, launchpad suites, and Mutt Rewards ($MRWD)</strong></p>
-<p>Project website: <a href="https://dex.lumsian.com/">dex.lumsian.com</a><br>Canonical MRWD page: <a href="https://dex.lumsian.com/mrwd">dex.lumsian.com/mrwd</a><br>Source repository: <a href="https://github.com/rickrichi/shaggy-dogg-dex">rickrichi/shaggy-dogg-dex</a><br>Implementation baseline: <code>main</code> (<code>shaggy-dogg-dex</code>, 3 November 2026), <code>48c1b54</code> (<code>shaggy-dogg-market-data</code>)</p>
+<p><strong>Version 2.0 · 4 November 2026</strong><br><strong>Multi-chain trading, liquidity infrastructure, launchpad suites, and Mutt Rewards ($MRWD)</strong></p>
+<p>Project website: <a href="https://dex.lumsian.com/">dex.lumsian.com</a><br>Canonical MRWD page: <a href="https://dex.lumsian.com/mrwd">dex.lumsian.com/mrwd</a><br>Source repository: <a href="https://github.com/rickrichi/shaggy-dogg-dex">rickrichi/shaggy-dogg-dex</a><br>Implementation baseline: <code>main</code> (<code>shaggy-dogg-dex</code>, 4 November 2026), <code>48c1b54</code> (<code>shaggy-dogg-market-data</code>)</p>
 <blockquote>
 <p><strong>Current live overview.</strong> Shaggy Dogg DEX is live on Base mainnet (and five additional EVM networks)
 with eight-venue Base swap routing, cross-venue outlier quote filtering, user-selectable execution
@@ -373,10 +373,13 @@ USDC reserve), and Aerodrome volatile pools. It does not read Aerodrome concentr
 <code>MD_MIN_INDICATIVE_LIQUIDITY_USD</code>, default <strong>$1</strong>), the price is returned only when requested with
 <code>allowThin=true</code> and is flagged <code>indicative</code> alongside the pool&#39;s USD liquidity, because a thin
 pool&#39;s price is cheap to move. Indicative prices are never written into price history.</li>
-<li><strong>Portfolio accounting.</strong> Held tokens whose pools sit below the $100 floor (such as MRWD, SD, and
-FBA at current pool sizes) display their <code>indicative</code> price and pool depth on <code>/portfolio</code> and
+<li><strong>Portfolio accounting.</strong> Held tokens whose pools sit below the $100 floor (such as SD and FBA at
+current pool sizes) display their <code>indicative</code> price and pool depth on <code>/portfolio</code> and
 <code>/market-data</code> with sub-cent significant digits preserved, but indicative prices are excluded from
-the portfolio total, 24-hour change, and largest-holding summary.</li>
+the portfolio total, 24-hour change, and largest-holding summary. Following the November 2026
+liquidity additions (§13.2–§13.3), the canonical MRWD/WETH 0.30% V3 pool holds <code>0.0463 WETH</code>
+(<code>~$107.27</code> single-sided WETH, <code>~$214.54</code> total pool depth at <code>2 × WETH</code>), clearing the $100
+firm-liquidity floor.</li>
 <li><strong>Honest failure.</strong> When the service cannot price an asset, the API returns <code>503</code> rather than a
 fabricated or stale value, and the interface reports that price data is unavailable. Sources:
 [R10], [R11].</li>
@@ -807,7 +810,7 @@ Uniswap V3 automatically from those requiring additional pools or off-chain inde
 </tr>
 <tr>
 <td><strong>Staked V3 positions</strong></td>
-<td>V3 position NFTs deposited and staked in <code>UniswapV3Staker</code> (<code>0x42bE…C3C1</code>)</td>
+<td>Six full-range V3 position NFTs (<code>#6367926</code>, <code>#6383531</code>, <code>#6383541</code>, <code>#6383553</code>, <code>#6448087</code>, and <code>#6448166</code>, ticks <code>-887220</code> to <code>887220</code>) deposited and staked in <code>UniswapV3Staker</code> (<code>0x42bE…C3C1</code>), bringing canonical pool reserves to <code>0.04633571 WETH</code> (<code>~$107.27</code> single-sided WETH) and <code>171.44 billion MRWD</code> (<code>~$214.54</code> total pool depth at <code>2 × WETH</code>)</td>
 <td>Earn MRWD in proportion to in-range liquidity-seconds; can be claimed+restaked or unstaked at any time on <code>/stake</code> and <code>/protocol</code></td>
 </tr>
 <tr>
@@ -821,12 +824,15 @@ positions can unstake and withdraw their own NFTs at any time. The enforced comm
 is the 24-month timelock until 24 October 2028, accompanied by a declared policy to retain or extend
 the position through the 48-month reward program.</p>
 <h3 id="13-3-pool-price-and-valuation-versus-depth">13.3 Pool price and valuation versus depth</h3>
-<p>Because the MRWD/WETH pool currently sits below the market-data service&#39;s $100 firm-liquidity floor,
-MRWD&#39;s price is displayed with an <code>indicative</code> thin-pool badge until pool liquidity reaches at least
-$100 (§4). Implied whole-supply valuation (<code>5 × E</code> for a 20% supply pairing) is never equal to
-executable pool depth: selling into a thin pool moves the price rapidly, and when the spot tick moves
-outside a concentrated position&#39;s tick range (such as <code>#6351512</code>&#39;s ticks <code>304260–331980</code>), only
-positions covering the active tick supply executable liquidity and earn rewards.</p>
+<p>Following the November 2026 full-range LP additions (staked positions <code>#6367926</code>, <code>#6383531</code>,
+<code>#6383541</code>, <code>#6383553</code>, <code>#6448087</code>, and <code>#6448166</code>), the canonical MRWD/WETH 0.30% V3 pool holds
+<code>0.04633571 WETH</code> (<code>~$107.27</code> single-sided WETH) and <code>171.44 billion MRWD</code> (<code>~$214.54</code> total pool
+depth at <code>2 × WETH</code>), clearing the market-data service&#39;s $100 firm-liquidity floor (§4). Implied
+whole-supply valuation (<code>5 × E</code> for a 20% supply pairing) is never equal to executable pool depth:
+selling into a modest pool still moves the price rapidly, and when the spot tick moves outside a
+concentrated position&#39;s tick range (such as <code>#6351512</code>&#39;s ticks <code>304260–331980</code>), only positions
+covering the active tick (including the six full-range staked positions) supply executable liquidity
+and earn rewards.</p>
 <h2 id="14-rewards-program">14. Rewards program</h2>
 <h3 id="14-1-mechanism-uniswapv3staker-and-in-app-claiming">14.1 Mechanism: <code>UniswapV3Staker</code> and in-app claiming</h3>
 <p>Rewards are distributed through Uniswap&#39;s official <strong>UniswapV3Staker</strong> on Base,
@@ -984,9 +990,12 @@ emissions at realizable prices rather than spot valuation. Source: [R16].</p>
 <li><strong>Live and verified on-chain:</strong><ul>
 <li>Sourcify <code>exact_match</code> verification of all five MRWD contracts (<code>MuttRewards</code>,
 <code>MuttIncentiveScheduler</code>, treasury <code>MuttVesting</code>, team <code>MuttVesting</code>, and <code>MuttProStaking</code>).</li>
-<li>Canonical 0.30% V3 pool (<code>0xa7D4…bDB5</code>) initialized, Quarter 1 active on <code>UniswapV3Staker</code>
-(55.45B MRWD funded), launch position <code>#6351512</code> locked in <code>V3PositionTimelock</code> until 24 October
-2028, and deployer holding 0 MRWD.</li>
+<li>Canonical 0.30% V3 pool (<code>0xa7D4…bDB5</code>) initialized with <code>0.04633571 WETH</code> (<code>~$107.27</code>
+single-sided WETH, <code>~$214.54</code> total pool depth) and <code>171.44B MRWD</code>, Quarter 1 active on
+<code>UniswapV3Staker</code> (55.45B MRWD funded) with 6 staked full-range positions (<code>#6367926</code>,
+<code>#6383531</code>, <code>#6383541</code>, <code>#6383553</code>, <code>#6448087</code>, and <code>#6448166</code>), launch position <code>#6351512</code>
+locked in <code>V3PositionTimelock</code> until 24 October 2028, and 0 unpaired MRWD held in the deployer
+wallet.</li>
 <li>Uniswap V3 pool pricing active in <code>shaggy-dogg-market-data</code>, daily automated keeper running in
 GitHub Actions, in-app V3 reward claiming and <code>MuttProStaking</code> live on <code>/stake</code> and <code>/protocol</code>,
 and canonical token identity published at <code>https://dex.lumsian.com/mrwd</code>.</li>
@@ -995,8 +1004,8 @@ and canonical token identity published at <code>https://dex.lumsian.com/mrwd</co
 <li><strong>Open items:</strong><ul>
 <li>Third-party token-profile submissions (BaseScan, CoinGecko, CoinMarketCap, DexScreener, Birdeye)
 and search-index verification.</li>
-<li>Deeper WETH liquidity in the canonical MRWD/WETH pool (currently priced as <code>indicative</code> below the
-$100 liquidity floor).</li>
+<li>Continued expansion of WETH liquidity in the canonical MRWD/WETH pool beyond its current
+<code>~$214.54</code> (<code>0.0463 WETH</code>) depth for larger trade sizes.</li>
 <li>Independent external security review of the ecosystem contracts.</li>
 <li>Completion of the three-month launchpad demand test below before enabling MRWD-quoted token
 launches.</li>
@@ -1261,6 +1270,6 @@ and quoters are listed in §3.1.</p>
 </tbody></table>
 </main>
   </div>
-  <footer>Version 2.0 · 3 November 2026 · Use your browser's Print command for a print-formatted copy.</footer>
+  <footer>Version 2.0 · 4 November 2026 · Use your browser's Print command for a print-formatted copy.</footer>
 </body>
 </html>

@@ -40,6 +40,16 @@
     "durationSeconds": 94608000
   },
   "proStaking": { "lockSeconds": 2592000 },
+  "stakedPositions": {
+    "staker": "0x42bE4D6527829FeFA1493e1fb9F3676d2425C3C1",
+    "tokenIds": [6367926, 6383531, 6383541, 6383553, 6448087, 6448166],
+    "range": "Full range (ticks -887220 to 887220, spacing 60)",
+    "poolReservesAsOf2026_11_04": {
+      "blockNumber": 53495429,
+      "WETH": "46335705063088794",
+      "MRWD": "171444979246109571333170455923"
+    }
+  },
   "rewards": {
     "reserve": "600000000000000000000000000000",
     "periods": 16,

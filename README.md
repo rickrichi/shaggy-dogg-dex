@@ -9,7 +9,7 @@ token and DeFi suite launchpad, and ecosystem portal centered on **Base Mainnet*
 additional swap routing configured for Ethereum (`1`), Arbitrum One (`42161`), Optimism (`10`),
 Polygon (`137`), and Sepolia (`11155111`).
 
-The [technical whitepaper](docs/WHITEPAPER.md) (Version 2.0 · 3 November 2026) documents the live
+The [technical whitepaper](docs/WHITEPAPER.md) (Version 2.0 · 4 November 2026) documents the live
 architecture, eight-venue Base swap routing, launchpad archetypes, staking and lending vault
 accounting, **Mutt Rewards ($MRWD)** tokenomics and on-chain custody, administrative permissions, and
 verified Base mainnet deployments. Its public page is generated at `public/whitepaper.html` (served
@@ -55,7 +55,7 @@ regenerate `public/whitepaper.html` and `public/whitepaper.md`.
 | Contract or Asset | Address | Verification / Notes |
 | :--- | :--- | :--- |
 | **Mutt Rewards (`MRWD`)** | [`0xC17227AAa33C54634B6cE7AD0bf33A156563c179`](https://basescan.org/token/0xC17227AAa33C54634B6cE7AD0bf33A156563c179) | 1T fixed supply; ownerless; Sourcify `exact_match` |
-| **MRWD/WETH 0.30% V3 Pool** | [`0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5`](https://basescan.org/address/0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5) | Canonical Uniswap V3 pool; launch NFT `#6351512` locked until 24 Oct 2028 |
+| **MRWD/WETH 0.30% V3 Pool** | [`0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5`](https://basescan.org/address/0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5) | Canonical Uniswap V3 pool (`0.0463 WETH` + `171.44B MRWD`, `~$214.54` depth); launch NFT `#6351512` locked until 24 Oct 2028; 6 full-range NFTs (`#6367926`, `#6383531`, `#6383541`, `#6383553`, `#6448087`, `#6448166`) staked in `UniswapV3Staker` |
 | **MuttIncentiveScheduler** | [`0xCAbf284806b800d9A771B55857B9fCF735ea7109`](https://basescan.org/address/0xCAbf284806b800d9A771B55857B9fCF735ea7109) | 600B MRWD LP reward reserve across 16 quarters; ownerless; Sourcify `exact_match` |
 | **MuttVesting (Treasury / Team)** | [`0x7bC37041E1205841a83413625650EC12DA119697`](https://basescan.org/address/0x7bC37041E1205841a83413625650EC12DA119697) / [`0x6be3920f45Fe0836A3a29F40d8AA3f324E0610a1`](https://basescan.org/address/0x6be3920f45Fe0836A3a29F40d8AA3f324E0610a1) | 150B / 50B MRWD; 12-month cliff to 25 Oct 2027, 36-month linear to 24 Oct 2030 |
 | **MuttProStaking** | [`0x67dBC193bF510225EBf189ab25dC3b34a32c1766`](https://basescan.org/address/0x67dBC193bF510225EBf189ab25dC3b34a32c1766) | 30-day lock; 1B MRWD unlocks Equilnyxs Pro; ownerless; Sourcify `exact_match` |
