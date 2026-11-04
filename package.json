@@ -14,7 +14,7 @@
     "contracts:check": "npm run contracts:verify && npm run contracts:compile && npm run contracts:test",
     "dev": "concurrently -k -n \"vite,api\" -c \"cyan,magenta\" \"vite\" \"npm --prefix server run dev\"",
     "dev:vite": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/build-seo-pages.mjs",
     "build:dev": "vite build --mode development",
     "type-check": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json",
     "lint": "eslint .",
