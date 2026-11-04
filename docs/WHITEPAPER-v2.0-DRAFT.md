@@ -2,18 +2,17 @@
 
 ## Technical whitepaper — DRAFT
 
-**Version 2.0 draft · 25 October 2026 · not approved, not published**\
+**Version 2.0 draft · 25 October 2026 · superseded by published [Version 2.0](./WHITEPAPER.md) (3 November 2026)**\
 **Multi-chain trading, liquidity infrastructure, and Mutt Rewards ($MRWD), a liquidity-rewards token**
 
 Project website: [dex.lumsian.com](https://dex.lumsian.com/)\
 Source repository: [rickrichi/shaggy-dogg-dex](https://github.com/rickrichi/shaggy-dogg-dex)\
 Implementation baseline: `cfe2bb0` (shaggy-dogg-dex), `e29afd2` (shaggy-dogg-market-data)\
-Superseded edition: [Version 1.3](./WHITEPAPER.md), the published edition until this draft is approved.
+Published edition: [Version 2.0](./WHITEPAPER.md) (`public/whitepaper.html` and `public/whitepaper.md`).
 
-> **Draft status.** Parts I and II describe what is implemented and recorded at the baseline.
-> Part III describes Mutt Rewards ($MRWD), a **proposed** token that does not exist yet: it has no
-> contract, address, or deployment. Every Part III parameter is a modeling assumption until §17 is satisfied.
-> Nothing in this draft is an offer of tokens, a promised return, or a commitment to launch.
+> **Historical draft notice.** This file preserves the 23–25 October 2026 working draft. The
+> published Version 2.0 white paper is in [docs/WHITEPAPER.md](./WHITEPAPER.md) (baseline `4e47b5b`,
+> 3 November 2026).
 
 ### Abstract
 

@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { YieldVaultPanel } from "@/components/YieldVaultPanel";
 
-// Mutt Rewards (MRWD) staking for Equilnyxs Pro is live (whitepaper v2.0 draft §11.1); the DEX tools
+// Mutt Rewards (MRWD) staking for Equilnyxs Pro is live (whitepaper v2.0 §11.1); the DEX tools
 // below are still planned.
 const PRO_FEATURES = ["Live trading on Base", "Full bar history", "Token tools"];
 const PLANNED_FEATURES = [

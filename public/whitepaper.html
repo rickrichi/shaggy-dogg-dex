@@ -9,7 +9,7 @@
   <link rel="canonical" href="https://dex.lumsian.com/whitepaper" />
   <link rel="icon" type="image/png" href="/favicon-32x32.png" />
   <meta property="og:title" content="Shaggy Dogg DEX — Technical Whitepaper" />
-  <meta property="og:description" content="Version 1.4 · 24 October 2026. Architecture, implementation status, and deployment evidence." />
+  <meta property="og:description" content="Version 2.0 · 3 November 2026. Architecture, implementation status, and deployment evidence." />
   <meta property="og:type" content="article" />
   <meta property="og:url" content="https://dex.lumsian.com/whitepaper" />
   <style>
@@ -61,98 +61,156 @@
     <nav class="contents" aria-label="Whitepaper contents"><p>In this paper</p><ol><li><a href="#1-purpose-and-scope">1. Purpose and scope</a></li>
 <li><a href="#2-system-architecture">2. System architecture</a></li>
 <li><a href="#3-networks-and-swap-routing">3. Networks and swap routing</a></li>
-<li><a href="#4-liquidity-and-position-ownership">4. Liquidity and position ownership</a></li>
-<li><a href="#5-tokens-and-supply-mechanics">5. Tokens and supply mechanics</a></li>
-<li><a href="#6-fee-discount-staking">6. Fee-discount staking</a></li>
-<li><a href="#7-lending-vaults-and-fee-accounting">7. Lending vaults and fee accounting</a></li>
-<li><a href="#8-arbitrage-and-cancelled-reward-policy">8. Arbitrage and cancelled reward policy</a></li>
-<li><a href="#9-governance-and-administrative-authority">9. Governance and administrative authority</a></li>
-<li><a href="#10-base-contract-inventory">10. Base contract inventory</a></li>
-<li><a href="#11-security-model-and-limitations">11. Security model and limitations</a></li>
-<li><a href="#12-development-roadmap">12. Development roadmap</a></li>
-<li><a href="#13-evidence-and-references">13. Evidence and references</a></li></ol></nav>
+<li><a href="#4-price-data-and-market-data">4. Price data and Market Data</a></li>
+<li><a href="#5-arbitrage-tooling">5. Arbitrage tooling</a></li>
+<li><a href="#6-liquidity-position-ownership-and-launchpad">6. Liquidity, position ownership, and launchpad</a></li>
+<li><a href="#7-fee-discount-staking-and-lending-vaults">7. Fee-discount staking and lending vaults</a></li>
+<li><a href="#8-sponsored-reward-paymaster-and-administrative-authority">8. Sponsored Reward Paymaster and administrative authority</a></li>
+<li><a href="#9-security-model-and-limitations">9. Security model and limitations</a></li>
+<li><a href="#10-active-ecosystem-tokens">10. Active ecosystem tokens</a></li>
+<li><a href="#11-purpose-and-design-principle">11. Purpose and design principle</a></li>
+<li><a href="#12-token-contract-muttrewards-sol">12. Token contract (MuttRewards.sol)</a></li>
+<li><a href="#13-liquidity-architecture-and-aggregator-routing">13. Liquidity architecture and aggregator routing</a></li>
+<li><a href="#14-rewards-program">14. Rewards program</a></li>
+<li><a href="#15-allocation-and-vesting-muttvesting-sol">15. Allocation and vesting (MuttVesting.sol)</a></li>
+<li><a href="#16-measurement-and-economic-model">16. Measurement and economic model</a></li>
+<li><a href="#17-launch-verification-and-launchpad-demand-test">17. Launch verification and launchpad demand test</a></li>
+<li><a href="#18-open-decisions-and-legal-notice">18. Open decisions and legal notice</a></li>
+<li><a href="#19-roadmap">19. Roadmap</a></li>
+<li><a href="#20-base-contract-inventory">20. Base contract inventory</a></li>
+<li><a href="#21-evidence-and-references">21. Evidence and references</a></li></ol></nav>
     <main id="document"><h1 id="shaggy-dogg-dex">Shaggy Dogg DEX</h1>
 <h2 id="technical-whitepaper">Technical whitepaper</h2>
-<p><strong>Version 1.4 · 24 October 2026</strong><br><strong>Multi-chain trading and liquidity infrastructure</strong></p>
-<p>Project website: <a href="https://dex.lumsian.com/">dex.lumsian.com</a><br>Source repository: <a href="https://github.com/rickrichi/shaggy-dogg-dex">rickrichi/shaggy-dogg-dex</a><br>Implementation baseline: <code>b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899</code>; routing and launchpad as revised in <code>cfe2bb0</code></p>
+<p><strong>Version 2.0 · 3 November 2026</strong><br><strong>Multi-chain trading, liquidity infrastructure, launchpad suites, and Mutt Rewards ($MRWD)</strong></p>
+<p>Project website: <a href="https://dex.lumsian.com/">dex.lumsian.com</a><br>Canonical MRWD page: <a href="https://dex.lumsian.com/mrwd">dex.lumsian.com/mrwd</a><br>Source repository: <a href="https://github.com/rickrichi/shaggy-dogg-dex">rickrichi/shaggy-dogg-dex</a><br>Implementation baseline: <code>4e47b5be09537455ce34918c4b11116a84de2059</code> (<code>shaggy-dogg-dex</code>), <code>48c1b54</code> (<code>shaggy-dogg-market-data</code>)</p>
 <blockquote>
-<p><strong>What changed in Version 1.4.</strong> Astro Mutt (AMUTT) is discontinued and has no role in the project.
-The AMUTT USDC staker-reward policy and its distributor, described in Versions 1.1–1.3, are
-cancelled and will not be deployed, funded, or enabled. The advisory AMUTT governance terms are
-cancelled. Swap routing now includes two-hop Uniswap V3 routes, and the token launchpad is open to
-any wallet with a fixed-supply token template. A new edition will describe any future token only
-after its design is complete and reviewed.</p>
+<p><strong>Current live overview.</strong> Shaggy Dogg DEX is live on Base mainnet (and five additional EVM networks)
+with eight-venue Base swap routing, cross-venue outlier quote filtering, user-selectable execution
+venues, a four-archetype token and DeFi suite launchpad (<code>LaunchpadFees</code> at 10 USDC and atomic
+<code>LaunchpadSuiteDeployer</code>), in-app token staking and contract administration, hardened Aave v3 and
+Compound v3 USDC vaults, sovereign Uniswap V3 position timelocks, live CeFi and DEX arbitrage
+telemetry, and <strong>Mutt Rewards ($MRWD)</strong> (<code>0xC17227AAa33C54634B6cE7AD0bf33A156563c179</code>, verified on
+Sourcify) with its canonical 0.30% Uniswap V3 pool, 24-month locked launch position <code>#6351512</code>,
+ownerless 16-quarter <code>MuttIncentiveScheduler</code>, 12-month cliff plus 36-month linear <code>MuttVesting</code>
+contracts for treasury and team, and ownerless <code>MuttProStaking</code> for Equilnyxs Pro access.</p>
 </blockquote>
 <h3 id="abstract">Abstract</h3>
-<p>Shaggy Dogg DEX is a wallet-connected application for trading tokens, managing decentralized liquidity, and accessing ecosystem contracts. Its trading interface compares supported on-chain routes and submits user-authorized transactions to the selected exchange router. Base is the home network; the application also configures trading routes on Ethereum, Arbitrum, Optimism, and Polygon.</p>
-<p>The project combines market swaps, Uniswap-compatible liquidity tools, token deployment tooling, fee-discount staking, lending-vault implementations, and operator tools for arbitrage research and execution. These components have different maturity levels and trust assumptions. A deployed token, an implemented contract, and an enabled financial product are separate milestones.</p>
-<p>This paper describes the implementation and published deployment records available at the baseline above. It explains fee flows, administrative powers, and development priorities. No profit-sharing, reward, or governance program is active or planned in this edition: the AMUTT terms of earlier editions are cancelled (§8.2), and no token gives holders control over contracts or treasury assets.</p>
+<p>Shaggy Dogg DEX is a wallet-connected application for trading tokens, managing decentralized
+liquidity, launching fixed-supply tokens and DeFi suites, and operating ecosystem contracts. Its
+trading interface compares supported on-chain routes, filters unsafe outlier quotes, and submits
+user-authorized transactions to the selected exchange router. Base is the home network; the
+application also configures swap routes on Ethereum, Arbitrum One, Optimism, Polygon, and Sepolia.</p>
+<p>This whitepaper documents the current live state of the application and <strong>Mutt Rewards ($MRWD)</strong>, an
+immutable fixed-supply utility and liquidity-incentive token on Base whose core functions are
+rewarding liquidity provision in its canonical Uniswap V3 pool, unlocking Equilnyxs Pro through
+<code>MuttProStaking</code>, rewarding eligible sponsored operations in <code>SponsoredRewardPaymaster</code>, and serving
+as a planned optional quote asset for launchpad tokens. Part III separates three kinds of claims,
+because only the first can be guaranteed by code:</p>
+<ul>
+<li><strong>Cryptographically enforced:</strong> properties the contracts make impossible to violate.</li>
+<li><strong>Economically incentivized:</strong> outcomes the design rewards but cannot force.</li>
+<li><strong>Market-dependent:</strong> outcomes that depend on participants the project does not control.</li>
+</ul>
 <h3 id="reading-this-paper">Reading this paper</h3>
-<p>“Implemented” means the behavior exists in the reviewed source. “Recorded deployment” means the repository identifies an address on a particular chain; it does not certify that the latest local source is deployed there. “Approved, not live” means a policy exists but its execution infrastructure is incomplete or disabled. This edition does not provide a fresh block-pinned audit of every deployment, balance, administrator, or pool.</p>
+<p>&quot;Implemented&quot; means the behavior exists in the reviewed source at the baseline. &quot;Deployed&quot; means the
+contract is live on Base mainnet and verified on Sourcify, Blockscout, or pinned in repository
+bytecode fixtures. &quot;Planned&quot; marks features that remain gated on explicit post-launch conditions
+(§17–§19). Nothing in this document is investment advice, an offer of securities, or a promise of
+price, yield, or financial return.</p>
+<hr>
+<h2 id="part-i-the-trading-system">Part I — The trading system</h2>
 <h2 id="1-purpose-and-scope">1. Purpose and scope</h2>
-<p>Decentralized trading requires users to coordinate several tasks: identify the correct token, compare pools, approve a spender, execute a swap, and monitor the resulting position. Liquidity management adds another set of tasks, including choosing a pool type, depositing at the correct ratio, collecting fees, and understanding withdrawal restrictions.</p>
-<p>Shaggy Dogg DEX brings these workflows into one application while keeping transaction settlement on the selected blockchain. The project&#39;s design objectives are explicit transaction review, traceable contract identities, reusable liquidity infrastructure, and a clear distinction between observed data and estimated outcomes.</p>
-<p>The application does not introduce a new consensus network. It relies on existing EVM chains and liquidity protocols. Multi-chain support means that users can select supported networks and transact within each network; it does not mean a swap bridges assets between chains. A token on Base is distinct from a similarly named token elsewhere.</p>
+<p>Decentralized trading requires users to identify the correct token, compare pools, approve a spender,
+execute a swap, and monitor the resulting position. Shaggy Dogg DEX brings trading, liquidity
+management, token deployment, staking, yield vaults, protocol operations, and arbitrage workflows
+into one application while keeping settlement on the selected blockchain. It does not introduce a
+consensus network or bridge assets between chains; a token on Base is distinct from a similarly named
+token elsewhere.</p>
 <table>
 <thead>
 <tr>
 <th>Component</th>
-<th>Scope at this edition</th>
+<th>Current live scope</th>
 </tr>
 </thead>
 <tbody><tr>
-<td>Market swaps</td>
-<td>Implemented route quotation, approval, simulation, submission, and receipt handling</td>
+<td>Market swaps (<code>/swap</code>)</td>
+<td>Defaults to <code>ETH → USDC</code>; route quotation across eight Base venues (and Uniswap on Ethereum, Arbitrum One, Optimism, Polygon, Sepolia), 35% cross-venue median outlier filtering, user venue selection, approval, simulation, submission, and receipt handling (§3)</td>
 </tr>
 <tr>
-<td>Liquidity tools</td>
-<td>V2 liquidity flows and Base V3 position workflows; availability depends on pool and deployment configuration</td>
+<td>Liquidity &amp; DEX explorer (<code>/liquidity</code>, <code>/stake/dexes</code>)</td>
+<td>Classic Uniswap V2 flows (including Ethereum V2), Base V3 position minting/collection/staking/locking, and <code>/stake/dexes</code> comparing seven active Base liquidity venues with portfolio discovery and guided pool planners (§6.1)</td>
 </tr>
 <tr>
-<td>Aave and Compound vaults</td>
-<td>Contract implementations and deployment records; each deployment requires its own configuration and bytecode checks</td>
+<td>Price service &amp; Market Data (<code>/market-data</code>, <code>/portfolio</code>)</td>
+<td>Self-hosted exchange medians and Base Uniswap V2, Uniswap V3 (<code>slot0</code>), and Aerodrome volatile pool prices; $100 firm-liquidity floor; thin pools ($1–$100) are flagged <code>indicative</code> and excluded from portfolio totals; <code>/market-data</code> defaults to <code>AERO</code> (§4)</td>
+</tr>
+<tr>
+<td>Token launchpad (<code>/launchpad</code>)</td>
+<td>Open to any wallet on Base; 10 USDC live launch fee via <code>LaunchpadFees</code>; session-persisted wizard; four verified archetypes deployed via <code>FixedSupplyToken</code> and atomic <code>LaunchpadSuiteDeployer</code>; multi-DEX liquidity seeding; in-app holder staking and contract management (§6.2)</td>
+</tr>
+<tr>
+<td>Fee-discount staking (<code>/stake</code>)</td>
+<td><code>FeeDiscountStaking</code> with 365-day lock cap, per-stake unlock snapshot, <code>accruedFees</code> admin withdrawal, and 10%/25%/50%/75% vault discount tiers on launchpad suites; SD staking live at <code>0x8a76…3faa</code> (§7.1)</td>
+</tr>
+<tr>
+<td>Lending vaults</td>
+<td><code>YieldStakingVault</code> (Aave v3) and <code>CompoundYieldVault</code> (Compound v3) with immutable market and staking links, virtual-share offset (<code>1e6</code>), fee-increase guard, deposit pause, and vault-only emergency recovery (§7.2)</td>
 </tr>
 <tr>
 <td>V3 position timelock</td>
-<td>Source and Base deployment record available</td>
+<td><code>V3PositionTimelock</code> deployed on Base (<code>0xb5c9…2e25</code>), holding the locked MRWD launch position <code>#6351512</code> and available to any wallet&#39;s Base V3 positions (§6.1)</td>
 </tr>
 <tr>
-<td>Token launchpad</td>
-<td>Open to any wallet; launched tokens use a fixed-supply template with no mint, owner, or admin; no platform fee</td>
+<td>Arbitrage tooling (<code>/arbitrage</code>, <code>/arbitrage/matrix</code>)</td>
+<td>Public spread snapshot feed (<code>/api/arbitrage/snapshot</code>), live Base quote scanner, multi-asset triangular routing, CeFi Pair Matrix WebSocket streams (Coinbase, Kraken, Binance, Bybit, OKX), and atomic flash-loan execution via <code>AtomicFlashArbitrageRouter</code> (<code>0xdF77…78Fd</code>) (§5)</td>
 </tr>
 <tr>
-<td>Arbitrage tooling</td>
-<td>Research, quoting, and operator execution components; neither a quote nor a displayed spread proves realized profit</td>
+<td>Mutt Rewards ($MRWD) &amp; Protocol Hub (<code>/mrwd</code>, <code>/protocol</code>, <code>/stake</code>)</td>
+<td>Live on Base (<code>0xC172…c179</code>): 1T fixed supply, Uniswap V3 0.30% pool, 16-quarter <code>MuttIncentiveScheduler</code>, treasury and team <code>MuttVesting</code>, <code>MuttProStaking</code>, in-app V3 reward claiming, and 56-aggregator routing audit (Part III)</td>
 </tr>
 <tr>
-<td>AMUTT USDC rewards</td>
-<td>Cancelled in Version 1.4; will not be deployed, funded, or enabled</td>
+<td>Sponsored paymaster (<code>/paymaster</code>)</td>
+<td><code>SponsoredRewardPaymaster</code> (<code>0x9cD4…7CB4</code>) deployed on Base EntryPoint v0.7 (100 MRWD reward per eligible op); browser-wallet sponsorship is currently disabled and explained in the UI (§8.1)</td>
 </tr>
 <tr>
 <td>Governance</td>
-<td>None in this edition</td>
+<td>None; contract roles alone govern administration where roles exist (§8.2)</td>
 </tr>
 <tr>
 <td>Limit orders</td>
-<td>Preview-only according to the repository&#39;s documented product scope</td>
+<td>Disabled preview tab (<code>Limit · Soon</code>) on <code>/swap</code></td>
 </tr>
 </tbody></table>
 <h2 id="2-system-architecture">2. System architecture</h2>
 <p>The application has four principal layers.</p>
 <ol>
-<li><strong>Wallet and interface.</strong> React, TypeScript, and Vite provide the interface. Wagmi, Viem, and RainbowKit connect compatible wallets and construct contract reads and writes. The ordinary trading flow asks the user&#39;s wallet to authorize transactions.</li>
-<li><strong>Quotation and data.</strong> Public RPC clients read on-chain pools and allowances. The Hono backend provides API services for market information and integrations. Prices, analytics, and external feeds inform the interface but do not replace transaction receipts as evidence of execution.</li>
-<li><strong>Execution.</strong> Selected exchange routers execute swaps. Position managers and liquidity contracts hold liquidity positions. Project contracts implement staking, vault accounting, and timelocks. Approval gives a specified contract spending authority; depositing into a contract changes where assets are held.</li>
-<li><strong>Operations.</strong> Administrators configure supported services and contract parameters where the contract permits it. Separate operator tools may use automation and execution credentials. Their permissions and custody model differ from the wallet-connected trading interface.</li>
+<li><strong>Wallet and interface.</strong> React, TypeScript, and Vite provide the frontend; Wagmi, Viem, and
+RainbowKit connect wallets and construct contract reads and writes. Fonts (<code>Inter</code> and <code>JetBrains Mono</code>) are bundled locally so pages make no external font requests. Ordinary trading, liquidity,
+staking, and launchpad flows ask the user&#39;s wallet to sign every transaction.</li>
+<li><strong>Quotation and data.</strong> Public and configured RPC clients read on-chain pools, positions, and
+allowances. The Hono backend and Vercel routes serve market data, arbitrage spread snapshots,
+launch verification, and paymaster policy checks. Displayed prices and analytics inform the
+interface; transaction receipts are the evidence of execution.</li>
+<li><strong>Execution.</strong> Exchange routers execute swaps; position managers and liquidity contracts hold
+LP positions; project contracts implement fixed-supply tokens, atomic suite deployment,
+fee-discount staking, Aave and Compound vault accounting, V3 position timelocks, MRWD incentive
+scheduling, vesting, Pro staking, and flash-loan routing.</li>
+<li><strong>Operations.</strong> Contract administrators configure parameters only where the contract permits it.
+A dedicated GitHub Actions keeper wallet triggers permissionless <code>MuttIncentiveScheduler</code> periods,
+and operator tools run arbitrage checks. Their permissions and custody boundaries differ from the
+wallet-connected interface.</li>
 </ol>
-<p>The basic trading flow is:</p>
-<pre><code class="language-text">Token and network selection
+<pre><code class="language-text">Token, network, and venue selection (&quot;Best price&quot; or chosen DEX)
           |
           v
-Pool quotations at an observed block --&gt; Route and minimum-output review
+Pool quotations at a shared block --&gt; Cross-venue median outlier filter (35%)
                                                    |
                                                    v
-                                     Wallet approval, when required
+                                     Route and minimum-output review
+                                                   |
+                                                   v
+                                     Allowance check &amp; approvalSequence()
                                                    |
                                                    v
                                      Re-quote and transaction simulation
@@ -160,26 +218,31 @@ Pool quotations at an observed block --&gt; Route and minimum-output review
                                                    v
                                      Wallet signature --&gt; Router --&gt; Receipt
 </code></pre>
-<p>A frontend or API outage can prevent convenient access without changing blockchain ownership. Conversely, a compromised frontend can propose an unsafe transaction even if the destination chain works correctly. Users therefore depend on both contract behavior and the accuracy of the transaction presented by the interface. Source references: [R1], [R2].</p>
+<p>A frontend or API outage can prevent convenient access without changing on-chain ownership. A
+compromised frontend could propose an unsafe transaction even when the blockchain works as intended,
+so users depend on both contract behavior and the accuracy of the transaction presented for signing.
+Sources: [R1], [R2].</p>
 <h2 id="3-networks-and-swap-routing">3. Networks and swap routing</h2>
 <h3 id="3-1-configured-route-universe">3.1 Configured route universe</h3>
+<p><code>/swap</code> opens on <code>ETH → USDC</code> with market swap execution active and the limit tab disabled as
+<code>Limit · Soon</code>.</p>
 <table>
 <thead>
 <tr>
 <th>Network</th>
 <th>Chain ID</th>
-<th>Routes configured in the reviewed trading code</th>
+<th>Routes configured in the trading code</th>
 </tr>
 </thead>
 <tbody><tr>
+<td>Base</td>
+<td>8453</td>
+<td>Eight venues: Uniswap V3 (direct and two-hop); Uniswap V2; Aerodrome (stable and volatile); PancakeSwap V3 (direct and two-hop); SushiSwap V3 (direct and two-hop); PancakeSwap V2; SushiSwap V2; BaseSwap</td>
+</tr>
+<tr>
 <td>Ethereum</td>
 <td>1</td>
 <td>Uniswap V2; Uniswap V3 direct and two-hop</td>
-</tr>
-<tr>
-<td>Base</td>
-<td>8453</td>
-<td>Uniswap V2; Uniswap V3 direct and two-hop; Aerodrome stable and volatile routes</td>
 </tr>
 <tr>
 <td>Arbitrum One</td>
@@ -199,71 +262,308 @@ Pool quotations at an observed block --&gt; Route and minimum-output review
 <tr>
 <td>Sepolia</td>
 <td>11155111</td>
-<td>Uniswap V2 test-network configuration</td>
+<td>Uniswap V2 test configuration</td>
 </tr>
 </tbody></table>
-<p>Configuration does not guarantee liquidity for every pair. RPC availability, pool reserves, token behavior, and network selection determine whether a route can be quoted and executed. Base Sepolia appears in historical ecosystem records but is not listed as a current swap chain in the reviewed configuration.</p>
-<h3 id="3-2-candidate-selection">3.2 Candidate selection</h3>
-<p>The route engine considers a direct token pair and, where applicable, a two-hop path through the chain&#39;s wrapped native asset or USDC. V3 candidates are direct pools across configured fee tiers and, for a two-hop path, every pair of fee tiers, executed with the router&#39;s multi-hop <code>exactInput</code>. On Base, Aerodrome candidates consider stable and volatile settings for each hop.</p>
-<p>Candidate quotations are collected at a shared observed block. Failed or zero-output quotes are excluded; remaining quotes are ranked by output amount. The selected route is therefore the highest quoted output <strong>among the candidates actually checked</strong>. The algorithm does not search every exchange, split an order across pools, or optimize the ranking for gas-adjusted proceeds. V3 routes are limited to at most two hops. Source references: [R1], [R2].</p>
-<h3 id="3-3-transaction-protection">3.3 Transaction protection</h3>
-<p>For quoted output <code>Q</code> and slippage tolerance <code>s</code> in basis points, the minimum acceptable output is:</p>
+<p>On Base, the eight configured swap venues and their verified on-chain contracts are:</p>
+<table>
+<thead>
+<tr>
+<th>Base venue</th>
+<th>Router</th>
+<th>Factory</th>
+<th>Quoter / fee tiers</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Uniswap V3</td>
+<td><code>0x2626664c2603336E57B271c5C0b26F421741e481</code></td>
+<td><code>0x33128a8fC17869897dcE68Ed026d694621f6FDfD</code></td>
+<td>QuoterV2 <code>0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a</code> (0.01%, 0.05%, 0.30%, 1.00%)</td>
+</tr>
+<tr>
+<td>Uniswap V2</td>
+<td><code>0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24</code></td>
+<td><code>0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6</code></td>
+<td>Router <code>getAmountsOut</code> (0.30%)</td>
+</tr>
+<tr>
+<td>Aerodrome</td>
+<td><code>0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43</code></td>
+<td><code>0x420DD381b31aEf6683db6B902084cB0FFECe40Da</code></td>
+<td>Router quotes across volatile and stable pools</td>
+</tr>
+<tr>
+<td>PancakeSwap V3</td>
+<td><code>0x678Aa4bF4E210cf2166753e054d5b7c31cc7fa86</code></td>
+<td><code>0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865</code></td>
+<td>Quoter <code>0xB048Bbc1Ee6b733FFfCFb9e9CeF7375518e25997</code> (0.01%, 0.05%, 0.25%, 1.00%; two-hop: 0.05%, 0.25%)</td>
+</tr>
+<tr>
+<td>SushiSwap V3</td>
+<td><code>0xFB7eF66a7e61224DD6FcD0D7d9C3be5C8B049b9f</code></td>
+<td><code>0xc35DADB65012eC5796536bD9864eD8773aBc74C4</code></td>
+<td>Quoter <code>0xb1E835Dc2785b52265711e17fCCb0fd018226a6e</code> (0.01%, 0.05%, 0.30%, 1.00%; two-hop: 0.05%, 0.30%)</td>
+</tr>
+<tr>
+<td>PancakeSwap V2</td>
+<td><code>0x8cFe327CEc66d1C090Dd72bd0FF11d690C33a2Eb</code></td>
+<td><code>0x02a84c1b3BBD7401a5f7fa98a384EBC70bB5749E</code></td>
+<td>Router <code>getAmountsOut</code> (0.25%)</td>
+</tr>
+<tr>
+<td>SushiSwap V2</td>
+<td><code>0x6BDED42c6DA8FBf0d2bA55B2fa120C5e0c8D7891</code></td>
+<td><code>0x71524B4f93c58fcbF659783284E38825f0622859</code></td>
+<td>Router <code>getAmountsOut</code> (0.30%)</td>
+</tr>
+<tr>
+<td>BaseSwap</td>
+<td><code>0x327Df1E6de05895d2ab08513aaDD9313Fe505d86</code></td>
+<td><code>0xFDa619b6d20975be80A10332cD39b9a4b0FAa8BB</code></td>
+<td>Router <code>getAmountsOut</code> (0.25%)</td>
+</tr>
+</tbody></table>
+<h3 id="3-2-candidate-selection-outlier-filtering-and-venue-choice">3.2 Candidate selection, outlier filtering, and venue choice</h3>
+<p>The route engine considers a direct pair and, where applicable, a two-hop path through the chain&#39;s
+wrapped native asset (<code>WETH</code>) or <code>USDC</code>. V3 candidates are direct pools across configured fee tiers
+and, for a two-hop path, fee-tier pairs executed with the router&#39;s multi-hop <code>exactInput</code> (with
+SushiSwap V3 using its original SwapRouter deadline-in-struct and <code>address(0)</code> recipient convention
+before <code>unwrapWETH9</code>). Quotes are collected at a shared block, failed or zero quotes are excluded,
+and each venue&#39;s price impact is measured against that venue&#39;s own factory and pools.</p>
+<p><strong>Cross-venue outlier quote filter (<code>admitVenueQuotes</code>).</strong> An initialized V3 pool with negligible
+liquidity at an off-market tick can return a numerically valid quote without reverting. When at least
+<strong>three</strong> independent venues return positive quotes for a trade, the router computes the cross-venue
+median of each venue&#39;s best output and excludes any venue whose best quote deviates from that median
+by more than <strong>35% (<code>MAX_QUOTE_DEVIATION_BPS = 3,500</code>)</strong> before selecting or displaying routes.</p>
+<p>By default (<strong>Best price (automatic)</strong>), the highest quoted output among admitted candidates is
+selected. Users can also select a specific venue from the <strong>Route</strong> selector or the <strong>Quotes for your
+trade</strong> cards:</p>
+<ul>
+<li>A user-selected venue drives the quote, price impact, router approval, and swap call (<code>Swap on &lt;venue&gt;</code>).</li>
+<li>The interface shows how a chosen venue compares with the best quote and highlights choices that are
+ 1% or worse below the best quote.</li>
+<li>If a chosen venue has no route after a pair or amount change, the swap is blocked and <strong>Switch to
+best price</strong> is offered; the application never silently reroutes a user-chosen venue.</li>
+</ul>
+<p>The router does not split orders across pools or rank by gas-adjusted proceeds.</p>
+<h3 id="3-3-transaction-protection-and-non-standard-approvals">3.3 Transaction protection and non-standard approvals</h3>
+<p>For quoted output <code>Q</code> and slippage tolerance <code>s</code> in basis points:</p>
 <pre><code class="language-text">minimumOutput = floor(Q × (10,000 − s) / 10,000)
 </code></pre>
-<p>The current swap hook refreshes quotes periodically and treats quotes aged 30 seconds or more as stale. Before submission it checks the wallet and network, reads the selected route again, checks price impact, and simulates the transaction. ERC-20 approval requests use the trade amount. Higher-impact trades require a review tied to the quote being submitted. The configured deadline buffer is 15 minutes; V3 swaps use a deadline-protected router multicall.</p>
-<p>These controls constrain execution but cannot guarantee inclusion or eliminate adverse ordering. A price move beyond the minimum can cause a revert, and a failed transaction can still consume gas. Slippage tolerance and price impact are different: tolerance bounds deterioration from a quote, while price impact describes the trade&#39;s effect relative to the market reference used by the estimator.</p>
-<h2 id="4-liquidity-and-position-ownership">4. Liquidity and position ownership</h2>
-<h3 id="4-1-v2-pools">4.1 V2 pools</h3>
-<p>V2-style pools represent proportional reserve ownership with fungible LP tokens. In the constant-product model, reserves approximately follow <code>x × y = k</code>, with fees changing the reserve accounting. Deposits must respect the pool&#39;s asset ratio. Removing liquidity burns the holder&#39;s LP tokens and returns the corresponding assets according to the pool&#39;s rules.</p>
-<p>Uniswap V2 charges a 0.30% swap fee, with protocol-fee treatment determined by the underlying protocol configuration. The entire trading fee should not be described as revenue belonging to Shaggy Dogg DEX. The project&#39;s economic exposure depends on the liquidity it actually owns. See <a href="https://developers.uniswap.org/docs/get-started/concepts/fees">Uniswap&#39;s fee documentation</a>.</p>
-<h3 id="4-2-v3-positions">4.2 V3 positions</h3>
-<p>V3 liquidity positions are represented by NFTs with a token pair, fee tier, and price range. A position earns swap fees while its liquidity is active within that range. Leaving the range can stop fee accrual and leave the position concentrated in one asset. See <a href="https://developers.uniswap.org/docs/get-started/concepts/liquidity-providers/concentrated-liquidity">Uniswap&#39;s concentrated-liquidity documentation</a>.</p>
-<p>The project&#39;s documented Base integration supports full-range minting and fee collection through the canonical position manager. Its mint flow uses atomic pool initialization where needed and minimum-consumption checks on selected deposit amounts. Removing V2 liquidity and depositing into V3 remain separate transactions, creating an interval of market exposure. The recorded compatibility work does not certify every custom contract in the repository. Source reference: [R3].</p>
-<h3 id="4-3-sovereign-v3-position-timelock">4.3 Sovereign V3 position timelock</h3>
-<p>The <code>V3PositionTimelock</code> contract holds a position NFT until a user-selected future timestamp. The recorded lock owner can collect amounts owed by the position manager, extend the unlock time, and withdraw the NFT after expiry. The reviewed source contains no administrator override, early principal-withdrawal function, or mechanism to shorten a lock.</p>
-<p>The contract itself holds the NFT during the lock. Its fee-collection call sends collected assets to the lock owner and adds no project collection fee. Locking does not stabilize a token price, prevent sales of other token holdings, or lock all liquidity in a market. A public lock claim must identify the chain, timelock, position ID, owner, and unlock timestamp.</p>
-<p>Positions should enter through <code>lockPosition</code>, which creates the ownership record. Sending an NFT directly to the contract can bypass that record and leave it without the normal withdrawal path. This restriction follows from the reviewed receiver and withdrawal logic. Source reference: [R4].</p>
-<h2 id="5-tokens-and-supply-mechanics">5. Tokens and supply mechanics</h2>
-<h3 id="5-1-discontinued-amutt">5.1 Discontinued: AMUTT</h3>
-<p>AMUTT (<code>0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7</code> on Base) is discontinued. It has no role in the project&#39;s trading features, staking, rewards, or governance, and there is no conversion or transition arrangement. The application no longer features it. The contracts tied to it are retired and listed in §10 only so they can be identified. Source: [R5].</p>
-<h3 id="5-2-sd-fba-and-other-listed-assets">5.2 SD, FBA, and other listed assets</h3>
-<p>SD is a separate Base ecosystem token recorded at <code>0x051c758521971f5c5a84edaf18eea12854375469</code>. Historical deployment documentation records a supply of 1,000,000 SD and separate staking and vault addresses. Those records do not establish today&#39;s holder balances.</p>
-<p>FBA is included in the Base token registry at <code>0xb8f3d5143ffddb99688bb31e7c2c3894a1e17263</code>, with 18 decimals. Registry inclusion alone does not establish its supply schedule, allocation, governance authority, or entitlement to project revenue. No FBA reward or governance entitlement is asserted in this paper.</p>
-<p>SD, FBA, and third-party trading assets are distinct contracts. Holding one does not create ownership of the others, a claim on LP positions, or a right to treasury funds. Sources: [R5], [R6].</p>
-<h2 id="6-fee-discount-staking">6. Fee-discount staking</h2>
-<p><code>FeeDiscountStaking</code> accepts its immutable configured token and records balances by account. An account&#39;s qualifying tier is returned by <code>getTier</code>. Tier thresholds, discount values, minimum stake duration, and withdrawal fees are parameters; the current deployed values must be read before depositing.</p>
-<p>The reviewed implementation has several material properties:</p>
+<p>Quotes older than 30 seconds are treated as stale. Before submission the interface re-reads the
+route, checks price impact, and simulates the transaction; approvals use the exact trade or deposit
+amount; the deadline buffer is 15 minutes.</p>
+<p>Some tokens (such as USDT on Ethereum) revert when <code>approve</code> changes an existing non-zero allowance
+to another non-zero value. When a wallet already has a non-zero allowance smaller than the required
+amount, <code>approvalSequence()</code> simulates the direct <code>approve(spender, needed)</code> call first and, only if
+the token rejects it, prepends <code>approve(spender, 0)</code> before setting the new allowance. Standard
+ERC-20 tokens still require only a single approval. Sources: [R1], [R2].</p>
+<h2 id="4-price-data-and-market-data">4. Price data and Market Data</h2>
+<p>Prices come from the self-hosted market-data service: exchange order-book medians for listed assets,
+and Base on-chain pool reserves for tokens no exchange lists. No third-party price API is used.
+<code>/market-data</code> opens on <code>AERO</code> by default.</p>
 <ul>
-<li>A new stake resets the account&#39;s stake timestamp, including the withdrawal clock applied to its existing balance.</li>
-<li>Withdrawal requires the minimum stake period to have elapsed. A withdrawal fee is not an early-exit option.</li>
-<li>The administrator can change the minimum period and set a withdrawal fee up to 5,000 basis points, or 50%. Those mutable values are read when withdrawing.</li>
-<li>A separate tier administrator can replace the tier list. The administrator can replace that role.</li>
-<li>Withheld withdrawal fees remain in the staking contract under the reviewed implementation; the withdrawal function does not route them to the treasury.</li>
-<li>The contract contains no built-in interest accrual or reward claim function.</li>
+<li><strong>On-chain venues read.</strong> The service reads Base Uniswap V2 pairs, Uniswap V3 pools (0.05%, 0.30%,
+and 1.00% tiers, priced from <code>slot0</code> and valued for liquidity depth at twice the pool&#39;s WETH or
+USDC reserve), and Aerodrome volatile pools. It does not read Aerodrome concentrated-liquidity
+(Slipstream) pools.</li>
+<li><strong>Liquidity floor.</strong> A pool price is treated as firm only when the pool holds at least
+<code>MD_MIN_POOL_LIQUIDITY_USD</code> (default <strong>$100</strong>). Below that floor (down to
+<code>MD_MIN_INDICATIVE_LIQUIDITY_USD</code>, default <strong>$1</strong>), the price is returned only when requested with
+<code>allowThin=true</code> and is flagged <code>indicative</code> alongside the pool&#39;s USD liquidity, because a thin
+pool&#39;s price is cheap to move. Indicative prices are never written into price history.</li>
+<li><strong>Portfolio accounting.</strong> Held tokens whose pools sit below the $100 floor (such as MRWD, SD, and
+FBA at current pool sizes) display their <code>indicative</code> price and pool depth on <code>/portfolio</code> and
+<code>/market-data</code> with sub-cent significant digits preserved, but indicative prices are excluded from
+the portfolio total, 24-hour change, and largest-holding summary.</li>
+<li><strong>Honest failure.</strong> When the service cannot price an asset, the API returns <code>503</code> rather than a
+fabricated or stale value, and the interface reports that price data is unavailable. Sources:
+[R10], [R11].</li>
 </ul>
-<p>Discounts apply only where another contract explicitly reads the staking tier and uses it in fee calculation. The reviewed Aave and Compound vault implementations do so when configured with a discount-staking contract. Direct swaps through external routers do not reduce an external pool&#39;s fee because a wallet holds or stakes a token. Sources: [R7], [R8].</p>
-<h2 id="7-lending-vaults-and-fee-accounting">7. Lending vaults and fee accounting</h2>
-<p>The repository includes an Aave-oriented <code>YieldStakingVault</code> and a Compound-oriented <code>CompoundYieldVault</code>. They accept an underlying asset, track each user&#39;s internal shares and deposited principal, and can supply assets to the configured external lending market. These internal share balances should not be assumed to be transferable ERC-20 receipt tokens or a complete ERC-4626 interface.</p>
-<p>In the current source, let <code>A</code> be assets before deposit, <code>S</code> total shares, and <code>d</code> the deposited amount. Virtual offsets are one underlying base unit and one million share units:</p>
-<pre><code class="language-text">sharesMinted = floor(d × (S + 1,000,000) / (A + 1))
-grossWithdrawal = floor(sharesRedeemed × (A + 1) / (S + 1,000,000))
+<h2 id="5-arbitrage-tooling">5. Arbitrage tooling</h2>
+<p>Arbitrage tools compare execution opportunities across decentralized and centralized venues. A
+displayed spread is an estimate; gas, pool fees, flash-loan premiums, slippage, and transaction
+ordering can eliminate it.</p>
+<ul>
+<li><strong>Public spread snapshot (<code>/arbitrage</code>).</strong> On the public website, <code>/arbitrage</code> polls
+<code>/api/arbitrage/snapshot</code> from the self-hosted market-data spread feed to display live cross-venue
+opportunities without requiring a local bot process; when a local bot engine is explicitly
+configured via <code>VITE_BOT_API_URL</code>, operator controls connect to that engine.</li>
+<li><strong>CeFi Pair Matrix (<code>/arbitrage/matrix</code>).</strong> Connects directly from the browser to live WebSocket
+order-book and ticker streams from Coinbase, Kraken, Binance (<code>wss://data-stream.binance.vision</code>),
+Bybit (<code>wss://stream.bybit.com</code>), and OKX (<code>wss://ws.okx.com:8443</code>) to compare centralized spreads
+against Base DEX quotes.</li>
+<li><strong>Browser Auto-Pilot.</strong> Each tick reads live quotes from Base Uniswap V3 and Aerodrome pools,
+scans multiple candidate intermediate assets (including <code>USDC</code> and <code>cbBTC</code>) for triangular routes,
+and reads Aerodrome&#39;s on-chain pool fee and Aave&#39;s on-chain flash-loan premium. If any leg fails to
+quote, the tick is skipped.</li>
+<li><strong>Execution and profit guard.</strong> Wallet-funded triangular trades execute via SwapRouter02
+<code>exactInput</code> on the quoted path. Flash-loan routes execute through the pinned
+<code>AtomicFlashArbitrageRouter</code> (<code>0xdF77eBFB6e0468aE4e94b13Fc9881427B82178Fd</code>, <code>executeGenericArbitrage</code>)
+inside a single Aave V3 flash loan so every leg settles atomically or the transaction reverts.
+Screening and pre-signature checks price L2 execution gas plus the L1 data fee and require quoted
+net profit to cover both gas and the user&#39;s profit target.</li>
+</ul>
+<p>Every dispatch is simulated before signing. These controls make losing on-chain execution revert
+rather than settle; they do not guarantee profitable opportunities. Sources: [R9], [R12].</p>
+<hr>
+<h2 id="part-ii-liquidity-launchpad-custody-and-contracts">Part II — Liquidity, launchpad, custody, and contracts</h2>
+<h2 id="6-liquidity-position-ownership-and-launchpad">6. Liquidity, position ownership, and launchpad</h2>
+<h3 id="6-1-v2-pools-v3-positions-and-dex-liquidity-explorer">6.1 V2 pools, V3 positions, and DEX liquidity explorer</h3>
+<p><strong>V2 pools</strong> represent proportional reserve ownership with fungible LP tokens (<code>x × y = k</code>). Deposits
+must respect the pool ratio, and <strong>the initial deposit sets the starting price</strong>. When no wallet is
+connected, <code>/liquidity</code> defaults to Base (<code>8453</code>); on Ethereum (<code>1</code>), <code>/liquidity</code> opens directly on
+classic Uniswap V2 while Base-only V2→V3 migration, V3 position manager, and V3 timelock tools offer
+a one-click switch to Base.</p>
+<p><strong>V3 positions</strong> are NFTs with a fee tier and price range. A position adds depth and earns fees only
+while the market price stays inside its range. On Base, <code>/liquidity</code> discovers every V3 position a
+wallet holds, stakes in <code>UniswapV3Staker</code>, or locks in <code>V3PositionTimelock</code>.</p>
+<p><strong>DEX liquidity explorer (<code>/stake/dexes</code>).</strong> Compares <strong>seven active Base liquidity venues</strong> (Uniswap
+V3, Uniswap V2, Aerodrome, PancakeSwap V3, SushiSwap V3, PancakeSwap V2, and SushiSwap V2; BaseSwap
+is used for swap routing in §3.1 but omitted from the liquidity directory because its web frontend is
+parked), discovers held and staked tokens across ecosystem contracts (even when wallet balance is zero
+because the balance is staked), and provides guided in-app pool planners (<code>POOL_PLANNERS</code>) and
+pair-specific deposit links.</p>
+<p><strong>Sovereign V3 position timelock.</strong> <code>V3PositionTimelock</code>
+(<code>0xb5c9bedb57f4e348e40a5e6326c90de474072e25</code>) holds a V3 position NFT until a user-chosen unlock
+timestamp. The recorded lock owner can collect fees (<code>collectFees</code>), extend the lock
+(<code>extendLock</code>), and withdraw the NFT after expiry (<code>withdraw</code>). The contract has no administrator
+override and no early withdrawal path. Positions must enter through <code>lockPosition</code>. Sources: [R3],
+[R4].</p>
+<h3 id="6-2-token-launchpad-and-atomic-suite-deployment">6.2 Token launchpad and atomic suite deployment</h3>
+<p>The launchpad (<code>/launchpad</code>) is open to any wallet on Base mainnet. Wizard steps
+(<code>/launchpad/identity</code>, <code>/launchpad/purpose</code>, <code>/launchpad/liquidity</code>, <code>/launchpad/review</code>) redirect
+incomplete token identities back to Step 1 while persisting drafts across reloads in <code>sessionStorage</code>.
+Four verified archetypes are offered:</p>
+<table>
+<thead>
+<tr>
+<th>Archetype card</th>
+<th>Contracts deployed</th>
+<th>Risk model</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Standard Fixed-Supply ERC-20</strong></td>
+<td><code>FixedSupplyToken.sol</code></td>
+<td>None (no admin or extra protocol contracts)</td>
+</tr>
+<tr>
+<td><strong>Staking &amp; Loyalty Ecosystem</strong></td>
+<td><code>FixedSupplyToken.sol</code> + <code>FeeDiscountStaking.sol</code></td>
+<td>Sovereign (creator admin controls tiers, future lock up to 365 days, and unstake fee up to 50%)</td>
+</tr>
+<tr>
+<td><strong>Aave v3 CeDeFi Vault</strong></td>
+<td><code>FixedSupplyToken.sol</code> + <code>FeeDiscountStaking.sol</code> + <code>YieldStakingVault.sol</code></td>
+<td>Pooled + Sovereign (pooled Aave v3 USDC vault; creator admin controls treasury, pause, and fee reductions)</td>
+</tr>
+<tr>
+<td><strong>Full Sovereign Protocol Suite</strong></td>
+<td><code>FixedSupplyToken.sol</code> + <code>FeeDiscountStaking.sol</code> + <code>YieldStakingVault.sol</code> + <code>CompoundYieldVault.sol</code> + <code>AtomicFlashArbitrageRouter.sol</code></td>
+<td>Pooled + Sovereign (separate Aave v3 and Compound v3 USDC vaults + operator-restricted flash router)</td>
+</tr>
+</tbody></table>
+<p>Key launchpad mechanics enforced in source:</p>
+<ul>
+<li><strong>Fixed-supply token (<code>FixedSupplyToken.sol</code>).</strong> Mints 100% of supply once in the constructor to
+the recipient wallet, with 18 decimals and no mint, owner, admin, pause, fee, or blacklist. Its
+<code>_transfer</code> function reverts on <code>to == address(this)</code> (<code>&quot;Transfer to token contract&quot;</code>) so tokens
+cannot be accidentally stranded in the ownerless token contract. The server&#39;s launch verifier
+matches both approved <code>FixedSupplyToken</code> creation builds (<code>0x692f…9343</code> and <code>0x79c0…1662</code>).</li>
+<li><strong>On-chain launch fee (<code>LaunchpadFees</code>).</strong> Before deploying any contract, the launchpad reads live
+<code>feeAmount()</code> from <code>0x2443C90eB4eA63b74383a5f0dB36c95A1091b68b</code> (<strong>10 USDC</strong>, <code>10_000_000</code> base
+units) and verifies the connected wallet holds enough USDC. After the token deploys, the user
+approves and calls <code>payLaunchFee(tokenAddress)</code>.</li>
+<li><strong>Atomic suite deployment (<code>LaunchpadSuiteDeployer.sol</code>).</strong> For the Staking, Aave Vault, and Full
+Suite cards, a single <code>LaunchpadSuiteDeployer</code> transaction deploys and configures
+<code>FeeDiscountStaking</code> (lock, unstake fee, and four discount tiers) and any selected vaults and
+router, verifies that USDC (<code>0x8335…2913</code>), Aave v3 Pool (<code>0xA238…d1c5</code>), aUSDC (<code>0x4e65…c0AB</code>),
+and Compound v3 USDC Comet (<code>0xb125…Eb2F</code>) match their canonical Base addresses, revokes its own
+temporary operator/admin privileges, and transfers every admin and tierAdmin role to the creator
+before returning. A launch can never end half-configured.</li>
+<li><strong>Multi-DEX liquidity seeding.</strong> Optional initial liquidity seeding (minimum <strong>0.05 ETH</strong>) supports
+Base Uniswap V3 (1.00% tier, full-range position), Uniswap V2, PancakeSwap V2, and Aerodrome
+volatile pools (<code>stable = false</code>).</li>
+<li><strong>In-app staking and contract management.</strong> Token holders can stake and unstake launched tokens on
+<code>/stake</code> (including via shareable <code>/stake?contract=0x...</code> links, Explore Launches, and My Tokens);
+<code>LaunchStakingPanel</code> verifies that the contract&#39;s runtime bytecode matches the pinned
+<code>FeeDiscountStaking</code> build byte-for-byte (outside its immutable token slot) before acting. Creators
+can withdraw accrued staking fees, pause/resume or recover vaults, and manage flash routers from
+<code>/launchpad/my-tokens</code>, or load any approved contract on <strong>Load my contract</strong> (which checks
+approved runtime bytecode hashes in <code>contract-versions.json</code> before checking <code>admin</code>). Sources:
+[R2], [R6], [R7], [R13].</li>
+</ul>
+<h2 id="7-fee-discount-staking-and-lending-vaults">7. Fee-discount staking and lending vaults</h2>
+<h3 id="7-1-fee-discount-staking-feediscountstaking-sol">7.1 Fee-discount staking (<code>FeeDiscountStaking.sol</code>)</h3>
+<p><code>FeeDiscountStaking</code> accepts its immutable configured token and records balances by account. Its
+implementation enforces the following rules:</p>
+<ul>
+<li><strong>Capped lock and per-stake unlock snapshot.</strong> <code>setMinimumStakePeriod</code> is hard-capped at
+<code>MAXIMUM_STAKE_PERIOD = 365 days</code>. When a user stakes, <code>unlockTimestamp[msg.sender] = block.timestamp + minimumStakePeriod</code> snapshots the unlock time for that position, so a later admin
+increase to <code>minimumStakePeriod</code> affects future stakes only and cannot extend existing locks.
+Adding stake to an existing position resets the lock for the user&#39;s whole staked balance.</li>
+<li><strong>Unstake fee and isolated fee accounting.</strong> <code>setWithdrawalFee</code> is capped at 5,000 bps (50%) and
+applies at withdrawal. Withheld unstake fees accumulate in <code>accruedFees</code>, and <code>withdrawFees(to, amount)</code> allows the administrator to withdraw at most <code>accruedFees</code>, keeping staked principal
+unreachable by the administrator.</li>
+<li><strong>Vault discount tiers.</strong> Launchpad suites configure four ascending tiers based on supply share:
+staking <strong>0.01%, 0.1%, 1%, and 10% of total supply</strong> grants <strong>10%, 25%, 50%, and 75% discounts</strong>
+(1,000 / 2,500 / 5,000 / 7,500 bps) on linked vault performance fees. Staking alone pays no yield.</li>
+</ul>
+<p>For the SD token (<code>0x051c758521971f5c5a84edaf18eea12854375469</code>), the active Base <code>FeeDiscountStaking</code>
+contract is <code>0x8a765d450d38d13f5e2533d29399f743cdf23faa</code>. Sources: [R6], [R13].</p>
+<h3 id="7-2-lending-vaults-yieldstakingvault-sol-and-compoundyieldvault-sol">7.2 Lending vaults (<code>YieldStakingVault.sol</code> and <code>CompoundYieldVault.sol</code>)</h3>
+<p><code>YieldStakingVault</code> (Aave v3) and <code>CompoundYieldVault</code> (Compound v3 Comet) accept USDC on Base,
+track internal shares and principal per depositor, and supply deposits to their lending market. With
+assets <code>A</code> before deposit, total shares <code>S</code>, deposit <code>d</code>, and virtual offsets (<code>VIRTUAL_SHARES = 1,000,000</code>, <code>VIRTUAL_ASSETS = 1</code>):</p>
+<pre><code class="language-text">sharesMinted     = floor(d × (S + 1,000,000) / (A + 1))
+grossWithdrawal  = floor(sharesRedeemed × (A + 1) / (S + 1,000,000))
+effectiveFeeBps  = floor(baseFeeBps × (10,000 − discountBps) / 10,000)
+performanceFee   = floor(positiveYield × effectiveFeeBps / 10,000)
 </code></pre>
-<p>The offsets reduce the effect of first-depositor donation manipulation. Integer arithmetic introduces rounding. These are current source formulas, not a claim that older recorded deployments have received those changes.</p>
-<p>On withdrawal, the implementation compares gross proceeds with the proportional recorded principal. It charges a performance fee only on a positive difference. The source defaults to a 10% performance fee and permits the administrator to set up to 30%. A configured staking discount reduces the fee rate:</p>
-<pre><code class="language-text">effectiveFeeBps = floor(baseFeeBps × (10,000 − discountBps) / 10,000)
-performanceFee = floor(positiveYield × effectiveFeeBps / 10,000)
-</code></pre>
-<p>The helper clamps discounts of 10,000 basis points or more to a zero fee. For illustration, 100 units of positive yield, a 10% base fee, and a 25% discount produce a 7.5-unit fee before base-unit rounding. This is an accounting example, not a yield forecast.</p>
-<p>Administrators can change the treasury, performance fee, and external lending configuration. Withdrawal availability depends on contract solvency and the external market&#39;s liquidity. Incorrect configuration, lending-market losses, or unsupported token behavior can impair deposits and withdrawals. Source reference: [R8].</p>
-<h2 id="8-arbitrage-and-cancelled-reward-policy">8. Arbitrage and cancelled reward policy</h2>
-<h3 id="8-1-execution-boundaries">8.1 Execution boundaries</h3>
-<p>Arbitrage tools compare execution opportunities across supported venues. A displayed spread is an estimate before all execution outcomes are known. Network gas, pool fees, flash-loan premiums, slippage, centralized-exchange fills, and settlement costs can eliminate it.</p>
-<p>The basic <code>AaveFlashBorrower</code> source verifies its callback origin and repayment balance but contains no swap execution in the callback. Deploying that contract alone does not establish an automated trading strategy. The separate <code>AtomicFlashArbitrageRouter</code> implements authorized route execution, including generic steps and supported cyclical routes. Its operational use requires the correct deployment, operator permissions, funding for costs, and strategy validation. Source reference: [R9].</p>
-<p>An on-chain flash-loan transaction must satisfy its repayment checks within the transaction or revert. A centralized-exchange trade cannot participate in the same atomic rollback. Cross-venue hedging therefore introduces partial-fill, custody, timing, and inventory risks. Neither flash lending nor strategy automation establishes risk-free profit.</p>
-<h3 id="8-2-cancelled-amutt-usdc-staker-rewards">8.2 Cancelled: AMUTT USDC staker rewards</h3>
-<p>Versions 1.0–1.3 described an approved but inactive policy to share 10% of eligible realized arbitrage profit, in USDC, with AMUTT stakers outside the project, paid by an implemented but undeployed <code>WeeklyUsdcDistributor</code>. Version 1.4 cancels that policy. The distributor will not be deployed, funded, or enabled; no reward week will run; and no staker has any claim under the cancelled terms. Nothing was ever distributed. Sources: [R10], [R11] (historical).</p>
-<h2 id="9-governance-and-administrative-authority">9. Governance and administrative authority</h2>
-<p>The advisory AMUTT governance terms of earlier editions are cancelled. This edition has no governance: contract roles alone govern administration, and any change requires an authorized administrator to review and sign the transaction. Binding governance would require a separately reviewed governor, execution timelock, and explicit transfer of administrative authority.</p>
+<p>Both vault contracts enforce identical trust boundaries:</p>
+<ul>
+<li><strong>Immutable market and staking wiring.</strong> <code>underlyingAsset</code>, <code>discountStaking</code>, and the lending
+market addresses (<code>aavePool</code> and <code>aToken</code> in <code>YieldStakingVault</code>; <code>comet</code> in <code>CompoundYieldVault</code>)
+are <code>immutable</code>. Neither vault has a market-repointing setter, so an administrator cannot redirect
+deposited funds to a fake market.</li>
+<li><strong>No fee increase while shares exist.</strong> <code>performanceFeeBps</code> defaults to 10% (1,000 bps) and is
+capped at 30% (3,000 bps). <code>setPerformanceFee</code> requires <code>totalShares == 0 || newFeeBps &lt;= performanceFeeBps</code>, so the administrator can lower the fee at any time but cannot raise it while
+any depositor holds shares.</li>
+<li><strong>Pause and vault-only emergency recovery.</strong> <code>setPaused(true)</code> blocks new <code>deposit</code> calls while
+leaving <code>withdraw</code> open. While paused, <code>emergencyWithdrawFromAave</code> /
+<code>emergencyWithdrawFromComet</code> pulls funds from the immutable lending market <strong>only back into the
+vault contract (<code>address(this)</code>)</strong> so depositors can withdraw their shares; the administrator
+cannot withdraw depositor principal. Source: [R7].</li>
+</ul>
+<h2 id="8-sponsored-reward-paymaster-and-administrative-authority">8. Sponsored Reward Paymaster and administrative authority</h2>
+<h3 id="8-1-sponsored-reward-paymaster-sponsoredrewardpaymaster-sol">8.1 Sponsored Reward Paymaster (<code>SponsoredRewardPaymaster.sol</code>)</h3>
+<p><code>SponsoredRewardPaymaster</code> is deployed on Base mainnet at
+<a href="https://basescan.org/address/0x9cD40EBa4B0793C43FdF8C5A3272073820f77CB4"><code>0x9cD40EBa4B0793C43FdF8C5A3272073820f77CB4</code></a>
+on ERC-4337 <strong>EntryPoint v0.7</strong> (<code>0x0000000071727De22E5E9d8BAf0edAc6f37da032</code>). It sponsors gas in
+ETH from its EntryPoint deposit for eligible Base ERC-20 transfers, swaps (on allowlisted Uniswap V3,
+Uniswap V2, and Aerodrome routers), and staking calls (<code>MuttProStaking</code> and launchpad
+<code>FeeDiscountStaking</code>), and pays <strong>100 MRWD</strong> to the user inside <code>_postOp</code> when
+<code>mode == PostOpMode.opSucceeded</code>. Each sponsorship is capped at 0.0001 ETH of gas with a 24-hour
+per-wallet cooldown.</p>
+<p><strong>Current browser-wallet status: gas-free operations are disabled in the UI.</strong> While the contract
+path is verified on a Base fork with real EIP-7702 delegated accounts and EntryPoint v0.7
+(<code>SponsoredRewardPaymaster.t.sol</code>), current browser wallets cannot submit compatible signatures:</p>
+<ol>
+<li><strong>MetaMask EIP-7702 Smart Account (<code>0x63c0…E32B</code>, EntryPoint v0.7):</strong> MetaMask refuses website
+EIP-712 UserOperation signature requests whose <code>verifyingContract</code> is the internal account itself.</li>
+<li><strong>Plain browser (JSON-RPC) wallets:</strong> cannot sign an EIP-7702 authorization for a website.</li>
+<li><strong>Simple 7702 accounts (<code>0xe6Ca…555B</code>, EntryPoint v0.8):</strong> use EntryPoint v0.8, whereas the
+reward paymaster answers only EntryPoint v0.7; the API refuses to sign mismatched EntryPoint
+requests.</li>
+</ol>
+<p>Accordingly, <code>/paymaster</code> explains why sponsorship is unavailable for the connected wallet and
+disables the sponsored send button until wallet-native ERC-7677 <code>wallet_sendCalls</code> support is
+available. Source: [R14].</p>
+<h3 id="8-2-administrative-authority">8.2 Administrative authority</h3>
+<p>The system has no DAO or token governance; contract roles alone govern administration where roles
+exist:</p>
 <table>
 <thead>
 <tr>
@@ -272,177 +572,695 @@ performanceFee = floor(positiveYield × effectiveFeeBps / 10,000)
 </tr>
 </thead>
 <tbody><tr>
-<td>GovernanceToken</td>
-<td>Administrator changes admin and minter; immutable cap remains fixed</td>
+<td><code>FixedSupplyToken</code> (launchpad tokens)</td>
+<td><strong>None:</strong> no owner, admin, or mint function; transfers to <code>address(this)</code> revert</td>
 </tr>
 <tr>
-<td>FeeDiscountStaking</td>
-<td>Admin changes duration, withdrawal fee, and roles; tier admin replaces tiers</td>
+<td><code>MuttRewards</code> (MRWD), <code>MuttIncentiveScheduler</code>, <code>MuttProStaking</code></td>
+<td><strong>None:</strong> ownerless, non-upgradeable, no pause or admin withdrawal (§11.1, §12, §14.3)</td>
 </tr>
 <tr>
-<td>Lending vaults</td>
-<td>Admin changes treasury, fee within its cap, and lending configuration</td>
+<td><code>MuttVesting</code> (treasury and team)</td>
+<td><strong>None over schedule:</strong> fixed beneficiary, 12-month cliff, 36-month linear release; ownership cannot be transferred or renounced (§15)</td>
 </tr>
 <tr>
-<td>Flash-loan tooling</td>
-<td>Admin and, in the atomic router, authorized operators control execution</td>
+<td><code>V3PositionTimelock</code></td>
+<td>Recorded lock owner collects fees, extends lock, and withdraws NFT after expiry; no admin override</td>
 </tr>
 <tr>
-<td>V3PositionTimelock</td>
-<td>Recorded owner collects, extends, and withdraws after expiry; no admin override in source</td>
+<td><code>FeeDiscountStaking</code></td>
+<td>Admin changes future lock (≤ 365 days), unstake fee (≤ 50%), roles, and withdraws <code>accruedFees</code> only; tier admin updates tiers</td>
+</tr>
+<tr>
+<td><code>YieldStakingVault</code> / <code>CompoundYieldVault</code></td>
+<td>Admin changes treasury, pauses deposits, recovers market funds into the paused vault only, and lowers fee (or raises only when <code>totalShares == 0</code>); market and staking links are immutable</td>
+</tr>
+<tr>
+<td><code>AtomicFlashArbitrageRouter</code></td>
+<td>Admin and approved operators execute flash routes; callback reverts below required repayment and <code>minNetProfit</code></td>
+</tr>
+<tr>
+<td><code>SponsoredRewardPaymaster</code></td>
+<td>Owner configures signer, reward amount, cooldown, gas cap, allowlists, and withdraws ETH/MRWD reserves</td>
+</tr>
+<tr>
+<td><code>LaunchpadFees</code></td>
+<td>Owner updates <code>feeAmount</code> and <code>treasury</code></td>
 </tr>
 </tbody></table>
-<p>A contract name containing “governance,” “sovereign,” or “decentralized” does not remove these powers. This edition does not claim that existing roles are held by a multisignature or transferred to a DAO. Sources: [R4], [R7]–[R11].</p>
-<h2 id="10-base-contract-inventory">10. Base contract inventory</h2>
-<p>All addresses below refer to <strong>Base mainnet, chain ID 8453</strong>. They are identified in repository configuration or deployment records; they are not a recommendation to deposit. Historical SD deployments must be evaluated separately; AMUTT contracts are retired (§5.1). Before use, compare verified bytecode and read the deployment&#39;s token, asset, role, fee, and external-market parameters.</p>
+<p>For project-deployed contracts that have an administrator role, that role is held by the single-key
+wallet <code>0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98</code>. For launchpad suites deployed by users,
+<code>LaunchpadSuiteDeployer</code> transfers all administrator roles to the creator&#39;s recipient wallet.</p>
+<h2 id="9-security-model-and-limitations">9. Security model and limitations</h2>
+<ul>
+<li><strong>Trading and liquidity:</strong> thin pools, adverse ordering, token restrictions, and changing prices
+can materially affect execution outcomes.</li>
+<li><strong>Contract custody:</strong> deposited or staked assets follow each contract&#39;s rules; wallet custody
+before a deposit does not mean immediate withdrawal after it.</li>
+<li><strong>Administration:</strong> for contracts with admin roles, a compromised admin key or adverse parameter
+change (such as raising <code>withdrawalFeeBps</code> up to 50% in <code>FeeDiscountStaking</code>) can affect users.</li>
+<li><strong>Dependencies:</strong> RPC providers, wallet extensions, external lending markets (Aave v3, Compound
+v3), centralized exchange WebSockets, and the market-data service can fail or lag.</li>
+<li><strong>Bytecode verification:</strong> the application&#39;s contract loader checks runtime bytecode hashes
+(<code>contract-versions.json</code>) before interacting with user-supplied staking, vault, or router
+contracts and refuses unapproved contracts.</li>
+</ul>
+<p>The repository includes unit tests and Base-fork test suites (<code>YieldVaultBaseFork.t.sol</code>,
+<code>CompoundVaultBaseFork.t.sol</code>, <code>LaunchpadSuiteBaseFork.t.sol</code>, <code>FlashRouterBaseFork.t.sol</code>,
+<code>MuttIncentiveScheduler.t.sol</code>, <code>SponsoredRewardPaymaster.t.sol</code>, and <code>V3PositionTimelock.t.sol</code>)
+that run against real Base USDC, Aave v3, Compound v3, Uniswap V2/V3, Aerodrome, UniswapV3Staker,
+and EntryPoint v0.7, alongside a self-assessment in <code>audit/KNOWN-ISSUES.md</code>. Passing tests and
+Sourcify/Blockscout verification do not constitute an independent security audit, and this paper
+asserts no completed external audit. Report vulnerabilities privately via
+<a href="https://github.com/rickrichi/shaggy-dogg-dex/security/advisories/new">private vulnerability reporting</a>
+or the <a href="https://github.com/rickrichi/shaggy-dogg-dex/security/policy">security policy</a>. No bug bounty
+is offered.</p>
+<h2 id="10-active-ecosystem-tokens">10. Active ecosystem tokens</h2>
+<p>In addition to <strong>Mutt Rewards ($MRWD)</strong> (Part III), the Base token registry and portfolio views
+include three project-associated tokens:</p>
+<ul>
+<li><strong>SD (<code>0x051c758521971f5c5a84edaf18eea12854375469</code>):</strong> Base ecosystem token with 1,000,000 fixed
+supply and active <code>FeeDiscountStaking</code> at <code>0x8a765d450d38d13f5e2533d29399f743cdf23faa</code>.</li>
+<li><strong>FBA (<code>0xb8f3d5143ffddb99688bb31e7c2c3894a1e17263</code>):</strong> Base ERC-20 token included in the token
+registry and portfolio views; no reward or governance entitlement is attached to it.</li>
+<li><strong>EQX (<code>0x1aEB45Fd7B6C59B52da3e41558410F306CBaa56C</code>):</strong> Equilnyxs shares on Base. Only wallets
+verified in its on-chain <code>IdentityRegistry</code> can hold or receive EQX, and it has no DEX pool. It is
+shown in <code>/portfolio</code>, <code>/launchpad/my-tokens</code>, and the beneficiary vesting view, and is
+intentionally excluded from <code>/swap</code> and pool planners. Source: [R5].</li>
+</ul>
+<hr>
+<h2 id="part-iii-mutt-rewards-mrwd-the-liquidity-rewards-and-utility-token">Part III — Mutt Rewards ($MRWD), the liquidity-rewards and utility token</h2>
+<h2 id="11-purpose-and-design-principle">11. Purpose and design principle</h2>
+<p><strong>Mutt Rewards ($MRWD)</strong> (<code>0xC17227AAa33C54634B6cE7AD0bf33A156563c179</code> on Base mainnet, canonical
+page <a href="https://dex.lumsian.com/mrwd">dex.lumsian.com/mrwd</a>) is a utility and liquidity-incentive
+token. It is not a meme token, and it is not a claim on project revenue, profit, treasury assets, or
+governance. Public listings and search profiles must use only its canonical Base address above.</p>
+<p>MRWD has four documented functions in the ecosystem:</p>
+<ol>
+<li><strong>Liquidity-provider rewards (live):</strong> rewarding eligible liquidity providers who stake in-range
+positions from the canonical MRWD/WETH 0.30% Uniswap V3 pool in <code>UniswapV3Staker</code> (§14).</li>
+<li><strong>Equilnyxs Pro access (live):</strong> locking 1 billion MRWD in <code>MuttProStaking</code> to unlock Equilnyxs
+Pro without paying a subscription fee (§11.1).</li>
+<li><strong>Sponsored-operation rewards (deployed on-chain):</strong> paying 100 MRWD per eligible sponsored
+operation in <code>SponsoredRewardPaymaster</code> (§8.1).</li>
+<li><strong>Launchpad quote asset (planned):</strong> serving as an optional quote asset for tokens launched on the
+launchpad once the launchpad demand test (§17.2) is evaluated.</li>
+</ol>
+<p>The design starts from a fundamental economic question: <strong>why would anyone hold or acquire the token
+after liquidity incentives decline?</strong> A rewards program can rent liquidity temporarily without
+creating lasting demand. Reward sustainability and durable demand are therefore treated as explicit
+design requirements (§16–§17), without adding transfer taxes, governance promises, or revenue
+sharing.</p>
+<h3 id="11-1-demand-architecture-and-equilnyxs-pro-staking">11.1 Demand architecture and Equilnyxs Pro staking</h3>
+<p><strong>Primary (planned): MRWD-quoted launches.</strong> The launchpad is designed to gain an option to pair a
+new token against MRWD (<code>PROJECT/MRWD</code>), requiring creators who choose it to hold MRWD to seed the
+pool and routing <code>WETH → MRWD → PROJECT</code> trades through the canonical MRWD/WETH pool. Before enabling
+MRWD-quoted launches, actual launchpad activity is measured on WETH-paired launches during the
+three-month demand test window (§17.2).</p>
+<p><strong>Secondary (live): utility staking for Equilnyxs Pro.</strong> Equilnyxs, the project&#39;s language and
+toolchain for strategy code and Base DEX execution, sells Pro passes ($12 for 30 days, $99 for a
+year in USDC on Base). Staking MRWD is a live second path to Pro: keeping <strong>1,000,000,000 (1 billion)
+MRWD</strong> locked in <code>MuttProStaking</code> unlocks a free Equilnyxs Pro key at
+<code>https://www.lumsian.com/pro/stake.php</code>, with staking managed on <code>https://dex.lumsian.com/stake</code>.</p>
+<ul>
+<li><strong>Staking contract (<code>MuttProStaking</code>, <code>0x67dBC193bF510225EBf189ab25dC3b34a32c1766</code>).</strong> Separate
+from the token, non-upgradeable, and verified on Sourcify (<code>exact_match</code>), with <strong>no owner and no
+pause</strong>: each deposit has a fixed 30-day lock (<code>lockSeconds = 2,592,000</code>), there is no exit fee,
+matured deposits can always be withdrawn (<code>withdrawMatured</code>), and no function can move staked MRWD
+except back to its depositor. A wallet holds at most 32 open deposits. It records stakes only and
+pays <strong>no yield</strong>.</li>
+<li><strong>License issuance.</strong> The holder signs a message with the staking wallet. The store recovers the
+signer, reads the wallet&#39;s locked deposits, checks <code>lockedUntil(wallet, T)</code> against the 1 billion
+MRWD threshold, and issues an <code>EQX1</code> Pro license valid until the day before the stake unlocks. A
+license therefore never outlives the stake behind it. Calling <code>relockAll</code> relocks all open deposits
+for a full 30-day period from <code>block.timestamp</code>.</li>
+<li><strong>Free features stay free.</strong> The Equilnyxs compiler, checker, REPL, dry runs, and test-network
+trading never require MRWD, and USDC passes remain available.</li>
+</ul>
+<p><strong>Target and model findings.</strong> The economic model (<code>scripts/mchow-model/</code>) puts the volume at which
+outside LPs stay without rewards at roughly $150,000–$220,000 per month through MRWD/WETH
+($220,000/month conservative target, or ~$660/month in gross fees at 0.30%). The deployed 60/20/15/5
+allocation passes every model criterion across all three organic scenarios at ~15 seeded launches per
+month ($40,000 first-month volume each), passes the base scenario at 5 launches per month ($25,000
+each), and fails below 5 launches per month (§17.2). Sources: [R15], [R16].</p>
+<h2 id="12-token-contract-muttrewards-sol">12. Token contract (MuttRewards.sol)</h2>
+<p><code>MuttRewards</code> is a standard, fixed-supply ERC-20 on Base built on OpenZeppelin Contracts 5.x (<code>ERC20</code>
+and <code>ERC20Permit</code>) and verified on Sourcify as an exact bytecode match.</p>
 <table>
 <thead>
 <tr>
-<th>Contract or asset</th>
-<th>Address</th>
-<th>Record</th>
+<th>Parameter</th>
+<th>Value on Base mainnet</th>
+<th>Status</th>
 </tr>
 </thead>
 <tbody><tr>
-<td>AMUTT token</td>
-<td><a href="https://basescan.org/address/0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7">0x41F40BAE5318f2C67a4d04D1dc7a42D53A346Ae7</a></td>
-<td>Retired (§5.1)</td>
+<td>Name</td>
+<td><strong>Mutt Rewards</strong></td>
+<td>Deployed 25 October 2026</td>
 </tr>
 <tr>
-<td>AMUTT fee-discount staking</td>
-<td><a href="https://basescan.org/address/0x055BB4eD8d5464C25D71391E940ce53CA30845fC">0x055BB4eD8d5464C25D71391E940ce53CA30845fC</a></td>
-<td>Retired (§5.1)</td>
+<td>Symbol</td>
+<td><strong>MRWD</strong></td>
+<td>Deployed 25 October 2026</td>
 </tr>
 <tr>
-<td>AMUTT yield vault</td>
-<td><a href="https://basescan.org/address/0x16a1E9c10B913912b7B7df4649D9596D95ce33E6">0x16a1E9c10B913912b7B7df4649D9596D95ce33E6</a></td>
-<td>Retired (§5.1)</td>
+<td>Contract address</td>
+<td><a href="https://basescan.org/token/0xC17227AAa33C54634B6cE7AD0bf33A156563c179"><code>0xC17227AAa33C54634B6cE7AD0bf33A156563c179</code></a></td>
+<td>Verified on Sourcify (<code>exact_match</code>)</td>
 </tr>
 <tr>
-<td>AMUTT flash borrower</td>
-<td><a href="https://basescan.org/address/0x936a3D52c3037848879F3641dfBc9132aAe51bDF">0x936a3D52c3037848879F3641dfBc9132aAe51bDF</a></td>
-<td>Recorded with the AMUTT deployment</td>
+<td>Network</td>
+<td>Base mainnet (chain ID 8453)</td>
+<td>Deployed</td>
 </tr>
 <tr>
-<td>AMUTT/WETH V2 pair</td>
-<td><a href="https://basescan.org/address/0x581B294FeC1A4332f17cf18B49D68087c09b6784">0x581B294FeC1A4332f17cf18B49D68087c09b6784</a></td>
-<td>Retired (§5.1)</td>
+<td>Standard and library</td>
+<td>ERC-20 + EIP-2612 Permit (<code>ERC20</code>, <code>ERC20Permit</code>, OpenZeppelin 5.x, solc 0.8.28)</td>
+<td>Deployed</td>
 </tr>
 <tr>
-<td>SD token</td>
-<td><a href="https://basescan.org/address/0x051c758521971f5c5a84edaf18eea12854375469">0x051c758521971f5c5a84edaf18eea12854375469</a></td>
-<td>Historical SD deployment</td>
+<td>Total supply</td>
+<td><strong>1,000,000,000,000</strong> (10¹² MRWD, 10³⁰ base units)</td>
+<td>Minted once in constructor</td>
 </tr>
 <tr>
-<td>SD fee-discount staking</td>
-<td><a href="https://basescan.org/address/0x42134ccc6c41149cf71c7b4994e33ee66758af20">0x42134ccc6c41149cf71c7b4994e33ee66758af20</a></td>
-<td>Historical SD deployment</td>
+<td>Decimals</td>
+<td>18</td>
+<td>Immutable</td>
 </tr>
 <tr>
-<td>SD yield vault</td>
-<td><a href="https://basescan.org/address/0x8531807ef36560cd7db230c95db85791aa586dda">0x8531807ef36560cd7db230c95db85791aa586dda</a></td>
-<td>Historical SD deployment</td>
+<td>Further issuance</td>
+<td>None: no external or internal mint path reachable after construction</td>
+<td>Enforced by bytecode</td>
 </tr>
 <tr>
-<td>Compound yield vault</td>
-<td><a href="https://basescan.org/address/0x38cccafb4ae96a8ef187f07fb17d18eb63e43782">0x38cccafb4ae96a8ef187f07fb17d18eb63e43782</a></td>
-<td>Historical ecosystem deployment</td>
+<td>Owner / admin roles</td>
+<td>None</td>
+<td>Enforced by bytecode</td>
 </tr>
 <tr>
-<td>SD flash borrower</td>
-<td><a href="https://basescan.org/address/0xa5b50037a8d2fda22805f750252268adaeb36480">0xa5b50037a8d2fda22805f750252268adaeb36480</a></td>
-<td>Historical SD deployment</td>
+<td>Upgradeability</td>
+<td>None (no proxy)</td>
+<td>Enforced by bytecode</td>
 </tr>
 <tr>
-<td>FBA token</td>
-<td><a href="https://basescan.org/address/0xb8f3d5143ffddb99688bb31e7c2c3894a1e17263">0xb8f3d5143ffddb99688bb31e7c2c3894a1e17263</a></td>
-<td>Token registry</td>
+<td>Transfer behavior</td>
+<td>Standard ERC-20: no tax, reflection, rebase, blacklist, or pause</td>
+<td>Enforced by bytecode</td>
 </tr>
 <tr>
-<td>V3 position timelock</td>
-<td><a href="https://basescan.org/address/0xb5c9bedb57f4e348e40a5e6326c90de474072e25">0xb5c9bedb57f4e348e40a5e6326c90de474072e25</a></td>
-<td>Deployment recorded at block 52,527,662</td>
-</tr>
-<tr>
-<td>V3 position manager used by timelock</td>
-<td><a href="https://basescan.org/address/0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1">0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1</a></td>
-<td>Timelock deployment configuration</td>
-</tr>
-<tr>
-<td>Owner and administrator wallet</td>
-<td><a href="https://basescan.org/address/0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98">0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98</a></td>
-<td>Single key; administrator of the project&#39;s recorded contracts</td>
+<td>Burn / voting extensions</td>
+<td>Excluded (<code>ERC20Burnable</code> and <code>ERC20Votes</code> omitted)</td>
+<td>Enforced by bytecode</td>
 </tr>
 </tbody></table>
-<p>The timelock deployment record identifies transaction <a href="https://basescan.org/tx/0xf9fd35c9c716e32ae22e5ed3844cd173e97faecd4e003d7a547edafd3dd7ec09">0xf9fd35c9c716e32ae22e5ed3844cd173e97faecd4e003d7a547edafd3dd7ec09</a>. An NFT lock requires a separate position-specific transaction and cannot be inferred from deployment alone. Sources: [R4]–[R7].</p>
-<h2 id="11-security-model-and-limitations">11. Security model and limitations</h2>
-<p>The system&#39;s main risk boundaries are concrete:</p>
+<p>The deployer wallet (<code>0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98</code>) holds <strong>0 MRWD</strong> from the initial
+allocation, and unused rounding dust sits at <code>0x000000000000000000000000000000000000dEaD</code>. Source:
+[R15].</p>
+<h2 id="13-liquidity-architecture-and-aggregator-routing">13. Liquidity architecture and aggregator routing</h2>
+<h3 id="13-1-canonical-pool-and-56-aggregator-routing-audit">13.1 Canonical pool and 56-aggregator routing audit</h3>
+<p>The canonical pool is the <strong>MRWD/WETH 0.30% Uniswap V3 pool on Base</strong>,
+<a href="https://basescan.org/address/0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5"><code>0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5</code></a>,
+created through Uniswap&#39;s canonical Base V3 factory (<code>0x33128a8fC17869897dcE68Ed026d694621f6FDfD</code>)
+and position manager (<code>0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1</code>). Because V3 liquidity is held as
+position NFTs with chosen price ranges, usable depth must be measured as <strong>active, in-range
+liquidity</strong>, not nominal deposited value. A second pool on another venue would split liquidity and
+would not share the <code>UniswapV3Staker</code> incentive key bound to this pool.</p>
+<p>On <code>/protocol</code>, the <strong>56-Aggregator Routing Audit</strong> (<code>MrwdAggregatorAuditCard</code>) quotes 11 on-chain
+Base routers and quoters live against the canonical MRWD/WETH V3 pool and classifies 56 aggregator
+routing targets (<code>public/mrwd-56-aggregators/report.json</code>), distinguishing venues that route through
+Uniswap V3 automatically from those requiring additional pools or off-chain indexing.</p>
+<h3 id="13-2-three-kinds-of-liquidity">13.2 Three kinds of liquidity</h3>
+<table>
+<thead>
+<tr>
+<th>Kind</th>
+<th>What it is</th>
+<th>On-chain state</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Protocol-owned launch liquidity</strong></td>
+<td>Position <strong>#6351512</strong>, covering ¼× to 4× around the launch tick <code>318126</code> (ticks <code>304260</code> to <code>331980</code>, spacing 60), seeded with 200 billion MRWD (20% of supply) and 0.003059671793548375 WETH</td>
+<td>Locked in <code>V3PositionTimelock</code> (<code>0xB5C9BeDb57f4E348e40A5E6326c90dE474072E25</code>) until <strong>24 October 2028 23:11:39 UTC</strong> (<code>1856041899</code>), owner <code>0x9dC0…7C98</code></td>
+</tr>
+<tr>
+<td><strong>Staked V3 positions</strong></td>
+<td>V3 position NFTs deposited and staked in <code>UniswapV3Staker</code> (<code>0x42bE…C3C1</code>)</td>
+<td>Earn MRWD in proportion to in-range liquidity-seconds; can be claimed+restaked or unstaked at any time on <code>/stake</code> and <code>/protocol</code></td>
+</tr>
+<tr>
+<td><strong>Liquidity depth</strong></td>
+<td>What a trader can actually execute</td>
+<td>Measured by price impact at stated trade sizes and active in-range liquidity</td>
+</tr>
+</tbody></table>
+<p>Locking the protocol&#39;s launch position does not lock any other position; holders of staked V3
+positions can unstake and withdraw their own NFTs at any time. The enforced commitment on <code>#6351512</code>
+is the 24-month timelock until 24 October 2028, accompanied by a declared policy to retain or extend
+the position through the 48-month reward program.</p>
+<h3 id="13-3-pool-price-and-valuation-versus-depth">13.3 Pool price and valuation versus depth</h3>
+<p>Because the MRWD/WETH pool currently sits below the market-data service&#39;s $100 firm-liquidity floor,
+MRWD&#39;s price is displayed with an <code>indicative</code> thin-pool badge until pool liquidity reaches at least
+$100 (§4). Implied whole-supply valuation (<code>5 × E</code> for a 20% supply pairing) is never equal to
+executable pool depth: selling into a thin pool moves the price rapidly, and when the spot tick moves
+outside a concentrated position&#39;s tick range (such as <code>#6351512</code>&#39;s ticks <code>304260–331980</code>), only
+positions covering the active tick supply executable liquidity and earn rewards.</p>
+<h2 id="14-rewards-program">14. Rewards program</h2>
+<h3 id="14-1-mechanism-uniswapv3staker-and-in-app-claiming">14.1 Mechanism: <code>UniswapV3Staker</code> and in-app claiming</h3>
+<p>Rewards are distributed through Uniswap&#39;s official <strong>UniswapV3Staker</strong> on Base,
+<a href="https://basescan.org/address/0x42bE4D6527829FeFA1493e1fb9F3676d2425C3C1"><code>0x42bE4D6527829FeFA1493e1fb9F3676d2425C3C1</code></a>.
+Rewards accrue in proportion to a staked position&#39;s <strong>in-range liquidity multiplied by seconds in
+range</strong>:</p>
+<pre><code class="language-text">reward ≈ unclaimedRewards × (Δ secondsPerLiquidityInside × positionLiquidity) / unclaimedLiquiditySeconds
+</code></pre>
+<p>Because <code>secondsPerLiquidityInside</code> is tracked by the V3 pool across <strong>all</strong> active in-range
+liquidity (staked or unstaked), any unstaked in-range position—including the locked launch position
+whenever the price is inside its range—dilutes the share of the period budget claimable by staked
+positions, and the unclaimed remainder goes to the burn-address refundee (<code>0x…dEaD</code>) when the period
+is finalized.</p>
+<p>On <code>/stake</code> and <code>/protocol</code>, the MRWD rewards panel discovers the connected wallet&#39;s staked and
+unstaked MRWD/WETH V3 positions directly from contract state and provides three owner-checked
+actions:</p>
 <ul>
-<li><strong>Trading and liquidity:</strong> thin pools, adverse ordering, token restrictions, changing prices, and liquidity-provider losses can materially change outcomes.</li>
-<li><strong>Contract custody:</strong> staking, vaults, pools, and timelocks hold assets under their own rules. Wallet custody before deposit does not mean immediate access after deposit.</li>
-<li><strong>Administration:</strong> compromised keys or adverse parameter changes can affect withdrawal conditions, fees, and lending destinations. The staking source does not cap the minimum stake duration.</li>
-<li><strong>Dependencies:</strong> RPC services, wallet connections, external lending markets, centralized venues, and market feeds can fail or report incomplete data.</li>
-<li><strong>Supply concentration:</strong> constructor allocation to one administrator creates initial concentration. Subsequent distribution and lock claims require on-chain evidence.</li>
-<li><strong>Version mismatch:</strong> a locally improved contract does not upgrade an older deployed instance. Changes to deployment addresses or user migrations require separate verification.</li>
+<li><strong>Claim:</strong> unstakes the position, claims accrued MRWD to the wallet, and re-stakes the position in
+the same transaction so it keeps earning without interruption.</li>
+<li><strong>Unstake:</strong> claims rewards and withdraws the position NFT back to the wallet after confirmation.</li>
+<li><strong>Claim to Wallet:</strong> withdraws rewards already credited in the staker.</li>
 </ul>
-<p>The repository contains unit, integration, and fork tests and a documented V3 compatibility review. Those records describe specific scopes and historical runs. Source publication, explorer verification, domain allowlisting, and passing tests do not constitute an independent security audit or a guarantee against loss. This whitepaper does not assert completion of an independent audit across the ecosystem.</p>
-<p>The source repository is public, so every pinned reference in §13 can be read without an account. Report suspected vulnerabilities privately, either through the repository&#39;s <a href="https://github.com/rickrichi/shaggy-dogg-dex/security/advisories/new">private vulnerability reporting</a> or by following the <a href="https://github.com/rickrichi/shaggy-dogg-dex/security/policy">security policy</a>; do not open a public issue first. Handling is best effort, and no bug bounty is offered. The repository runs secret scanning with push protection, which blocks commits containing recognized credentials.</p>
-<p>Useful deployment evidence includes compiler input, creation transaction, runtime bytecode comparison, role addresses, parameter reads at a stated block, and reproducible test results. For a liquidity-lock claim, add the NFT identity and lock state. For revenue claims, add final transaction receipts, exchange fills where relevant, expenses, and reconciliation. Sources: [R3], [R4], [R10].</p>
-<h2 id="12-development-roadmap">12. Development roadmap</h2>
-<p>Roadmap stages describe acceptance criteria rather than promised dates.</p>
+<h3 id="14-2-emissions-and-16-quarter-schedule">14.2 Emissions and 16-quarter schedule</h3>
+<ul>
+<li><strong>60% maximum reserve (600,000,000,000 MRWD).</strong> Allocated to <code>MuttIncentiveScheduler</code> at launch; no
+tokens can be minted.</li>
+<li><strong>48-month declining linear curve across 16 quarters (<code>MuttEmissionSchedule.sol</code>).</strong> Monthly
+emissions start at 1.5× the 48-month average (18.75 billion MRWD/month) and decline linearly to
+0.5× (6.25 billion MRWD/month) in month 48. The program runs as <strong>16 consecutive quarterly periods</strong>
+of 91.25 days (<code>7,884,000</code> seconds) starting <strong>26 October 2026 00:07:15 UTC</strong> (<code>1792973235</code>):
+quarter <em>k</em> (for <em>k</em> = 0 … 15) holds <code>600,000,000,000 × (417 − 18k) / 4,512</code> MRWD (about 55.45
+billion MRWD in Quarter 1 down to 19.55 billion MRWD in Quarter 16, summing to exactly 600 billion
+MRWD).</li>
+<li><strong>Quarter 1 (live):</strong> funded on <code>UniswapV3Staker</code> with 55.45 billion MRWD, running from
+<strong>26 October 2026 00:07:15 UTC</strong> to <strong>25 January 2027 06:07:15 UTC</strong> (<code>1800857235</code>).</li>
+<li><strong>Unused rewards go to <code>0x…dEaD</code>.</strong> Every period&#39;s refundee is
+<code>0x000000000000000000000000000000000000dEaD</code>. Unclaimed rewards and any missed period are
+permanently removed from circulation (while remaining part of <code>totalSupply()</code>, as MRWD has no burn
+function).</li>
+</ul>
+<h3 id="14-3-bounded-authority-muttincentivescheduler-and-automated-keeper">14.3 Bounded authority: <code>MuttIncentiveScheduler</code> and automated keeper</h3>
+<p><code>MuttIncentiveScheduler</code> is deployed on Base mainnet at
+<a href="https://basescan.org/address/0xCAbf284806b800d9A771B55857B9fCF735ea7109"><code>0xCAbf284806b800d9A771B55857B9fCF735ea7109</code></a>
+and verified on Sourcify (<code>exact_match</code>). It:</p>
+<ul>
+<li>holds the 544.55 billion MRWD reserve for Quarters 2–16 on-chain;</li>
+<li>encodes all 16 periods, the canonical pool, and the <code>0x…dEaD</code> refundee immutably at construction;</li>
+<li>has <strong>no owner, no admin, and no withdrawal function</strong>;</li>
+<li>exposes four permissionless functions callable by any address:<ol>
+<li><code>createIncentive(period)</code> — creates that quarter&#39;s incentive on <code>UniswapV3Staker</code> inside its
+30-day lead window;</li>
+<li><code>skipMissedPeriod(period)</code> — if a quarter&#39;s start time passes without creation, sends that
+quarter&#39;s MRWD allocation to <code>0x…dEaD</code> so tokens are never trapped;</li>
+<li><code>finalize(period, tokenIds)</code> — after a quarter ends, unstakes any remaining positions and calls
+<code>endIncentive</code>, sending unclaimed rewards to <code>0x…dEaD</code>;</li>
+<li><code>burnLeftover()</code> — after all 16 quarters are settled, sends any residual balance to <code>0x…dEaD</code>.</li>
+</ol>
+</li>
+</ul>
+<p>A daily GitHub Actions workflow (<code>.github/workflows/mrwd-keeper.yml</code>, running <code>server/src/mrwd/keeper.ts</code>
+with dedicated gas-only keeper wallet <code>0x5Fb98222c6010D6A3fCD3119372e82777282796f</code>) checks the
+scheduler each day at 07:41 UTC and submits any due permissionless call. Quarter 2&#39;s creation window
+opens on <strong>26 December 2026 06:07 UTC</strong>. Sources: [R15], [R17].</p>
+<h2 id="15-allocation-and-vesting-muttvesting-sol">15. Allocation and vesting (MuttVesting.sol)</h2>
+<table>
+<thead>
+<tr>
+<th>Allocation</th>
+<th>Share</th>
+<th>MRWD</th>
+<th>On-chain custody and release schedule</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>LP rewards</td>
+<td>60%</td>
+<td>600,000,000,000</td>
+<td><code>MuttIncentiveScheduler</code> (<code>0xCAbf…7109</code>); Quarter 1 (55.45B) funded on <code>UniswapV3Staker</code>, Quarters 2–16 (544.55B) in scheduler</td>
+</tr>
+<tr>
+<td>Launch liquidity</td>
+<td>20%</td>
+<td>200,000,000,000</td>
+<td>Uniswap V3 position <code>#6351512</code>, locked in <code>V3PositionTimelock</code> (<code>0xB5C9…2E25</code>) until 24 October 2028</td>
+</tr>
+<tr>
+<td>Treasury</td>
+<td>15%</td>
+<td>150,000,000,000</td>
+<td><code>MuttVesting</code> (<code>0x7bC37041E1205841a83413625650EC12DA119697</code>) → beneficiary <code>0xB04A0b807BCD463351F90133242F0AcA15C2280f</code></td>
+</tr>
+<tr>
+<td>Team</td>
+<td>5%</td>
+<td>50,000,000,000</td>
+<td><code>MuttVesting</code> (<code>0x6be3920f45Fe0836A3a29F40d8AA3f324E0610a1</code>) → beneficiary <code>0x88D67A5fEAafd4501B0E3510ebb3533b7d8245f2</code></td>
+</tr>
+</tbody></table>
+<p>Both <code>MuttVesting</code> contracts are deployed on Base mainnet, verified on Sourcify (<code>exact_match</code>), and
+built on OpenZeppelin <code>VestingWallet</code> with ownership transfer and renunciation disabled:</p>
+<ul>
+<li><strong>12-month cliff:</strong> zero tokens release before <strong>25 October 2027 23:11:39 UTC</strong> (<code>1824505899</code>).</li>
+<li><strong>36-month linear vesting:</strong> releases linearly over <code>94,608,000</code> seconds (1,095 days), completing
+on <strong>24 October 2030 23:11:39 UTC</strong>.</li>
+<li><strong>Permissionless release:</strong> anyone can call <code>release(token)</code>, which always transfers vested tokens
+to the fixed beneficiary address. Source: [R15].</li>
+</ul>
+<h2 id="16-measurement-and-economic-model">16. Measurement and economic model</h2>
+<p>The project tracks and evaluates the following metrics for the MRWD liquidity program:</p>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Definition</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Depth at 1% and 2%</td>
+<td>USD trade size that moves the canonical MRWD/WETH pool&#39;s price by 1% and 2%</td>
+</tr>
+<tr>
+<td>Reference slippage</td>
+<td>Price impact for benchmark trade sizes</td>
+</tr>
+<tr>
+<td>LP concentration</td>
+<td>Share of active in-range liquidity held by top position owners (launch position reported separately)</td>
+</tr>
+<tr>
+<td>In-range share</td>
+<td>Share of staked liquidity that is currently in range</td>
+</tr>
+<tr>
+<td>Holder concentration</td>
+<td>Top-10 holder share excluding labelled custody contracts (pool, scheduler, staker, vesting, timelock, Pro staking)</td>
+</tr>
+<tr>
+<td>Yield composition</td>
+<td>Trading-fee yield and MRWD incentive yield reported separately</td>
+</tr>
+<tr>
+<td>Finalization delay</td>
+<td>Time between a quarter&#39;s scheduled end and its <code>endIncentive</code> settlement</td>
+</tr>
+</tbody></table>
+<p>In simplified constant-liquidity form, effective rewards claimable by staked positions are:</p>
+<pre><code class="language-text">R_effective ≈ R_emitted × L_staked,in-range / L_total,in-range
+</code></pre>
+<p>Because rewards sold into the pool move the price, the economic model (<code>scripts/mchow-model/</code>) values
+emissions at realizable prices rather than spot valuation. Source: [R16].</p>
+<h2 id="17-launch-verification-and-launchpad-demand-test">17. Launch verification and launchpad demand test</h2>
+<h3 id="17-1-mainnet-deployment-status">17.1 Mainnet deployment status</h3>
+<p>MRWD and its companion contracts are live on Base mainnet (<code>deployments/mrwd-base-mainnet.json</code>):</p>
+<ul>
+<li><strong>Live and verified on-chain:</strong><ul>
+<li>Sourcify <code>exact_match</code> verification of all five MRWD contracts (<code>MuttRewards</code>,
+<code>MuttIncentiveScheduler</code>, treasury <code>MuttVesting</code>, team <code>MuttVesting</code>, and <code>MuttProStaking</code>).</li>
+<li>Canonical 0.30% V3 pool (<code>0xa7D4…bDB5</code>) initialized, Quarter 1 active on <code>UniswapV3Staker</code>
+(55.45B MRWD funded), launch position <code>#6351512</code> locked in <code>V3PositionTimelock</code> until 24 October
+2028, and deployer holding 0 MRWD.</li>
+<li>Uniswap V3 pool pricing active in <code>shaggy-dogg-market-data</code>, daily automated keeper running in
+GitHub Actions, in-app V3 reward claiming and <code>MuttProStaking</code> live on <code>/stake</code> and <code>/protocol</code>,
+and canonical token identity published at <code>https://dex.lumsian.com/mrwd</code>.</li>
+</ul>
+</li>
+<li><strong>Open items:</strong><ul>
+<li>Third-party token-profile submissions (BaseScan, CoinGecko, CoinMarketCap, DexScreener, Birdeye)
+and search-index verification.</li>
+<li>Deeper WETH liquidity in the canonical MRWD/WETH pool (currently priced as <code>indicative</code> below the
+$100 liquidity floor).</li>
+<li>Independent external security review of the ecosystem contracts.</li>
+<li>Completion of the three-month launchpad demand test below before enabling MRWD-quoted token
+launches.</li>
+</ul>
+</li>
+</ul>
+<h3 id="17-2-launchpad-demand-test">17.2 Launchpad demand test</h3>
+<p>Before relying on launchpad activity as a primary source of MRWD demand (§11.1), the project
+measures real launchpad usage on WETH-paired launches against fixed thresholds:</p>
+<ul>
+<li><strong>Window:</strong> Three consecutive full calendar months (UTC) with persistent Supabase launch storage
+active, opening <strong>November 2026</strong>.</li>
+<li><strong>Counted launches (<code>/api/launches/stats</code>):</strong> Deployment transaction verified on Base, creation
+bytecode matching an approved <code>FixedSupplyToken</code> build (<code>server/src/launches/verify.ts</code>), and
+<strong>seeded</strong> with at least 0.05 WETH in the token&#39;s Uniswap V3 1.00% WETH pool within 24 hours.</li>
+<li><strong>Trading per launch (<code>npm --prefix server run launches:measure -- --window YYYY-MM</code>):</strong> 30-day
+WETH swap volume in that pool from public Base <code>Swap</code> events, excluding the creator and initial
+supply recipient.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Three-month average</th>
+<th>Seeded launches / month</th>
+<th>Median 30-day trading / launch</th>
+<th>Consequence for MRWD-quoted launches</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Proceed</strong></td>
+<td>15 or more</td>
+<td>$40,000 or more</td>
+<td>Rerun the §16 model with measured inputs and proceed with MRWD pairing</td>
+</tr>
+<tr>
+<td><strong>Re-model</strong></td>
+<td>5 to 14</td>
+<td>$25,000 or more</td>
+<td>Rerun the §16 model; proceed only if the conservative scenario passes every criterion</td>
+</tr>
+<tr>
+<td><strong>Stop</strong></td>
+<td>Fewer than 5</td>
+<td>Below $25,000</td>
+<td>Do not enable MRWD-quoted launches as designed; rely on utility staking or revise the demand model</td>
+</tr>
+</tbody></table>
+<p>Source: [R18].</p>
+<h2 id="18-open-decisions-and-legal-notice">18. Open decisions and legal notice</h2>
+<ol>
+<li><strong>MRWD staking and EQX coexistence:</strong> Equilnyxs Pro access via 1 billion MRWD in <code>MuttProStaking</code>
+is live (§11.1), and <code>EQX</code> (<code>0x1aEB…a56C</code>) is deployed as transfer-restricted Equilnyxs shares
+(§10). How MRWD utility staking and EQX relate in future Equilnyxs tiers will be specified in a
+later edition.</li>
+<li><strong>Browser-wallet gas sponsorship:</strong> <code>SponsoredRewardPaymaster</code> (<code>0x9cD4…7CB4</code>) is live on Base
+EntryPoint v0.7, while browser-wallet submission awaits wallet-native ERC-7677 <code>wallet_sendCalls</code>
+support or an updated account integration (§8.1).</li>
+<li><strong>Second MRWD liquidity venue:</strong> Deferred (<code>docs/MRWD_LIQUIDITY_VENUES_2026-10-30.md</code>) until
+organic trading volume justifies splitting liquidity or funding a separate gauge.</li>
+<li><strong>Legal and regulatory notice:</strong> MRWD rewards and staking utilities are functional protocol
+mechanisms, not investment contracts or promised yields. No APY is promised, and holding or
+staking MRWD does not grant equity, revenue rights, or governance control.</li>
+</ol>
+<h2 id="19-roadmap">19. Roadmap</h2>
 <table>
 <thead>
 <tr>
 <th>Stage</th>
 <th>Deliverable</th>
-<th>Evidence required</th>
+<th>Status</th>
 </tr>
 </thead>
 <tbody><tr>
-<td>Deployment transparency</td>
-<td>Versioned inventory for each supported token and contract</td>
-<td>Chain, address, creation transaction, verified source, compiler settings, and block-pinned roles and parameters</td>
+<td>MRWD mainnet launch &amp; keeper</td>
+<td>Token, 0.30% V3 pool, 24-month timelock, 16-quarter scheduler, vestings, Pro staking, Sourcify verification, daily keeper</td>
+<td><strong>Live on Base mainnet</strong> (<code>deployments/mrwd-base-mainnet.json</code>)</td>
 </tr>
 <tr>
-<td>Execution reliability</td>
-<td>Broader route coverage and clearer cost comparison</td>
-<td>Reproducible quote and execution checks; gas-aware comparison; chain-specific integration tests</td>
+<td>Multi-venue Base routing &amp; launchpad suite hardening</td>
+<td>Eight Base swap venues with 35% outlier filter and user selection; 4 launchpad archetypes, 10 USDC <code>LaunchpadFees</code>, atomic <code>LaunchpadSuiteDeployer</code>, hardened vaults/staking, in-app holder staking</td>
+<td><strong>Live on Base mainnet</strong></td>
 </tr>
 <tr>
-<td>Contract assurance</td>
-<td>Review staking, vaults, timelock, and operator execution contracts</td>
-<td>Independent findings, fixes, retests, and a deployment-specific release decision</td>
+<td>Launchpad demand measurement</td>
+<td>Three full calendar months of verified launches and 30-day trading volume</td>
+<td><strong>In progress</strong> (window opens November 2026; §17.2)</td>
 </tr>
 <tr>
-<td>Further decentralization</td>
-<td>Evaluate multisignature administration and binding governance</td>
-<td>Reviewed governance contracts, migration plan, and explicit authority transfers</td>
+<td>Browser-wallet paymaster sponsorship</td>
+<td>ERC-7677 <code>wallet_sendCalls</code> or compatible smart-account signing in browser wallets</td>
+<td>Open (§8.1)</td>
+</tr>
+<tr>
+<td>Contract assurance &amp; decentralization</td>
+<td>Independent security review of ecosystem contracts; evaluate multisignature administration for admin-governed contracts</td>
+<td>Open (§8.2, §9)</td>
 </tr>
 </tbody></table>
-<p>Features that depend on these stages remain conditional. In particular, a website description or configuration flag cannot add reward claims to a contract that lacks them.</p>
-<h2 id="13-evidence-and-references">13. Evidence and references</h2>
-<p>Repository references [R1]–[R10] are pinned to the implementation baseline, with [R2] also pinned to the routing revision; [R11] code links are pinned to the reward-distribution revision, and its configuration and runbook links to the owner-and-exclusions revision. They document code and recorded configuration; explorer links identify deployments. External protocol documentation explains mechanisms of the underlying protocols and does not endorse this project.</p>
+<h2 id="20-base-contract-inventory">20. Base contract inventory</h2>
+<p>All addresses below are live on <strong>Base mainnet (chain ID 8453)</strong>. Base swap venue routers, factories,
+and quoters are listed in §3.1.</p>
+<table>
+<thead>
+<tr>
+<th>Contract or asset</th>
+<th>Address</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Mutt Rewards (MRWD) token</strong></td>
+<td><a href="https://basescan.org/token/0xC17227AAa33C54634B6cE7AD0bf33A156563c179"><code>0xC17227AAa33C54634B6cE7AD0bf33A156563c179</code></a></td>
+<td>1T fixed supply; Sourcify <code>exact_match</code>; §12</td>
+</tr>
+<tr>
+<td><strong>MRWD/WETH 0.30% Uniswap V3 pool</strong></td>
+<td><a href="https://basescan.org/address/0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5"><code>0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5</code></a></td>
+<td>Canonical MRWD pool; §13.1</td>
+</tr>
+<tr>
+<td><strong>MRWD launch position NFT</strong></td>
+<td><code>#6351512</code> in <code>V3PositionTimelock</code></td>
+<td>Locked until 24 October 2028; §13.2</td>
+</tr>
+<tr>
+<td><strong>MuttIncentiveScheduler</strong></td>
+<td><a href="https://basescan.org/address/0xCAbf284806b800d9A771B55857B9fCF735ea7109"><code>0xCAbf284806b800d9A771B55857B9fCF735ea7109</code></a></td>
+<td>600B MRWD reserve across 16 quarters; ownerless; Sourcify <code>exact_match</code>; §14.3</td>
+</tr>
+<tr>
+<td><strong>MuttVesting (Treasury / Team)</strong></td>
+<td><a href="https://basescan.org/address/0x7bC37041E1205841a83413625650EC12DA119697"><code>0x7bC37041E1205841a83413625650EC12DA119697</code></a> / <a href="https://basescan.org/address/0x6be3920f45Fe0836A3a29F40d8AA3f324E0610a1"><code>0x6be3920f45Fe0836A3a29F40d8AA3f324E0610a1</code></a></td>
+<td>150B / 50B MRWD; cliff to 25 Oct 2027, linear to 24 Oct 2030; Sourcify <code>exact_match</code>; §15</td>
+</tr>
+<tr>
+<td><strong>MuttProStaking</strong></td>
+<td><a href="https://basescan.org/address/0x67dBC193bF510225EBf189ab25dC3b34a32c1766"><code>0x67dBC193bF510225EBf189ab25dC3b34a32c1766</code></a></td>
+<td>30-day deposit lock; 1B MRWD for Equilnyxs Pro; ownerless; Sourcify <code>exact_match</code>; §11.1</td>
+</tr>
+<tr>
+<td><strong>SponsoredRewardPaymaster (v0.7)</strong></td>
+<td><a href="https://basescan.org/address/0x9cD40EBa4B0793C43FdF8C5A3272073820f77CB4"><code>0x9cD40EBa4B0793C43FdF8C5A3272073820f77CB4</code></a></td>
+<td>EntryPoint v0.7 (<code>0x0000000071727De22E5E9d8BAf0edAc6f37da032</code>); 100 MRWD reward; §8.1</td>
+</tr>
+<tr>
+<td><strong>LaunchpadFees</strong></td>
+<td><a href="https://basescan.org/address/0x2443C90eB4eA63b74383a5f0dB36c95A1091b68b"><code>0x2443C90eB4eA63b74383a5f0dB36c95A1091b68b</code></a></td>
+<td>On-chain USDC launch fee collector (live <code>feeAmount()</code>: 10 USDC); §6.2</td>
+</tr>
+<tr>
+<td><strong>V3PositionTimelock</strong></td>
+<td><a href="https://basescan.org/address/0xb5c9bedb57f4e348e40a5e6326c90de474072e25"><code>0xb5c9bedb57f4e348e40a5e6326c90de474072e25</code></a></td>
+<td>Sovereign V3 NFT locker; §6.1</td>
+</tr>
+<tr>
+<td><strong>AtomicFlashArbitrageRouter</strong></td>
+<td><a href="https://basescan.org/address/0xdF77eBFB6e0468aE4e94b13Fc9881427B82178Fd"><code>0xdF77eBFB6e0468aE4e94b13Fc9881427B82178Fd</code></a></td>
+<td>Pinned Aave V3 flash-loan arbitrage router; §5</td>
+</tr>
+<tr>
+<td><strong>SD token / SD FeeDiscountStaking</strong></td>
+<td><a href="https://basescan.org/address/0x051c758521971f5c5a84edaf18eea12854375469"><code>0x051c758521971f5c5a84edaf18eea12854375469</code></a> / <a href="https://basescan.org/address/0x8a765d450d38d13f5e2533d29399f743cdf23faa"><code>0x8a765d450d38d13f5e2533d29399f743cdf23faa</code></a></td>
+<td>Active SD token and fee-discount staking contract; §7.1, §10</td>
+</tr>
+<tr>
+<td><strong>YieldStakingVault (Aave v3 USDC)</strong></td>
+<td><a href="https://basescan.org/address/0x5c98f6bc9d17ba0eb02e1336bdf035938f5859e5"><code>0x5c98f6bc9d17ba0eb02e1336bdf035938f5859e5</code></a></td>
+<td>10,000 bps discount denominator and virtual-share protection; §7.2</td>
+</tr>
+<tr>
+<td><strong>FBA token / EQX token</strong></td>
+<td><a href="https://basescan.org/address/0xb8f3d5143ffddb99688bb31e7c2c3894a1e17263"><code>0xb8f3d5143ffddb99688bb31e7c2c3894a1e17263</code></a> / <a href="https://basescan.org/address/0x1aEB45Fd7B6C59B52da3e41558410F306CBaa56C"><code>0x1aEB45Fd7B6C59B52da3e41558410F306CBaa56C</code></a></td>
+<td>Base registry tokens (EQX transfer-restricted); §10</td>
+</tr>
+<tr>
+<td><strong>UniswapV3Staker (external)</strong></td>
+<td><a href="https://basescan.org/address/0x42bE4D6527829FeFA1493e1fb9F3676d2425C3C1"><code>0x42bE4D6527829FeFA1493e1fb9F3676d2425C3C1</code></a></td>
+<td>Official Uniswap V3 Staker on Base; §14.1</td>
+</tr>
+<tr>
+<td><strong>Owner / administrator / keeper</strong></td>
+<td><a href="https://basescan.org/address/0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98"><code>0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98</code></a> / <a href="https://basescan.org/address/0x5Fb98222c6010D6A3fCD3119372e82777282796f"><code>0x5Fb98222c6010D6A3fCD3119372e82777282796f</code></a></td>
+<td>Project admin EOA / gas-only MRWD scheduler keeper EOA</td>
+</tr>
+</tbody></table>
+<h2 id="21-evidence-and-references">21. Evidence and references</h2>
+<p>Repository references are pinned to the current implementation baseline (<code>4e47b5b</code> in
+<code>shaggy-dogg-dex</code> and <code>48c1b54</code> in <code>shaggy-dogg-market-data</code>).</p>
 <ul>
-<li><strong>[R1] Network and venue configuration:</strong> <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/src/config/contracts.ts">contracts.ts</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/src/config/chains/config.ts">chain configuration</a>.</li>
-<li><strong>[R2] Routing and transaction workflow:</strong> <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/src/lib/amm/smart-routing.ts">smart-routing.ts</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/src/hooks/useSwap.tsx">useSwap.tsx</a>; two-hop V3 routing and the open launchpad: <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/cfe2bb0/src/lib/amm/smart-routing.ts">smart-routing.ts</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/cfe2bb0/src/lib/launchpad/deployEngine.ts">deployEngine.ts</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/cfe2bb0/contracts/src/FixedSupplyToken.sol">FixedSupplyToken.sol</a>.</li>
-<li><strong>[R3] Liquidity integration evidence:</strong> <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/audit/UNISWAP-V3-COMPATIBILITY.md">Uniswap V3 compatibility review</a>.</li>
-<li><strong>[R4] Liquidity locking:</strong> <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/contracts/src/V3PositionTimelock.sol">V3PositionTimelock.sol</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/src/config/dex/timelock-deployment.json">deployment record</a>.</li>
-<li><strong>[R5] AMUTT token and supply:</strong> <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/contracts/src/GovernanceToken.sol">GovernanceToken.sol</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/public/amutt.html">AMUTT metadata</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/docs/AMUTT_LAUNCH/AMUTT_CONTRACT_ADDRESS.txt">AMUTT deployment record</a>.</li>
-<li><strong>[R6] Other ecosystem assets:</strong> <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/src/config/tokens.ts">token registry</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/docs/current-session-2026-09-30-base-mainnet-live.md">historical Base mainnet report</a>.</li>
-<li><strong>[R7] Staking implementation and selected deployment:</strong> <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/contracts/src/FeeDiscountStaking.sol">FeeDiscountStaking.sol</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/src/lib/staking.ts">staking configuration</a>.</li>
-<li><strong>[R8] Vault accounting:</strong> <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/contracts/src/YieldStakingVault.sol">YieldStakingVault.sol</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/contracts/src/CompoundYieldVault.sol">CompoundYieldVault.sol</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/contracts/src/FeeDiscountMath.sol">FeeDiscountMath.sol</a>.</li>
-<li><strong>[R9] Flash-loan implementations:</strong> <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/contracts/src/AaveFlashBorrower.sol">AaveFlashBorrower.sol</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/contracts/src/AtomicFlashArbitrageRouter.sol">AtomicFlashArbitrageRouter.sol</a>.</li>
-<li><strong>[R10] Cancelled economics policy (historical):</strong> <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/config/protocol-economics.json">policy JSON</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/docs/protocol-economics-decision.md">decision record</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/scripts/calculate-epoch-rewards.ts">epoch calculation script</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/b8e65aba3dcd705b0fb96d8bbe7fc84e525c7899/scripts/lib/epoch-rewards.ts">allocation library</a>.</li>
-<li><strong>[R11] Cancelled reward distributor (historical, never deployed):</strong> <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/56732cfce5dbd24bfbdf0e1fde5ca1eff89997e3/contracts/src/WeeklyUsdcDistributor.sol">WeeklyUsdcDistributor.sol</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/56732cfce5dbd24bfbdf0e1fde5ca1eff89997e3/contracts/test/WeeklyUsdcDistributor.t.sol">distributor tests</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/56732cfce5dbd24bfbdf0e1fde5ca1eff89997e3/scripts/lib/epoch-rewards.ts">accounting</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/56732cfce5dbd24bfbdf0e1fde5ca1eff89997e3/scripts/lib/staking-history.ts">staking history</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/56732cfce5dbd24bfbdf0e1fde5ca1eff89997e3/scripts/lib/reward-merkle.ts">claim tree</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/fd24c15a9fa487852fb14a8fb16189807a5dc7e5/config/reward-deployment.json">deployment and exclusion configuration</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/fd24c15a9fa487852fb14a8fb16189807a5dc7e5/docs/reward-distribution-runbook.md">operator runbook</a>.</li>
+<li><strong>[R1] Network and venue configuration:</strong> <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/src/config/contracts.ts">contracts.ts</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/src/config/dex-venues.ts">dex-venues.ts</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/src/config/chains/config.ts">chain configuration</a>.</li>
+<li><strong>[R2] Routing, outlier filtering, approvals, and swap workflow:</strong> <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/src/lib/amm/smart-routing.ts">smart-routing.ts</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/src/hooks/useSwap.tsx">useSwap.tsx</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/src/lib/approvals.ts">approvals.ts</a>.</li>
+<li><strong>[R3] Liquidity integration and DEX explorer:</strong> <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/audit/UNISWAP-V3-COMPATIBILITY.md">Uniswap V3 compatibility review</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/src/pages/Liquidity.tsx">Liquidity.tsx</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/src/pages/DexStaking.tsx">DexStaking.tsx</a>.</li>
+<li><strong>[R4] Liquidity locking:</strong> <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/contracts/src/V3PositionTimelock.sol">V3PositionTimelock.sol</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/src/config/dex/timelock-deployment.json">timelock-deployment.json</a>.</li>
+<li><strong>[R5] Ecosystem token registry:</strong> <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/src/config/tokens.ts">tokens.ts</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/deployments/base-mainnet.json">base-mainnet.json</a>.</li>
+<li><strong>[R6] Fee-discount staking:</strong> <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/contracts/src/FeeDiscountStaking.sol">FeeDiscountStaking.sol</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/src/components/launchpad/LaunchStakingPanel.tsx">LaunchStakingPanel.tsx</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/deployments/base-mainnet-staking-migration.json">base-mainnet-staking-migration.json</a>.</li>
+<li><strong>[R7] Vault accounting and Base fork tests:</strong> <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/contracts/src/YieldStakingVault.sol">YieldStakingVault.sol</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/contracts/src/CompoundYieldVault.sol">CompoundYieldVault.sol</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/contracts/src/FeeDiscountMath.sol">FeeDiscountMath.sol</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/contracts/test/LaunchVaultForkTests.sol">LaunchVaultForkTests.sol</a>.</li>
+<li><strong>[R8] Flash-loan implementations and review:</strong> <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/contracts/src/AtomicFlashArbitrageRouter.sol">AtomicFlashArbitrageRouter.sol</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/audit/ROUTER-REVIEW.md">ROUTER-REVIEW.md</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/audit/KNOWN-ISSUES.md">KNOWN-ISSUES.md</a>.</li>
+<li><strong>[R9] Arbitrage snapshot, Auto-Pilot, and CeFi Matrix feeds:</strong> <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/src/pages/Arbitrage.tsx">Arbitrage.tsx</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/src/lib/amm/bot-market-snapshot.ts">bot-market-snapshot.ts</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/src/lib/amm/flash-routes.ts">flash-routes.ts</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/src/lib/amm/gas-cost.ts">gas-cost.ts</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/src/hooks/useCeFiMatrixFeeds.ts">useCeFiMatrixFeeds.ts</a>.</li>
+<li><strong>[R10] Price API and thin-pool handling:</strong> <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/server/src/routes/prices.ts">prices.ts</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/server/src/utils/marketData.ts">marketData.ts</a>.</li>
+<li><strong>[R11] Market-data service:</strong> <a href="https://github.com/rickrichi/shaggy-dogg-market-data/blob/48c1b54/app/market_data.py">market_data.py</a>, <a href="https://github.com/rickrichi/shaggy-dogg-market-data/blob/48c1b54/app/main.py">main.py</a>.</li>
+<li><strong>[R12] Aggregator routing audit:</strong> <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/src/components/mrwd/MrwdAggregatorAuditCard.tsx">MrwdAggregatorAuditCard.tsx</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/public/mrwd-56-aggregators/report.json">report.json</a>.</li>
+<li><strong>[R13] Launchpad suite deployment and contract loader:</strong> <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/contracts/src/FixedSupplyToken.sol">FixedSupplyToken.sol</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/contracts/src/LaunchpadSuiteDeployer.sol">LaunchpadSuiteDeployer.sol</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/src/lib/launchpad/deployEngine.ts">deployEngine.ts</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/src/lib/launchpad/settings.ts">settings.ts</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/src/lib/launchpad/contract-versions.json">contract-versions.json</a>.</li>
+<li><strong>[R14] Sponsored Reward Paymaster:</strong> <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/contracts/src/SponsoredRewardPaymaster.sol">SponsoredRewardPaymaster.sol</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/contracts/test/SponsoredRewardPaymaster.t.sol">SponsoredRewardPaymaster.t.sol</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/docs/PAYMASTER.md">PAYMASTER.md</a>.</li>
+<li><strong>[R15] Mutt Rewards ($MRWD) contracts and deployment record:</strong> <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/contracts/src/MuttRewards.sol">MuttRewards.sol</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/contracts/src/MuttIncentiveScheduler.sol">MuttIncentiveScheduler.sol</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/contracts/src/MuttEmissionSchedule.sol">MuttEmissionSchedule.sol</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/contracts/src/MuttVesting.sol">MuttVesting.sol</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/contracts/src/MuttProStaking.sol">MuttProStaking.sol</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/deployments/mrwd-base-mainnet.json">mrwd-base-mainnet.json</a>.</li>
+<li><strong>[R16] Economic model:</strong> <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/docs/MCHOW-ECONOMIC-MODEL-v0.4.md">MCHOW-ECONOMIC-MODEL-v0.4.md</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/scripts/mchow-model/model-v0.4.ts">model-v0.4.ts</a>.</li>
+<li><strong>[R17] Automated MRWD scheduler keeper:</strong> <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/server/src/mrwd/keeper.ts">keeper.ts</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/server/src/mrwd/run-keeper.ts">run-keeper.ts</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/.github/workflows/mrwd-keeper.yml">mrwd-keeper.yml</a>.</li>
+<li><strong>[R18] Launchpad verification and trading measurement:</strong> <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/server/src/launches/verify.ts">verify.ts</a>, <a href="https://github.com/rickrichi/shaggy-dogg-dex/blob/4e47b5b/server/src/launches/trading.ts">trading.ts</a>.</li>
 </ul>
-<h3 id="publication-record">Publication record</h3>
-<p>Version 1.0 establishes the technical scope, recorded Base inventory, token mechanics, approved but inactive economics, and administrative boundaries.</p>
-<p>Version 1.1 (21 October 2026) describes the implemented but undeployed USDC distributor, its staking-history accounting and trust boundary, and the exclusion of the AMUTT project wallet from staker allocations. The 10% staker and 90% treasury split is unchanged.</p>
-<p>Version 1.2 (21 October 2026) names the intended distributor owner, a single-key wallet rather than the multisignature stated in 1.1, and excludes that owner and administrator wallet from staker allocations. At publication it was the only staker.</p>
-<p>Version 1.3 (21 October 2026) states the planned first reward week, which remains conditional on review and rehearsal, notes that the source repository is public, and adds the private vulnerability-reporting channel. Reward terms, addresses, and permissions are unchanged.</p>
-<p>Version 1.4 (24 October 2026) discontinues AMUTT, cancels the AMUTT USDC staker-reward policy and its undeployed distributor, and cancels the advisory AMUTT governance terms; nothing was ever distributed under them. It also records two-hop Uniswap V3 routing and the open launchpad with its fixed-supply token template. Future editions should identify their source revision and explain material changes to addresses, permissions, fees, and activation status. This document describes the project; it does not offer a guaranteed return or certify the safety of any asset or contract.</p>
+<hr>
+<h3 id="appendix-a-how-each-mrwd-launch-risk-is-handled">Appendix A — How each MRWD launch risk is handled</h3>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Enforced by contract</th>
+<th>Incentivized by design</th>
+<th>Depends on the market</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Mintable supply</td>
+<td><strong>Yes:</strong> 1T supply minted once in constructor; no callable mint path, no owner, no proxy</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Thin launch liquidity</td>
+<td>Pool price below $100 floor is flagged <code>indicative</code> and excluded from portfolio totals (§4)</td>
+<td>16-quarter V3 Staker rewards attract LP deposits</td>
+<td>Depth depends on independent LPs and trading volume</td>
+</tr>
+<tr>
+<td>Unlocked launch liquidity</td>
+<td><strong>Yes, for position <code>#6351512</code>:</strong> locked in <code>V3PositionTimelock</code> until 24 October 2028</td>
+<td>—</td>
+<td>Community V3 positions are unlocked by design</td>
+</tr>
+<tr>
+<td>Reserve redirection</td>
+<td><strong>Yes:</strong> <code>MuttIncentiveScheduler</code> has no owner or withdrawal path; unused/missed rewards go to <code>0x…dEaD</code></td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Team / treasury dump at launch</td>
+<td><strong>Yes:</strong> 150B treasury and 50B team MRWD sit in <code>MuttVesting</code> with a 12-month cliff to 25 Oct 2027 and 36-month linear release</td>
+<td>—</td>
+<td>Beneficiaries decide what to do with tokens after they vest</td>
+</tr>
+<tr>
+<td>Holder concentration</td>
+<td>Vesting for team and treasury; immutable scheduler custody for rewards</td>
+<td>LP emissions and utility staking distribute tokens over time</td>
+<td>Unemitted reserve remains concentrated in the scheduler until paid out</td>
+</tr>
+<tr>
+<td>Durable demand after emissions</td>
+<td><code>MuttProStaking</code> enforces a 30-day lock per deposit with no admin override</td>
+<td>Equilnyxs Pro access, LP rewards, and planned launchpad pairing</td>
+<td>Whether users value Pro access and launched tokens</td>
+</tr>
+</tbody></table>
 </main>
   </div>
-  <footer>Version 1.4 · 24 October 2026 · Use your browser's Print command for a print-formatted copy.</footer>
+  <footer>Version 2.0 · 3 November 2026 · Use your browser's Print command for a print-formatted copy.</footer>
 </body>
 </html>
