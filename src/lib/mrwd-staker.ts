@@ -26,7 +26,11 @@ const unstake = (key: StakerIncentiveKey, tokenId: bigint) =>
 
 // An amount of 0 tells the staker to pay the owner's whole balance.
 const claimAll = (owner: Address) =>
-  encodeFunctionData({ abi: stakerActionsAbi, functionName: "claimReward", args: [MRWD, owner, 0n] });
+  encodeFunctionData({
+    abi: stakerActionsAbi,
+    functionName: "claimReward",
+    args: [MRWD, owner, 0n],
+  });
 
 /** Pays out rewards already credited to the owner, such as from an unstake made elsewhere. */
 export function claimBankedCalls(owner: Address): Hex[] {
@@ -71,4 +75,52 @@ export function unstakeCalls(
     args: [tokenId, owner, "0x"],
   });
   return isStaked ? [unstake(key, tokenId), claimAll(owner), withdraw] : [withdraw];
+}
+
+/** One MuttIncentiveScheduler period as read from `period(i)`. Status 1 is Created. */
+export interface SchedulerPeriod {
+  index: number;
+  startTime: bigint;
+  endTime: bigint;
+  status: number;
+}
+
+const CREATED = 1;
+
+/**
+ * Which quarters the staking panel works with at `now`:
+ * - `current`: a created period that has started and not ended — the only one the staker accepts
+ *   new stakes into.
+ * - `previous`: the latest created period that has ended, where positions stay parked (earning
+ *   nothing) until they are moved.
+ * - `upcoming`: the first period that has not started yet, created or not.
+ */
+export function selectPeriods(periods: SchedulerPeriod[], now: bigint) {
+  const created = periods.filter((p) => p.status === CREATED);
+  const current = created.find((p) => p.startTime <= now && now < p.endTime);
+  const previous = created.filter((p) => p.endTime <= now).at(-1);
+  const upcoming = periods.find((p) => p.startTime > now);
+  return { current, previous, upcoming };
+}
+
+/**
+ * Moves positions into `to` in one transaction: each one is unstaked from the ended incentive it
+ * sits in (`from`; null when it is already unstaked), staked into `to`, and finally every credited
+ * reward is paid to the owner. The staker accepts the stakes only while `to` is running and only
+ * from the deposit's owner.
+ */
+export function moveCalls(
+  moves: Array<{ tokenId: bigint; from: StakerIncentiveKey | null }>,
+  to: StakerIncentiveKey,
+  owner: Address
+): Hex[] {
+  const calls: Hex[] = [];
+  for (const { tokenId, from } of moves) {
+    if (from) calls.push(unstake(from, tokenId));
+    calls.push(
+      encodeFunctionData({ abi: stakerActionsAbi, functionName: "stakeToken", args: [to, tokenId] })
+    );
+  }
+  calls.push(claimAll(owner));
+  return calls;
 }

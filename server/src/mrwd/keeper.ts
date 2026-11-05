@@ -50,6 +50,7 @@ export function planKeeper(periods: PeriodState[], now: number, lead: number): K
       } else {
         notes.push(
           `Period ${p.index} ended ${iso(p.endTime)} with ${p.incentive.stakes} position(s) still staked; ` +
+            'they earn nothing until their owners move them (staking page: "Move all to Quarter N"); ' +
             'finalize(index, tokenIds) needs their token ids, so it is left for a manual call.',
         )
       }

@@ -3,7 +3,14 @@ import { describe, expect, it } from "vitest";
 
 import { MRWD } from "@/lib/mrwd-pro";
 
-import { claimBankedCalls, claimCalls, stakerActionsAbi, unstakeCalls } from "./mrwd-staker";
+import {
+  claimBankedCalls,
+  claimCalls,
+  moveCalls,
+  selectPeriods,
+  stakerActionsAbi,
+  unstakeCalls,
+} from "./mrwd-staker";
 
 const owner = "0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98";
 const zero = "0x0000000000000000000000000000000000000000";
@@ -41,5 +48,49 @@ describe("MRWD staker calls", () => {
 
   it("only withdraws a position that is no longer staked", () => {
     expect(names(unstakeCalls(key, 7n, owner, false))).toEqual(["withdrawToken"]);
+  });
+});
+
+describe("MRWD quarter rollover", () => {
+  const q = (index: number, startTime: bigint, endTime: bigint, status: number) => ({
+    index,
+    startTime,
+    endTime,
+    status,
+  });
+  const schedule = [q(0, 100n, 200n, 1), q(1, 200n, 300n, 1), q(2, 300n, 400n, 0)];
+
+  it("picks the running quarter and the one that just ended", () => {
+    const s = selectPeriods(schedule, 250n);
+    expect(s.current?.index).toBe(1);
+    expect(s.previous?.index).toBe(0);
+    expect(s.upcoming?.index).toBe(2);
+  });
+
+  it("treats the end second as the start of the next quarter", () => {
+    const s = selectPeriods(schedule, 200n);
+    expect(s.current?.index).toBe(1);
+    expect(s.previous?.index).toBe(0);
+  });
+
+  it("has no current quarter when the next one was never created", () => {
+    const s = selectPeriods(schedule, 350n);
+    expect(s.current).toBeUndefined();
+    expect(s.previous?.index).toBe(1);
+  });
+
+  it("moves several positions and claims once", () => {
+    const next = { ...key, startTime: 1_000n, endTime: 2_000n };
+    const calls = moveCalls(
+      [
+        { tokenId: 7n, from: key },
+        { tokenId: 8n, from: null },
+      ],
+      next,
+      owner
+    );
+    expect(names(calls)).toEqual(["unstakeToken", "stakeToken", "stakeToken", "claimReward"]);
+    expect(decodeFunctionData({ abi: stakerActionsAbi, data: calls[0]! }).args).toEqual([key, 7n]);
+    expect(decodeFunctionData({ abi: stakerActionsAbi, data: calls[2]! }).args).toEqual([next, 8n]);
   });
 });
