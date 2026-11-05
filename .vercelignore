@@ -45,3 +45,8 @@ node_modules.corrupt-*/
 *.log
 *.tsbuildinfo
 .env.example.orig
+
+# Local browser-automation profiles and QA output (untracked; cookies, screenshots)
+.browser-profile/
+dogfood-output/
+test-results/
