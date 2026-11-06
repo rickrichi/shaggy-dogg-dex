@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { type Address, formatUnits, type Hex, parseAbi } from "viem";
 import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 
+import { MrwdAddLiquidity } from "@/components/MrwdAddLiquidity";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -689,6 +690,16 @@ export function MrwdLpStakerPanel() {
                   </tfoot>
                 </table>
               </div>
+            )}
+
+            {address && stakerQuery.data.canStake && (
+              <MrwdAddLiquidity
+                incentiveKey={stakerQuery.data.incentiveKey}
+                onDone={() => {
+                  void portfolio.refetch?.();
+                  void stakerQuery.refetch();
+                }}
+              />
             )}
 
             {/* Inspect Additional Position ID */}
