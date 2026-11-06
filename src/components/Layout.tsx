@@ -4,6 +4,7 @@ import { Link, useLocation } from "react-router-dom";
 import {
   Activity,
   ArrowLeftRight,
+  Bot,
   CandlestickChart,
   ChevronDown,
   Droplets,
@@ -62,6 +63,7 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
       { name: "Market Data", href: "/market-data", icon: LineChart },
       { name: "Arbitrage", href: "/arbitrage/matrix", icon: Zap },
       { name: "Live Desk", href: "/arbitrage/live-desk", icon: Radio },
+      { name: "Liquidation Bot", href: "/mev", icon: Bot },
     ],
   },
   {

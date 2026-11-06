@@ -234,6 +234,11 @@ export default defineConfig(({ mode }) => {
           ws: true,
           rewrite: (path) => path.replace(/^\/cryptostream/, ''),
         },
+        // Liquidation-bot summary (read-only) on the market-data VM
+        '/api/mev': {
+          target: 'https://34-9-52-175.sslip.io',
+          changeOrigin: true,
+        },
         // Main API → Hono backend on port 8788 (8787 is reserved locally)
         '/api': {
           target: 'http://localhost:8788',

@@ -23,6 +23,7 @@ const pageNames: Record<string, string> = {
   "/launchpad/paymaster": "ERC-4337 Gas Paymaster",
   "/markets": "Markets",
   "/market-data": "Market Data",
+  "/mev": "Aave Liquidation Bot",
   "/portfolio": "Portfolio",
   "/activity": "Activity",
   "/admin": "Admin",
