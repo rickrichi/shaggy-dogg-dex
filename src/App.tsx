@@ -21,6 +21,7 @@ import type { JSX, ReactNode } from "react";
 const Home = lazy(() => import("./pages/Home"));
 const Swap = lazy(() => import("./pages/Swap"));
 const Liquidity = lazy(() => import("./pages/Liquidity"));
+const UniswapV4 = lazy(() => import("./pages/UniswapV4"));
 const BaseDex = lazy(() => import("./pages/BaseDex"));
 const DexSetup = lazy(() => import("./pages/DexSetup"));
 const Portfolio = lazy(() => import("./pages/Portfolio"));
@@ -221,6 +222,7 @@ export const AppRoutes = (): JSX.Element => (
         <Route path="/swap/compare" element={<Swap />} />
         <Route path="/swap" element={<Swap />} />
         <Route path="/liquidity" element={<Liquidity />} />
+        <Route path="/v4" element={<UniswapV4 />} />
         <Route path="/dex/setup" element={<DexSetup />} />
         <Route path="/legacy/liquidity" element={<Liquidity />} />
         <Route path="/own-dex" element={<BaseDex key="swap" />} />

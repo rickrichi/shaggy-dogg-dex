@@ -8,6 +8,7 @@ import {
   ChevronDown,
   Droplets,
   Fuel,
+  Layers,
   LineChart,
   Menu,
   PieChart,
@@ -49,6 +50,7 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
     items: [
       { name: "Swap", href: "/swap", icon: ArrowLeftRight },
       { name: "Liquidity", href: "/liquidity", icon: Droplets },
+      { name: "Uniswap v4", href: "/v4", icon: Layers },
       { name: "Stake", href: "/stake", icon: ShieldCheck },
     ],
   },
