@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
+import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
   AlertTriangle,
@@ -83,6 +84,7 @@ import {
   rankMidAssetCandidates,
   v3TriangularSwapCall,
 } from "@/lib/amm/bot-market-snapshot";
+import { liveFlashPreview, routeLabel } from "@/lib/amm/flash-preview";
 import {
   atomicSpreadSteps,
   bestV3Cycle,
@@ -1024,25 +1026,30 @@ export default function Arbitrage() {
     );
   }, [customBorrowerAddress]);
 
-  const flashArbResult = useMemo(() => {
-    try {
-      return ShaggyDoggQuantAiEngine.calculateAaveFlashArbitrage({
-        borrowAsset: flashBorrowAsset,
-        borrowAmount: flashBorrowAmount,
-        flashPremiumBps: 5,
-        sdStakedTier: flashVipTier,
-        triangularRoute: {
-          wethUsdcPrice: 3450.0,
-          usdcMidRate: 1.0025,
-          midWethRate: 1 / 3442.0,
-          basePoolFeeBps: 30,
-        },
-        gasCostUsd: 0.15,
-      });
-    } catch {
-      return null;
-    }
-  }, [flashBorrowAsset, flashBorrowAmount, flashVipTier]);
+  // Live economics: the same route and Aave premium "Dispatch Live Aave Flash Loan" would use.
+  const flashPreview = useQuery({
+    queryKey: ["flash-preview", flashBorrowAsset, flashBorrowAmount],
+    refetchInterval: 20_000,
+    queryFn: async () => {
+      const assetConfig = BASE_ASSETS[flashBorrowAsset as keyof typeof BASE_ASSETS];
+      if (!assetConfig) {
+        return { kind: "held", reason: "Flash routes borrow USDC or WETH only." } as const;
+      }
+      const principal =
+        flashBorrowAmount > 0 ? parseUnits(flashBorrowAmount.toString(), assetConfig.decimals) : 0n;
+      const [preview, block] = await Promise.all([
+        liveFlashPreview(
+          BASE_QUOTE_CLIENT,
+          BOT_QUOTE_VENUES,
+          BASE_AAVE_POOL,
+          flashBorrowAsset,
+          principal
+        ),
+        BASE_QUOTE_CLIENT.getBlockNumber(),
+      ]);
+      return { ...preview, decimals: assetConfig.decimals, block };
+    },
+  });
 
   const handleDeployAtomicRouter = useCallback(async () => {
     if (!walletClient || !address) {
@@ -1397,7 +1404,6 @@ export default function Arbitrage() {
     flashBorrowAmount,
     flashBorrowAsset,
     isAtomicRouter,
-    flashArbResult,
     writeContractAsync,
     publicClient,
     addTerminalLog,
@@ -3273,41 +3279,17 @@ export default function Arbitrage() {
               <Card className="flex h-full flex-col justify-between border-amber-100 bg-gradient-to-br from-white to-amber-50/30 shadow-sm">
                 <CardHeader>
                   <CardTitle className="text-lg text-gray-900">Flash Loan Economics</CardTitle>
-                  <CardDescription>Capital required: $0 upfront collateral</CardDescription>
+                  <CardDescription>
+                    Live Uniswap V3 quotes on Base for the route Dispatch would take. Capital
+                    required: $0 upfront collateral.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {flashArbResult && (
-                    <div className="space-y-2 rounded-xl border border-amber-100 bg-white p-4 text-xs">
-                      <div className="flex justify-between text-gray-500">
-                        <span>Principal Borrowed:</span>
-                        <span className="font-mono font-bold text-gray-900">
-                          {flashArbResult.borrowAmount.toLocaleString()} {flashBorrowAsset}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-gray-500">
-                        <span>Aave Flash Fee (0.05%):</span>
-                        <span className="font-mono text-amber-700">
-                          ${flashArbResult.flashLoanPremium.toFixed(2)} USD
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-gray-500">
-                        <span>Effective Pool Fee:</span>
-                        <span className="font-mono text-slate-700">
-                          {(flashArbResult.effectivePoolFeeBps / 100).toFixed(2)}% (VIP Discounted)
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between border-t pt-2 text-sm">
-                        <span className="font-bold text-gray-900">Net Arbitrage Yield:</span>
-                        <span
-                          className={`font-mono text-lg font-black ${
-                            flashArbResult.isProfitable ? "text-emerald-600" : "text-rose-600"
-                          }`}
-                        >
-                          +${flashArbResult.netProfitUsd.toFixed(2)} USD
-                        </span>
-                      </div>
-                    </div>
-                  )}
+                  <FlashPreviewBox
+                    query={flashPreview}
+                    asset={flashBorrowAsset}
+                    venues={BOT_QUOTE_VENUES}
+                  />
 
                   <div className="space-y-2 pt-2">
                     <Button
@@ -3421,6 +3403,99 @@ export default function Arbitrage() {
           </Card>
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+type FlashPreviewData =
+  | (Awaited<ReturnType<typeof liveFlashPreview>> & { decimals: number; block: bigint })
+  | { kind: "held"; reason: string };
+
+/** The live "Flash Loan Economics" box: principal, Aave's fee, the route and its result before gas. */
+function FlashPreviewBox({
+  query,
+  asset,
+  venues,
+}: {
+  query: { data?: FlashPreviewData | undefined; isPending: boolean; isError: boolean; isFetching: boolean };
+  asset: string;
+  venues: BotQuoteVenues;
+}) {
+  if (query.isPending) {
+    return (
+      <p className="rounded-xl border border-amber-100 bg-white p-4 text-xs text-gray-500">
+        Quoting the live route on Base…
+      </p>
+    );
+  }
+  if (query.isError || !query.data) {
+    return (
+      <p role="alert" className="rounded-xl border border-rose-100 bg-white p-4 text-xs text-rose-600">
+        Could not read live quotes. Dispatch re-checks before sending anything.
+      </p>
+    );
+  }
+  const d = query.data;
+  if (d.kind === "held") {
+    return (
+      <p role="status" className="rounded-xl border border-amber-100 bg-white p-4 text-xs text-gray-600">
+        {d.reason} Dispatch would send nothing.
+      </p>
+    );
+  }
+  const fmt = (v: bigint) => {
+    const n = Number(formatUnits(v < 0n ? -v : v, "decimals" in d ? d.decimals : 18));
+    return `${v < 0n ? "-" : ""}${n.toLocaleString("en-US", { maximumFractionDigits: asset === "WETH" ? 8 : 4 })}`;
+  };
+  const profitable = d.edge > 0n;
+  const pct = Number((d.edge * 1_000_000n) / d.principal) / 10_000;
+  return (
+    <div className="space-y-2 rounded-xl border border-amber-100 bg-white p-4 text-xs">
+      <div className="flex justify-between text-gray-500">
+        <span>Principal Borrowed:</span>
+        <span className="font-mono font-bold text-gray-900">
+          {fmt(d.principal)} {asset}
+        </span>
+      </div>
+      <div className="flex justify-between text-gray-500">
+        <span>Aave Flash Fee ({(d.premiumBps / 100).toFixed(2)}%, live):</span>
+        <span className="font-mono text-amber-700">
+          {fmt(d.premium)} {asset}
+        </span>
+      </div>
+      <div className="flex justify-between gap-3 text-gray-500">
+        <span>Best Route:</span>
+        <span className="text-right font-mono text-slate-700">
+          {routeLabel(d.cycle.tokens, venues)}
+          <br />
+          fees {d.cycle.fees.map((f) => `${f / 10_000}%`).join(" / ")}
+        </span>
+      </div>
+      <div className="flex justify-between text-gray-500">
+        <span>Route Returns:</span>
+        <span className="font-mono text-slate-700">
+          {fmt(d.cycle.amountOut)} {asset}
+        </span>
+      </div>
+      <div className="flex items-center justify-between border-t pt-2 text-sm">
+        <span className="font-bold text-gray-900">Net Before Gas:</span>
+        <span
+          className={`font-mono text-lg font-black ${profitable ? "text-emerald-600" : "text-rose-600"}`}
+        >
+          {profitable ? "+" : ""}
+          {fmt(d.edge)} {asset} ({pct >= 0 ? "+" : ""}
+          {pct.toFixed(3)}%)
+        </span>
+      </div>
+      <p className={profitable ? "text-emerald-700" : "text-rose-700"}>
+        {profitable
+          ? "Positive before gas. Dispatch still subtracts gas and your minimum-profit target before sending."
+          : "Not profitable: Dispatch would send nothing."}
+      </p>
+      <p className="text-[11px] text-gray-400">
+        Block #{d.block.toString()}
+        {query.isFetching ? " · refreshing…" : " · refreshes every 20 s"}
+      </p>
     </div>
   );
 }
