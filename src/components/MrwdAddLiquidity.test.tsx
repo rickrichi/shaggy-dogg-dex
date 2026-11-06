@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { positionManagerAbi } from "@/lib/mrwd-liquidity";
 
-import { MrwdAddLiquidity } from "./MrwdAddLiquidity";
+import { MrwdAddLiquidity, parseEthAmount } from "./MrwdAddLiquidity";
 
 const OWNER = "0x9dC0a2E92cC1f08050D2c5F560A45229CcF47C98";
 const NPM = "0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1";
@@ -134,5 +134,27 @@ describe("MrwdAddLiquidity", () => {
       expect(mocks.toastError).toHaveBeenCalledWith(expect.stringContaining("still in your wallet"))
     );
     expect(mocks.write).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("parseEthAmount", () => {
+  it("accepts amounts pasted with spaces, a unit, a comma or invisible characters", () => {
+    const want = 4_257_000_000_000_000n;
+    for (const text of [
+      "0.004257",
+      " 0.004257 ",
+      "0.004257 ETH",
+      "0,004257",
+      "​0.004257 ",
+      ".004257",
+    ]) {
+      expect(parseEthAmount(text)).toBe(want);
+    }
+    expect(parseEthAmount("0.004257308522998578123")).toBe(4_257_308_522_998_578n);
+  });
+
+  it("rejects text that is not a number", () => {
+    expect(() => parseEthAmount("")).toThrow(/as a number/);
+    expect(() => parseEthAmount("1.2.3")).toThrow(/as a number/);
   });
 });

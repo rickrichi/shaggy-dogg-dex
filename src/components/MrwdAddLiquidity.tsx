@@ -45,6 +45,22 @@ const slot0Abi = [
 ] as const;
 
 const fmtEth = (wei: bigint) => Number(formatEther(wei)).toFixed(6);
+
+/**
+ * Reads the amount field leniently: text pasted from elsewhere often carries spaces, a unit, a
+ * comma decimal separator or invisible characters, which parseEther rejects outright.
+ */
+export function parseEthAmount(text: string): bigint {
+  const cleaned = text
+    .replace(/eth/gi, "")
+    .replace(/,/g, ".")
+    .replace(/[^0-9.]/g, "");
+  if (!/^\d*\.?\d+$|^\d+\.$/.test(cleaned)) {
+    throw new Error("Enter the ETH amount as a number, for example 0.004.");
+  }
+  const [whole = "0", fraction = ""] = cleaned.split(".");
+  return parseEther(`${whole || "0"}.${fraction.slice(0, 18) || "0"}`);
+}
 const fmtB = (wei: bigint) =>
   `${(Number(formatEther(wei)) / 1e9).toLocaleString("en-US", { maximumFractionDigits: 3 })}B`;
 
@@ -93,7 +109,7 @@ export function MrwdAddLiquidity({
   const preview = async () => {
     setBusy("preview");
     try {
-      const ethIn = parseEther(amount || "0");
+      const ethIn = parseEthAmount(amount);
       const eth = await client.getBalance({ address });
       if (ethIn + GAS_RESERVE > eth) {
         throw new Error(
