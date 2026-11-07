@@ -22,6 +22,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
+/** The user closed the wallet window or declined in the wallet app. */
+export const isUserCancel = (err: unknown) => {
+  const e = err as { name?: string; code?: number; message?: string } | null;
+  return (
+    e?.name === "UserRejectedRequestError" ||
+    e?.code === 4001 ||
+    /user rejected|connection request reset/i.test(e?.message ?? "")
+  );
+};
+
 export const WalletConnect = () => {
   const { address, isConnected, chain, connector: activeConnector } = useAccount();
   const { connect, connectors, error, isPending } = useConnect();
@@ -121,8 +131,11 @@ export const WalletConnect = () => {
     // it's showing anything — it only adds the "open" class when actually visible. Checking for
     // the element's mere presence (rather than .open) would clear this watch immediately and
     // defeat the whole fallback.
+    // "Appeared" also requires the modal's inner components to be registered: a build that
+    // drops them opens an empty blurred overlay that still has the "open" class.
     const modalAppeared = () =>
-      Boolean(document.querySelector("w3m-modal.open, appkit-modal.open"));
+      Boolean(document.querySelector("w3m-modal.open, appkit-modal.open")) &&
+      Boolean(customElements.get("w3m-router"));
 
     if (!modalAppeared()) {
       const observer = new MutationObserver(() => {
@@ -147,6 +160,8 @@ export const WalletConnect = () => {
       {
         onError: (err) => {
           clearWalletConnectWatch();
+          // Closing the WalletConnect window is a cancel, not a failure.
+          if (isUserCancel(err)) return;
           setConnectError(err.message || "Failed to start WalletConnect pairing.");
           setIsOpen(true);
         },

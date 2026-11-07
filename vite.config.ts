@@ -203,7 +203,8 @@ export default defineConfig(({ mode }) => {
           "worker-src 'self' blob:",
           "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
           "img-src 'self' data: https: blob:",
-          "font-src 'self' data: https://fonts.gstatic.com",
+          "font-src 'self' data: https://fonts.gstatic.com https://fonts.reown.com",
+          "frame-src https://verify.walletconnect.org https://verify.walletconnect.com",
           `connect-src ${arbOrigins} ${rpcOrigins} 'self' http://localhost:5173 http://localhost:8788 http://localhost:8000 http://127.0.0.1:8000 http://localhost:8010 ws://localhost:5173 ws://localhost:8000 ws://127.0.0.1:8000 https://ethereum.publicnode.com https://*.alchemy.com https://*.infura.io https://*.walletconnect.com https://*.walletconnect.org https://*.supabase.co https://*.supabase.in wss://*.walletconnect.com wss://*.walletconnect.org wss://*.supabase.co wss://*.supabase.in https://api.exchange.coinbase.com https://api.coinbase.com wss://ws-feed.exchange.coinbase.com https://*.coinbase.com wss://*.coinbase.com https://api.kraken.com wss://ws.kraken.com https://*.kraken.com wss://*.kraken.com wss://data-stream.binance.vision wss://stream.bybit.com wss://ws.okx.com:8443`,
           "object-src 'none'",
           "base-uri 'self'",
@@ -383,7 +384,11 @@ export default defineConfig(({ mode }) => {
 
         // Aggressive tree-shaking
         treeshake: {
-          moduleSideEffects: false,
+          // Reown/WalletConnect register their modal's web components (<wui-flex>,
+          // <w3m-router>, the QR view...) through side-effect-only imports. Dropping those
+          // left the WalletConnect modal as an empty blurred overlay.
+          moduleSideEffects: (id) =>
+            /[\\/]node_modules[\\/](@reown|@walletconnect|lit|@lit|lit-html|lit-element)[\\/]/.test(id),
           propertyReadSideEffects: false,
           tryCatchDeoptimization: false,
           unknownGlobalSideEffects: false,
@@ -406,7 +411,8 @@ export default defineConfig(({ mode }) => {
           "script-src 'self' 'unsafe-eval'",  // Required for Web3 wallet connectors
           "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
           "img-src 'self' data: https: blob:",
-          "font-src 'self' data: https://fonts.gstatic.com",
+          "font-src 'self' data: https://fonts.gstatic.com https://fonts.reown.com",
+          "frame-src https://verify.walletconnect.org https://verify.walletconnect.com",
           `connect-src ${arbOrigins} ${rpcOrigins} 'self' https://*.alchemy.com https://*.infura.io https://*.walletconnect.com https://*.walletconnect.org https://*.supabase.co https://*.supabase.in wss://*.walletconnect.com wss://*.walletconnect.org wss://*.supabase.co wss://*.supabase.in https://api.exchange.coinbase.com https://api.coinbase.com wss://ws-feed.exchange.coinbase.com https://api.kraken.com wss://ws.kraken.com wss://data-stream.binance.vision wss://stream.bybit.com wss://ws.okx.com:8443`,
           "worker-src 'self' blob:",
           "object-src 'none'",

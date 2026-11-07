@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { WalletConnect } from "./WalletConnect";
+import { isUserCancel, WalletConnect } from "./WalletConnect";
 
 const wallet = vi.hoisted(() => ({
   connect: vi.fn(),
@@ -112,5 +112,17 @@ describe("MetaMask extension connection", () => {
 
     expect(await screen.findByText("User rejected the request")).toBeVisible();
     expect(screen.getByRole("dialog")).toBeVisible();
+  });
+});
+
+describe("WalletConnect cancel detection", () => {
+  it("treats a closed WalletConnect window or a declined request as a cancel", () => {
+    expect(isUserCancel({ name: "UserRejectedRequestError", message: "x" })).toBe(true);
+    expect(isUserCancel({ code: 4001 })).toBe(true);
+    expect(
+      isUserCancel(new Error("User rejected the request. Details: Connection request reset."))
+    ).toBe(true);
+    expect(isUserCancel(new Error("Project ID is invalid"))).toBe(false);
+    expect(isUserCancel(null)).toBe(false);
   });
 });

@@ -87,8 +87,8 @@ export const LAUNCHPAD_ARCHETYPES: ArchetypeDefinition[] = [
     description:
       "The complete 5-contract Shaggy Dogg DeFi suite: Token + Staking + Aave Vault + Compound Vault + Aave Flash Loan Arbitrage Router. Staking your token lowers the fee in both vaults. The supply goes to your wallet, minus any share you seed as liquidity.",
     architectureDetails:
-      "Deploys FixedSupplyToken + FeeDiscountStaking + an Aave v3 USDC vault and a Compound v3 USDC vault, both with immutable Base USDC, Aave v3 Pool, aUSDC and USDC Comet addresses and both discounted by the same staking tiers, + AtomicFlashArbitrageRouter. Every admin role goes to your wallet; the deployer keeps none.",
-    protocolsReferenced: ["Aave v3", "Compound v3", "Uniswap V2"],
+      "Deploys FixedSupplyToken + FeeDiscountStaking + an Aave v3 USDC vault and a Compound v3 USDC vault, both with immutable Base USDC, Aave v3 Pool, aUSDC and USDC Comet addresses and both discounted by the same staking tiers, + AtomicFlashArbitrageRouter, which borrows from Aave v3 and trades through Uniswap V2-compatible routers, Aerodrome, or custom swap steps. Every admin role goes to your wallet; the deployer keeps none.",
+    protocolsReferenced: ["Aave v3", "Compound v3", "Uniswap V2", "Aerodrome"],
     contractsDeployed: [
       "FixedSupplyToken.sol",
       "FeeDiscountStaking.sol",
