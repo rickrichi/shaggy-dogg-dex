@@ -63,11 +63,54 @@ export interface ChainSummary {
   }>;
 }
 
+export interface BackrunRow {
+  t: string;
+  block: string;
+  pair: string;
+  swapVenue: string;
+  buy: string;
+  sell: string;
+  edgeBps: number;
+  amountIn: number;
+  quote: string;
+  profitQuote: number;
+  profitEth: number;
+  gasEth: number;
+  bribeEth: number;
+  netEth: number;
+  decision: string;
+}
+
+export interface BackrunSummary {
+  chain: string;
+  mode: "shadow" | "live";
+  connected: boolean;
+  lastEventAt: string | null;
+  totals: {
+    events: number;
+    swapHints: number;
+    withSwapData: number;
+    poolOnly: number;
+    skippedBusy: number;
+    simulated: number;
+    profitableBeforeGas: number;
+    worthSending: number;
+    bundlesSent: number;
+    landed: number;
+    errors: number;
+    rateLimited: number;
+  };
+  best: BackrunRow | null;
+  recent: BackrunRow[];
+  submissions: ChainSummary["submissions"];
+}
+
 export interface ArbSummary {
   version: 1;
   startedAt: string;
   updatedAt: string;
   chains: ChainSummary[];
+  backrun?: BackrunSummary;
 }
 
 const EXPLORER: Record<string, string> = {
@@ -257,6 +300,89 @@ function ChainCard({ c, now }: { c: ChainSummary; now: number }) {
   );
 }
 
+function BackrunCard({ b, now }: { b: BackrunSummary; now: number }) {
+  const live = b.connected && !!b.lastEventAt && now - Date.parse(b.lastEventAt) < STALE_MS;
+  const t = b.totals;
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+          Ethereum backruns (Flashbots MEV-Share)
+          <Badge variant={live ? "default" : "destructive"}>
+            {live ? "Listening" : "Not connected"}
+          </Badge>
+          <Badge variant="outline">
+            {b.mode === "live" ? "LIVE — sends bundles" : "Shadow — simulates, never sends"}
+          </Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4 text-sm">
+        <p className="text-xs text-muted-foreground">
+          Wallets that opt in to MEV-Share announce pending swaps. When one moves a Uniswap pool we
+          watch, the bot prices a trade placed right after it that brings the pool back in line. The
+          user is refunded most of what that trade pays the block builder. It never trades ahead of
+          anyone.
+        </p>
+        <div className="text-xs text-muted-foreground">
+          {t.events.toLocaleString()} hints seen · {t.swapHints.toLocaleString()} swapped on our
+          pools ({t.withSwapData} with the swap result, {t.poolOnly} pool only) · {t.simulated}{" "}
+          simulated · {t.profitableBeforeGas} profitable before gas ·{" "}
+          <strong>{t.worthSending} worth sending</strong>
+          {b.mode === "live" ? ` · ${t.bundlesSent} sent, ${t.landed} landed` : ""}
+        </div>
+        {b.recent.length ? (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="py-1 pr-3">When</th>
+                  <th className="pr-3">Pair</th>
+                  <th className="pr-3">User swapped on</th>
+                  <th className="pr-3">Backrun route</th>
+                  <th className="pr-3">Gap</th>
+                  <th className="pr-3">Profit</th>
+                  <th className="pr-3">Net after gas</th>
+                  <th>Verdict</th>
+                </tr>
+              </thead>
+              <tbody>
+                {b.recent.slice(0, 12).map((r) => (
+                  <tr key={`${r.t}-${r.pair}-${r.buy}-${r.sell}`} className="border-t">
+                    <td className="whitespace-nowrap py-1 pr-3">{ago(r.t, now)}</td>
+                    <td className="pr-3">{r.pair}</td>
+                    <td className="pr-3">{r.swapVenue}</td>
+                    <td className="whitespace-nowrap pr-3">
+                      {r.buy} → {r.sell}
+                    </td>
+                    <td className="pr-3 tabular-nums">{r.edgeBps.toFixed(2)} bp</td>
+                    <td className="pr-3 tabular-nums">{fmtSigned(r.profitQuote, r.quote)}</td>
+                    <td className="pr-3 tabular-nums">{fmtSigned(r.netEth, "ETH")}</td>
+                    <td>
+                      {r.decision === "send" ? (
+                        <Badge className="bg-emerald-600">worth sending</Badge>
+                      ) : (
+                        <span className="text-muted-foreground">{r.decision}</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="text-muted-foreground">
+            No announced swap has opened a gap bigger than the pool fees yet.
+          </div>
+        )}
+        <div className="text-xs text-muted-foreground">
+          {t.skippedBusy} skipped while busy · {t.errors} errors ({t.rateLimited} free-RPC rate
+          limits)
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function MevArb() {
   const q = useQuery({ queryKey: ["mev-arb-summary"], queryFn: fetchArb, refetchInterval: 15_000 });
   const now = Date.now();
@@ -284,6 +410,7 @@ export default function MevArb() {
           {q.data.chains.map((c) => (
             <ChainCard key={c.chain} c={c} now={now} />
           ))}
+          {q.data.backrun ? <BackrunCard b={q.data.backrun} now={now} /> : null}
         </div>
       ) : null}
     </section>

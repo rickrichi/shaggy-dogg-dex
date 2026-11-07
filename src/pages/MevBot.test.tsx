@@ -187,3 +187,67 @@ describe("MEV bot page", () => {
     expect(fmtSigned(0.00000123, "ETH")).toBe("0.00000123 ETH");
   });
 });
+
+describe("MEV-Share backrun card", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("shows hint counts and priced backruns when the scanner reports them", async () => {
+    const withBackrun: ArbSummary = {
+      ...arb(),
+      backrun: {
+        chain: "ethereum",
+        mode: "shadow",
+        connected: true,
+        lastEventAt: new Date().toISOString(),
+        totals: {
+          events: 2888,
+          swapHints: 29,
+          withSwapData: 20,
+          poolOnly: 9,
+          skippedBusy: 2,
+          simulated: 2,
+          profitableBeforeGas: 2,
+          worthSending: 0,
+          bundlesSent: 0,
+          landed: 0,
+          errors: 0,
+          rateLimited: 0,
+        },
+        best: null,
+        recent: [
+          {
+            t: new Date().toISOString(),
+            block: "26362660",
+            pair: "WETH/USDC",
+            swapVenue: "v3 0.01%",
+            buy: "v3 0.01%",
+            sell: "v4 0.01%",
+            edgeBps: 3.9,
+            amountIn: 235.75,
+            quote: "USDC",
+            profitQuote: 0.042103,
+            profitEth: 0.0000188,
+            gasEth: 0.0000242,
+            bribeEth: 0,
+            netEth: -0.0000055,
+            decision: "profit does not cover gas",
+          },
+        ],
+        submissions: [],
+      },
+    };
+    vi.stubGlobal(
+      "fetch",
+      byUrl(
+        () => new Response(JSON.stringify(summary())),
+        () => new Response(JSON.stringify(withBackrun))
+      )
+    );
+    renderPage();
+    expect(await screen.findByText("Ethereum backruns (Flashbots MEV-Share)")).toBeTruthy();
+    expect(screen.getByText("Listening")).toBeTruthy();
+    expect(screen.getByText(/2,888 hints seen/)).toBeTruthy();
+    expect(screen.getByText("User swapped on")).toBeTruthy();
+    expect(screen.getByText("v3 0.01% → v4 0.01%")).toBeTruthy();
+  });
+});
