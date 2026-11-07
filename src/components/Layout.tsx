@@ -63,7 +63,7 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
       { name: "Market Data", href: "/market-data", icon: LineChart },
       { name: "Arbitrage", href: "/arbitrage/matrix", icon: Zap },
       { name: "Live Desk", href: "/arbitrage/live-desk", icon: Radio },
-      { name: "Liquidation Bot", href: "/mev", icon: Bot },
+      { name: "MEV Bots", href: "/mev", icon: Bot },
     ],
   },
   {

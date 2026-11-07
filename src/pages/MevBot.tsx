@@ -4,6 +4,8 @@ import { AlertTriangle, Bot, ExternalLink, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
+import MevArb from "./MevArb";
+
 // Read-only summary published by the aave-mev searcher on the market-data VM. vercel.json forwards
 // /api/mev/* there; in development Vite proxies it.
 export const MEV_SUMMARY_PATH = "/api/mev/summary";
@@ -124,7 +126,7 @@ export default function MevBot() {
     <div className="mx-auto max-w-6xl space-y-6 p-4">
       <div className="flex flex-wrap items-center gap-3">
         <Bot className="size-7" />
-        <h1 className="text-2xl font-bold">Aave liquidation bot</h1>
+        <h1 className="text-2xl font-bold">MEV bots: Aave liquidations and Uniswap arbitrage</h1>
         {s ? (
           <>
             <Badge variant={live ? "default" : "destructive"}>
@@ -334,6 +336,7 @@ export default function MevBot() {
           </p>
         </>
       ) : null}
+      <MevArb />
     </div>
   );
 }
