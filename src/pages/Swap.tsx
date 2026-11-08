@@ -2,7 +2,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
-import { Activity, ArrowRight, ExternalLink, Fuel, ShieldCheck, Sparkles } from "lucide-react";
+import {
+  Activity,
+  ArrowRight,
+  ExternalLink,
+  Fuel,
+  QrCode,
+  ShieldCheck,
+  Sparkles,
+  Wallet,
+} from "lucide-react";
 import { formatGwei } from "viem";
 import { useAccount, useBlockNumber, useGasPrice, useSwitchChain } from "wagmi";
 
@@ -150,10 +159,7 @@ export default function Swap() {
     () => chainTokens.find((t) => t.symbol.toUpperCase() === "MRWD"),
     [chainTokens]
   );
-  const nativeEthToken = useMemo(
-    () => chainTokens.find((t) => t.kind === "native"),
-    [chainTokens]
-  );
+  const nativeEthToken = useMemo(() => chainTokens.find((t) => t.kind === "native"), [chainTokens]);
   const isBuyingMrwd = buyToken.symbol.toUpperCase() === "MRWD";
 
   const handleSelectBuyMrwd = useCallback(() => {
@@ -321,8 +327,34 @@ export default function Swap() {
             </aside>
 
             {!isConnected && (
-              <div className="mt-1 rounded-lg border border-amber-100 bg-amber-50/50 p-4 text-center text-sm text-amber-800">
-                Connect wallet to execute trades. Viewing mode active.
+              <div className="mt-1 space-y-2.5 rounded-lg border border-amber-100 bg-amber-50/50 p-4 text-center text-sm text-amber-800">
+                <p>Connect wallet to execute trades. Viewing mode active.</p>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      window.dispatchEvent(
+                        new CustomEvent("shaggy:open-wallet-connect", { detail: { view: "qr" } })
+                      )
+                    }
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:from-purple-700 hover:to-pink-700"
+                  >
+                    <QrCode className="size-3.5" />
+                    <span>MetaMask Mobile QR</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      window.dispatchEvent(
+                        new CustomEvent("shaggy:open-wallet-connect", { detail: { view: "list" } })
+                      )
+                    }
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-purple-300 bg-white px-3 py-1.5 text-xs font-semibold text-purple-800 transition hover:bg-purple-50"
+                  >
+                    <Wallet className="size-3.5" />
+                    <span>All Wallets</span>
+                  </button>
+                </div>
               </div>
             )}
           </div>

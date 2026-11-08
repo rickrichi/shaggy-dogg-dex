@@ -1,8 +1,14 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { isUserCancel, WalletConnect } from "./WalletConnect";
+import {
+  buildMetaMaskDappLink,
+  buildMetaMaskWcDeepLink,
+  buildMetaMaskWcUniversalLink,
+  isUserCancel,
+  WalletConnect,
+} from "./WalletConnect";
 
 const wallet = vi.hoisted(() => ({
   connect: vi.fn(),
@@ -11,6 +17,10 @@ const wallet = vi.hoisted(() => ({
     name: string;
     type: string;
     getProvider: ReturnType<typeof vi.fn>;
+    emitter?: {
+      on?: ReturnType<typeof vi.fn>;
+      off?: ReturnType<typeof vi.fn>;
+    };
   }>,
 }));
 
@@ -24,7 +34,7 @@ vi.mock("wagmi", () => ({
 
 const connector = (id: string, provider: unknown, type = "injected") => ({
   id,
-  name: id === "injected" ? "Injected" : "MetaMask",
+  name: id === "injected" ? "Injected" : id === "walletConnect" ? "WalletConnect" : "MetaMask",
   type,
   getProvider: vi.fn().mockResolvedValue(provider),
 });
@@ -39,6 +49,7 @@ async function selectMetaMask() {
 describe("MetaMask extension connection", () => {
   beforeEach(() => {
     wallet.connectors = [];
+    wallet.connect.mockReset();
   });
 
   it("uses the announced MetaMask provider even without window.ethereum", async () => {
@@ -112,6 +123,90 @@ describe("MetaMask extension connection", () => {
 
     expect(await screen.findByText("User rejected the request")).toBeVisible();
     expect(screen.getByRole("dialog")).toBeVisible();
+  });
+});
+
+describe("MetaMask Mobile QR Code & Android login", () => {
+  beforeEach(() => {
+    wallet.connectors = [];
+    wallet.connect.mockReset();
+  });
+
+  it("renders the inline QR code when WalletConnect emits display_uri and switches scan modes", async () => {
+    const sampleUri = "wc:9f8e7d6c5b4a@2?relay-protocol=irn&symKey=1234567890abcdef";
+    const listeners: Record<string, Array<(uri: string) => void>> = {};
+    const wcProvider = {
+      on: vi.fn((event: string, cb: (uri: string) => void) => {
+        listeners[event] = listeners[event] ?? [];
+        listeners[event]?.push(cb);
+      }),
+      removeListener: vi.fn(),
+    };
+    const wcConnector = connector("walletConnect", wcProvider, "walletConnect");
+    wallet.connectors = [wcConnector];
+    wallet.connect.mockImplementation(() => {
+      listeners["display_uri"]?.forEach((cb) => cb(sampleUri));
+    });
+
+    const user = userEvent.setup();
+    render(<WalletConnect />);
+
+    await user.click(screen.getByRole("button", { name: "Connect Wallet" }));
+    await user.click(screen.getByRole("button", { name: /MetaMask Mobile \(QR Code\)/ }));
+
+    expect(await screen.findByText("MetaMask Mobile QR Login")).toBeVisible();
+    const qrImg = await screen.findByRole("img", { name: "MetaMask Mobile QR Code" });
+    expect(qrImg).toBeVisible();
+    expect(qrImg.getAttribute("src")).toMatch(/^data:image\/svg\+xml;utf8,/);
+
+    // Pair MetaMask App link should point to the MetaMask universal/deep link
+    const pairLink = screen.getByRole("link", { name: /Pair MetaMask App/i });
+    expect(pairLink).toHaveAttribute("href", buildMetaMaskWcUniversalLink(sampleUri));
+
+    // Switch to Phone Camera mode and Open Swap on Phone mode
+    await user.click(screen.getByRole("tab", { name: "Phone Camera" }));
+    expect(
+      screen.getByText(/Point your Android phone's native Camera app at this QR code/i)
+    ).toBeVisible();
+
+    await user.click(screen.getByRole("tab", { name: "Open Swap on Phone" }));
+    expect(
+      screen.getByText(/open dex\.lumsian\.com\/swap directly inside the MetaMask Mobile browser/i)
+    ).toBeVisible();
+  });
+
+  it("opens directly to the QR login view when triggered from the /swap page event", async () => {
+    const sampleUri = "wc:swap-direct-qr@2?relay-protocol=irn&symKey=abcdef";
+    const wcProvider = {
+      signer: { uri: sampleUri },
+      on: vi.fn(),
+      removeListener: vi.fn(),
+    };
+    const wcConnector = connector("walletConnect", wcProvider, "walletConnect");
+    wallet.connectors = [wcConnector];
+
+    render(<WalletConnect />);
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent("shaggy:open-wallet-connect", { detail: { view: "qr" } })
+      );
+    });
+
+    expect(await screen.findByText("MetaMask Mobile QR Login")).toBeVisible();
+    expect(await screen.findByRole("img", { name: "MetaMask Mobile QR Code" })).toBeVisible();
+    expect(wallet.connect).toHaveBeenCalledWith({ connector: wcConnector }, expect.any(Object));
+  });
+
+  it("formats MetaMask Mobile universal and deep links for Android", () => {
+    const uri = "wc:abc@2?relay-protocol=irn&symKey=xyz";
+    expect(buildMetaMaskWcUniversalLink(uri)).toBe(
+      `https://metamask.app.link/wc?uri=${encodeURIComponent(uri)}`
+    );
+    expect(buildMetaMaskWcDeepLink(uri)).toBe(`metamask://wc?uri=${encodeURIComponent(uri)}`);
+    expect(buildMetaMaskDappLink()).toMatch(
+      /^https:\/\/metamask\.app\.link\/dapp\/dex\.lumsian\.com/
+    );
   });
 });
 

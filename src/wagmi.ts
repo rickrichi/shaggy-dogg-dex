@@ -98,12 +98,16 @@ const connectors = [
     ? [
         walletConnect({
           projectId: WALLETCONNECT_PROJECT_ID,
-          showQrModal: true,
+          showQrModal: false,
           metadata: {
             name: APP_NAME,
             description: `${APP_NAME} - Decentralized Exchange`,
-            url: typeof window !== "undefined" ? window.location.origin : "http://localhost:5173",
-            icons: [],
+            url: typeof window !== "undefined" ? window.location.origin : "https://dex.lumsian.com",
+            icons: [
+              typeof window !== "undefined"
+                ? `${window.location.origin}/amutt-logo-256.png`
+                : "https://dex.lumsian.com/amutt-logo-256.png",
+            ],
           },
         }),
       ]
