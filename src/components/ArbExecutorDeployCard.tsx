@@ -85,6 +85,18 @@ function ArbExecutorDeployCardInner() {
     address: address ?? SHAGGY_DOGG_OWNER,
     chainId: 8453,
   });
+  const { data: execEthBalance } = useBalance({
+    address: (deployedAddresses.ethereum || DEFAULT_ETHEREUM_EXECUTOR) as `0x${string}`,
+    chainId: 1,
+  });
+  const { data: opEthBalance } = useBalance({
+    address: (isAddress(operatorInput) ? operatorInput : DEFAULT_OPERATOR_ADDRESS) as `0x${string}`,
+    chainId: 1,
+  });
+  const { data: opBaseBalance } = useBalance({
+    address: (isAddress(operatorInput) ? operatorInput : DEFAULT_OPERATOR_ADDRESS) as `0x${string}`,
+    chainId: 8453,
+  });
 
   const { sendTransactionAsync, isPending: isSending } = useSendTransaction();
   const { data: deployReceipt, isLoading: isConfirmingDeploy } = useWaitForTransactionReceipt({
@@ -115,7 +127,11 @@ function ArbExecutorDeployCardInner() {
 
   const ethBalNum = ethBalance ? Number(formatEther(ethBalance.value)) : 0;
   const baseBalNum = baseBalance ? Number(formatEther(baseBalance.value)) : 0;
-  const needsEthBridge = targetChain === "ethereum" && ethBalNum < 0.0002 && baseBalNum > 0.001;
+  const execEthBalNum = execEthBalance ? Number(formatEther(execEthBalance.value)) : 0;
+  const opEthBalNum = opEthBalance ? Number(formatEther(opEthBalance.value)) : 0;
+  const opBaseBalNum = opBaseBalance ? Number(formatEther(opBaseBalance.value)) : 0;
+  const needsEthBridge =
+    !deployedForChain && targetChain === "ethereum" && ethBalNum < 0.0002 && baseBalNum > 0.001;
 
   const openWalletModal = (preferQr: boolean) => {
     window.dispatchEvent(
