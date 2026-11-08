@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, ArrowRightLeft, ExternalLink } from "lucide-react";
 
+import { ArbExecutorDeployCard } from "@/components/ArbExecutorDeployCard";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -434,6 +435,7 @@ export default function MevArb() {
         v4 PoolManager, buy, sell, repay) on the real chain state at many sizes, then subtracts gas.
         Only trades that clear the minimum after gas are ever sent.
       </p>
+      <ArbExecutorDeployCard />
       {q.isError ? (
         <Card className="border-destructive">
           <CardContent className="flex items-center gap-2 p-4">
