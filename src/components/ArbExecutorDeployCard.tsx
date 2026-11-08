@@ -1,8 +1,8 @@
 import { useContext, useEffect, useState } from "react";
-
-import { encodeDeployData, getAddress, type Hex, isAddress, parseEther } from "viem";
+import { encodeDeployData, formatEther, getAddress, type Hex, isAddress, parseEther } from "viem";
 import {
   useAccount,
+  useBalance,
   useChainId,
   useSendTransaction,
   useSwitchChain,
@@ -47,14 +47,30 @@ function ArbExecutorDeployCardInner() {
       base: window.localStorage.getItem(`${STORAGE_PREFIX}base`) || DEFAULT_BASE_EXECUTOR,
     };
   });
-  const [deployTxHash, setDeployTxHash] = useState<Hex | undefined>(undefined);
-  const [fundTxHash, setFundTxHash] = useState<Hex | undefined>(undefined);
+  const [deployTxByChain, setDeployTxByChain] = useState<Partial<Record<"ethereum" | "base", Hex>>>(
+    {},
+  );
+  const [fundTxByChain, setFundTxByChain] = useState<Partial<Record<"ethereum" | "base", Hex>>>({});
   const [localError, setLocalError] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
+  const chainConfig = ARB_DEPLOY_CHAINS[targetChain];
+  const currentDeployTxHash = deployTxByChain[targetChain];
+  const currentFundTxHash = fundTxByChain[targetChain];
+
+  const { data: ethBalance } = useBalance({
+    address: address ?? SHAGGY_DOGG_OWNER,
+    chainId: 1,
+  });
+  const { data: baseBalance } = useBalance({
+    address: address ?? SHAGGY_DOGG_OWNER,
+    chainId: 8453,
+  });
+
   const { sendTransactionAsync, isPending: isSending } = useSendTransaction();
   const { data: deployReceipt, isLoading: isConfirmingDeploy } = useWaitForTransactionReceipt({
-    hash: deployTxHash,
+    hash: currentDeployTxHash,
+    chainId: chainConfig.chainId,
   });
 
   useEffect(() => {
@@ -67,16 +83,20 @@ function ArbExecutorDeployCardInner() {
         }
         return next;
       });
+      setDeployTxByChain((prev) => ({ ...prev, [targetChain]: undefined }));
     }
   }, [deployReceipt, targetChain]);
 
-  const chainConfig = ARB_DEPLOY_CHAINS[targetChain];
   const isShaggyConnected =
     isConnected &&
     Boolean(address) &&
     address!.toLowerCase() === SHAGGY_DOGG_OWNER.toLowerCase();
   const isWrongChain = isConnected && activeChainId !== chainConfig.chainId;
   const deployedForChain = deployedAddresses[targetChain] || "";
+
+  const ethBalNum = ethBalance ? Number(formatEther(ethBalance.value)) : 0;
+  const baseBalNum = baseBalance ? Number(formatEther(baseBalance.value)) : 0;
+  const needsEthBridge = targetChain === "ethereum" && ethBalNum < 0.0002 && baseBalNum > 0.001;
 
   const openWalletModal = (preferQr: boolean) => {
     window.dispatchEvent(
@@ -138,9 +158,10 @@ function ArbExecutorDeployCardInner() {
         data: deployData,
         value: 0n,
       });
-      setDeployTxHash(hash);
+      setDeployTxByChain((prev) => ({ ...prev, [targetChain]: hash }));
     } catch (err) {
-      const msg = (err as { shortMessage?: string; message?: string })?.shortMessage ||
+      const msg =
+        (err as { shortMessage?: string; message?: string })?.shortMessage ||
         (err as { message?: string })?.message ||
         "Deployment transaction cancelled or failed.";
       setLocalError(msg);
@@ -162,9 +183,10 @@ function ArbExecutorDeployCardInner() {
         to: getAddress(to),
         value: parseEther(amountEth),
       });
-      setFundTxHash(hash);
+      setFundTxByChain((prev) => ({ ...prev, [targetChain]: hash }));
     } catch (err) {
-      const msg = (err as { shortMessage?: string; message?: string })?.shortMessage ||
+      const msg =
+        (err as { shortMessage?: string; message?: string })?.shortMessage ||
         (err as { message?: string })?.message ||
         "Funding transfer cancelled or failed.";
       setLocalError(msg);
@@ -196,21 +218,73 @@ function ArbExecutorDeployCardInner() {
           <Button
             size="sm"
             variant={targetChain === "ethereum" ? "default" : "outline"}
-            onClick={() => setTargetChain("ethereum")}
+            onClick={() => {
+              setLocalError(null);
+              setTargetChain("ethereum");
+            }}
           >
             Ethereum Mainnet (~$0.25)
           </Button>
           <Button
             size="sm"
             variant={targetChain === "base" ? "default" : "outline"}
-            onClick={() => setTargetChain("base")}
+            onClick={() => {
+              setLocalError(null);
+              setTargetChain("base");
+            }}
           >
-            Base Mainnet (~$0.03)
+            Base Mainnet (Deployed ✅)
           </Button>
         </div>
       </CardHeader>
 
       <CardContent className="space-y-4 text-sm">
+        {/* Per-chain ETH balance bar */}
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/20 px-3 py-2 text-xs">
+          <div>
+            <strong>Your ETH by Network:</strong>{" "}
+            <span className="ml-2">
+              Base Mainnet: <strong>{baseBalNum.toFixed(4)} ETH</strong>
+            </span>{" "}
+            ·{" "}
+            <span>
+              Ethereum Mainnet (L1):{" "}
+              <strong className={ethBalNum < 0.0002 ? "text-amber-600" : "text-emerald-600"}>
+                {ethBalNum.toFixed(4)} ETH
+              </strong>
+            </span>
+          </div>
+          {needsEthBridge ? (
+            <a
+              href="https://relay.link/bridge/ethereum?fromChainId=8453&amount=0.004"
+              target="_blank"
+              rel="noreferrer"
+              className="rounded bg-amber-500 px-2.5 py-1 font-semibold text-white hover:bg-amber-600"
+            >
+              Bridge 0.004 ETH (Base → Ethereum L1) ↗
+            </a>
+          ) : null}
+        </div>
+
+        {needsEthBridge ? (
+          <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-xs">
+            <strong>Why Ethereum Mainnet didn&apos;t go through:</strong> Your{" "}
+            <strong>$16.47 ({baseBalNum.toFixed(4)} ETH)</strong> is currently on{" "}
+            <strong>Base Mainnet</strong>, while your <strong>Ethereum Mainnet (L1)</strong> balance
+            is <strong>{ethBalNum.toFixed(4)} ETH</strong>. Click{" "}
+            <a
+              href="https://relay.link/bridge/ethereum?fromChainId=8453&amount=0.004"
+              target="_blank"
+              rel="noreferrer"
+              className="font-semibold underline"
+            >
+              Bridge 0.004 ETH (Base → Ethereum L1)
+            </a>{" "}
+            (~10 seconds, costs pennies) to move ~$9 of your Base ETH to Ethereum Mainnet, then
+            click Deploy below!
+          </div>
+        ) : null}
+
         {/* Wallet connection banner */}
         {!isConnected ? (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-muted/40 p-3">
@@ -313,14 +387,14 @@ function ArbExecutorDeployCardInner() {
                     : `Deploy ArbExecutor on ${chainConfig.name}`}
           </Button>
 
-          {deployTxHash ? (
+          {currentDeployTxHash ? (
             <a
-              href={`${chainConfig.explorerUrl}/tx/${deployTxHash}`}
+              href={`${chainConfig.explorerUrl}/tx/${currentDeployTxHash}`}
               target="_blank"
               rel="noreferrer"
               className="text-xs underline"
             >
-              View deploy tx {deployTxHash.slice(0, 10)}…
+              View deploy tx {currentDeployTxHash.slice(0, 10)}…
             </a>
           ) : null}
         </div>
@@ -361,33 +435,33 @@ function ArbExecutorDeployCardInner() {
               {targetChain === "ethereum" ? (
                 <Button
                   size="sm"
-                  variant="secondary"
+                  className="bg-emerald-600 text-white hover:bg-emerald-700"
                   disabled={!isConnected || isSending}
-                  onClick={() => handleFund(deployedForChain, "0.01")}
+                  onClick={() => handleFund(deployedForChain, "0.002")}
                 >
-                  1. Fund Executor Bribe Float (0.01 ETH)
+                  1. Fund Executor Bribe Float (0.002 ETH / ~$4.50)
                 </Button>
               ) : null}
               <Button
                 size="sm"
-                variant="secondary"
+                className="bg-blue-600 text-white hover:bg-blue-700"
                 disabled={!isConnected || isSending}
                 onClick={() =>
-                  handleFund(operatorInput, targetChain === "ethereum" ? "0.005" : "0.002")
+                  handleFund(operatorInput, targetChain === "ethereum" ? "0.001" : "0.002")
                 }
               >
                 {targetChain === "ethereum"
-                  ? "2. Fund Operator Gas (0.005 ETH)"
+                  ? "2. Fund Operator Gas (0.001 ETH / ~$2.20)"
                   : "Fund Operator Gas on Base (0.002 ETH)"}
               </Button>
-              {fundTxHash ? (
+              {currentFundTxHash ? (
                 <a
-                  href={`${chainConfig.explorerUrl}/tx/${fundTxHash}`}
+                  href={`${chainConfig.explorerUrl}/tx/${currentFundTxHash}`}
                   target="_blank"
                   rel="noreferrer"
                   className="self-center text-xs underline"
                 >
-                  Funding tx {fundTxHash.slice(0, 10)}…
+                  Funding tx {currentFundTxHash.slice(0, 10)}…
                 </a>
               ) : null}
             </div>
