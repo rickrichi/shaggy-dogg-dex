@@ -32,6 +32,7 @@ import {
 } from "@/config/arbExecutorArtifact";
 
 const STORAGE_PREFIX = "shaggy:arb-executor:";
+const DEFAULT_ETHEREUM_EXECUTOR = "0xeB9b695770BE083b6bE7f40B9F4682EcC5793179";
 const DEFAULT_BASE_EXECUTOR = "0x48a3e5e013B30E12d66008b62fF74840aA9611E5";
 
 export function ArbExecutorDeployCard() {
@@ -50,9 +51,17 @@ function ArbExecutorDeployCardInner() {
   const [beneficiaryInput, setBeneficiaryInput] = useState<string>(SHAGGY_DOGG_OWNER);
   const [operatorInput, setOperatorInput] = useState<string>(DEFAULT_OPERATOR_ADDRESS);
   const [deployedAddresses, setDeployedAddresses] = useState<Record<string, string>>(() => {
-    if (typeof window === "undefined") return { base: DEFAULT_BASE_EXECUTOR };
+    if (typeof window === "undefined") {
+      return { ethereum: DEFAULT_ETHEREUM_EXECUTOR, base: DEFAULT_BASE_EXECUTOR };
+    }
+    const storedEth = window.localStorage.getItem(`${STORAGE_PREFIX}ethereum`);
+    const validEth =
+      storedEth && storedEth.toLowerCase() !== DEFAULT_BASE_EXECUTOR.toLowerCase()
+        ? storedEth
+        : DEFAULT_ETHEREUM_EXECUTOR;
+    window.localStorage.setItem(`${STORAGE_PREFIX}ethereum`, validEth);
     return {
-      ethereum: window.localStorage.getItem(`${STORAGE_PREFIX}ethereum`) || "",
+      ethereum: validEth,
       base: window.localStorage.getItem(`${STORAGE_PREFIX}base`) || DEFAULT_BASE_EXECUTOR,
     };
   });
