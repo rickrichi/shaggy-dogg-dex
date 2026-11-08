@@ -13,6 +13,7 @@ import {
   useAccount,
   useBalance,
   useChainId,
+  usePublicClient,
   useSendTransaction,
   useSwitchChain,
   useWaitForTransactionReceipt,
@@ -64,6 +65,7 @@ function ArbExecutorDeployCardInner() {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   const chainConfig = ARB_DEPLOY_CHAINS[targetChain];
+  const publicClient = usePublicClient({ chainId: chainConfig.chainId });
   const currentDeployTxHash = deployTxByChain[targetChain];
   const currentFundTxHash = fundTxByChain[targetChain];
 
@@ -123,6 +125,20 @@ function ArbExecutorDeployCardInner() {
     }
   };
 
+  const getDynamicEip1559Fees = async () => {
+    if (targetChain !== "ethereum" || !publicClient) return {};
+    try {
+      const block = await publicClient.getBlock({ blockTag: "latest" });
+      if (!block.baseFeePerGas) return {};
+      const maxPriorityFeePerGas = parseGwei("0.02");
+      // Standard EIP-1559 formula: 2 * live baseFeePerGas + priorityFee (covers 6 consecutive 100%-full blocks)
+      const maxFeePerGas = block.baseFeePerGas * 2n + maxPriorityFeePerGas;
+      return { maxFeePerGas, maxPriorityFeePerGas };
+    } catch {
+      return {};
+    }
+  };
+
   const handleDeploy = async () => {
     setLocalError(null);
     if (!isAddress(ownerInput)) {
@@ -162,17 +178,12 @@ function ArbExecutorDeployCardInner() {
           [...chainConfig.quotes],
         ],
       });
+      const feeOverrides = await getDynamicEip1559Fees();
       const hash = await sendTransactionAsync({
         chainId: chainConfig.chainId,
         data: deployData,
         value: 0n,
-        ...(targetChain === "ethereum"
-          ? {
-              gas: 2_250_000n,
-              maxFeePerGas: parseGwei("0.12"),
-              maxPriorityFeePerGas: parseGwei("0.01"),
-            }
-          : {}),
+        ...(targetChain === "ethereum" ? { gas: 2_250_000n, ...feeOverrides } : {}),
       });
       setDeployTxByChain((prev) => ({ ...prev, [targetChain]: hash }));
     } catch (err) {
@@ -194,17 +205,12 @@ function ArbExecutorDeployCardInner() {
       if (activeChainId !== chainConfig.chainId) {
         await switchChainAsync({ chainId: chainConfig.chainId });
       }
+      const feeOverrides = await getDynamicEip1559Fees();
       const hash = await sendTransactionAsync({
         chainId: chainConfig.chainId,
         to: getAddress(to),
         value: parseEther(amountEth),
-        ...(targetChain === "ethereum"
-          ? {
-              gas: 30_000n,
-              maxFeePerGas: parseGwei("0.12"),
-              maxPriorityFeePerGas: parseGwei("0.01"),
-            }
-          : {}),
+        ...(targetChain === "ethereum" ? { gas: 30_000n, ...feeOverrides } : {}),
       });
       setFundTxByChain((prev) => ({ ...prev, [targetChain]: hash }));
     } catch (err) {
