@@ -7,7 +7,6 @@ import {
   type Hex,
   isAddress,
   parseEther,
-  parseGwei,
 } from "viem";
 import {
   useAccount,
@@ -128,13 +127,14 @@ function ArbExecutorDeployCardInner() {
   const getDynamicEip1559Fees = async () => {
     if (targetChain !== "ethereum" || !publicClient) return {};
     try {
-      const block = await publicClient.getBlock({ blockTag: "latest" });
-      if (!block.baseFeePerGas) return {};
-      const maxPriorityFeePerGas = parseGwei("0.02");
-      // Standard EIP-1559 formula: 2 * live baseFeePerGas + priorityFee (covers 6 consecutive 100%-full blocks)
-      const maxFeePerGas = block.baseFeePerGas * 2n + maxPriorityFeePerGas;
+      // Ask the connected chain for current EIP-1559 fees instead of relying on
+      // a static priority fee. Wallets may still let the user adjust these.
+      const { maxFeePerGas, maxPriorityFeePerGas } = await publicClient.estimateFeesPerGas({
+        type: "eip1559",
+      });
       return { maxFeePerGas, maxPriorityFeePerGas };
     } catch {
+      // Omitting overrides delegates fee estimation to the wallet/provider.
       return {};
     }
   };
@@ -252,7 +252,7 @@ function ArbExecutorDeployCardInner() {
               setTargetChain("ethereum");
             }}
           >
-            Ethereum Mainnet (~$0.25)
+            Ethereum Mainnet
           </Button>
           <Button
             size="sm"
@@ -309,8 +309,8 @@ function ArbExecutorDeployCardInner() {
             >
               Bridge 0.004 ETH (Base → Ethereum L1)
             </a>{" "}
-            (~10 seconds, costs pennies) to move ~$9 of your Base ETH to Ethereum Mainnet, then
-            click Deploy below!
+            to move funds to Ethereum Mainnet. Review the bridge quote, fees, destination amount,
+            and network before approving, then click Deploy below.
           </div>
         ) : null}
 
@@ -346,7 +346,7 @@ function ArbExecutorDeployCardInner() {
           <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-xs">
             <strong>Note:</strong> MetaMask is currently connected to <code>{address}</code>, not
             ShaggyDogg (<code>{SHAGGY_DOGG_OWNER}</code>). You can switch accounts in MetaMask so
-            ShaggyDogg pays the ~$0.25 deploy gas, or deploy right now —{" "}
+            ShaggyDogg pays the deployment gas, or deploy right now —{" "}
             <code>{SHAGGY_DOGG_OWNER}</code> is still hard-set as the on-chain{" "}
             <strong>Owner &amp; Beneficiary</strong> below.
           </div>
@@ -468,7 +468,7 @@ function ArbExecutorDeployCardInner() {
                   disabled={!isConnected || isSending}
                   onClick={() => handleFund(deployedForChain, "0.0005")}
                 >
-                  1. Fund Executor Bribe Float (0.0005 ETH / ~$1.10)
+                  1. Fund Executor Bribe Float (0.0005 ETH)
                 </Button>
               ) : null}
               <Button
@@ -480,7 +480,7 @@ function ArbExecutorDeployCardInner() {
                 }
               >
                 {targetChain === "ethereum"
-                  ? "2. Fund Operator Gas (0.0003 ETH / ~$0.65)"
+                  ? "2. Fund Operator Gas (0.0003 ETH)"
                   : "Fund Operator Gas on Base (0.002 ETH)"}
               </Button>
               {currentFundTxHash ? (

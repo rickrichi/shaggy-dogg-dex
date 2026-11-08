@@ -302,9 +302,9 @@ function ChainCard({ c, now }: { c: ChainSummary; now: number }) {
         ) : null}
 
         <div className="text-xs text-muted-foreground">
-          {c.blocksProcessed.toLocaleString()} blocks checked, {c.blocksSkipped.toLocaleString()}{" "}
-          skipped while busy · {c.totals.errors} errors ({c.totals.rateLimited} free-RPC rate
-          limits)
+          {c.blocksProcessed.toLocaleString()} state snapshots checked,{" "}
+          {c.blocksSkipped.toLocaleString()} newer blocks observed while the previous scan was busy
+          · {c.totals.errors} errors ({c.totals.rateLimited} free-RPC rate limits)
         </div>
       </CardContent>
     </Card>
@@ -430,10 +430,12 @@ export default function MevArb() {
         <ArrowRightLeft className="size-5" /> Uniswap v2 / v3 / v4 arbitrage
       </h2>
       <p className="max-w-3xl text-sm text-muted-foreground">
-        Compares every Uniswap v2, v3 and v4 pool for each pair, every block. When one pool is
-        cheaper than another by more than both fees, it runs the whole trade (flash borrow from the
-        v4 PoolManager, buy, sell, repay) on the real chain state at many sizes, then subtracts gas.
-        Only trades that clear the minimum after gas are ever sent.
+        Compares every configured Uniswap v2, v3 and v4 pool for each pair whenever the scanner is
+        free. On fast chains such as Base it samples the newest available state instead of queuing
+        stale blocks. When one pool is cheaper than another by more than both fees, it runs the
+        whole trade (flash borrow from the v4 PoolManager, buy, sell, repay) on the real chain state
+        at many sizes, then subtracts gas. Only trades that clear the minimum after gas are ever
+        sent.
       </p>
       <ArbExecutorDeployCard />
       {q.isError ? (

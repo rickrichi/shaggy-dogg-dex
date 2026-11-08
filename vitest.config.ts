@@ -72,11 +72,8 @@ export default defineConfig({
 
     // Parallel execution
     pool: 'threads',
-    poolOptions: {
-      threads: {
-        singleThread: false,
-      },
-    },
+    // Vitest 4 moved pool options to the top-level test configuration.
+    maxWorkers: '100%',
   },
 
   resolve: {

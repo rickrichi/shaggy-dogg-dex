@@ -180,6 +180,8 @@ describe("MEV bot page", () => {
     expect(screen.getAllByText("cbBTC/USDC").length).toBeGreaterThan(0);
     expect(screen.getAllByText("11.68 bp").length).toBeGreaterThan(0);
     expect(screen.getByText("no profit at any size")).toBeTruthy();
+    expect(screen.getByText(/samples the newest available state/)).toBeTruthy();
+    expect(screen.getByText(/state snapshots checked/)).toBeTruthy();
   });
 
   it("formats signed amounts", () => {
