@@ -23,6 +23,7 @@ import {
 } from "@/config/arbExecutorArtifact";
 
 const STORAGE_PREFIX = "shaggy:arb-executor:";
+const DEFAULT_BASE_EXECUTOR = "0x48a3e5e013B30E12d66008b62fF74840aA9611E5";
 
 export function ArbExecutorDeployCard() {
   const wagmiConfig = useContext(WagmiContext);
@@ -40,10 +41,10 @@ function ArbExecutorDeployCardInner() {
   const [beneficiaryInput, setBeneficiaryInput] = useState<string>(SHAGGY_DOGG_OWNER);
   const [operatorInput, setOperatorInput] = useState<string>(DEFAULT_OPERATOR_ADDRESS);
   const [deployedAddresses, setDeployedAddresses] = useState<Record<string, string>>(() => {
-    if (typeof window === "undefined") return {};
+    if (typeof window === "undefined") return { base: DEFAULT_BASE_EXECUTOR };
     return {
       ethereum: window.localStorage.getItem(`${STORAGE_PREFIX}ethereum`) || "",
-      base: window.localStorage.getItem(`${STORAGE_PREFIX}base`) || "",
+      base: window.localStorage.getItem(`${STORAGE_PREFIX}base`) || DEFAULT_BASE_EXECUTOR,
     };
   });
   const [deployTxHash, setDeployTxHash] = useState<Hex | undefined>(undefined);
