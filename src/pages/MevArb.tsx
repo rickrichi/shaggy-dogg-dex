@@ -79,6 +79,13 @@ export interface BackrunRow {
   bribeEth: number;
   netEth: number;
   decision: string;
+  poolOnly?: {
+    tx: string;
+    blindAmountIn: number;
+    blindProfitQuote: number;
+    blindNetEth: number;
+    blindDecision: string;
+  };
 }
 
 export interface BackrunSummary {
@@ -91,6 +98,9 @@ export interface BackrunSummary {
     swapHints: number;
     withSwapData: number;
     poolOnly: number;
+    poolOnlyLanded?: number;
+    poolOnlySimulated?: number;
+    blindWorthSending?: number;
     skippedBusy: number;
     simulated: number;
     profitableBeforeGas: number;
@@ -325,9 +335,13 @@ function BackrunCard({ b, now }: { b: BackrunSummary; now: number }) {
         </p>
         <div className="text-xs text-muted-foreground">
           {t.events.toLocaleString()} hints seen · {t.swapHints.toLocaleString()} swapped on our
-          pools ({t.withSwapData} with the swap result, {t.poolOnly} pool only) · {t.simulated}{" "}
-          simulated · {t.profitableBeforeGas} profitable before gas ·{" "}
+          pools ({t.withSwapData} with the swap result, {t.poolOnly} pool only
+          {t.poolOnlyLanded !== undefined
+            ? ` — ${t.poolOnlyLanded} matched after landing, ${t.poolOnlySimulated ?? 0} priced`
+            : ""}
+          ) · {t.simulated} simulated · {t.profitableBeforeGas} profitable before gas ·{" "}
           <strong>{t.worthSending} worth sending</strong>
+          {t.blindWorthSending !== undefined ? ` (${t.blindWorthSending} blind)` : ""}
           {b.mode === "live" ? ` · ${t.bundlesSent} sent, ${t.landed} landed` : ""}
         </div>
         {b.recent.length ? (
@@ -350,13 +364,36 @@ function BackrunCard({ b, now }: { b: BackrunSummary; now: number }) {
                   <tr key={`${r.t}-${r.pair}-${r.buy}-${r.sell}`} className="border-t">
                     <td className="whitespace-nowrap py-1 pr-3">{ago(r.t, now)}</td>
                     <td className="pr-3">{r.pair}</td>
-                    <td className="pr-3">{r.swapVenue}</td>
+                    <td className="pr-3">
+                      {r.swapVenue}
+                      {r.poolOnly ? (
+                        <span className="ml-1 text-xs text-muted-foreground">
+                          (pool-only{" "}
+                          <a
+                            className="underline"
+                            href={`https://etherscan.io/tx/${r.poolOnly.tx}`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {r.poolOnly.tx.slice(0, 8)}…
+                          </a>
+                          )
+                        </span>
+                      ) : null}
+                    </td>
                     <td className="whitespace-nowrap pr-3">
                       {r.buy} → {r.sell}
                     </td>
                     <td className="pr-3 tabular-nums">{r.edgeBps.toFixed(2)} bp</td>
                     <td className="pr-3 tabular-nums">{fmtSigned(r.profitQuote, r.quote)}</td>
-                    <td className="pr-3 tabular-nums">{fmtSigned(r.netEth, "ETH")}</td>
+                    <td className="pr-3 tabular-nums">
+                      {fmtSigned(r.netEth, "ETH")}
+                      {r.poolOnly ? (
+                        <div className="text-xs text-muted-foreground">
+                          blind: {fmtSigned(r.poolOnly.blindNetEth, "ETH")}
+                        </div>
+                      ) : null}
+                    </td>
                     <td>
                       {r.decision === "send" ? (
                         <Badge className="bg-emerald-600">worth sending</Badge>

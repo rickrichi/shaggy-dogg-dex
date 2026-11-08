@@ -204,6 +204,9 @@ describe("MEV-Share backrun card", () => {
           swapHints: 29,
           withSwapData: 20,
           poolOnly: 9,
+          poolOnlyLanded: 4,
+          poolOnlySimulated: 1,
+          blindWorthSending: 0,
           skippedBusy: 2,
           simulated: 2,
           profitableBeforeGas: 2,
@@ -231,6 +234,13 @@ describe("MEV-Share backrun card", () => {
             bribeEth: 0,
             netEth: -0.0000055,
             decision: "profit does not cover gas",
+            poolOnly: {
+              tx: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+              blindAmountIn: 100,
+              blindProfitQuote: 0.025,
+              blindNetEth: -0.000012,
+              blindDecision: "profit does not cover gas",
+            },
           },
         ],
         submissions: [],
@@ -247,7 +257,9 @@ describe("MEV-Share backrun card", () => {
     expect(await screen.findByText("Ethereum backruns (Flashbots MEV-Share)")).toBeTruthy();
     expect(screen.getByText("Listening")).toBeTruthy();
     expect(screen.getByText(/2,888 hints seen/)).toBeTruthy();
+    expect(screen.getByText(/4 matched after landing, 1 priced/)).toBeTruthy();
     expect(screen.getByText("User swapped on")).toBeTruthy();
     expect(screen.getByText("v3 0.01% → v4 0.01%")).toBeTruthy();
+    expect(screen.getByText(/blind:/)).toBeTruthy();
   });
 });
