@@ -211,9 +211,14 @@ export function MrwdProStakingPanel() {
             )}
           </>
         )}
-        <label className="block">
+        <label htmlFor="mrwd-pro-stake-amount" className="block">
           MRWD to stake
-          <Input value={amount} onChange={(e) => setAmount(e.target.value)} disabled={busy} />
+          <Input
+            id="mrwd-pro-stake-amount"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            disabled={busy}
+          />
         </label>
         <div className="flex flex-wrap gap-2">
           <Button disabled={!ready} onClick={() => void run("stake")}>

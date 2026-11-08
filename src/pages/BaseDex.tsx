@@ -448,9 +448,10 @@ export default function BaseDex({ initialMode = "swap" }: { initialMode?: Mode }
                 )}
               </label>
             )}
-            <label className="block text-sm">
+            <label htmlFor="basedex-slippage-input" className="block text-sm">
               Slippage tolerance (%)
               <Input
+                id="basedex-slippage-input"
                 inputMode="decimal"
                 value={slippage}
                 onChange={(e) => setSlippage(e.target.value)}

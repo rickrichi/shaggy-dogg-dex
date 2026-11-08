@@ -47,7 +47,7 @@ async function main() {
       const wethOut = out[out.length - 1];
       const price = 2500 / Number(formatUnits(wethOut, 18));
       console.log(`${r.name.padEnd(15)}: 2,500 USDC -> ${formatUnits(wethOut, 18).slice(0, 8)} WETH (Price: $${price.toFixed(2)})`);
-    } catch (e) {
+    } catch {
       console.log(`${r.name.padEnd(15)}: No direct USDC/WETH pool or error`);
     }
   }

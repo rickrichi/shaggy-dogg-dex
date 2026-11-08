@@ -27,19 +27,13 @@ import {
   formatUnits,
   http,
   isAddress,
-  parseEther,
   parseUnits,
-  webSocket,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
 
 import { AERODROME_ROUTER_ABI, UNISWAP_V2_ROUTER_ABI } from "../src/config/abis.js";
-import {
-  AiArbitrageBotEngine,
-  type BotConfig,
-  type MarketSnapshot,
-} from "../src/lib/amm/ai-arbitrage-bot.js";
+import { type BotConfig } from "../src/lib/amm/ai-arbitrage-bot.js";
 import { LAUNCHPAD_ARTIFACTS } from "../src/lib/launchpad/artifacts.js";
 
 import { verifyPrivateSubmission } from "./lib/private-submission";
@@ -109,7 +103,6 @@ const USDC_ADDRESS: Address = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 const AERO_ADDRESS: Address = "0x940181a94A35A4569E4529A3CDfB74e38FD98631";
 const CBBTC_ADDRESS: Address = "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf";
 const VIRTUAL_ADDRESS: Address = "0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b";
-const DAI_ADDRESS: Address = "0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb";
 
 export interface AeroRouteStep {
   from: Address;

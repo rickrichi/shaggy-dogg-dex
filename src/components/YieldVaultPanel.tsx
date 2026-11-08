@@ -206,9 +206,14 @@ export function YieldVaultPanel() {
             {!info.data.configured && (
               <p role="alert">Vault asset, pool, or staking contract does not match this app.</p>
             )}
-            <label className="block">
+            <label htmlFor="yield-vault-deposit-amount" className="block">
               Deposit USDC
-              <Input value={amount} onChange={(e) => setAmount(e.target.value)} disabled={busy} />
+              <Input
+                id="yield-vault-deposit-amount"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                disabled={busy}
+              />
             </label>
             <Button
               disabled={

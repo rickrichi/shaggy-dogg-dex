@@ -211,7 +211,7 @@ export function MrwdAggregatorAuditCard() {
                 ? livePool.data.canonical
                   ? "Verified Live"
                   : "Mismatch"
-                : "Verified (Block " + auditReport.verification.blockNumber + ")"}
+                : `Verified (Block ${auditReport.verification.blockNumber})`}
             </p>
             <a
               href={`https://basescan.org/address/${POOL_ADDRESS}`}

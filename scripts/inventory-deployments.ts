@@ -2,7 +2,7 @@
 // Writes deployments/base-mainnet.manifest.json from chain state + Blockscout, never from docs.
 import { existsSync,readFileSync, writeFileSync } from "node:fs";
 
-import { type Address,createPublicClient, getAddress, http, parseAbi } from "viem";
+import { createPublicClient, getAddress, http, parseAbi } from "viem";
 import { base } from "viem/chains";
 
 const keyFile = "server/data/shaggy-daemon.key";

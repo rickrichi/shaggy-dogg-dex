@@ -96,14 +96,14 @@ async function quote0x(sell:string,buy:string,amount:string,label='0x') {
  const key=process.env.ZEROX_API_KEY;
  if (!key) return {status:'requires_key',detail:`${label}: Set ZEROX_API_KEY in .env (0x v2 indexes Base Uniswap V3 pool ${POOL})`};
  const q = new URLSearchParams({chainId:String(CHAIN),sellToken:sell,buyToken:buy,sellAmount:amount});
- const data=await fetchJson('https://api.0x.org/swap/allowance-holder/price?'+q.toString(),{headers:{'0x-api-key':key,'0x-version':'v2'}});
+ const data=await fetchJson(`https://api.0x.org/swap/allowance-holder/price?${q.toString()}`,{headers:{'0x-api-key':key,'0x-version':'v2'}});
  if (!data.buyAmount || data.liquidityAvailable === false) return {status:'no_quote',detail:`${label}: No usable buyAmount/liquidity`};
  return {status:'quote_returned',output:String(data.buyAmount),detail:`${label} indicative 0x v2 quote on Base`};
 }
 
 async function quoteKyberSwap(sell:string,buy:string,amount:string,label='KyberSwap') {
  const q = new URLSearchParams({tokenIn:sell,tokenOut:buy,amountIn:amount});
- const data = await fetchJson('https://aggregator-api.kyberswap.com/base/api/v1/routes?'+q.toString(),{headers:{'x-client-id':'shaggy-dogg-dex'}});
+ const data = await fetchJson(`https://aggregator-api.kyberswap.com/base/api/v1/routes?${q.toString()}`,{headers:{'x-client-id':'shaggy-dogg-dex'}});
  const summary = data?.data?.routeSummary;
  const output = summary?.amountOut;
  if (!output || BigInt(output) === 0n) return {status:'no_quote',detail:`${label}: No routeSummary.amountOut`};
@@ -120,7 +120,7 @@ async function quoteKyberSwap(sell:string,buy:string,amount:string,label='KyberS
 
 async function quoteVelora(sell:string,buy:string,amount:string,label='Velora/ParaSwap') {
  const q = new URLSearchParams({srcToken:sell,destToken:buy,amount,srcDecimals:'18',destDecimals:'18',side:'SELL',network:String(CHAIN)});
- const data = await fetchJson('https://api.paraswap.io/prices/?'+q.toString());
+ const data = await fetchJson(`https://api.paraswap.io/prices/?${q.toString()}`);
  const route = data?.priceRoute;
  const output = route?.destAmount;
  if (!output || BigInt(output) === 0n) return {status:'no_quote',detail:`${label}: No priceRoute.destAmount`};
@@ -175,7 +175,7 @@ async function quoteUniswapQuoter(sell:string,buy:string,amount:string,label='Un
 
 async function quoteLifi(sell:string,buy:string,amount:string,label='LI.FI') {
  const q=new URLSearchParams({fromChain:String(CHAIN),toChain:String(CHAIN),fromToken:sell,toToken:buy,fromAmount:amount,fromAddress:FROM});
- const data=await fetchJson('https://li.quest/v1/quote?'+q.toString());
+ const data=await fetchJson(`https://li.quest/v1/quote?${q.toString()}`);
  const output=data.estimate?.toAmount;
  if (!output) return {status:'no_quote',detail:`${label}: No estimate.toAmount`};
  return {status:'quote_returned',output:String(output),detail:`${label} (LI.FI engine tool=${String(data.tool||'unknown')}); live Base quote`};
@@ -300,7 +300,7 @@ async function main() {
   results,
  };
  await writeFile('report.json',JSON.stringify(report,null,2));
- const csv=['name,direction,status,output,exactPoolMatched,detail',...results.map(r=>[r.name,r.direction||'',r.status,r.output||'',r.exactPoolMatched===undefined?'':String(r.exactPoolMatched),r.detail||''].map(s=>'"'+s.replaceAll('"','""')+'"').join(','))].join('\n');
+ const csv=['name,direction,status,output,exactPoolMatched,detail',...results.map(r=>[r.name,r.direction||'',r.status,r.output||'',r.exactPoolMatched===undefined?'':String(r.exactPoolMatched),r.detail||''].map(s=>`"${s.replaceAll('"','""')}"`).join(','))].join('\n');
  await writeFile('report.csv',csv);
  console.table(results.map(({name,direction,status,output,exactPoolMatched})=>({name,direction,status,output,exactPoolMatched})));
  console.log('Saved report.json and report.csv');

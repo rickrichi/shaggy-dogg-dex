@@ -313,9 +313,10 @@ export default function DexSetup() {
           <CardTitle>1. Deploy factory</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <label className="block text-sm">
+          <label htmlFor="dex-setup-admin" className="block text-sm">
             Factory fee administrator (wallet or multisig)
             <Input
+              id="dex-setup-admin"
               value={admin}
               disabled={busy}
               onChange={(e) => {
@@ -339,9 +340,10 @@ export default function DexSetup() {
               Deploy factory — wallet approval
             </Button>
           </div>
-          <label className="block text-sm">
+          <label htmlFor="dex-setup-factory" className="block text-sm">
             Deployed factory address
             <Input
+              id="dex-setup-factory"
               value={factory}
               disabled={busy}
               onChange={(e) => {
@@ -374,9 +376,10 @@ export default function DexSetup() {
               Deploy router — wallet approval
             </Button>
           </div>
-          <label className="block text-sm">
+          <label htmlFor="dex-setup-router" className="block text-sm">
             Deployed router address
             <Input
+              id="dex-setup-router"
               value={router}
               disabled={busy}
               onChange={(e) => {
@@ -443,9 +446,10 @@ export default function DexSetup() {
               {currentFeeSetter ? ` · feeToSetter: ${currentFeeSetter}` : ""}
             </p>
           )}
-          <label className="block text-sm">
+          <label htmlFor="dex-setup-fee-recipient" className="block text-sm">
             Protocol fee recipient address (<code>feeTo</code>)
             <Input
+              id="dex-setup-fee-recipient"
               disabled={busy}
               value={feeRecipient}
               onChange={(e) => setFeeRecipient(e.target.value as Address)}
@@ -481,9 +485,10 @@ export default function DexSetup() {
           <CardTitle>Recover a submitted deployment</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <label className="block text-sm">
+          <label htmlFor="dex-setup-recover-hash" className="block text-sm">
             Base transaction hash
             <Input
+              id="dex-setup-recover-hash"
               disabled={busy}
               value={hash ?? ""}
               onChange={(e) => setHash(e.target.value as Hash)}

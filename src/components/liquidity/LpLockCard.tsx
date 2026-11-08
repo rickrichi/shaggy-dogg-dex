@@ -744,7 +744,15 @@ function LockerControls({ position, positions, onSelect, onChanged }: LockerCont
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {/* 3 Months Option */}
                 <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setSelectedDuration(3)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setSelectedDuration(3);
+                    }
+                  }}
                   className={`cursor-pointer rounded-xl border p-4 transition-all ${
                     selectedDuration === 3
                       ? "border-indigo-600 bg-indigo-50/60 shadow-sm ring-2 ring-indigo-500/20"
@@ -780,7 +788,15 @@ function LockerControls({ position, positions, onSelect, onChanged }: LockerCont
 
                 {/* 12 Months Option */}
                 <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setSelectedDuration(12)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setSelectedDuration(12);
+                    }
+                  }}
                   className={`cursor-pointer rounded-xl border p-4 transition-all ${
                     selectedDuration === 12
                       ? "border-purple-600 bg-purple-50/60 shadow-sm ring-2 ring-purple-500/20"
