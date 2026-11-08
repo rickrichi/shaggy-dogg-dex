@@ -1,5 +1,14 @@
 import { useContext, useEffect, useState } from "react";
-import { encodeDeployData, formatEther, getAddress, type Hex, isAddress, parseEther } from "viem";
+
+import {
+  encodeDeployData,
+  formatEther,
+  getAddress,
+  type Hex,
+  isAddress,
+  parseEther,
+  parseGwei,
+} from "viem";
 import {
   useAccount,
   useBalance,
@@ -157,6 +166,13 @@ function ArbExecutorDeployCardInner() {
         chainId: chainConfig.chainId,
         data: deployData,
         value: 0n,
+        ...(targetChain === "ethereum"
+          ? {
+              gas: 2_250_000n,
+              maxFeePerGas: parseGwei("0.12"),
+              maxPriorityFeePerGas: parseGwei("0.01"),
+            }
+          : {}),
       });
       setDeployTxByChain((prev) => ({ ...prev, [targetChain]: hash }));
     } catch (err) {
@@ -182,6 +198,13 @@ function ArbExecutorDeployCardInner() {
         chainId: chainConfig.chainId,
         to: getAddress(to),
         value: parseEther(amountEth),
+        ...(targetChain === "ethereum"
+          ? {
+              gas: 30_000n,
+              maxFeePerGas: parseGwei("0.12"),
+              maxPriorityFeePerGas: parseGwei("0.01"),
+            }
+          : {}),
       });
       setFundTxByChain((prev) => ({ ...prev, [targetChain]: hash }));
     } catch (err) {
@@ -437,9 +460,9 @@ function ArbExecutorDeployCardInner() {
                   size="sm"
                   className="bg-emerald-600 text-white hover:bg-emerald-700"
                   disabled={!isConnected || isSending}
-                  onClick={() => handleFund(deployedForChain, "0.002")}
+                  onClick={() => handleFund(deployedForChain, "0.0005")}
                 >
-                  1. Fund Executor Bribe Float (0.002 ETH / ~$4.50)
+                  1. Fund Executor Bribe Float (0.0005 ETH / ~$1.10)
                 </Button>
               ) : null}
               <Button
@@ -447,11 +470,11 @@ function ArbExecutorDeployCardInner() {
                 className="bg-blue-600 text-white hover:bg-blue-700"
                 disabled={!isConnected || isSending}
                 onClick={() =>
-                  handleFund(operatorInput, targetChain === "ethereum" ? "0.001" : "0.002")
+                  handleFund(operatorInput, targetChain === "ethereum" ? "0.0003" : "0.002")
                 }
               >
                 {targetChain === "ethereum"
-                  ? "2. Fund Operator Gas (0.001 ETH / ~$2.20)"
+                  ? "2. Fund Operator Gas (0.0003 ETH / ~$0.65)"
                   : "Fund Operator Gas on Base (0.002 ETH)"}
               </Button>
               {currentFundTxHash ? (
