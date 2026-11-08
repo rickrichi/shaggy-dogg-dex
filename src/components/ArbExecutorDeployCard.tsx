@@ -277,7 +277,7 @@ function ArbExecutorDeployCardInner() {
               setTargetChain("ethereum");
             }}
           >
-            Ethereum Mainnet
+            Ethereum Mainnet (Deployed ✅)
           </Button>
           <Button
             size="sm"
@@ -296,28 +296,25 @@ function ArbExecutorDeployCardInner() {
         {/* Per-chain ETH balance bar */}
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/20 px-3 py-2 text-xs">
           <div>
-            <strong>Your ETH by Network:</strong>{" "}
+            <strong>Live Bot Balances:</strong>{" "}
             <span className="ml-2">
-              Base Mainnet: <strong>{baseBalNum.toFixed(4)} ETH</strong>
+              Ethereum Executor Bribe Float:{" "}
+              <strong className="text-emerald-600">{execEthBalNum.toFixed(4)} ETH</strong>
             </span>{" "}
             ·{" "}
             <span>
-              Ethereum Mainnet (L1):{" "}
-              <strong className={ethBalNum < 0.0002 ? "text-amber-600" : "text-emerald-600"}>
-                {ethBalNum.toFixed(4)} ETH
-              </strong>
+              Ethereum Operator Gas:{" "}
+              <strong className="text-emerald-600">{opEthBalNum.toFixed(4)} ETH</strong>
+            </span>{" "}
+            ·{" "}
+            <span>
+              Base Operator Gas:{" "}
+              <strong className="text-emerald-600">{opBaseBalNum.toFixed(4)} ETH</strong>
             </span>
           </div>
-          {needsEthBridge ? (
-            <a
-              href="https://relay.link/bridge/ethereum?fromChainId=8453&amount=0.004"
-              target="_blank"
-              rel="noreferrer"
-              className="rounded bg-amber-500 px-2.5 py-1 font-semibold text-white hover:bg-amber-600"
-            >
-              Bridge 0.004 ETH (Base → Ethereum L1) ↗
-            </a>
-          ) : null}
+          <div className="text-muted-foreground">
+            ShaggyDogg Wallet: {baseBalNum.toFixed(4)} ETH (Base) · {ethBalNum.toFixed(4)} ETH (L1)
+          </div>
         </div>
 
         {needsEthBridge ? (
