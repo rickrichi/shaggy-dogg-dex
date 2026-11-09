@@ -44,6 +44,9 @@ export interface ChainSummary {
     errors: number;
     rateLimited: number;
   };
+  sessionTotals?: ChainSummary["totals"];
+  execution?: ExecutionFunnel;
+  risk?: RiskSnapshot;
   best: ArbRow | null;
   spreads: Array<{
     pair: string;
@@ -112,6 +115,9 @@ export interface BackrunSummary {
     errors: number;
     rateLimited: number;
   };
+  sessionTotals?: BackrunSummary["totals"];
+  execution?: ExecutionFunnel;
+  risk?: RiskSnapshot;
   latencyMs?: {
     samples: number;
     avgTotalMs: number;
@@ -120,6 +126,9 @@ export interface BackrunSummary {
     lastTotalMs: number | null;
     avgSimMs: number;
     avgSendMs: number;
+    avgDecisionMs?: number;
+    avgSigningMs?: number;
+    avgRelayMs?: number;
   };
   buildersSeen?: Record<string, number>;
   best: BackrunRow | null;
@@ -128,11 +137,33 @@ export interface BackrunSummary {
 }
 
 export interface ArbSummary {
-  version: 1;
+  version: 1 | 2;
   startedAt: string;
+  lifetimeStartedAt?: string;
   updatedAt: string;
   chains: ChainSummary[];
   backrun?: BackrunSummary;
+}
+
+interface ExecutionFunnel {
+  attempts: number;
+  accepted: number;
+  rejected: number;
+  notIncluded: number;
+  reverted: number;
+  landed: number;
+  realizedProfitQuote: number;
+  realizedLossWei: string;
+}
+
+interface RiskSnapshot {
+  paused: boolean;
+  reason: string | null;
+  utcDay: string;
+  realizedLossWei: string;
+  dailyLossLimitWei: string;
+  consecutiveFailures: number;
+  maxConsecutiveFailures: number;
 }
 
 const EXPLORER: Record<string, string> = {
@@ -185,6 +216,11 @@ function ChainCard({ c, now }: { c: ChainSummary; now: number }) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4 text-sm">
+        {c.risk?.paused ? (
+          <div className="rounded-md border border-destructive bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            Submissions paused by burn-in guard: {c.risk.reason}
+          </div>
+        ) : null}
         <div className="text-xs text-muted-foreground">
           Block #{c.lastBlock ?? "—"} ({ago(c.lastBlockAt, now)}) · watching {c.spreads.length}{" "}
           pairs ({c.venues.v2} v2 pairs, {c.venues.v3} v3 pools, {c.venues.v4} v4 pools) ·{" "}
@@ -193,6 +229,21 @@ function ChainCard({ c, now }: { c: ChainSummary; now: number }) {
           profitable before gas · <strong>{c.totals.worthSending} worth sending</strong>
           {c.mode === "live" ? ` · ${c.totals.submissions} sent, ${c.totals.landed} landed` : ""}
         </div>
+        {c.sessionTotals ? (
+          <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+            Current session: {c.sessionTotals.simulated} simulated · {c.sessionTotals.worthSending} worth sending ·{" "}
+            {c.sessionTotals.submissions} accepted · {c.sessionTotals.landed} landed. Lifetime: {c.totals.simulated} simulated ·{" "}
+            {c.totals.submissions} accepted · {c.totals.landed} landed.
+          </div>
+        ) : null}
+        {c.execution ? (
+          <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+            Execution funnel: {c.execution.attempts} attempts → {c.execution.accepted} relay/sequencer accepted →{" "}
+            <strong>{c.execution.landed} landed</strong> · {c.execution.rejected} rejected · {c.execution.notIncluded} not included ·{" "}
+            {c.execution.reverted} reverted · realized {c.execution.realizedProfitQuote.toFixed(4)} quote units · realized gas loss{" "}
+            {(Number(c.execution.realizedLossWei) / 1e18).toPrecision(3)} ETH
+          </div>
+        ) : null}
 
         <div className="max-h-72 overflow-auto">
           <table className="w-full">
@@ -342,6 +393,11 @@ function BackrunCard({ b, now }: { b: BackrunSummary; now: number }) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4 text-sm">
+        {b.risk?.paused ? (
+          <div className="rounded-md border border-destructive bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            MEV-Share submissions paused by burn-in guard: {b.risk.reason}
+          </div>
+        ) : null}
         <p className="text-xs text-muted-foreground">
           Wallets that opt in to MEV-Share announce pending swaps. When one moves a Uniswap pool we
           watch, the bot prices a trade placed right after it that brings the pool back in line. The
@@ -361,11 +417,26 @@ function BackrunCard({ b, now }: { b: BackrunSummary; now: number }) {
             ? ` · ${t.bundlesSent} priced bundles + ${t.blindBundlesSent ?? 0} blind bundles sent, ${t.landed} landed`
             : ""}
         </div>
+        {b.sessionTotals ? (
+          <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+            Current session: {b.sessionTotals.simulated} simulated · {b.sessionTotals.worthSending} worth sending ·{" "}
+            {b.sessionTotals.bundlesSent} accepted · {b.sessionTotals.landed} landed. Lifetime: {t.simulated} simulated ·{" "}
+            {t.bundlesSent} accepted · {t.landed} landed.
+          </div>
+        ) : null}
+        {b.execution ? (
+          <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+            Submission audit: {b.execution.attempts} attempts → {b.execution.accepted} relay accepted →{" "}
+            <strong>{b.execution.landed} landed</strong> · {b.execution.rejected} rejected · {b.execution.notIncluded} not included ·{" "}
+            {b.execution.reverted} reverted · realized {b.execution.realizedProfitQuote.toFixed(4)} quote units
+          </div>
+        ) : null}
         {b.latencyMs && b.latencyMs.samples > 0 ? (
           <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
             Latency: p50 <strong>{b.latencyMs.p50TotalMs.toFixed(1)} ms</strong> · p95{" "}
             <strong>{b.latencyMs.p95TotalMs.toFixed(1)} ms</strong> · simulation{" "}
-            {b.latencyMs.avgSimMs.toFixed(1)} ms · relay {b.latencyMs.avgSendMs.toFixed(1)} ms ·{" "}
+            {b.latencyMs.avgSimMs.toFixed(1)} ms · signing {(b.latencyMs.avgSigningMs ?? 0).toFixed(1)} ms · relay{" "}
+            {(b.latencyMs.avgRelayMs ?? b.latencyMs.avgSendMs).toFixed(1)} ms ·{" "}
             builders: {Object.keys(b.buildersSeen ?? {}).join(", ") || "default relay set"}
           </div>
         ) : null}
