@@ -102,6 +102,7 @@ export interface BackrunSummary {
     poolOnlyLanded?: number;
     poolOnlySimulated?: number;
     blindWorthSending?: number;
+    blindBundlesSent?: number;
     skippedBusy: number;
     simulated: number;
     profitableBeforeGas: number;
@@ -111,6 +112,16 @@ export interface BackrunSummary {
     errors: number;
     rateLimited: number;
   };
+  latencyMs?: {
+    samples: number;
+    avgTotalMs: number;
+    p50TotalMs: number;
+    p95TotalMs: number;
+    lastTotalMs: number | null;
+    avgSimMs: number;
+    avgSendMs: number;
+  };
+  buildersSeen?: Record<string, number>;
   best: BackrunRow | null;
   recent: BackrunRow[];
   submissions: ChainSummary["submissions"];
@@ -346,8 +357,18 @@ function BackrunCard({ b, now }: { b: BackrunSummary; now: number }) {
           ) · {t.simulated} simulated · {t.profitableBeforeGas} profitable before gas ·{" "}
           <strong>{t.worthSending} worth sending</strong>
           {t.blindWorthSending !== undefined ? ` (${t.blindWorthSending} blind)` : ""}
-          {b.mode === "live" ? ` · ${t.bundlesSent} sent, ${t.landed} landed` : ""}
+          {b.mode === "live"
+            ? ` · ${t.bundlesSent} priced bundles + ${t.blindBundlesSent ?? 0} blind bundles sent, ${t.landed} landed`
+            : ""}
         </div>
+        {b.latencyMs && b.latencyMs.samples > 0 ? (
+          <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+            Latency: p50 <strong>{b.latencyMs.p50TotalMs.toFixed(1)} ms</strong> · p95{" "}
+            <strong>{b.latencyMs.p95TotalMs.toFixed(1)} ms</strong> · simulation{" "}
+            {b.latencyMs.avgSimMs.toFixed(1)} ms · relay {b.latencyMs.avgSendMs.toFixed(1)} ms ·{" "}
+            builders: {Object.keys(b.buildersSeen ?? {}).join(", ") || "default relay set"}
+          </div>
+        ) : null}
         {b.recent.length ? (
           <div className="overflow-x-auto">
             <table className="w-full">
