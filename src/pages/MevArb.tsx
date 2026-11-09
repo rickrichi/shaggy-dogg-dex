@@ -175,17 +175,17 @@ function ChainCard({ c, now }: { c: ChainSummary; now: number }) {
       </CardHeader>
       <CardContent className="space-y-4 text-sm">
         <div className="text-xs text-muted-foreground">
-          Block #{c.lastBlock ?? "—"} ({ago(c.lastBlockAt, now)}) · watching {c.venues.v2} v2 pairs,{" "}
-          {c.venues.v3} v3 pools, {c.venues.v4} v4 pools · {c.totals.candidates.toLocaleString()}{" "}
-          price gaps seen · {c.totals.simulated.toLocaleString()} simulated ·{" "}
-          {c.totals.profitableBeforeGas} profitable before gas ·{" "}
-          <strong>{c.totals.worthSending} worth sending</strong>
+          Block #{c.lastBlock ?? "—"} ({ago(c.lastBlockAt, now)}) · watching {c.spreads.length}{" "}
+          pairs ({c.venues.v2} v2 pairs, {c.venues.v3} v3 pools, {c.venues.v4} v4 pools) ·{" "}
+          {c.totals.candidates.toLocaleString()} price gaps seen ·{" "}
+          {c.totals.simulated.toLocaleString()} simulated · {c.totals.profitableBeforeGas}{" "}
+          profitable before gas · <strong>{c.totals.worthSending} worth sending</strong>
           {c.mode === "live" ? ` · ${c.totals.submissions} sent, ${c.totals.landed} landed` : ""}
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="max-h-72 overflow-auto">
           <table className="w-full">
-            <thead className="text-left text-xs text-muted-foreground">
+            <thead className="sticky top-0 bg-card text-left text-xs text-muted-foreground">
               <tr>
                 <th className="py-1 pr-3">Pair</th>
                 <th className="pr-3">Pools</th>
@@ -195,29 +195,32 @@ function ChainCard({ c, now }: { c: ChainSummary; now: number }) {
               </tr>
             </thead>
             <tbody>
-              {c.spreads.map((s) => {
-                const prices = s.venues.map((v) => v.price);
-                const lo = Math.min(...prices);
-                const hi = Math.max(...prices);
-                const digits = hi >= 100 ? 2 : 6;
-                return (
-                  <tr key={s.pair} className="border-t">
-                    <td className="py-1 pr-3 font-medium">{s.pair}</td>
-                    <td className="pr-3">{s.venues.length}</td>
-                    <td className="pr-3 tabular-nums">
-                      {lo.toFixed(digits)} – {hi.toFixed(digits)}
-                    </td>
-                    <td
-                      className={`pr-3 tabular-nums ${s.bestEdgeBps !== null && s.bestEdgeBps > 0 ? "font-semibold text-emerald-600" : ""}`}
-                    >
-                      {s.bestEdgeBps === null ? "—" : `${s.bestEdgeBps.toFixed(2)} bp`}
-                    </td>
-                    <td className="text-muted-foreground">
-                      {s.buy && s.sell ? `${s.buy} → ${s.sell}` : "—"}
-                    </td>
-                  </tr>
-                );
-              })}
+              {[...c.spreads]
+                .sort((a, b) => (b.bestEdgeBps ?? -Infinity) - (a.bestEdgeBps ?? -Infinity))
+                .map((s) => {
+                  const prices = s.venues.map((v) => v.price);
+                  const hasPrices = prices.length > 0;
+                  const lo = hasPrices ? Math.min(...prices) : 0;
+                  const hi = hasPrices ? Math.max(...prices) : 0;
+                  const digits = hi >= 100 ? 2 : 6;
+                  return (
+                    <tr key={s.pair} className="border-t">
+                      <td className="py-1 pr-3 font-medium">{s.pair}</td>
+                      <td className="pr-3">{s.venues.length}</td>
+                      <td className="pr-3 tabular-nums">
+                        {hasPrices ? `${lo.toFixed(digits)} – ${hi.toFixed(digits)}` : "—"}
+                      </td>
+                      <td
+                        className={`pr-3 tabular-nums ${s.bestEdgeBps !== null && s.bestEdgeBps > 0 ? "font-semibold text-emerald-600" : ""}`}
+                      >
+                        {s.bestEdgeBps === null ? "—" : `${s.bestEdgeBps.toFixed(2)} bp`}
+                      </td>
+                      <td className="text-muted-foreground">
+                        {s.buy && s.sell ? `${s.buy} → ${s.sell}` : "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
             </tbody>
           </table>
         </div>
