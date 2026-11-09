@@ -37,6 +37,8 @@ const STORAGE_PREFIX = "shaggy:arb-executor:";
 const V2_STORAGE_PREFIX = "shaggy:arb-executor-v2:";
 const DEFAULT_ETHEREUM_EXECUTOR = "0xeB9b695770BE083b6bE7f40B9F4682EcC5793179";
 const DEFAULT_BASE_EXECUTOR = "0x48a3e5e013B30E12d66008b62fF74840aA9611E5";
+const DEFAULT_ETHEREUM_EXECUTOR_V2 = "0x41f40bae5318f2c67a4d04d1dc7a42d53a346ae7";
+const DEFAULT_BASE_EXECUTOR_V2 = "0x5FAca3396c177ad8a9D84655772a8a00038fD639";
 
 export function ArbExecutorDeployCard() {
   const wagmiConfig = useContext(WagmiContext);
@@ -71,12 +73,13 @@ function ArbExecutorDeployCardInner() {
   const [v2Addresses, setV2Addresses] = useState<Record<string, string>>(() => ({
     ethereum:
       typeof window === "undefined"
-        ? ""
-        : window.localStorage.getItem(`${V2_STORAGE_PREFIX}ethereum`) || "",
+        ? DEFAULT_ETHEREUM_EXECUTOR_V2
+        : window.localStorage.getItem(`${V2_STORAGE_PREFIX}ethereum`) ||
+          DEFAULT_ETHEREUM_EXECUTOR_V2,
     base:
       typeof window === "undefined"
-        ? ""
-        : window.localStorage.getItem(`${V2_STORAGE_PREFIX}base`) || "",
+        ? DEFAULT_BASE_EXECUTOR_V2
+        : window.localStorage.getItem(`${V2_STORAGE_PREFIX}base`) || DEFAULT_BASE_EXECUTOR_V2,
   }));
   const [deployTxByChain, setDeployTxByChain] = useState<Partial<Record<"ethereum" | "base", Hex>>>(
     {},
@@ -599,7 +602,7 @@ function ArbExecutorDeployCardInner() {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <div className="text-xs text-muted-foreground">
-                  Deployed {chainConfig.name} ArbExecutor Address
+                  Legacy {chainConfig.name} ArbExecutor V1 Address
                 </div>
                 <a
                   href={`${chainConfig.explorerUrl}/address/${deployedForChain}`}
@@ -627,7 +630,7 @@ function ArbExecutorDeployCardInner() {
                   disabled={!isConnected || isSending}
                   onClick={() => handleFund(deployedForChain, "0.0005")}
                 >
-                  1. Fund Executor Bribe Float (0.0005 ETH)
+                  Fund Legacy V1 Bribe Float (0.0005 ETH)
                 </Button>
               ) : null}
               <Button
