@@ -532,16 +532,28 @@ function ArbExecutorDeployCardInner() {
             ) : null}
           </div>
           {v2Addresses[targetChain] ? (
-            <div className="text-xs">
-              Verified deployment candidate: {" "}
-              <a
-                href={`${chainConfig.explorerUrl}/address/${v2Addresses[targetChain]}`}
-                target="_blank"
-                rel="noreferrer"
-                className="font-mono font-semibold underline"
-              >
-                {v2Addresses[targetChain]}
-              </a>
+            <div className="space-y-2 text-xs">
+              <div>
+                Verified deployment candidate: {" "}
+                <a
+                  href={`${chainConfig.explorerUrl}/address/${v2Addresses[targetChain]}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-mono font-semibold underline"
+                >
+                  {v2Addresses[targetChain]}
+                </a>
+              </div>
+              {targetChain === "ethereum" ? (
+                <Button
+                  size="sm"
+                  className="bg-violet-600 text-white hover:bg-violet-700"
+                  disabled={!isConnected || isSending}
+                  onClick={() => handleFund(v2Addresses.ethereum, "0.0005")}
+                >
+                  Fund Ethereum V2 Bribe Float (0.0005 ETH)
+                </Button>
+              ) : null}
             </div>
           ) : null}
         </div>
