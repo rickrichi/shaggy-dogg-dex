@@ -1,7 +1,6 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useState } from "react";
 
 import {
-  encodeDeployData,
   formatEther,
   getAddress,
   type Hex,
@@ -15,7 +14,6 @@ import {
   usePublicClient,
   useSendTransaction,
   useSwitchChain,
-  useWaitForTransactionReceipt,
   WagmiContext,
 } from "wagmi";
 
@@ -24,16 +22,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ARB_DEPLOY_CHAINS,
-  ARB_EXECUTOR_BYTECODE,
-  ARB_EXECUTOR_CONSTRUCTOR_ABI,
   DEFAULT_FLASHBOTS_AUTH_ADDRESS,
   DEFAULT_OPERATOR_ADDRESS,
   SHAGGY_DOGG_OWNER,
 } from "@/config/arbExecutorArtifact";
 
-const STORAGE_PREFIX = "shaggy:arb-executor:";
-const DEFAULT_ETHEREUM_EXECUTOR = "0xeB9b695770BE083b6bE7f40B9F4682EcC5793179";
-const DEFAULT_BASE_EXECUTOR = "0x48a3e5e013B30E12d66008b62fF74840aA9611E5";
 const DEFAULT_ETHEREUM_EXECUTOR_V2 = "0x41f40bae5318f2c67a4d04d1dc7a42d53a346ae7";
 const DEFAULT_BASE_EXECUTOR_V2 = "0x5FAca3396c177ad8a9D84655772a8a00038fD639";
 
@@ -46,41 +39,22 @@ export function ArbExecutorDeployCard() {
 function ArbExecutorDeployCardInner() {
   const { address, isConnected } = useAccount();
   const activeChainId = useChainId();
-  const { switchChainAsync, isPending: isSwitching } = useSwitchChain();
+  const { switchChainAsync } = useSwitchChain();
 
   const [targetChain, setTargetChain] = useState<"ethereum" | "base">("ethereum");
-  const [ownerInput, setOwnerInput] = useState<string>(SHAGGY_DOGG_OWNER);
-  const [beneficiaryInput, setBeneficiaryInput] = useState<string>(SHAGGY_DOGG_OWNER);
-  const [operatorInput, setOperatorInput] = useState<string>(DEFAULT_OPERATOR_ADDRESS);
-  const [deployedAddresses, setDeployedAddresses] = useState<Record<string, string>>(() => {
-    if (typeof window === "undefined") {
-      return { ethereum: DEFAULT_ETHEREUM_EXECUTOR, base: DEFAULT_BASE_EXECUTOR };
-    }
-    const storedEth = window.localStorage.getItem(`${STORAGE_PREFIX}ethereum`);
-    const validEth =
-      storedEth && storedEth.toLowerCase() !== DEFAULT_BASE_EXECUTOR.toLowerCase()
-        ? storedEth
-        : DEFAULT_ETHEREUM_EXECUTOR;
-    window.localStorage.setItem(`${STORAGE_PREFIX}ethereum`, validEth);
-    return {
-      ethereum: validEth,
-      base: window.localStorage.getItem(`${STORAGE_PREFIX}base`) || DEFAULT_BASE_EXECUTOR,
-    };
-  });
+  const ownerInput = SHAGGY_DOGG_OWNER;
+  const beneficiaryInput = SHAGGY_DOGG_OWNER;
+  const operatorInput = DEFAULT_OPERATOR_ADDRESS;
   const v2Addresses: Record<"ethereum" | "base", string> = {
     ethereum: DEFAULT_ETHEREUM_EXECUTOR_V2,
     base: DEFAULT_BASE_EXECUTOR_V2,
   };
-  const [deployTxByChain, setDeployTxByChain] = useState<Partial<Record<"ethereum" | "base", Hex>>>(
-    {},
-  );
   const [fundTxByChain, setFundTxByChain] = useState<Partial<Record<"ethereum" | "base", Hex>>>({});
   const [localError, setLocalError] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   const chainConfig = ARB_DEPLOY_CHAINS[targetChain];
   const publicClient = usePublicClient({ chainId: chainConfig.chainId });
-  const currentDeployTxHash = deployTxByChain[targetChain];
   const currentFundTxHash = fundTxByChain[targetChain];
 
   const { data: ethBalance } = useBalance({
@@ -105,32 +79,10 @@ function ArbExecutorDeployCardInner() {
   });
 
   const { sendTransactionAsync, isPending: isSending } = useSendTransaction();
-  const { data: deployReceipt, isLoading: isConfirmingDeploy } = useWaitForTransactionReceipt({
-    hash: currentDeployTxHash,
-    chainId: chainConfig.chainId,
-  });
-
-  useEffect(() => {
-    if (deployReceipt?.contractAddress) {
-      const addr = getAddress(deployReceipt.contractAddress);
-      setDeployedAddresses((prev) => {
-        const next = { ...prev, [targetChain]: addr };
-        if (typeof window !== "undefined") {
-          window.localStorage.setItem(`${STORAGE_PREFIX}${targetChain}`, addr);
-        }
-        return next;
-      });
-      setDeployTxByChain((prev) => ({ ...prev, [targetChain]: undefined }));
-    }
-  }, [deployReceipt, targetChain]);
-
-
   const isShaggyConnected =
     isConnected &&
     Boolean(address) &&
     address!.toLowerCase() === SHAGGY_DOGG_OWNER.toLowerCase();
-  const isWrongChain = isConnected && activeChainId !== chainConfig.chainId;
-  const deployedForChain = deployedAddresses[targetChain] || "";
 
   const ethBalNum = ethBalance ? Number(formatEther(ethBalance.value)) : 0;
   const baseBalNum = baseBalance ? Number(formatEther(baseBalance.value)) : 0;
@@ -138,7 +90,7 @@ function ArbExecutorDeployCardInner() {
   const opEthBalNum = opEthBalance ? Number(formatEther(opEthBalance.value)) : 0;
   const opBaseBalNum = opBaseBalance ? Number(formatEther(opBaseBalance.value)) : 0;
   const needsEthBridge =
-    !deployedForChain && targetChain === "ethereum" && ethBalNum < 0.0002 && baseBalNum > 0.001;
+    targetChain === "ethereum" && ethBalNum < 0.0002 && baseBalNum > 0.001;
 
   const openWalletModal = (preferQr: boolean) => {
     window.dispatchEvent(
@@ -168,62 +120,6 @@ function ArbExecutorDeployCardInner() {
     } catch {
       // Omitting overrides delegates fee estimation to the wallet/provider.
       return {};
-    }
-  };
-
-  const handleDeploy = async () => {
-    setLocalError(null);
-    if (!isAddress(ownerInput)) {
-      setLocalError("Owner must be a valid 0x address.");
-      return;
-    }
-    if (!isAddress(beneficiaryInput)) {
-      setLocalError("Beneficiary must be a valid 0x address.");
-      return;
-    }
-    if (!isAddress(operatorInput)) {
-      setLocalError("Operator must be a valid 0x address.");
-      return;
-    }
-    const owner = getAddress(ownerInput);
-    const beneficiary = getAddress(beneficiaryInput);
-    const operator = getAddress(operatorInput);
-    if (owner.toLowerCase() === operator.toLowerCase()) {
-      setLocalError("Owner and Operator must be different addresses.");
-      return;
-    }
-
-    try {
-      if (activeChainId !== chainConfig.chainId) {
-        await switchChainAsync({ chainId: chainConfig.chainId });
-      }
-      const deployData = encodeDeployData({
-        abi: ARB_EXECUTOR_CONSTRUCTOR_ABI,
-        bytecode: ARB_EXECUTOR_BYTECODE,
-        args: [
-          owner,
-          operator,
-          beneficiary,
-          chainConfig.maxBribeWei,
-          chainConfig.poolManager,
-          chainConfig.weth,
-          [...chainConfig.quotes],
-        ],
-      });
-      const feeOverrides = await getDynamicEip1559Fees();
-      const hash = await sendTransactionAsync({
-        chainId: chainConfig.chainId,
-        data: deployData,
-        value: 0n,
-        ...(targetChain === "ethereum" ? { gas: 2_250_000n, ...feeOverrides } : {}),
-      });
-      setDeployTxByChain((prev) => ({ ...prev, [targetChain]: hash }));
-    } catch (err) {
-      const msg =
-        (err as { shortMessage?: string; message?: string })?.shortMessage ||
-        (err as { message?: string })?.message ||
-        "Deployment transaction cancelled or failed.";
-      setLocalError(msg);
     }
   };
 
@@ -339,7 +235,7 @@ function ArbExecutorDeployCardInner() {
               Bridge 0.004 ETH (Base → Ethereum L1)
             </a>{" "}
             to move funds to Ethereum Mainnet. Review the bridge quote, fees, destination amount,
-            and network before approving, then click Deploy below.
+            and network before approving any transaction.
           </div>
         ) : null}
 
@@ -368,7 +264,7 @@ function ArbExecutorDeployCardInner() {
               <code className="text-xs">{address}</code>
             </div>
             <span className="text-xs text-muted-foreground">
-              Ready to deploy on {chainConfig.name}
+              V2 verified on {chainConfig.name}
             </span>
           </div>
         ) : (
@@ -390,7 +286,7 @@ function ArbExecutorDeployCardInner() {
             <input
               type="text"
               value={ownerInput}
-              onChange={(e) => setOwnerInput(e.target.value.trim())}
+              readOnly
               className="mt-1 w-full rounded border bg-background px-2 py-1 font-mono text-xs"
             />
           </div>
@@ -401,7 +297,7 @@ function ArbExecutorDeployCardInner() {
             <input
               type="text"
               value={beneficiaryInput}
-              onChange={(e) => setBeneficiaryInput(e.target.value.trim())}
+              readOnly
               className="mt-1 w-full rounded border bg-background px-2 py-1 font-mono text-xs"
             />
           </div>
@@ -412,7 +308,7 @@ function ArbExecutorDeployCardInner() {
             <input
               type="text"
               value={operatorInput}
-              onChange={(e) => setOperatorInput(e.target.value.trim())}
+              readOnly
               className="mt-1 w-full rounded border bg-background px-2 py-1 font-mono text-xs"
             />
           </div>
@@ -469,103 +365,24 @@ function ArbExecutorDeployCardInner() {
           ) : null}
         </div>
 
-        {/* Action buttons */}
-        <div className="flex flex-wrap items-center gap-3">
-          <Button
-            disabled={!isConnected || isSending || isConfirmingDeploy || isSwitching}
-            onClick={handleDeploy}
-          >
-            {isSwitching
-              ? `Switching to ${chainConfig.name}…`
-              : isSending
-                ? "Confirm in MetaMask…"
-                : isConfirmingDeploy
-                  ? "Waiting for on-chain confirmation…"
-                  : isWrongChain
-                    ? `Switch to ${chainConfig.name} & Deploy ArbExecutor`
-                    : `Deploy ArbExecutor on ${chainConfig.name}`}
-          </Button>
-
-          {currentDeployTxHash ? (
-            <a
-              href={`${chainConfig.explorerUrl}/tx/${currentDeployTxHash}`}
-              target="_blank"
-              rel="noreferrer"
-              className="text-xs underline"
-            >
-              View deploy tx {currentDeployTxHash.slice(0, 10)}…
-            </a>
-          ) : null}
-        </div>
-
         {localError ? (
           <div className="rounded-md border border-destructive p-2 text-xs text-destructive">
             {localError}
           </div>
         ) : null}
 
-        {/* Post-deploy status & funding helpers */}
-        {deployedForChain ? (
-          <div className="space-y-3 rounded-md border border-emerald-500/50 bg-emerald-500/5 p-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <div className="text-xs text-muted-foreground">
-                  Legacy {chainConfig.name} ArbExecutor V1 Address
-                </div>
-                <a
-                  href={`${chainConfig.explorerUrl}/address/${deployedForChain}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-mono text-sm font-semibold text-emerald-600 underline"
-                >
-                  {deployedForChain}
-                </a>
-              </div>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => copyText("executor", deployedForChain)}
-              >
-                {copiedKey === "executor" ? "Copied!" : "Copy Executor Address"}
-              </Button>
-            </div>
-
-            <div className="flex flex-wrap gap-2 pt-1">
-              {targetChain === "ethereum" ? (
-                <Button
-                  size="sm"
-                  className="bg-emerald-600 text-white hover:bg-emerald-700"
-                  disabled={!isConnected || isSending}
-                  onClick={() => handleFund(deployedForChain, "0.0005")}
-                >
-                  Fund Legacy V1 Bribe Float (0.0005 ETH)
-                </Button>
-              ) : null}
-              <Button
-                size="sm"
-                className="bg-blue-600 text-white hover:bg-blue-700"
-                disabled={!isConnected || isSending}
-                onClick={() =>
-                  handleFund(operatorInput, targetChain === "ethereum" ? "0.0003" : "0.002")
-                }
-              >
-                {targetChain === "ethereum"
-                  ? "2. Fund Operator Gas (0.0003 ETH)"
-                  : "Fund Operator Gas on Base (0.002 ETH)"}
-              </Button>
-              {currentFundTxHash ? (
-                <a
-                  href={`${chainConfig.explorerUrl}/tx/${currentFundTxHash}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="self-center text-xs underline"
-                >
-                  Funding tx {currentFundTxHash.slice(0, 10)}…
-                </a>
-              ) : null}
-            </div>
-
-            <div>
+        <div className="rounded-md border border-violet-500/40 bg-violet-500/5 p-3">
+          {currentFundTxHash ? (
+            <a
+              href={`${chainConfig.explorerUrl}/tx/${currentFundTxHash}`}
+              target="_blank"
+              rel="noreferrer"
+              className="mb-3 block text-xs underline"
+            >
+              V2 funding tx {currentFundTxHash.slice(0, 10)}…
+            </a>
+          ) : null}
+          <div>
               <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
                 <span>VM Config (`/etc/uni-arb.env` on GCE `market-data`):</span>
                 <Button
@@ -580,9 +397,8 @@ function ArbExecutorDeployCardInner() {
               <pre className="overflow-x-auto rounded border bg-background p-2 font-mono text-xs">
                 {envSnippet}
               </pre>
-            </div>
           </div>
-        ) : null}
+        </div>
       </CardContent>
     </Card>
   );
