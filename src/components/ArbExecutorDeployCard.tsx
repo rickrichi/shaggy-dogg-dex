@@ -1,7 +1,6 @@
 import { useContext, useEffect, useState } from "react";
 
 import {
-  type Abi,
   encodeDeployData,
   formatEther,
   getAddress,
@@ -20,7 +19,6 @@ import {
   WagmiContext,
 } from "wagmi";
 
-import arbExecutorV2Artifact from "@/abi/ArbExecutorV2.json";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,7 +32,6 @@ import {
 } from "@/config/arbExecutorArtifact";
 
 const STORAGE_PREFIX = "shaggy:arb-executor:";
-const V2_STORAGE_PREFIX = "shaggy:arb-executor-v2:";
 const DEFAULT_ETHEREUM_EXECUTOR = "0xeB9b695770BE083b6bE7f40B9F4682EcC5793179";
 const DEFAULT_BASE_EXECUTOR = "0x48a3e5e013B30E12d66008b62fF74840aA9611E5";
 const DEFAULT_ETHEREUM_EXECUTOR_V2 = "0x41f40bae5318f2c67a4d04d1dc7a42d53a346ae7";
@@ -70,23 +67,13 @@ function ArbExecutorDeployCardInner() {
       base: window.localStorage.getItem(`${STORAGE_PREFIX}base`) || DEFAULT_BASE_EXECUTOR,
     };
   });
-  const [v2Addresses, setV2Addresses] = useState<Record<string, string>>(() => ({
-    ethereum:
-      typeof window === "undefined"
-        ? DEFAULT_ETHEREUM_EXECUTOR_V2
-        : window.localStorage.getItem(`${V2_STORAGE_PREFIX}ethereum`) ||
-          DEFAULT_ETHEREUM_EXECUTOR_V2,
-    base:
-      typeof window === "undefined"
-        ? DEFAULT_BASE_EXECUTOR_V2
-        : window.localStorage.getItem(`${V2_STORAGE_PREFIX}base`) || DEFAULT_BASE_EXECUTOR_V2,
-  }));
+  const v2Addresses: Record<"ethereum" | "base", string> = {
+    ethereum: DEFAULT_ETHEREUM_EXECUTOR_V2,
+    base: DEFAULT_BASE_EXECUTOR_V2,
+  };
   const [deployTxByChain, setDeployTxByChain] = useState<Partial<Record<"ethereum" | "base", Hex>>>(
     {},
   );
-  const [v2DeployTxByChain, setV2DeployTxByChain] = useState<
-    Partial<Record<"ethereum" | "base", Hex>>
-  >({});
   const [fundTxByChain, setFundTxByChain] = useState<Partial<Record<"ethereum" | "base", Hex>>>({});
   const [localError, setLocalError] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -94,7 +81,6 @@ function ArbExecutorDeployCardInner() {
   const chainConfig = ARB_DEPLOY_CHAINS[targetChain];
   const publicClient = usePublicClient({ chainId: chainConfig.chainId });
   const currentDeployTxHash = deployTxByChain[targetChain];
-  const currentV2DeployTxHash = v2DeployTxByChain[targetChain];
   const currentFundTxHash = fundTxByChain[targetChain];
 
   const { data: ethBalance } = useBalance({
@@ -106,7 +92,7 @@ function ArbExecutorDeployCardInner() {
     chainId: 8453,
   });
   const { data: execEthBalance } = useBalance({
-    address: (deployedAddresses.ethereum || DEFAULT_ETHEREUM_EXECUTOR) as `0x${string}`,
+    address: (v2Addresses.ethereum || DEFAULT_ETHEREUM_EXECUTOR_V2) as `0x${string}`,
     chainId: 1,
   });
   const { data: opEthBalance } = useBalance({
@@ -123,11 +109,6 @@ function ArbExecutorDeployCardInner() {
     hash: currentDeployTxHash,
     chainId: chainConfig.chainId,
   });
-  const { data: v2DeployReceipt, isLoading: isConfirmingV2Deploy } =
-    useWaitForTransactionReceipt({
-      hash: currentV2DeployTxHash,
-      chainId: chainConfig.chainId,
-    });
 
   useEffect(() => {
     if (deployReceipt?.contractAddress) {
@@ -143,14 +124,6 @@ function ArbExecutorDeployCardInner() {
     }
   }, [deployReceipt, targetChain]);
 
-  useEffect(() => {
-    if (v2DeployReceipt?.contractAddress) {
-      const addr = getAddress(v2DeployReceipt.contractAddress);
-      setV2Addresses((prev) => ({ ...prev, [targetChain]: addr }));
-      window.localStorage.setItem(`${V2_STORAGE_PREFIX}${targetChain}`, addr);
-      setV2DeployTxByChain((prev) => ({ ...prev, [targetChain]: undefined }));
-    }
-  }, [targetChain, v2DeployReceipt]);
 
   const isShaggyConnected =
     isConnected &&
@@ -254,50 +227,6 @@ function ArbExecutorDeployCardInner() {
     }
   };
 
-  const handleDeployV2 = async () => {
-    setLocalError(null);
-    if (!isAddress(ownerInput) || !isAddress(beneficiaryInput) || !isAddress(operatorInput)) {
-      setLocalError("Owner, Beneficiary, and Operator must all be valid 0x addresses.");
-      return;
-    }
-    if (ownerInput.toLowerCase() === operatorInput.toLowerCase()) {
-      setLocalError("Owner and Operator must be different addresses.");
-      return;
-    }
-    try {
-      if (activeChainId !== chainConfig.chainId) {
-        await switchChainAsync({ chainId: chainConfig.chainId });
-      }
-      const deployData = encodeDeployData({
-        abi: arbExecutorV2Artifact.abi as Abi,
-        bytecode: arbExecutorV2Artifact.bytecode as Hex,
-        args: [
-          getAddress(ownerInput),
-          getAddress(operatorInput),
-          getAddress(beneficiaryInput),
-          chainConfig.maxBribeWei,
-          chainConfig.poolManager,
-          chainConfig.weth,
-          [...chainConfig.quotes],
-        ],
-      });
-      const feeOverrides = await getDynamicEip1559Fees();
-      const hash = await sendTransactionAsync({
-        chainId: chainConfig.chainId,
-        data: deployData,
-        value: 0n,
-        ...(targetChain === "ethereum" ? { ...feeOverrides } : {}),
-      });
-      setV2DeployTxByChain((prev) => ({ ...prev, [targetChain]: hash }));
-    } catch (err) {
-      const msg =
-        (err as { shortMessage?: string; message?: string })?.shortMessage ||
-        (err as { message?: string })?.message ||
-        "V2 deployment transaction cancelled or failed.";
-      setLocalError(msg);
-    }
-  };
-
   const handleFund = async (to: string, amountEth: string) => {
     setLocalError(null);
     if (!isAddress(to)) {
@@ -329,8 +258,8 @@ function ArbExecutorDeployCardInner() {
     "ARB_CHAINS=base,ethereum",
     "ARB_MODE=live",
     "LIVE_CONFIRM=I_ACCEPT_LOSSES",
-    `ARB_EXECUTOR_ETHEREUM=${deployedAddresses.ethereum || "<DEPLOY_ETHEREUM_EXECUTOR_ABOVE>"}`,
-    ...(deployedAddresses.base ? [`ARB_EXECUTOR_BASE=${deployedAddresses.base}`] : []),
+    `ARB_EXECUTOR_ETHEREUM=${v2Addresses.ethereum || DEFAULT_ETHEREUM_EXECUTOR_V2}`,
+    `ARB_EXECUTOR_BASE=${v2Addresses.base || DEFAULT_BASE_EXECUTOR_V2}`,
     "# Paste ARB_OPERATOR_PRIVATE_KEY and FLASHBOTS_AUTH_KEY from Desktop/mev-live-keys-DO-NOT-SHARE.txt",
   ].join("\n");
 
@@ -339,7 +268,7 @@ function ArbExecutorDeployCardInner() {
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
         <div>
           <CardTitle className="text-lg">
-            Deploy Live Flash-Swap Executor (ArbExecutor.sol)
+            Live Flash-Swap Executor (ArbExecutorV2.sol)
           </CardTitle>
           <CardDescription>
             Zero-capital Uniswap v4 flash-borrow executor · Pre-configured for ShaggyDogg (
@@ -355,7 +284,7 @@ function ArbExecutorDeployCardInner() {
               setTargetChain("ethereum");
             }}
           >
-            Ethereum Mainnet (Deployed ✅)
+            Ethereum Mainnet (V2 Deployed ✅)
           </Button>
           <Button
             size="sm"
@@ -365,7 +294,7 @@ function ArbExecutorDeployCardInner() {
               setTargetChain("base");
             }}
           >
-            Base Mainnet (Deployed ✅)
+            Base Mainnet (V2 Deployed ✅)
           </Button>
         </div>
       </CardHeader>
@@ -376,7 +305,7 @@ function ArbExecutorDeployCardInner() {
           <div>
             <strong>Live Bot Balances:</strong>{" "}
             <span className="ml-2">
-              Ethereum Executor Bribe Float:{" "}
+              Ethereum V2 Executor Bribe Float:{" "}
               <strong className="text-emerald-600">{execEthBalNum.toFixed(4)} ETH</strong>
             </span>{" "}
             ·{" "}
@@ -506,33 +435,12 @@ function ArbExecutorDeployCardInner() {
             </div>
             <p className="text-xs text-muted-foreground">
               Adds live post-swap sizing, per-venue v2 fees, and WETH-profit-funded builder bribes.
-              Deployment does not activate V2 automatically; the VM configuration is changed only
-              after its owner, operator, beneficiary, PoolManager, WETH, and quote allowlist are
-              verified on-chain.
+              Both deployments have been byte-for-byte verified on-chain. The configuration below
+              is ready to activate V2 on the VM.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <Button
-              className="bg-violet-600 text-white hover:bg-violet-700"
-              disabled={!isConnected || isSending || isConfirmingV2Deploy || isSwitching}
-              onClick={handleDeployV2}
-            >
-              {isConfirmingV2Deploy
-                ? "Waiting for V2 confirmation…"
-                : isWrongChain
-                  ? `Switch to ${chainConfig.name} & Deploy ArbExecutorV2`
-                  : `Deploy ArbExecutorV2 on ${chainConfig.name}`}
-            </Button>
-            {currentV2DeployTxHash ? (
-              <a
-                href={`${chainConfig.explorerUrl}/tx/${currentV2DeployTxHash}`}
-                target="_blank"
-                rel="noreferrer"
-                className="text-xs underline"
-              >
-                View V2 deploy tx {currentV2DeployTxHash.slice(0, 10)}…
-              </a>
-            ) : null}
+            <Badge className="bg-violet-600 text-white">V2 deployed & verified</Badge>
           </div>
           {v2Addresses[targetChain] ? (
             <div className="space-y-2 text-xs">
