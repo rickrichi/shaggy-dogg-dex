@@ -138,6 +138,17 @@ export interface BackrunSummary {
     avgDecisionMs?: number;
     avgSigningMs?: number;
     avgRelayMs?: number;
+    send?: StagePct & { samples: number };
+    stages?: {
+      prepMs: StagePct;
+      simMs: StagePct;
+      signingMs: StagePct;
+      relayMs: StagePct;
+      snapshotAgeMs: StagePct;
+      snapshotLagBlocks: StagePct;
+    };
+    relayNetworkFailures?: number;
+    eventLoopMs?: { p50: number; p99: number; max: number; at: string };
   };
   buildersSeen?: Record<string, number>;
   best: BackrunRow | null;
@@ -163,6 +174,13 @@ interface ExecutionFunnel {
   landed: number;
   realizedProfitQuote: number;
   realizedLossWei: string;
+  pending?: number;
+  unresolved?: number;
+}
+
+interface StagePct {
+  p50: number;
+  p95: number;
 }
 
 interface RiskSnapshot {
@@ -442,8 +460,13 @@ function BackrunCard({ b, now }: { b: BackrunSummary; now: number }) {
             {(b.sessionExecution ?? b.execution).accepted} relay accepted →{" "}
             <strong>{(b.sessionExecution ?? b.execution).landed} landed</strong> ·{" "}
             {(b.sessionExecution ?? b.execution).rejected} rejected · {(b.sessionExecution ?? b.execution).notIncluded} not included ·{" "}
-            {(b.sessionExecution ?? b.execution).reverted} reverted · realized{" "}
-            {(b.sessionExecution ?? b.execution).realizedProfitQuote.toFixed(4)} quote units. Lifetime: {b.execution.attempts} attempts / {b.execution.landed} landed.
+            {(b.sessionExecution ?? b.execution).reverted} reverted
+            {(b.sessionExecution ?? b.execution).pending !== undefined
+              ? ` · ${(b.sessionExecution ?? b.execution).pending} awaiting outcome`
+              : ""}{" "}
+            · realized {(b.sessionExecution ?? b.execution).realizedProfitQuote.toFixed(4)} quote units. Lifetime:{" "}
+            {b.execution.attempts} attempts / {b.execution.landed} landed
+            {b.execution.unresolved ? ` / ${b.execution.unresolved} unresolved across restarts` : ""}.
           </div>
         ) : null}
         {b.blindDiagnostics ? (
@@ -460,6 +483,23 @@ function BackrunCard({ b, now }: { b: BackrunSummary; now: number }) {
             {b.latencyMs.avgSimMs.toFixed(1)} ms · signing {(b.latencyMs.avgSigningMs ?? 0).toFixed(1)} ms · relay{" "}
             {(b.latencyMs.avgRelayMs ?? b.latencyMs.avgSendMs).toFixed(1)} ms ·{" "}
             builders: {Object.keys(b.buildersSeen ?? {}).join(", ") || "default relay set"}
+          </div>
+        ) : null}
+        {b.latencyMs?.stages ? (
+          <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+            Latency stages (p50 / p95):{" "}
+            {b.latencyMs.send && b.latencyMs.send.samples > 0
+              ? `hint→relay ${b.latencyMs.send.p50.toFixed(0)} / ${b.latencyMs.send.p95.toFixed(0)} ms · `
+              : ""}
+            state refresh {b.latencyMs.stages.prepMs.p50.toFixed(0)} / {b.latencyMs.stages.prepMs.p95.toFixed(0)} ms ·
+            simulation {b.latencyMs.stages.simMs.p50.toFixed(0)} / {b.latencyMs.stages.simMs.p95.toFixed(0)} ms · relay{" "}
+            {b.latencyMs.stages.relayMs.p50.toFixed(0)} / {b.latencyMs.stages.relayMs.p95.toFixed(0)} ms · snapshot age{" "}
+            {(b.latencyMs.stages.snapshotAgeMs.p50 / 1000).toFixed(1)} / {(b.latencyMs.stages.snapshotAgeMs.p95 / 1000).toFixed(1)} s
+            ({b.latencyMs.stages.snapshotLagBlocks.p50} / {b.latencyMs.stages.snapshotLagBlocks.p95} blocks behind)
+            {b.latencyMs.relayNetworkFailures ? ` · ${b.latencyMs.relayNetworkFailures} relay timeouts/network failures` : ""}
+            {b.latencyMs.eventLoopMs
+              ? ` · event-loop delay p99 ${b.latencyMs.eventLoopMs.p99.toFixed(0)} ms (max ${b.latencyMs.eventLoopMs.max.toFixed(0)} ms)`
+              : ""}
           </div>
         ) : null}
         {b.recent.length ? (

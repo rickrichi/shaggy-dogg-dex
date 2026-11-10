@@ -264,4 +264,83 @@ describe("MEV-Share backrun card", () => {
     expect(screen.getByText("v3 0.01% → v4 0.01%")).toBeTruthy();
     expect(screen.getByText(/blind:/)).toBeTruthy();
   });
+
+  it("shows pending outcomes, restart-orphaned bundles and per-stage latency", async () => {
+    const funnel = {
+      attempts: 6,
+      accepted: 4,
+      rejected: 2,
+      notIncluded: 3,
+      reverted: 0,
+      landed: 0,
+      realizedProfitQuote: 0,
+      realizedLossWei: "0",
+    };
+    const pct = (p50: number, p95: number) => ({ p50, p95 });
+    const withStages: ArbSummary = {
+      ...arb(),
+      backrun: {
+        chain: "ethereum",
+        mode: "live",
+        connected: true,
+        lastEventAt: new Date().toISOString(),
+        totals: {
+          events: 10,
+          swapHints: 1,
+          withSwapData: 0,
+          poolOnly: 1,
+          poolOnlyLanded: 0,
+          poolOnlySimulated: 0,
+          blindWorthSending: 0,
+          skippedBusy: 0,
+          simulated: 0,
+          profitableBeforeGas: 0,
+          worthSending: 0,
+          bundlesSent: 4,
+          landed: 0,
+          errors: 0,
+          rateLimited: 0,
+        },
+        execution: { ...funnel, pending: 1, unresolved: 2 },
+        sessionExecution: { ...funnel, pending: 1 },
+        latencyMs: {
+          samples: 3,
+          avgTotalMs: 900,
+          p50TotalMs: 800,
+          p95TotalMs: 1200,
+          lastTotalMs: 800,
+          avgSimMs: 0,
+          avgSendMs: 800,
+          send: { samples: 3, p50: 800, p95: 1200 },
+          stages: {
+            prepMs: pct(5, 9),
+            simMs: pct(0, 0),
+            signingMs: pct(1, 2),
+            relayMs: pct(750, 1100),
+            snapshotAgeMs: pct(4000, 11000),
+            snapshotLagBlocks: pct(0, 1),
+          },
+          relayNetworkFailures: 2,
+          eventLoopMs: { p50: 1, p99: 40, max: 90, at: new Date().toISOString() },
+        },
+        best: null,
+        recent: [],
+        submissions: [],
+      },
+    };
+    vi.stubGlobal(
+      "fetch",
+      byUrl(
+        () => new Response(JSON.stringify(summary())),
+        () => new Response(JSON.stringify(withStages))
+      )
+    );
+    renderPage();
+    expect(await screen.findByText(/1 awaiting outcome/)).toBeTruthy();
+    expect(screen.getByText(/2 unresolved across restarts/)).toBeTruthy();
+    expect(screen.getByText(/hint→relay 800 \/ 1200 ms/)).toBeTruthy();
+    expect(screen.getByText(/0 \/ 1 blocks behind/)).toBeTruthy();
+    expect(screen.getByText(/2 relay timeouts\/network failures/)).toBeTruthy();
+    expect(screen.getByText(/event-loop delay p99 40 ms/)).toBeTruthy();
+  });
 });
