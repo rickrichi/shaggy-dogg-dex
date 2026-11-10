@@ -46,6 +46,7 @@ export interface ChainSummary {
   };
   sessionTotals?: ChainSummary["totals"];
   execution?: ExecutionFunnel;
+  sessionExecution?: ExecutionFunnel;
   risk?: RiskSnapshot;
   best: ArbRow | null;
   spreads: Array<{
@@ -117,6 +118,14 @@ export interface BackrunSummary {
   };
   sessionTotals?: BackrunSummary["totals"];
   execution?: ExecutionFunnel;
+  sessionExecution?: ExecutionFunnel;
+  blindDiagnostics?: {
+    attempted: number;
+    skipped: number;
+    failed: number;
+    lastReason: string | null;
+    lastAt: string | null;
+  };
   risk?: RiskSnapshot;
   latencyMs?: {
     samples: number;
@@ -238,10 +247,13 @@ function ChainCard({ c, now }: { c: ChainSummary; now: number }) {
         ) : null}
         {c.execution ? (
           <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-            Execution funnel: {c.execution.attempts} attempts → {c.execution.accepted} relay/sequencer accepted →{" "}
-            <strong>{c.execution.landed} landed</strong> · {c.execution.rejected} rejected · {c.execution.notIncluded} not included ·{" "}
-            {c.execution.reverted} reverted · realized {c.execution.realizedProfitQuote.toFixed(4)} quote units · realized gas loss{" "}
-            {(Number(c.execution.realizedLossWei) / 1e18).toPrecision(3)} ETH
+            Current-session execution: {(c.sessionExecution ?? c.execution).attempts} attempts →{" "}
+            {(c.sessionExecution ?? c.execution).accepted} relay/sequencer accepted →{" "}
+            <strong>{(c.sessionExecution ?? c.execution).landed} landed</strong> ·{" "}
+            {(c.sessionExecution ?? c.execution).rejected} rejected · {(c.sessionExecution ?? c.execution).notIncluded} not included ·{" "}
+            {(c.sessionExecution ?? c.execution).reverted} reverted · realized{" "}
+            {(c.sessionExecution ?? c.execution).realizedProfitQuote.toFixed(4)} quote units · realized gas loss{" "}
+            {(Number((c.sessionExecution ?? c.execution).realizedLossWei) / 1e18).toPrecision(3)} ETH. Lifetime: {c.execution.attempts} attempts / {c.execution.landed} landed.
           </div>
         ) : null}
 
@@ -426,9 +438,19 @@ function BackrunCard({ b, now }: { b: BackrunSummary; now: number }) {
         ) : null}
         {b.execution ? (
           <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-            Submission audit: {b.execution.attempts} attempts → {b.execution.accepted} relay accepted →{" "}
-            <strong>{b.execution.landed} landed</strong> · {b.execution.rejected} rejected · {b.execution.notIncluded} not included ·{" "}
-            {b.execution.reverted} reverted · realized {b.execution.realizedProfitQuote.toFixed(4)} quote units
+            Current-session submission audit: {(b.sessionExecution ?? b.execution).attempts} attempts →{" "}
+            {(b.sessionExecution ?? b.execution).accepted} relay accepted →{" "}
+            <strong>{(b.sessionExecution ?? b.execution).landed} landed</strong> ·{" "}
+            {(b.sessionExecution ?? b.execution).rejected} rejected · {(b.sessionExecution ?? b.execution).notIncluded} not included ·{" "}
+            {(b.sessionExecution ?? b.execution).reverted} reverted · realized{" "}
+            {(b.sessionExecution ?? b.execution).realizedProfitQuote.toFixed(4)} quote units. Lifetime: {b.execution.attempts} attempts / {b.execution.landed} landed.
+          </div>
+        ) : null}
+        {b.blindDiagnostics ? (
+          <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+            Blind fanout diagnostics: {b.blindDiagnostics.attempted} attempted · {b.blindDiagnostics.skipped} skipped ·{" "}
+            {b.blindDiagnostics.failed} failed
+            {b.blindDiagnostics.lastReason ? ` · latest: ${b.blindDiagnostics.lastReason}` : ""}
           </div>
         ) : null}
         {b.latencyMs && b.latencyMs.samples > 0 ? (
