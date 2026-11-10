@@ -50,3 +50,4 @@ node_modules.corrupt-*/
 .browser-profile/
 dogfood-output/
 test-results/
+.tmp/
