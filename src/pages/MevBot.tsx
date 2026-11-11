@@ -34,6 +34,27 @@ export interface CompetitorRow {
   seenByUs: boolean;
 }
 
+export interface WinnerStats {
+  txs: number;
+  bonusEth: number;
+  paidEth: number;
+  shareP25: number | null;
+  shareMedian: number | null;
+  shareP75: number | null;
+}
+
+export interface WinnerRow {
+  t: string;
+  block: string;
+  tx: string;
+  liquidator: string;
+  pairs: string[];
+  bonusEth: number;
+  paidEth: number;
+  share: number | null;
+  afterOracleUpdate: boolean;
+}
+
 export interface MevSummary {
   version: 1;
   mode: string;
@@ -67,6 +88,12 @@ export interface MevSummary {
     simFailed: number;
     submissions: number;
     competitorTargets: number;
+  };
+  /** What winning liquidators earned and paid block builders. Absent on older bot builds. */
+  winners?: {
+    oracleBackruns: WinnerStats;
+    other: WinnerStats;
+    recent: WinnerRow[];
   };
   best: OpportunityRow | null;
   sumProfitEth: number;
@@ -114,6 +141,19 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
         {hint ? <div className="mt-1 text-xs text-muted-foreground">{hint}</div> : null}
       </CardContent>
     </Card>
+  );
+}
+
+const pct = (v: number | null) => (v === null ? "—" : `${(v * 100).toFixed(1)}%`);
+
+function WinnerLine({ label, w }: { label: string; w: WinnerStats }) {
+  return (
+    <p>
+      <strong>{label}:</strong> {w.txs.toLocaleString()} transactions · bonus {fmtEth(w.bonusEth)} ·
+      paid to builders {fmtEth(w.paidEth)} · winners kept {fmtEth(w.bonusEth - w.paidEth)} · payment
+      as share of bonus: median {pct(w.shareMedian)} (middle half {pct(w.shareP25)}–
+      {pct(w.shareP75)})
+    </p>
   );
 }
 
@@ -225,6 +265,64 @@ export default function MevBot() {
                   an update push under 1 · {s.oracle.simFailed} simulations reverted ·{" "}
                   {s.oracle.unreplayable} updates already landed before we could replay them
                 </p>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {s.winners ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">What winning liquidators paid</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <p className="text-muted-foreground">
+                  For every liquidation another bot makes: the bonus it earned (collateral seized
+                  minus debt repaid, at Aave&apos;s prices) and what it paid the block builder to
+                  win the slot. A bid has to beat that share to win.
+                </p>
+                <WinnerLine label="Right after an oracle update" w={s.winners.oracleBackruns} />
+                <WinnerLine label="Other liquidations" w={s.winners.other} />
+                {s.winners.recent.length ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="text-left text-xs text-muted-foreground">
+                        <tr>
+                          <th className="py-1 pr-3">When</th>
+                          <th className="pr-3">Pair</th>
+                          <th className="pr-3">Bonus</th>
+                          <th className="pr-3">Paid builder</th>
+                          <th className="pr-3">Share</th>
+                          <th className="pr-3">Oracle backrun?</th>
+                          <th>Transaction</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {s.winners.recent.map((w) => (
+                          <tr key={w.tx} className="border-t">
+                            <td className="whitespace-nowrap py-1 pr-3">{ago(w.t, now)}</td>
+                            <td className="pr-3">{w.pairs.join(", ")}</td>
+                            <td className="pr-3 tabular-nums">{fmtEth(w.bonusEth)}</td>
+                            <td className="pr-3 tabular-nums">{fmtEth(w.paidEth)}</td>
+                            <td className="pr-3 tabular-nums">{pct(w.share)}</td>
+                            <td className="pr-3">{w.afterOracleUpdate ? "yes" : "no"}</td>
+                            <td>
+                              <a
+                                className="inline-flex items-center gap-1 underline"
+                                href={`${ES}/tx/${w.tx}`}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                {short(w.tx)} <ExternalLink className="size-3" />
+                              </a>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <span className="text-muted-foreground">No liquidation measured yet.</span>
+                )}
               </CardContent>
             </Card>
           ) : null}

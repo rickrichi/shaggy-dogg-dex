@@ -176,6 +176,45 @@ describe("MEV bot page", () => {
     expect(screen.getByText(/2 liquidations by other bots/)).toBeTruthy();
   });
 
+  it("shows what winning liquidators paid the builder", async () => {
+    const stats = (txs: number, bonusEth: number, paidEth: number, median: number) => ({
+      txs,
+      bonusEth,
+      paidEth,
+      shareP25: median - 0.05,
+      shareMedian: median,
+      shareP75: median + 0.05,
+    });
+    const winners = {
+      oracleBackruns: stats(11, 49.52, 48.96, 0.988),
+      other: stats(8, 0.3367, 0.257, 0.743),
+      recent: [
+        {
+          t: new Date().toISOString(),
+          block: "26385480",
+          tx: "0xc5d9552baaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          liquidator: "0xCDB5681700000000000000000000000000000000",
+          pairs: ["wstETH→USDT", "WETH→USDC"],
+          bonusEth: 32.57,
+          paidEth: 32.17,
+          share: 0.988,
+          afterOracleUpdate: true,
+        },
+      ],
+    };
+    vi.stubGlobal(
+      "fetch",
+      byUrl(() => new Response(JSON.stringify(summary({ winners }))))
+    );
+    renderPage();
+    expect(await screen.findByText("What winning liquidators paid")).toBeTruthy();
+    expect(screen.getByText(/11 transactions/)).toBeTruthy();
+    expect(screen.getByText(/median 98.8%/)).toBeTruthy();
+    expect(screen.getByText("wstETH→USDT, WETH→USDC")).toBeTruthy();
+    expect(screen.getByText("32.5700 ETH")).toBeTruthy();
+    expect(screen.getByText("Oracle backrun?")).toBeTruthy();
+  });
+
   it("omits the oracle card for bot builds that do not report it", async () => {
     vi.stubGlobal(
       "fetch",
