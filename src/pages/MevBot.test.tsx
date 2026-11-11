@@ -150,6 +150,42 @@ describe("MEV bot page", () => {
     expect(screen.getByText("WETH→USDC")).toBeTruthy();
   });
 
+  it("shows oracle-update backrun counts when the bot reports them, and hides the card otherwise", async () => {
+    const oracle = {
+      hints: 120,
+      unreplayable: 3,
+      aaveUpdates: 14,
+      positionsPushedUnder: 5,
+      opportunities: 4,
+      viable: 1,
+      simFailed: 1,
+      submissions: 0,
+      competitorTargets: 2,
+    };
+    vi.stubGlobal(
+      "fetch",
+      byUrl(() => new Response(JSON.stringify(summary({ oracle }))))
+    );
+    renderPage();
+    expect(
+      await screen.findByText("Oracle-update backruns (Chainlink SVR via MEV-Share)")
+    ).toBeTruthy();
+    expect(screen.getByText(/120 oracle updates seen since restart/)).toBeTruthy();
+    expect(screen.getByText(/5 borrowers pushed under 1/)).toBeTruthy();
+    expect(screen.getByText("1 worth sending")).toBeTruthy();
+    expect(screen.getByText(/2 liquidations by other bots/)).toBeTruthy();
+  });
+
+  it("omits the oracle card for bot builds that do not report it", async () => {
+    vi.stubGlobal(
+      "fetch",
+      byUrl(() => new Response(JSON.stringify(summary())))
+    );
+    renderPage();
+    expect(await screen.findByText("Running")).toBeTruthy();
+    expect(screen.queryByText(/Oracle-update backruns/)).toBeNull();
+  });
+
   it("flags a bot that stopped reporting blocks", async () => {
     const old = new Date(Date.now() - 10 * 60_000).toISOString();
     vi.stubGlobal(

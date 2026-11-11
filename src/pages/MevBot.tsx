@@ -56,6 +56,18 @@ export interface MevSummary {
     errors: number;
     rateLimited: number;
   };
+  /** Chainlink SVR oracle-update backruns. Absent on bot builds before 2026-11-11. */
+  oracle?: {
+    hints: number;
+    unreplayable: number;
+    aaveUpdates: number;
+    positionsPushedUnder: number;
+    opportunities: number;
+    viable: number;
+    simFailed: number;
+    submissions: number;
+    competitorTargets: number;
+  };
   best: OpportunityRow | null;
   sumProfitEth: number;
   recentOpportunities: OpportunityRow[];
@@ -185,6 +197,37 @@ export default function MevBot() {
               hint={`${s.totals.competitorSeenByUs} we had flagged`}
             />
           </div>
+
+          {s.oracle ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">
+                  Oracle-update backruns (Chainlink SVR via MEV-Share)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <p className="text-muted-foreground">
+                  Most Aave liquidations happen in the same block as the price update that causes
+                  them. Chainlink sends those updates privately through MEV-Share with the new price
+                  in the hint, so the bot replays each update, finds the borrowers it pushes under
+                  health factor 1 and simulates liquidating them right behind it.
+                </p>
+                <p>
+                  {s.oracle.hints.toLocaleString()} oracle updates seen since restart ·{" "}
+                  {s.oracle.aaveUpdates.toLocaleString()} moved an Aave price ·{" "}
+                  {s.oracle.positionsPushedUnder.toLocaleString()} borrowers pushed under 1 ·{" "}
+                  {s.oracle.opportunities.toLocaleString()} liquidations simulated ·{" "}
+                  <strong>{s.oracle.viable.toLocaleString()} worth sending</strong>
+                  {s.mode === "live" ? ` · ${s.oracle.submissions} sent` : ""}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {s.oracle.competitorTargets} liquidations by other bots were of borrowers we saw
+                  an update push under 1 · {s.oracle.simFailed} simulations reverted ·{" "}
+                  {s.oracle.unreplayable} updates already landed before we could replay them
+                </p>
+              </CardContent>
+            </Card>
+          ) : null}
 
           <Card>
             <CardHeader>
