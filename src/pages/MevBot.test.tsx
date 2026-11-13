@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ARB_SUMMARY_PATH, type ArbSummary, fmtSigned } from "./MevArb";
-import MevBot, { fmtEth, MEV_SUMMARY_PATH, type MevSummary } from "./MevBot";
+import MevBot, { fmtEth, fmtSettlement, MEV_SUMMARY_PATH, type MevSummary } from "./MevBot";
 
 const summary = (over: Partial<MevSummary> = {}): MevSummary => ({
   version: 1,
@@ -38,6 +38,11 @@ const summary = (over: Partial<MevSummary> = {}): MevSummary => ({
     gasEth: 3.7e-5,
     netEth: null,
     decision: "profit does not cover gas",
+    settlementSymbol: "USDC",
+    settlementProfit: 0.0018,
+    profitRaw: "1800",
+    bribeEth: 0,
+    lifecycle: "simulated",
   },
   sumProfitEth: 0,
   recentOpportunities: [],
@@ -136,6 +141,8 @@ describe("MEV bot page", () => {
     expect(fmtEth(8.8e-7)).toBe("8.80e-7 ETH");
     expect(fmtEth(0.1234)).toBe("0.1234 ETH");
     expect(fmtEth(null)).toBe("—");
+    expect(fmtSettlement(summary().best!)).toBe("0.0018 USDC");
+    expect(fmtSettlement({ ...summary().best!, settlementProfit: undefined })).toBe("—");
   });
 
   it("shows the live summary from the bot's endpoint", async () => {
@@ -148,6 +155,54 @@ describe("MEV bot page", () => {
     expect(screen.getByText("88,476")).toBeTruthy();
     expect(screen.getByText("WETH→wstETH")).toBeTruthy();
     expect(screen.getByText("WETH→USDC")).toBeTruthy();
+    expect(screen.getByText("Settlement profit")).toBeTruthy();
+    expect(screen.getByText("0.0018 USDC")).toBeTruthy();
+    expect(screen.getByText("Builder payment")).toBeTruthy();
+    expect(screen.getByText("Projected net")).toBeTruthy();
+    expect(screen.getByText("Simulated opportunity total")).toBeTruthy();
+    expect(screen.getByText(/not earned, landed, or realized P&L/)).toBeTruthy();
+    expect(screen.getAllByText("simulated").length).toBeGreaterThan(0);
+  });
+
+  it("renders settlement economics and lifecycle in the recent evidence ledger", async () => {
+    const tx = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd";
+    const row = {
+      ...summary().best!,
+      settlementSymbol: "USDC",
+      settlementProfit: 23_795.357879,
+      profitRaw: "23795357879",
+      profitEth: 11.6463,
+      gasEth: 0.0000439,
+      bribeEth: 0.05,
+      netEth: 11.5963,
+      lifecycle: "realized" as const,
+      realizedProfit: 23_700.125,
+      realizedProfitEth: 11.6,
+      tx,
+      decision: "send",
+    };
+    const landed = { ...row, lifecycle: "landed" as const, realizedProfit: null, realizedProfitEth: null };
+    vi.stubGlobal(
+      "fetch",
+      byUrl(() => new Response(JSON.stringify(summary({
+        best: landed,
+        recentOpportunities: [row],
+        sumProfitEth: 99,
+        simulatedOpportunityTotalEth: 11.6463,
+      }))))
+    );
+    renderPage();
+    expect((await screen.findAllByText("23,795.357879 USDC")).length).toBeGreaterThanOrEqual(3);
+    expect(screen.getAllByText("0.0500 ETH").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("11.5963 ETH").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("landed").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("realized").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("23,700.125 USDC").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("11.6000 ETH").length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: /0xabcd/ }).every((link) => link.getAttribute("href") === `https://etherscan.io/tx/${tx}`)).toBe(true);
+    expect(screen.getAllByText("11.6463 ETH").length).toBeGreaterThan(0);
+    expect(screen.queryByText("99.0000 ETH")).toBeNull();
+    expect(screen.getAllByText("projected viable").length).toBeGreaterThan(0);
   });
 
   it("shows oracle-update backrun counts when the bot reports them, and hides the card otherwise", async () => {
