@@ -1,9 +1,9 @@
 // src/wagmi.ts
-import { createConfig, http } from "wagmi";
+import { createConfig, fallback, http } from "wagmi";
 import { arbitrum, base, mainnet, optimism, polygon, sepolia } from "wagmi/chains";
 import { coinbaseWallet, injected, metaMask, walletConnect } from "wagmi/connectors";
 
-import { createBaseReadTransport } from "@/lib/base-rpc";
+import { createBaseReadTransport, goldenFleasRelayTransport } from "@/lib/base-rpc";
 
 import type { Config } from "wagmi";
 
@@ -75,9 +75,18 @@ const createTransport = (network: string) => {
   const fallbackUrl = PUBLIC_FALLBACK[network];
 
   // Prefer Alchemy if available, else explicit public RPC, else default
-  if (alchemy) return http(alchemy, common);
-  if (fallbackUrl) return http(fallbackUrl, common);
-  return http(undefined, common);
+  const direct = alchemy
+    ? http(alchemy, common)
+    : fallbackUrl
+      ? http(fallbackUrl, common)
+      : http(undefined, common);
+
+  // Ethereum reads go through the Golden-Fleas relay first, falling back to the direct endpoint.
+  if (network === "mainnet") {
+    const relay = goldenFleasRelayTransport("ethereum");
+    if (relay.length) return fallback([...relay, direct], { retryCount: 1 });
+  }
+  return direct;
 };
 
 // ---------- CONNECTORS ----------

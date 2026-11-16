@@ -13,8 +13,18 @@ export const BASE_PUBLIC_RPC_URLS = [
 const GATEWAY_URL = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env
   ?.VITE_SHAGGY_RPC_URL;
 
+// Same-origin relay (api/rpc/[network].ts) to the Golden-Fleas gateway. Its API key stays on the
+// server; the relay accepts read methods only. Absent outside the browser (tests, scripts).
+export function goldenFleasRelayTransport(network: "ethereum" | "base") {
+  const origin = (globalThis as { location?: { origin?: string } }).location?.origin;
+  if (!origin?.startsWith("http")) return [];
+  const url = new URL(`/api/rpc/${network}`, origin).href;
+  return [http(url, { batch: { batchSize: 20, wait: 16 }, timeout: 8_000, retryCount: 0 })];
+}
+
 export function createBaseReadTransport() {
   const transports = [
+    ...goldenFleasRelayTransport("base"),
     ...(GATEWAY_URL
       ? [http(GATEWAY_URL, { batch: { batchSize: 20, wait: 16 }, timeout: 8_000, retryCount: 0 })]
       : []),
