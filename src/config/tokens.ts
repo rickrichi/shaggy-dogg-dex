@@ -639,6 +639,14 @@ export const BASE_MAINNET_TOKENS = [
   },
   {
     kind: "erc20",
+    address: "0x3F6eB1ddBFc665A8760BC77d00125bA486871CfB" as Address,
+    symbol: "DSNAK",
+    name: "Doggy Snacks",
+    decimals: 18,
+    chainId: 8453,
+  },
+  {
+    kind: "erc20",
     address: "0xC17227AAa33C54634B6cE7AD0bf33A156563c179" as Address, // deployments/mrwd-base-mainnet.json
     symbol: "MRWD",
     name: "Mutt Rewards",
@@ -1096,6 +1104,7 @@ const DROPDOWN_SYMBOL_ORDER: readonly string[] = [
   "cbBTC",
   "WBTC",
   "SD",
+  "DSNAK",
   "MRWD",
   "FBA",
   "uSOL",

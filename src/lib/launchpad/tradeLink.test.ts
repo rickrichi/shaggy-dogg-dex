@@ -7,6 +7,7 @@ import { CANONICAL_LAUNCHED_TOKENS } from "./storage";
 import { tradeLinkFor } from "./tradeLink";
 
 const SD = "0x051c758521971f5c5a84edaf18eea12854375469";
+const DSNAK = "0x3F6eB1ddBFc665A8760BC77d00125bA486871CfB";
 
 describe("tradeLinkFor", () => {
   it("uses the parameter Swap actually reads for a listed token", () => {
@@ -21,6 +22,14 @@ describe("tradeLinkFor", () => {
     expect(tradeLinkFor(SD.toUpperCase().replace("0X", "0x") as `0x${string}`).external).toBe(
       false
     );
+  });
+
+  it("keeps DSNAK swaps inside the app", () => {
+    expect(tradeLinkFor(DSNAK)).toEqual({
+      href: `/swap?output=${DSNAK}`,
+      external: false,
+      label: "Trade Swap",
+    });
   });
 
   it("sends an unlisted launched token to Uniswap, not a wrong pair", () => {
@@ -59,6 +68,13 @@ describe("project tokens", () => {
     for (const token of CANONICAL_LAUNCHED_TOKENS) {
       expect(listed).toContain(token.tokenAddress.toLowerCase());
     }
+  });
+
+  it("lists DSNAK in the Base swap dropdown and portfolio watchlist", () => {
+    expect(getSwapDropdownTokens(8453).map((token) => token.symbol)).toContain("DSNAK");
+    expect(
+      tokenWatchlistForChain(8453).tokens.map((token) => token.address.toLowerCase())
+    ).toContain(DSNAK.toLowerCase());
   });
 
   it("keeps EQX off Swap until it has a market", () => {
