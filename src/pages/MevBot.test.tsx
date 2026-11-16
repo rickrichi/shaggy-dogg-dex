@@ -142,7 +142,8 @@ describe("MEV bot page", () => {
     expect(fmtEth(0.1234)).toBe("0.1234 ETH");
     expect(fmtEth(null)).toBe("—");
     expect(fmtSettlement(summary().best!)).toBe("0.0018 USDC");
-    expect(fmtSettlement({ ...summary().best!, settlementProfit: undefined })).toBe("—");
+    const { settlementProfit: _omitted, ...withoutSettlement } = summary().best!;
+    expect(fmtSettlement(withoutSettlement)).toBe("—");
   });
 
   it("shows the live summary from the bot's endpoint", async () => {
