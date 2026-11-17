@@ -380,7 +380,7 @@ function ChainCard({ c, now }: { c: ChainSummary; now: number }) {
                 <li key={s.tx ?? s.t} className="flex flex-wrap items-center gap-2">
                   {ago(s.t, now)} · {s.pair} · {s.status}
                   {s.status === "landed" ? ` · +${s.profitQuote} ${s.quote}` : ""}
-                  {s.tx ? (
+                  {s.tx && (s.status === "landed" || s.status === "reverted") ? (
                     <a
                       className="inline-flex items-center gap-1 underline"
                       href={`${ex}/tx/${s.tx}`}
@@ -389,17 +389,36 @@ function ChainCard({ c, now }: { c: ChainSummary; now: number }) {
                     >
                       {s.tx.slice(0, 10)}… <ExternalLink className="size-3" />
                     </a>
+                  ) : s.tx ? (
+                    <code
+                      className="text-xs"
+                      title="Private transaction hash; it will not exist on a block explorer unless included"
+                    >
+                      {s.tx.slice(0, 10)}…
+                    </code>
                   ) : null}
                 </li>
               ))}
             </ul>
+            <div className="mt-1 text-xs text-muted-foreground">
+              Private submissions marked not included were never placed on-chain, so block explorers
+              will not have a transaction page for them.
+            </div>
           </div>
         ) : null}
 
         <div className="text-xs text-muted-foreground">
           {c.blocksProcessed.toLocaleString()} state snapshots checked,{" "}
           {c.blocksSkipped.toLocaleString()} newer blocks observed while the previous scan was busy
-          · {c.totals.errors} errors ({c.totals.rateLimited} free-RPC rate limits)
+          {c.sessionTotals ? (
+            <>
+              {" "}· this session: {c.sessionTotals.errors} errors ({c.sessionTotals.rateLimited} RPC
+              rate limits) · lifetime: {c.totals.errors} errors ({c.totals.rateLimited} RPC rate
+              limits)
+            </>
+          ) : (
+            <> · {c.totals.errors} errors ({c.totals.rateLimited} RPC rate limits)</>
+          )}
         </div>
       </CardContent>
     </Card>

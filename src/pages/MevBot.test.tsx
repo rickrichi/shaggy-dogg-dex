@@ -315,6 +315,35 @@ describe("MEV bot page", () => {
     expect(screen.getByText(/state snapshots checked/)).toBeTruthy();
   });
 
+  it("does not link private transactions that were never included", async () => {
+    const data = arb();
+    const chain = data.chains[0]!;
+    chain.submissions = [
+      {
+        t: new Date().toISOString(),
+        block: "53816558",
+        pair: "WETH/USDC",
+        tx: "0xd877af273f4e37c9b801b89252c8aa95bd3b50e050d827b317945ce9936293d9",
+        quote: "USDC",
+        profitQuote: 0,
+        status: "not included",
+      },
+    ];
+    chain.sessionTotals = { ...chain.totals, errors: 1, rateLimited: 0 };
+    vi.stubGlobal(
+      "fetch",
+      byUrl(
+        () => new Response(JSON.stringify(summary())),
+        () => new Response(JSON.stringify(data))
+      )
+    );
+    renderPage();
+    expect(await screen.findByText(/Private submissions marked not included/)).toBeTruthy();
+    expect(screen.queryByRole("link", { name: /0xd877af27/ })).toBeNull();
+    expect(screen.getByTitle(/Private transaction hash/)).toHaveTextContent("0xd877af27…");
+    expect(screen.getByText(/this session: 1 errors \(0 RPC rate limits\)/)).toBeTruthy();
+  });
+
   it("formats signed amounts", () => {
     expect(fmtSigned(-1.5, "USDC")).toBe("−1.5000 USDC");
     expect(fmtSigned(0.00000123, "ETH")).toBe("0.00000123 ETH");
