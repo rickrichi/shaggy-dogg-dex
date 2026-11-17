@@ -464,12 +464,18 @@ describe("MEV-Share backrun card", () => {
         execution: { ...funnel, pending: 1, unresolved: 2 },
         sessionExecution: { ...funnel, pending: 1 },
         missAudit: {
-          total: 4,
-          outcomes: { competitor_backran: 2, would_have_succeeded: 1, user_swap_not_landed: 1 },
+          total: 5,
+          outcomes: { competitor_backran: 2, would_have_succeeded: 1, user_swap_not_landed: 1, inconclusive: 1 },
+          retries: 3,
+          errors: 4,
+          queueDropped: 1,
         },
         sessionMissAudit: {
           total: 2,
           outcomes: { competitor_backran: 1, would_have_succeeded: 1 },
+          retries: 1,
+          errors: 1,
+          queueDropped: 0,
         },
         latencyMs: {
           samples: 3,
@@ -512,6 +518,9 @@ describe("MEV-Share backrun card", () => {
     expect(screen.getByText(/event-loop delay p99 40 ms/)).toBeTruthy();
     expect(screen.getByText(/Accepted-bundle outcome audit: current session 2/)).toBeTruthy();
     expect(screen.getByText(/1 still profitable; builder\/bid lost/)).toBeTruthy();
-    expect(screen.getByText(/Lifetime 4/)).toBeTruthy();
+    expect(screen.getByText(/Lifetime 5/)).toBeTruthy();
+    expect(screen.getByText(/1 inconclusive after audit failures/)).toBeTruthy();
+    expect(screen.getByText(/Reliability: current session 1 retries · 1 RPC errors · 0 queue drops/)).toBeTruthy();
+    expect(screen.getByText(/lifetime 3 retries · 4 RPC errors · 1 queue drops/)).toBeTruthy();
   });
 });

@@ -166,11 +166,15 @@ type MissOutcome =
   | "landed_after_window"
   | "competitor_backran"
   | "would_have_succeeded"
-  | "would_have_reverted";
+  | "would_have_reverted"
+  | "inconclusive";
 
 interface MissAuditSummary {
   total: number;
   outcomes: Partial<Record<MissOutcome, number>>;
+  retries?: number;
+  errors?: number;
+  queueDropped?: number;
 }
 
 const MISS_LABEL: Record<MissOutcome, string> = {
@@ -182,6 +186,7 @@ const MISS_LABEL: Record<MissOutcome, string> = {
   competitor_backran: "competitor moved our route first",
   would_have_succeeded: "still profitable; builder/bid lost",
   would_have_reverted: "stale or no longer profitable",
+  inconclusive: "inconclusive after audit failures",
 };
 
 function missBreakdown(a: MissAuditSummary) {
@@ -524,11 +529,11 @@ function BackrunCard({ b, now }: { b: BackrunSummary; now: number }) {
             {b.execution.unresolved ? ` / ${b.execution.unresolved} unresolved across restarts` : ""}.
           </div>
         ) : null}
-        {b.missAudit && b.missAudit.total > 0 ? (
+        {b.missAudit && (b.missAudit.total > 0 || (b.missAudit.retries ?? 0) > 0 || (b.missAudit.errors ?? 0) > 0 || (b.missAudit.queueDropped ?? 0) > 0) ? (
           <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
             Accepted-bundle outcome audit: current session {b.sessionMissAudit?.total ?? 0}
             {b.sessionMissAudit?.total ? ` (${missBreakdown(b.sessionMissAudit)})` : ""}. Lifetime {b.missAudit.total}
-            {b.missAudit.total ? ` (${missBreakdown(b.missAudit)})` : ""}.
+            {b.missAudit.total ? ` (${missBreakdown(b.missAudit)})` : ""}. Reliability: current session {b.sessionMissAudit?.retries ?? 0} retries · {b.sessionMissAudit?.errors ?? 0} RPC errors · {b.sessionMissAudit?.queueDropped ?? 0} queue drops; lifetime {b.missAudit.retries ?? 0} retries · {b.missAudit.errors ?? 0} RPC errors · {b.missAudit.queueDropped ?? 0} queue drops.
           </div>
         ) : null}
         {b.blindDiagnostics ? (
