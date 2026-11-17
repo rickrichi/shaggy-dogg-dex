@@ -19,7 +19,7 @@ const list = [
   { name: "Arbitrum Sepolia", chain: arbitrumSepolia, rpc: "https://sepolia-rollup.arbitrum.io/rpc" },
   { name: "Optimism Sepolia", chain: optimismSepolia, rpc: "https://sepolia.optimism.io" },
   { name: "Base Mainnet", chain: base, rpc: "https://mainnet.base.org" },
-  { name: "Polygon", chain: polygon, rpc: "https://polygon-rpc.com" },
+  { name: "Polygon", chain: polygon, rpc: "https://polygon.drpc.org" },
   { name: "Arbitrum One", chain: arbitrum, rpc: "https://arb1.arbitrum.io/rpc" },
   { name: "Optimism Mainnet", chain: optimism, rpc: "https://mainnet.optimism.io" },
 ];

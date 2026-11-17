@@ -54,7 +54,7 @@ const PUBLIC_FALLBACK: Record<SupportedChainName, string | undefined> = {
   base: 'https://mainnet.base.org',
   arbitrum: 'https://arb1.arbitrum.io/rpc',
   optimism: 'https://mainnet.optimism.io',
-  polygon: 'https://polygon-rpc.com',
+  polygon: 'https://polygon.drpc.org',
   sepolia: 'https://rpc.sepolia.org',
 }
 

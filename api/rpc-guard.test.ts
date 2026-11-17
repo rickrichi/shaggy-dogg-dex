@@ -27,10 +27,11 @@ describe("RPC relay guard", () => {
     expect(checkRpcBody(JSON.stringify(batch))).toMatchObject({ ok: false, status: 400 });
   });
 
-  it("serves only Ethereum and Base", () => {
+  it("serves only Ethereum, Base and Polygon", () => {
     expect(relayNetwork("/api/rpc/base")).toBe("base");
     expect(relayNetwork("/api/rpc/ethereum/")).toBe("ethereum");
-    expect(relayNetwork("/api/rpc/polygon")).toBeNull();
+    expect(relayNetwork("/api/rpc/polygon")).toBe("polygon");
+    expect(relayNetwork("/api/rpc/arbitrum")).toBeNull();
     expect(relayNetwork("/api/rpc/../admin")).toBeNull();
   });
 

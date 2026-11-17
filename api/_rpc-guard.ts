@@ -6,7 +6,7 @@
  * Transactions are never relayed: the user's wallet signs and broadcasts them itself.
  */
 
-export const RELAY_NETWORKS = ["ethereum", "base"] as const;
+export const RELAY_NETWORKS = ["ethereum", "base", "polygon"] as const;
 export type RelayNetwork = (typeof RELAY_NETWORKS)[number];
 
 export const MAX_BODY_BYTES = 64 * 1024;

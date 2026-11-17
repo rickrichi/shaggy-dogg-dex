@@ -54,8 +54,14 @@ const PUBLIC_FALLBACK: Record<string, string | undefined> = {
   base: "https://mainnet.base.org",
   arbitrum: "https://arb1.arbitrum.io/rpc",
   optimism: "https://mainnet.optimism.io",
-  polygon: "https://polygon-rpc.com",
+  polygon: "https://polygon.drpc.org", // polygon-rpc.com now refuses keyless requests
   sepolia: undefined, // default wagmi
+};
+
+// wagmi network name -> Golden-Fleas relay route (Base has its own transport in base-rpc.ts).
+const RELAYED_NETWORKS: Record<string, "ethereum" | "polygon" | undefined> = {
+  mainnet: "ethereum",
+  polygon: "polygon",
 };
 
 const buildAlchemyUrl = (network: string) =>
@@ -81,9 +87,10 @@ const createTransport = (network: string) => {
       ? http(fallbackUrl, common)
       : http(undefined, common);
 
-  // Ethereum reads go through the Golden-Fleas relay first, falling back to the direct endpoint.
-  if (network === "mainnet") {
-    const relay = goldenFleasRelayTransport("ethereum");
+  // Ethereum and Polygon reads go through the Golden-Fleas relay first, falling back to the direct endpoint.
+  const relayName = RELAYED_NETWORKS[network];
+  if (relayName) {
+    const relay = goldenFleasRelayTransport(relayName);
     if (relay.length) return fallback([...relay, direct], { retryCount: 1 });
   }
   return direct;

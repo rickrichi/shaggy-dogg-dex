@@ -140,7 +140,7 @@ export default defineConfig(({ mode }) => {
   const apiUrl = (env.VITE_ARB_API_URL || 'http://localhost:8000').replace(/\/+$/, '');
   const wsUrl = env.VITE_ARB_WS_URL || `${apiUrl.replace(/^http/, 'ws')}/ws`;
   const arbOrigins = `${new URL(apiUrl).origin} ${new URL(wsUrl).origin}`;
-  const rpcOrigins = [...BASE_PUBLIC_RPC_URLS, 'https://arb1.arbitrum.io', 'https://mainnet.optimism.io', 'https://polygon-rpc.com', 'https://rpc.sepolia.org'].map(url => new URL(url).origin).join(' ');
+  const rpcOrigins = [...BASE_PUBLIC_RPC_URLS, 'https://arb1.arbitrum.io', 'https://mainnet.optimism.io', 'https://polygon.drpc.org', 'https://rpc.sepolia.org'].map(url => new URL(url).origin).join(' ');
   return {
     // ── Vite 7.x Configuration ──────────────────────────────────────────────
     appType: 'spa',

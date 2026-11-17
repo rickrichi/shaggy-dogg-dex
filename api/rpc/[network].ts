@@ -1,7 +1,7 @@
 /**
  * Browser-facing JSON-RPC relay to the Golden-Fleas gateway.
  *
- * Public route: POST /api/rpc/ethereum, POST /api/rpc/base
+ * Public route: POST /api/rpc/ethereum, /api/rpc/base, /api/rpc/polygon
  * Runtime: Vercel Edge
  *
  * The swap page reads chain data through this route so the Golden-Fleas API key stays on the

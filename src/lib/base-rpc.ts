@@ -15,7 +15,7 @@ const GATEWAY_URL = (import.meta as ImportMeta & { env?: Record<string, string |
 
 // Same-origin relay (api/rpc/[network].ts) to the Golden-Fleas gateway. Its API key stays on the
 // server; the relay accepts read methods only. Absent outside the browser (tests, scripts).
-export function goldenFleasRelayTransport(network: "ethereum" | "base") {
+export function goldenFleasRelayTransport(network: "ethereum" | "base" | "polygon") {
   const origin = (globalThis as { location?: { origin?: string } }).location?.origin;
   if (!origin?.startsWith("http")) return [];
   const url = new URL(`/api/rpc/${network}`, origin).href;
