@@ -126,6 +126,8 @@ export interface BackrunSummary {
     lastReason: string | null;
     lastAt: string | null;
   };
+  missAudit?: MissAuditSummary;
+  sessionMissAudit?: MissAuditSummary;
   risk?: RiskSnapshot;
   latencyMs?: {
     samples: number;
@@ -154,6 +156,40 @@ export interface BackrunSummary {
   best: BackrunRow | null;
   recent: BackrunRow[];
   submissions: ChainSummary["submissions"];
+}
+
+type MissOutcome =
+  | "landed"
+  | "no_user_tx_hash"
+  | "user_swap_not_landed"
+  | "landed_before_window"
+  | "landed_after_window"
+  | "competitor_backran"
+  | "would_have_succeeded"
+  | "would_have_reverted";
+
+interface MissAuditSummary {
+  total: number;
+  outcomes: Partial<Record<MissOutcome, number>>;
+}
+
+const MISS_LABEL: Record<MissOutcome, string> = {
+  landed: "our backrun landed",
+  no_user_tx_hash: "hint could not be followed",
+  user_swap_not_landed: "user swap did not land",
+  landed_before_window: "user landed before our window",
+  landed_after_window: "user landed after our window",
+  competitor_backran: "competitor moved our route first",
+  would_have_succeeded: "still profitable; builder/bid lost",
+  would_have_reverted: "stale or no longer profitable",
+};
+
+function missBreakdown(a: MissAuditSummary) {
+  return (Object.entries(a.outcomes) as Array<[MissOutcome, number]>)
+    .filter(([, n]) => n > 0)
+    .sort(([, a], [, b]) => b - a)
+    .map(([outcome, n]) => `${n} ${MISS_LABEL[outcome]}`)
+    .join(" · ");
 }
 
 export interface ArbSummary {
@@ -486,6 +522,13 @@ function BackrunCard({ b, now }: { b: BackrunSummary; now: number }) {
             · realized {(b.sessionExecution ?? b.execution).realizedProfitQuote.toFixed(4)} quote units. Lifetime:{" "}
             {b.execution.attempts} attempts / {b.execution.landed} landed
             {b.execution.unresolved ? ` / ${b.execution.unresolved} unresolved across restarts` : ""}.
+          </div>
+        ) : null}
+        {b.missAudit && b.missAudit.total > 0 ? (
+          <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+            Accepted-bundle outcome audit: current session {b.sessionMissAudit?.total ?? 0}
+            {b.sessionMissAudit?.total ? ` (${missBreakdown(b.sessionMissAudit)})` : ""}. Lifetime {b.missAudit.total}
+            {b.missAudit.total ? ` (${missBreakdown(b.missAudit)})` : ""}.
           </div>
         ) : null}
         {b.blindDiagnostics ? (

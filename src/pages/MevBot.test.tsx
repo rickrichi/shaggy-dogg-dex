@@ -463,6 +463,14 @@ describe("MEV-Share backrun card", () => {
         },
         execution: { ...funnel, pending: 1, unresolved: 2 },
         sessionExecution: { ...funnel, pending: 1 },
+        missAudit: {
+          total: 4,
+          outcomes: { competitor_backran: 2, would_have_succeeded: 1, user_swap_not_landed: 1 },
+        },
+        sessionMissAudit: {
+          total: 2,
+          outcomes: { competitor_backran: 1, would_have_succeeded: 1 },
+        },
         latencyMs: {
           samples: 3,
           avgTotalMs: 900,
@@ -502,5 +510,8 @@ describe("MEV-Share backrun card", () => {
     expect(screen.getByText(/0 \/ 1 blocks behind/)).toBeTruthy();
     expect(screen.getByText(/2 relay timeouts\/network failures/)).toBeTruthy();
     expect(screen.getByText(/event-loop delay p99 40 ms/)).toBeTruthy();
+    expect(screen.getByText(/Accepted-bundle outcome audit: current session 2/)).toBeTruthy();
+    expect(screen.getByText(/1 still profitable; builder\/bid lost/)).toBeTruthy();
+    expect(screen.getByText(/Lifetime 4/)).toBeTruthy();
   });
 });
