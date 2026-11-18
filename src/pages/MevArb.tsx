@@ -26,6 +26,33 @@ export interface ArbRow {
   decision: string;
 }
 
+export interface Tier2TelemetrySummary {
+  enabled: boolean;
+  authorityEnabled: boolean;
+  eligible: boolean;
+  samples: number;
+  agreedSamples: number;
+  agreementRate: number;
+  streak: number;
+  reason: string | null;
+  totals: {
+    evaluated: number;
+    unavailable: number;
+    authorityUsed: number;
+    improvedCount: number;
+    adaptiveExpansions: number;
+  };
+  last: {
+    block: string;
+    target: string;
+    boundaryMode: string;
+    currentProfit: string;
+    tier2ExactProfit: string | null;
+    profitDelta: string | null;
+    authorityUsed: boolean;
+  } | null;
+}
+
 export interface ChainSummary {
   chain: string;
   mode: "shadow" | "live";
@@ -48,6 +75,7 @@ export interface ChainSummary {
   execution?: ExecutionFunnel;
   sessionExecution?: ExecutionFunnel;
   risk?: RiskSnapshot;
+  tier2?: Tier2TelemetrySummary;
   best: ArbRow | null;
   spreads: Array<{
     pair: string;
@@ -129,6 +157,7 @@ export interface BackrunSummary {
   missAudit?: MissAuditSummary;
   sessionMissAudit?: MissAuditSummary;
   risk?: RiskSnapshot;
+  tier2?: Tier2TelemetrySummary;
   latencyMs?: {
     samples: number;
     avgTotalMs: number;
@@ -240,6 +269,28 @@ const EXPLORER: Record<string, string> = {
 };
 const NAME: Record<string, string> = { base: "Base", ethereum: "Ethereum" };
 
+function Tier2Telemetry({ t }: { t: Tier2TelemetrySummary | undefined }) {
+  if (!t?.enabled) return null;
+  const rate = `${(t.agreementRate * 100).toFixed(1)}%`;
+  return (
+    <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-2">
+        <strong className="text-foreground">Tier 2 sizing</strong>
+        <Badge variant={t.eligible ? "default" : "outline"}>{t.eligible ? "Authority eligible" : "Burn-in"}</Badge>
+        <Badge variant="outline">{t.authorityEnabled ? "Execution enabled" : "Shadow only"}</Badge>
+      </div>
+      <div className="mt-1">
+        {t.agreedSamples}/{t.samples} agreed ({rate}) · streak {t.streak} · {t.totals.evaluated} evaluated · {t.totals.authorityUsed} authority uses · {t.totals.improvedCount} improvements · {t.totals.adaptiveExpansions} adaptive expansions · {t.totals.unavailable} unavailable
+      </div>
+      {t.last ? (
+        <div className="mt-1 break-all">
+          Latest #{t.last.block}: {t.last.target} · {t.last.boundaryMode} · profit Δ {t.last.profitDelta ?? "—"} raw units{t.last.authorityUsed ? " · Tier 2 used" : ""}
+        </div>
+      ) : t.reason ? <div className="mt-1">{t.reason}</div> : null}
+    </div>
+  );
+}
+
 async function fetchArb(): Promise<ArbSummary> {
   let res: Response;
   try {
@@ -289,6 +340,7 @@ function ChainCard({ c, now }: { c: ChainSummary; now: number }) {
             Submissions paused by burn-in guard: {c.risk.reason}
           </div>
         ) : null}
+        <Tier2Telemetry t={c.tier2} />
         <div className="text-xs text-muted-foreground">
           Block #{c.lastBlock ?? "—"} ({ago(c.lastBlockAt, now)}) · watching {c.spreads.length}{" "}
           pairs ({c.venues.v2} v2 pairs, {c.venues.v3} v3 pools, {c.venues.v4} v4 pools) ·{" "}
@@ -488,6 +540,7 @@ function BackrunCard({ b, now }: { b: BackrunSummary; now: number }) {
             MEV-Share submissions paused by burn-in guard: {b.risk.reason}
           </div>
         ) : null}
+        <Tier2Telemetry t={b.tier2} />
         <p className="text-xs text-muted-foreground">
           Wallets that opt in to MEV-Share announce pending swaps. When one moves a Uniswap pool we
           watch, the bot prices a trade placed right after it that brings the pool back in line. The
