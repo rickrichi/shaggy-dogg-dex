@@ -6,6 +6,8 @@ import { ARB_SUMMARY_PATH, type ArbSummary, fmtSigned } from "./MevArb";
 import MevBot, {
   fmtEth,
   fmtSettlement,
+  LENDING_MONITORS,
+  type LendingMonitorSummary,
   MEV_SUMMARY_PATH,
   type MevSummary,
   SPARK_SUMMARY_PATH,
@@ -129,13 +131,48 @@ const arb = (): ArbSummary => ({
 const byUrl = (
   mev: () => Response,
   arbRes: () => Response = () => new Response(JSON.stringify(arb())),
-  sparkRes: () => Response = () => new Response("{}", { status: 404 })
+  sparkRes: () => Response = () => new Response("{}", { status: 404 }),
+  monitorRes: (url: string) => Response = () => new Response("{}", { status: 404 })
 ) =>
   vi.fn((url: string) =>
     Promise.resolve(
-      url === ARB_SUMMARY_PATH ? arbRes() : url === SPARK_SUMMARY_PATH ? sparkRes() : mev()
+      url === ARB_SUMMARY_PATH
+        ? arbRes()
+        : url === SPARK_SUMMARY_PATH
+          ? sparkRes()
+          : LENDING_MONITORS.some((m) => m.path === url)
+            ? monitorRes(url)
+            : mev()
     )
   );
+
+const monitorSummary = (over: Partial<LendingMonitorSummary> = {}): LendingMonitorSummary => ({
+  protocol: "compound",
+  mode: "shadow",
+  startedAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  lastBlock: "26449200",
+  lastBlockAt: new Date().toISOString(),
+  backfill: { from: "100", syncedTo: "26449200", target: "26449200", done: true },
+  markets: 3,
+  positions: 4321,
+  hot: 12,
+  liquidatableNow: 1,
+  totals: { scans: 10, liquidatableSeen: 2, competitorLiquidations: 5, errors: 0, rateLimited: 0 },
+  best: {
+    t: new Date().toISOString(),
+    block: "26449199",
+    market: "cWETHv3",
+    account: "0x1111111111111111111111111111111111111111",
+    hf: 0.97,
+    debt: 12.5,
+    estBonus: 0.25,
+    unit: "ETH",
+    estBonusUsd: 450,
+  },
+  recent: [],
+  ...over,
+});
 
 const renderPage = () =>
   render(
@@ -156,6 +193,38 @@ describe("MEV bot page", () => {
     expect(fmtSettlement(summary().best!)).toBe("0.0018 USDC");
     const { settlementProfit: _omitted, ...withoutSettlement } = summary().best!;
     expect(fmtSettlement(withoutSettlement)).toBe("—");
+  });
+
+  it("shows each lending monitor from its own endpoint, with backfill progress", async () => {
+    const fetchMock = byUrl(
+      () => new Response("{}", { status: 503 }),
+      undefined,
+      undefined,
+      (url) =>
+        new Response(
+          JSON.stringify(
+            url.includes("/morpho/")
+              ? monitorSummary({
+                  protocol: "morpho",
+                  lastBlockAt: null,
+                  backfill: { from: "0", syncedTo: "25", target: "100", done: false },
+                })
+              : monitorSummary()
+          )
+        )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    renderPage();
+    expect(await screen.findByText("Compound III liquidations")).toBeTruthy();
+    expect(await screen.findByText("Indexing history 25%")).toBeTruthy();
+    for (const m of LENDING_MONITORS)
+      expect(fetchMock.mock.calls.map((c) => c[0])).toContain(m.path);
+    expect(screen.getAllByText("4,321").length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText(
+        /cWETHv3 · health 0.970 · debt 12.5 ETH · est. reward 0.25 ETH \(≈\$450\)/
+      ).length
+    ).toBeGreaterThan(0);
   });
 
   it("shows the SparkLend card from its own endpoint while it indexes borrowers", async () => {

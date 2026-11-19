@@ -699,8 +699,233 @@ export default function MevBot() {
         </>
       ) : null}
       <SparkLendCard />
+      {LENDING_MONITORS.map((m) => (
+        <LendingMonitorCard key={m.path} {...m} />
+      ))}
       <MevArb />
     </div>
+  );
+}
+
+/** Summary served by the Compound III / Morpho Blue / Euler v2 liquidation monitors (shadow). */
+export interface MonitorRow {
+  t: string;
+  block: string;
+  market: string;
+  account: string;
+  hf: number;
+  debt: number;
+  estBonus: number;
+  unit: string;
+  estBonusUsd?: number;
+}
+
+export interface LendingMonitorSummary {
+  protocol: string;
+  mode: "shadow" | "live";
+  startedAt: string;
+  updatedAt: string;
+  lastBlock: string | null;
+  lastBlockAt: string | null;
+  backfill: { from: string; syncedTo: string; target: string | null; done: boolean };
+  markets: number;
+  positions: number;
+  hot: number;
+  liquidatableNow: number;
+  totals: {
+    scans: number;
+    liquidatableSeen: number;
+    competitorLiquidations: number;
+    errors: number;
+    rateLimited: number;
+  };
+  best: MonitorRow | null;
+  recent: MonitorRow[];
+}
+
+export const LENDING_MONITORS = [
+  {
+    title: "Compound III liquidations",
+    path: "/api/mev/compound/summary",
+    marketsLabel: "Markets",
+    description:
+      "Watches every borrower in the cUSDCv3, cWETHv3 and cUSDTv3 markets. Underwater accounts can be absorbed, then their collateral bought at the store-front discount; the reward shown is that discount.",
+  },
+  {
+    title: "Morpho Blue liquidations",
+    path: "/api/mev/morpho/summary",
+    marketsLabel: "Markets",
+    description:
+      "Watches every Morpho Blue market and borrower. A position past its LLTV can be liquidated for the market's incentive (up to 15%); the reward shown is that incentive on the debt the collateral can cover.",
+  },
+  {
+    title: "Euler v2 liquidations",
+    path: "/api/mev/euler/summary",
+    marketsLabel: "Vaults",
+    description:
+      "Watches every borrower of every Euler vault with an oracle. An unhealthy account can be liquidated at a discount of 1 − health factor, capped per vault; the reward shown is that discount on the whole debt.",
+  },
+] as const;
+
+async function fetchMonitor(path: string): Promise<LendingMonitorSummary> {
+  let res: Response;
+  try {
+    res = await fetch(path, { signal: AbortSignal.timeout(15_000) });
+  } catch {
+    throw new Error("The monitor's server did not answer.");
+  }
+  if (!res.ok) throw new Error(`The monitor's server answered HTTP ${res.status}.`);
+  return (await res.json()) as LendingMonitorSummary;
+}
+
+const fmtAmount = (v: number, unit: string) =>
+  `${v.toLocaleString(undefined, { maximumFractionDigits: unit === "USD" ? 0 : 4 })} ${unit}`;
+
+const backfillPct = (b: LendingMonitorSummary["backfill"]) => {
+  if (b.done || !b.target) return 100;
+  const from = Number(b.from);
+  const span = Number(b.target) - from;
+  return span > 0 ? Math.max(0, Math.min(100, ((Number(b.syncedTo) - from) / span) * 100)) : 100;
+};
+
+/** Card for one shadow liquidation monitor (Compound III, Morpho Blue or Euler v2). */
+export function LendingMonitorCard({
+  title,
+  path,
+  marketsLabel,
+  description,
+}: {
+  title: string;
+  path: string;
+  marketsLabel: string;
+  description: string;
+}) {
+  const q = useQuery({
+    queryKey: ["lending-monitor", path],
+    queryFn: () => fetchMonitor(path),
+    refetchInterval: 15_000,
+  });
+  const s = q.data;
+  const now = Date.now();
+  const live = !!s?.lastBlockAt && now - Date.parse(s.lastBlockAt) < STALE_MS;
+  const pct = s ? backfillPct(s.backfill) : 0;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+          {title}
+          {s ? (
+            <>
+              <Badge variant={live ? "default" : "secondary"}>
+                {live
+                  ? "Running"
+                  : !s.backfill.done
+                    ? `Indexing history ${pct.toFixed(0)}%`
+                    : "Not responding"}
+              </Badge>
+              <Badge variant="outline">
+                {s.mode === "live" ? "LIVE — sends bundles" : "Shadow — watches, never trades"}
+              </Badge>
+            </>
+          ) : null}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        <p className="text-muted-foreground">{description}</p>
+        {q.isLoading ? (
+          <div className="flex items-center gap-2">
+            <Loader2 className="size-4 animate-spin" /> Loading…
+          </div>
+        ) : null}
+        {q.isError ? (
+          <div className="flex items-center gap-2 text-destructive">
+            <AlertTriangle className="size-4" /> {(q.error as Error).message}
+          </div>
+        ) : null}
+        {s ? (
+          <>
+            {!s.backfill.done ? (
+              <div className="space-y-1">
+                <div className="h-2 w-full overflow-hidden rounded bg-muted">
+                  <div className="h-full bg-violet-600" style={{ width: `${pct}%` }} />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Reading borrower history: block {Number(s.backfill.syncedTo).toLocaleString()} of{" "}
+                  {s.backfill.target ? Number(s.backfill.target).toLocaleString() : "—"}
+                </p>
+              </div>
+            ) : null}
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+              <Stat
+                label="Last block checked"
+                value={s.lastBlock ? `#${s.lastBlock}` : "—"}
+                hint={ago(s.lastBlockAt, now)}
+              />
+              <Stat label={marketsLabel} value={s.markets.toLocaleString()} />
+              <Stat label="Positions with debt" value={s.positions.toLocaleString()} />
+              <Stat
+                label="Close to liquidation"
+                value={s.hot.toLocaleString()}
+                hint="health factor under 1.05"
+              />
+              <Stat
+                label="Liquidatable now"
+                value={s.liquidatableNow.toLocaleString()}
+                hint={`${s.totals.liquidatableSeen.toLocaleString()} seen so far`}
+              />
+              <Stat
+                label="Taken by others"
+                value={s.totals.competitorLiquidations.toLocaleString()}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Best so far:{" "}
+              {s.best
+                ? `${s.best.market} · health ${s.best.hf.toFixed(3)} · debt ${fmtAmount(s.best.debt, s.best.unit)} · est. reward ${fmtAmount(s.best.estBonus, s.best.unit)}${s.best.estBonusUsd !== undefined && s.best.unit !== "USD" ? ` (≈$${s.best.estBonusUsd.toFixed(0)})` : ""}`
+                : "none yet"}{" "}
+              · rewards are estimates before gas and the builder bid · {s.totals.errors} errors
+            </p>
+            {s.recent.length ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="text-left text-xs text-muted-foreground">
+                    <tr>
+                      <th className="py-1 pr-3">When</th>
+                      <th className="pr-3">Market</th>
+                      <th className="pr-3">Account</th>
+                      <th className="pr-3">Health</th>
+                      <th className="pr-3">Debt</th>
+                      <th>Est. reward</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {s.recent.slice(0, 5).map((r) => (
+                      <tr key={`${r.market}:${r.account}:${r.t}`} className="border-t">
+                        <td className="whitespace-nowrap py-1 pr-3">{ago(r.t, now)}</td>
+                        <td className="pr-3">{r.market}</td>
+                        <td className="pr-3">
+                          <a
+                            className="inline-flex items-center gap-1 underline"
+                            href={`${ES}/address/${r.account}`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {short(r.account)} <ExternalLink className="size-3" />
+                          </a>
+                        </td>
+                        <td className="pr-3 tabular-nums">{r.hf.toFixed(3)}</td>
+                        <td className="pr-3 tabular-nums">{fmtAmount(r.debt, r.unit)}</td>
+                        <td className="tabular-nums">{fmtAmount(r.estBonus, r.unit)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+          </>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }
 
