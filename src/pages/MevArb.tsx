@@ -1,9 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { AlertTriangle, ArrowRightLeft, ExternalLink } from "lucide-react";
 
 import { ArbExecutorDeployCard } from "@/components/ArbExecutorDeployCard";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 
 // Read-only summary of the Uniswap v2/v3/v4 arbitrage scanner on the market-data VM
 // (vercel.json forwards /api/mev/* there).
@@ -295,8 +297,51 @@ const EXPLORER: Record<string, string> = {
 const NAME: Record<string, string> = { base: "Base", ethereum: "Ethereum" };
 
 function Tier2Telemetry({ t }: { t: Tier2TelemetrySummary | undefined }) {
+  const queryClient = useQueryClient();
+  const [pending, setPending] = useState(false);
+  const [controlError, setControlError] = useState<string | null>(null);
   if (!t?.enabled) return null;
   const rate = `${(t.agreementRate * 100).toFixed(1)}%`;
+  const setAuthority = async (enabled: boolean) => {
+    setPending(true);
+    setControlError(null);
+    try {
+      const provider = window.ethereum;
+      if (!provider)
+        throw new Error("Connect an authorized browser wallet to change this setting.");
+      const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
+      const address = accounts[0];
+      if (!address) throw new Error("No wallet account is connected.");
+      const challengeResponse = await fetch(
+        `/api/mev/arb/control/tier2/challenge?address=${encodeURIComponent(address)}&enabled=${enabled}`,
+        { cache: "no-store" }
+      );
+      const challenge = (await challengeResponse.json()) as {
+        nonce?: string;
+        message?: string;
+        error?: string;
+      };
+      if (!challengeResponse.ok || !challenge.nonce || !challenge.message)
+        throw new Error(challenge.error ?? "Could not authorize the Tier 2 change.");
+      const signature = await provider.request({
+        method: "personal_sign",
+        params: [challenge.message, address],
+      });
+      if (typeof signature !== "string") throw new Error("The wallet did not return a signature.");
+      const response = await fetch("/api/mev/arb/control/tier2", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ address, enabled, nonce: challenge.nonce, signature }),
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(result.error ?? "Tier 2 control failed.");
+      await queryClient.invalidateQueries({ queryKey: ["mev-arb-summary"] });
+    } catch (error) {
+      setControlError(error instanceof Error ? error.message : "Tier 2 control failed.");
+    } finally {
+      setPending(false);
+    }
+  };
   return (
     <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
       <div className="flex flex-wrap items-center gap-2">
@@ -304,8 +349,23 @@ function Tier2Telemetry({ t }: { t: Tier2TelemetrySummary | undefined }) {
         <Badge variant={t.eligible ? "default" : "outline"}>
           {t.eligible ? "Authority eligible" : "Burn-in"}
         </Badge>
-        <Badge variant="outline">{t.authorityEnabled ? "Execution enabled" : "Shadow only"}</Badge>
+        <label
+          className="flex items-center gap-1.5"
+          title="Requires a signature from the authorized admin wallet"
+        >
+          <Switch
+            className="h-5 w-9 [&>span]:size-4 [&>span]:data-[state=checked]:translate-x-4"
+            checked={t.authorityEnabled}
+            disabled={pending || (!t.authorityEnabled && !t.eligible)}
+            onCheckedChange={(enabled) => void setAuthority(enabled)}
+            aria-label="Tier 2 execution authority"
+          />
+          <span>
+            {pending ? "Updating…" : t.authorityEnabled ? "Execution enabled" : "Shadow only"}
+          </span>
+        </label>
       </div>
+      {controlError ? <div className="mt-1 text-destructive">{controlError}</div> : null}
       <div className="mt-1">
         {t.agreedSamples}/{t.samples} agreed ({rate}) · streak {t.streak} · {t.totals.evaluated}{" "}
         evaluated · {t.totals.authorityUsed} authority uses · {t.totals.improvedCount} improvements
