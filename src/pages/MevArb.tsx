@@ -279,6 +279,7 @@ export interface OrderFlowStats {
   traceErrors: number;
   droppedBusy: number;
   withSwaps: number;
+  noRoute?: number;
   priced: number;
   worthSending: number;
   bestNetEth: number | null;
@@ -301,8 +302,9 @@ function OrderFlowFeeds({ feeds }: { feeds: Record<string, OrderFlowStats> | und
         >
           <strong className="text-foreground">{FEED_NAME[name] ?? name} feed</strong> ·{" "}
           {f.connected ? "connected" : `not connected${f.lastError ? ` (${f.lastError})` : ""}`} ·{" "}
-          {f.txs} txs · {f.traced} simulated · {f.withSwaps} moved our pools · {f.priced} routes
-          priced · {f.worthSending} worth sending
+          {f.txs} txs · {f.traced} simulated · {f.withSwaps} moved our pools
+          {f.noRoute ? ` (${f.noRoute} opened no price gap)` : ""} · {f.priced} routes priced ·{" "}
+          {f.worthSending} worth sending
           {f.bestNetEth !== null ? ` · best net ${f.bestNetEth.toFixed(4)} ETH` : ""}
           {f.traceErrors ? ` · ${f.traceErrors} trace errors` : ""}
           {f.droppedBusy ? ` · ${f.droppedBusy} skipped (busy)` : ""}

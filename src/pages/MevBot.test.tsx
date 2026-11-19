@@ -535,6 +535,7 @@ describe("MEV-Share backrun card", () => {
             traceErrors: 0,
             droppedBusy: 2,
             withSwaps: 9,
+            noRoute: 4,
             priced: 12,
             worthSending: 1,
             bestNetEth: 0.0042,
@@ -612,7 +613,9 @@ describe("MEV-Share backrun card", () => {
     expect(screen.getByText(/lifetime 3 retries · 4 RPC errors · 1 queue drops/)).toBeTruthy();
     expect(screen.getByText(/Lost to competitors/)).toBeTruthy();
     expect(screen.getByText(/MEV Blocker feed/)).toBeTruthy();
-    expect(screen.getByText(/9 moved our pools · 12 routes/)).toBeTruthy();
+    expect(
+      screen.getByText(/9 moved our pools \(4 opened no price gap\) · 12 routes/)
+    ).toBeTruthy();
     expect(screen.getByText(/best net 0.0042 ETH · 2 skipped \(busy\)/)).toBeTruthy();
     expect(screen.getByText(/paid 0.0030 ETH to the builder · we bid 0.0010 ETH/)).toBeTruthy();
     expect(screen.getByText(/we sent 1.76 s after the block started \(too late\)/)).toBeTruthy();
