@@ -182,15 +182,27 @@ describe("MEV bot page", () => {
       tx,
       decision: "send",
     };
-    const landed = { ...row, lifecycle: "landed" as const, realizedProfit: null, realizedProfitEth: null };
+    const landed = {
+      ...row,
+      lifecycle: "landed" as const,
+      realizedProfit: null,
+      realizedProfitEth: null,
+    };
     vi.stubGlobal(
       "fetch",
-      byUrl(() => new Response(JSON.stringify(summary({
-        best: landed,
-        recentOpportunities: [row],
-        sumProfitEth: 99,
-        simulatedOpportunityTotalEth: 11.6463,
-      }))))
+      byUrl(
+        () =>
+          new Response(
+            JSON.stringify(
+              summary({
+                best: landed,
+                recentOpportunities: [row],
+                sumProfitEth: 99,
+                simulatedOpportunityTotalEth: 11.6463,
+              })
+            )
+          )
+      )
     );
     renderPage();
     expect((await screen.findAllByText("23,795.357879 USDC")).length).toBeGreaterThanOrEqual(3);
@@ -200,7 +212,11 @@ describe("MEV bot page", () => {
     expect(screen.getAllByText("realized").length).toBeGreaterThan(0);
     expect(screen.getAllByText("23,700.125 USDC").length).toBeGreaterThan(0);
     expect(screen.getAllByText("11.6000 ETH").length).toBeGreaterThan(0);
-    expect(screen.getAllByRole("link", { name: /0xabcd/ }).every((link) => link.getAttribute("href") === `https://etherscan.io/tx/${tx}`)).toBe(true);
+    expect(
+      screen
+        .getAllByRole("link", { name: /0xabcd/ })
+        .every((link) => link.getAttribute("href") === `https://etherscan.io/tx/${tx}`)
+    ).toBe(true);
     expect(screen.getAllByText("11.6463 ETH").length).toBeGreaterThan(0);
     expect(screen.queryByText("99.0000 ETH")).toBeNull();
     expect(screen.getAllByText("projected viable").length).toBeGreaterThan(0);
@@ -378,6 +394,29 @@ describe("MEV-Share backrun card", () => {
           errors: 0,
           rateLimited: 0,
         },
+        tier3: {
+          shadowEnabled: true,
+          authorityEnabled: true,
+          modelVersion: "experimental-bid-v2",
+          halted: false,
+          haltReason: null,
+          control: { resolved: 19, landed: 3, landingRate: 3 / 19 },
+          experiment: { resolved: 1, landed: 0, landingRate: 0 },
+          totals: {
+            proposals: 20,
+            insufficientEvidence: 20,
+            assignedExperiment: 1,
+            appliedExperiment: 0,
+          },
+          last: {
+            pair: "WETH/USDC",
+            assignedGroup: "experiment",
+            appliedGroup: "control",
+            proposalStatus: "insufficient-evidence",
+            sharePpm: null,
+            expectedNetWei: null,
+          },
+        },
         best: null,
         recent: [
           {
@@ -423,6 +462,10 @@ describe("MEV-Share backrun card", () => {
     expect(screen.getByText("User swapped on")).toBeTruthy();
     expect(screen.getByText("v3 0.01% → v4 0.01%")).toBeTruthy();
     expect(screen.getByText(/blind:/)).toBeTruthy();
+    expect(screen.getByText("Tier 3 bid experiment")).toBeTruthy();
+    expect(screen.getByText("5% authority")).toBeTruthy();
+    expect(screen.getByText(/1 assigned to 5% cohort/)).toBeTruthy();
+    expect(screen.getByText(/experiment → control/)).toBeTruthy();
   });
 
   it("shows pending outcomes, restart-orphaned bundles and per-stage latency", async () => {
@@ -465,7 +508,12 @@ describe("MEV-Share backrun card", () => {
         sessionExecution: { ...funnel, pending: 1 },
         missAudit: {
           total: 5,
-          outcomes: { competitor_backran: 2, would_have_succeeded: 1, user_swap_not_landed: 1, inconclusive: 1 },
+          outcomes: {
+            competitor_backran: 2,
+            would_have_succeeded: 1,
+            user_swap_not_landed: 1,
+            inconclusive: 1,
+          },
           retries: 3,
           errors: 4,
           queueDropped: 1,
@@ -520,7 +568,9 @@ describe("MEV-Share backrun card", () => {
     expect(screen.getByText(/1 still profitable; builder\/bid lost/)).toBeTruthy();
     expect(screen.getByText(/Lifetime 5/)).toBeTruthy();
     expect(screen.getByText(/1 inconclusive after audit failures/)).toBeTruthy();
-    expect(screen.getByText(/Reliability: current session 1 retries · 1 RPC errors · 0 queue drops/)).toBeTruthy();
+    expect(
+      screen.getByText(/Reliability: current session 1 retries · 1 RPC errors · 0 queue drops/)
+    ).toBeTruthy();
     expect(screen.getByText(/lifetime 3 retries · 4 RPC errors · 1 queue drops/)).toBeTruthy();
   });
 });

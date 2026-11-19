@@ -53,6 +53,30 @@ export interface Tier2TelemetrySummary {
   } | null;
 }
 
+export interface Tier3TelemetrySummary {
+  shadowEnabled: boolean;
+  authorityEnabled: boolean;
+  modelVersion: string | null;
+  halted: boolean;
+  haltReason: string | null;
+  control: { resolved: number; landed: number; landingRate: number };
+  experiment: { resolved: number; landed: number; landingRate: number };
+  totals: {
+    proposals: number;
+    insufficientEvidence: number;
+    assignedExperiment: number;
+    appliedExperiment: number;
+  };
+  last: {
+    pair: string;
+    assignedGroup: string;
+    appliedGroup: string;
+    proposalStatus: string;
+    sharePpm: number | null;
+    expectedNetWei: string | null;
+  } | null;
+}
+
 export interface ChainSummary {
   chain: string;
   mode: "shadow" | "live";
@@ -158,6 +182,7 @@ export interface BackrunSummary {
   sessionMissAudit?: MissAuditSummary;
   risk?: RiskSnapshot;
   tier2?: Tier2TelemetrySummary;
+  tier3?: Tier3TelemetrySummary;
   latencyMs?: {
     samples: number;
     avgTotalMs: number;
@@ -276,17 +301,24 @@ function Tier2Telemetry({ t }: { t: Tier2TelemetrySummary | undefined }) {
     <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
       <div className="flex flex-wrap items-center gap-2">
         <strong className="text-foreground">Tier 2 sizing</strong>
-        <Badge variant={t.eligible ? "default" : "outline"}>{t.eligible ? "Authority eligible" : "Burn-in"}</Badge>
+        <Badge variant={t.eligible ? "default" : "outline"}>
+          {t.eligible ? "Authority eligible" : "Burn-in"}
+        </Badge>
         <Badge variant="outline">{t.authorityEnabled ? "Execution enabled" : "Shadow only"}</Badge>
       </div>
       <div className="mt-1">
-        {t.agreedSamples}/{t.samples} agreed ({rate}) · streak {t.streak} · {t.totals.evaluated} evaluated · {t.totals.authorityUsed} authority uses · {t.totals.improvedCount} improvements · {t.totals.adaptiveExpansions} adaptive expansions · {t.totals.unavailable} unavailable
+        {t.agreedSamples}/{t.samples} agreed ({rate}) · streak {t.streak} · {t.totals.evaluated}{" "}
+        evaluated · {t.totals.authorityUsed} authority uses · {t.totals.improvedCount} improvements
+        · {t.totals.adaptiveExpansions} adaptive expansions · {t.totals.unavailable} unavailable
       </div>
       {t.last ? (
         <div className="mt-1 break-all">
-          Latest #{t.last.block}: {t.last.target} · {t.last.boundaryMode} · profit Δ {t.last.profitDelta ?? "—"} raw units{t.last.authorityUsed ? " · Tier 2 used" : ""}
+          Latest #{t.last.block}: {t.last.target} · {t.last.boundaryMode} · profit Δ{" "}
+          {t.last.profitDelta ?? "—"} raw units{t.last.authorityUsed ? " · Tier 2 used" : ""}
         </div>
-      ) : t.reason ? <div className="mt-1">{t.reason}</div> : null}
+      ) : t.reason ? (
+        <div className="mt-1">{t.reason}</div>
+      ) : null}
     </div>
   );
 }
@@ -351,9 +383,10 @@ function ChainCard({ c, now }: { c: ChainSummary; now: number }) {
         </div>
         {c.sessionTotals ? (
           <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-            Current session: {c.sessionTotals.simulated} simulated · {c.sessionTotals.worthSending} worth sending ·{" "}
-            {c.sessionTotals.submissions} accepted · {c.sessionTotals.landed} landed. Lifetime: {c.totals.simulated} simulated ·{" "}
-            {c.totals.submissions} accepted · {c.totals.landed} landed.
+            Current session: {c.sessionTotals.simulated} simulated · {c.sessionTotals.worthSending}{" "}
+            worth sending · {c.sessionTotals.submissions} accepted · {c.sessionTotals.landed}{" "}
+            landed. Lifetime: {c.totals.simulated} simulated · {c.totals.submissions} accepted ·{" "}
+            {c.totals.landed} landed.
           </div>
         ) : null}
         {c.execution ? (
@@ -361,10 +394,13 @@ function ChainCard({ c, now }: { c: ChainSummary; now: number }) {
             Current-session execution: {(c.sessionExecution ?? c.execution).attempts} attempts →{" "}
             {(c.sessionExecution ?? c.execution).accepted} relay/sequencer accepted →{" "}
             <strong>{(c.sessionExecution ?? c.execution).landed} landed</strong> ·{" "}
-            {(c.sessionExecution ?? c.execution).rejected} rejected · {(c.sessionExecution ?? c.execution).notIncluded} not included ·{" "}
+            {(c.sessionExecution ?? c.execution).rejected} rejected ·{" "}
+            {(c.sessionExecution ?? c.execution).notIncluded} not included ·{" "}
             {(c.sessionExecution ?? c.execution).reverted} reverted · realized{" "}
-            {(c.sessionExecution ?? c.execution).realizedProfitQuote.toFixed(4)} quote units · realized gas loss{" "}
-            {(Number((c.sessionExecution ?? c.execution).realizedLossWei) / 1e18).toPrecision(3)} ETH. Lifetime: {c.execution.attempts} attempts / {c.execution.landed} landed.
+            {(c.sessionExecution ?? c.execution).realizedProfitQuote.toFixed(4)} quote units ·
+            realized gas loss{" "}
+            {(Number((c.sessionExecution ?? c.execution).realizedLossWei) / 1e18).toPrecision(3)}{" "}
+            ETH. Lifetime: {c.execution.attempts} attempts / {c.execution.landed} landed.
           </div>
         ) : null}
 
@@ -505,12 +541,16 @@ function ChainCard({ c, now }: { c: ChainSummary; now: number }) {
           {c.blocksSkipped.toLocaleString()} newer blocks observed while the previous scan was busy
           {c.sessionTotals ? (
             <>
-              {" "}· this session: {c.sessionTotals.errors} errors ({c.sessionTotals.rateLimited} RPC
+              {" "}
+              · this session: {c.sessionTotals.errors} errors ({c.sessionTotals.rateLimited} RPC
               rate limits) · lifetime: {c.totals.errors} errors ({c.totals.rateLimited} RPC rate
               limits)
             </>
           ) : (
-            <> · {c.totals.errors} errors ({c.totals.rateLimited} RPC rate limits)</>
+            <>
+              {" "}
+              · {c.totals.errors} errors ({c.totals.rateLimited} RPC rate limits)
+            </>
           )}
         </div>
       </CardContent>
@@ -541,6 +581,44 @@ function BackrunCard({ b, now }: { b: BackrunSummary; now: number }) {
           </div>
         ) : null}
         <Tier2Telemetry t={b.tier2} />
+        {b.tier3 ? (
+          <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-2">
+              <strong className="text-foreground">Tier 3 bid experiment</strong>
+              <Badge
+                variant={
+                  b.tier3.halted ? "destructive" : b.tier3.authorityEnabled ? "default" : "outline"
+                }
+              >
+                {b.tier3.halted ? "Halted" : b.tier3.authorityEnabled ? "5% authority" : "Shadow"}
+              </Badge>
+              <span>{b.tier3.modelVersion ?? "no model samples"}</span>
+            </div>
+            {b.tier3.haltReason ? (
+              <div className="mt-1 text-destructive">{b.tier3.haltReason}</div>
+            ) : null}
+            <div className="mt-1">
+              Control: {b.tier3.control.landed}/{b.tier3.control.resolved} landed (
+              {(b.tier3.control.landingRate * 100).toFixed(1)}%) · experiment:{" "}
+              {b.tier3.experiment.landed}/{b.tier3.experiment.resolved} (
+              {(b.tier3.experiment.landingRate * 100).toFixed(1)}%)
+            </div>
+            <div className="mt-1">
+              {b.tier3.totals.proposals} proposals · {b.tier3.totals.assignedExperiment} assigned to
+              5% cohort · {b.tier3.totals.appliedExperiment} experimental bids applied ·{" "}
+              {b.tier3.totals.insufficientEvidence} awaiting evidence
+            </div>
+            {b.tier3.last ? (
+              <div className="mt-1">
+                Last: {b.tier3.last.pair} · {b.tier3.last.assignedGroup} →{" "}
+                {b.tier3.last.appliedGroup} · {b.tier3.last.proposalStatus}
+                {b.tier3.last.sharePpm !== null
+                  ? ` · ${(b.tier3.last.sharePpm / 10_000).toFixed(2)}% bid`
+                  : ""}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         <p className="text-xs text-muted-foreground">
           Wallets that opt in to MEV-Share announce pending swaps. When one moves a Uniswap pool we
           watch, the bot prices a trade placed right after it that brings the pool back in line. The
@@ -562,37 +640,51 @@ function BackrunCard({ b, now }: { b: BackrunSummary; now: number }) {
         </div>
         {b.sessionTotals ? (
           <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-            Current session: {b.sessionTotals.simulated} simulated · {b.sessionTotals.worthSending} worth sending ·{" "}
-            {b.sessionTotals.bundlesSent} accepted · {b.sessionTotals.landed} landed. Lifetime: {t.simulated} simulated ·{" "}
-            {t.bundlesSent} accepted · {t.landed} landed.
+            Current session: {b.sessionTotals.simulated} simulated · {b.sessionTotals.worthSending}{" "}
+            worth sending · {b.sessionTotals.bundlesSent} accepted · {b.sessionTotals.landed}{" "}
+            landed. Lifetime: {t.simulated} simulated · {t.bundlesSent} accepted · {t.landed}{" "}
+            landed.
           </div>
         ) : null}
         {b.execution ? (
           <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-            Current-session submission audit: {(b.sessionExecution ?? b.execution).attempts} attempts →{" "}
-            {(b.sessionExecution ?? b.execution).accepted} relay accepted →{" "}
+            Current-session submission audit: {(b.sessionExecution ?? b.execution).attempts}{" "}
+            attempts → {(b.sessionExecution ?? b.execution).accepted} relay accepted →{" "}
             <strong>{(b.sessionExecution ?? b.execution).landed} landed</strong> ·{" "}
-            {(b.sessionExecution ?? b.execution).rejected} rejected · {(b.sessionExecution ?? b.execution).notIncluded} not included ·{" "}
+            {(b.sessionExecution ?? b.execution).rejected} rejected ·{" "}
+            {(b.sessionExecution ?? b.execution).notIncluded} not included ·{" "}
             {(b.sessionExecution ?? b.execution).reverted} reverted
             {(b.sessionExecution ?? b.execution).pending !== undefined
               ? ` · ${(b.sessionExecution ?? b.execution).pending} awaiting outcome`
               : ""}{" "}
-            · realized {(b.sessionExecution ?? b.execution).realizedProfitQuote.toFixed(4)} quote units. Lifetime:{" "}
-            {b.execution.attempts} attempts / {b.execution.landed} landed
-            {b.execution.unresolved ? ` / ${b.execution.unresolved} unresolved across restarts` : ""}.
+            · realized {(b.sessionExecution ?? b.execution).realizedProfitQuote.toFixed(4)} quote
+            units. Lifetime: {b.execution.attempts} attempts / {b.execution.landed} landed
+            {b.execution.unresolved
+              ? ` / ${b.execution.unresolved} unresolved across restarts`
+              : ""}
+            .
           </div>
         ) : null}
-        {b.missAudit && (b.missAudit.total > 0 || (b.missAudit.retries ?? 0) > 0 || (b.missAudit.errors ?? 0) > 0 || (b.missAudit.queueDropped ?? 0) > 0) ? (
+        {b.missAudit &&
+        (b.missAudit.total > 0 ||
+          (b.missAudit.retries ?? 0) > 0 ||
+          (b.missAudit.errors ?? 0) > 0 ||
+          (b.missAudit.queueDropped ?? 0) > 0) ? (
           <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
             Accepted-bundle outcome audit: current session {b.sessionMissAudit?.total ?? 0}
-            {b.sessionMissAudit?.total ? ` (${missBreakdown(b.sessionMissAudit)})` : ""}. Lifetime {b.missAudit.total}
-            {b.missAudit.total ? ` (${missBreakdown(b.missAudit)})` : ""}. Reliability: current session {b.sessionMissAudit?.retries ?? 0} retries · {b.sessionMissAudit?.errors ?? 0} RPC errors · {b.sessionMissAudit?.queueDropped ?? 0} queue drops; lifetime {b.missAudit.retries ?? 0} retries · {b.missAudit.errors ?? 0} RPC errors · {b.missAudit.queueDropped ?? 0} queue drops.
+            {b.sessionMissAudit?.total ? ` (${missBreakdown(b.sessionMissAudit)})` : ""}. Lifetime{" "}
+            {b.missAudit.total}
+            {b.missAudit.total ? ` (${missBreakdown(b.missAudit)})` : ""}. Reliability: current
+            session {b.sessionMissAudit?.retries ?? 0} retries · {b.sessionMissAudit?.errors ?? 0}{" "}
+            RPC errors · {b.sessionMissAudit?.queueDropped ?? 0} queue drops; lifetime{" "}
+            {b.missAudit.retries ?? 0} retries · {b.missAudit.errors ?? 0} RPC errors ·{" "}
+            {b.missAudit.queueDropped ?? 0} queue drops.
           </div>
         ) : null}
         {b.blindDiagnostics ? (
           <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-            Blind fanout diagnostics: {b.blindDiagnostics.attempted} attempted · {b.blindDiagnostics.skipped} skipped ·{" "}
-            {b.blindDiagnostics.failed} failed
+            Blind fanout diagnostics: {b.blindDiagnostics.attempted} attempted ·{" "}
+            {b.blindDiagnostics.skipped} skipped · {b.blindDiagnostics.failed} failed
             {b.blindDiagnostics.lastReason ? ` · latest: ${b.blindDiagnostics.lastReason}` : ""}
           </div>
         ) : null}
@@ -600,9 +692,10 @@ function BackrunCard({ b, now }: { b: BackrunSummary; now: number }) {
           <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
             Latency: p50 <strong>{b.latencyMs.p50TotalMs.toFixed(1)} ms</strong> · p95{" "}
             <strong>{b.latencyMs.p95TotalMs.toFixed(1)} ms</strong> · simulation{" "}
-            {b.latencyMs.avgSimMs.toFixed(1)} ms · signing {(b.latencyMs.avgSigningMs ?? 0).toFixed(1)} ms · relay{" "}
-            {(b.latencyMs.avgRelayMs ?? b.latencyMs.avgSendMs).toFixed(1)} ms ·{" "}
-            builders: {Object.keys(b.buildersSeen ?? {}).join(", ") || "default relay set"}
+            {b.latencyMs.avgSimMs.toFixed(1)} ms · signing{" "}
+            {(b.latencyMs.avgSigningMs ?? 0).toFixed(1)} ms · relay{" "}
+            {(b.latencyMs.avgRelayMs ?? b.latencyMs.avgSendMs).toFixed(1)} ms · builders:{" "}
+            {Object.keys(b.buildersSeen ?? {}).join(", ") || "default relay set"}
           </div>
         ) : null}
         {b.latencyMs?.stages ? (
@@ -611,12 +704,18 @@ function BackrunCard({ b, now }: { b: BackrunSummary; now: number }) {
             {b.latencyMs.send && b.latencyMs.send.samples > 0
               ? `hint→relay ${b.latencyMs.send.p50.toFixed(0)} / ${b.latencyMs.send.p95.toFixed(0)} ms · `
               : ""}
-            state refresh {b.latencyMs.stages.prepMs.p50.toFixed(0)} / {b.latencyMs.stages.prepMs.p95.toFixed(0)} ms ·
-            simulation {b.latencyMs.stages.simMs.p50.toFixed(0)} / {b.latencyMs.stages.simMs.p95.toFixed(0)} ms · relay{" "}
-            {b.latencyMs.stages.relayMs.p50.toFixed(0)} / {b.latencyMs.stages.relayMs.p95.toFixed(0)} ms · snapshot age{" "}
-            {(b.latencyMs.stages.snapshotAgeMs.p50 / 1000).toFixed(1)} / {(b.latencyMs.stages.snapshotAgeMs.p95 / 1000).toFixed(1)} s
-            ({b.latencyMs.stages.snapshotLagBlocks.p50} / {b.latencyMs.stages.snapshotLagBlocks.p95} blocks behind)
-            {b.latencyMs.relayNetworkFailures ? ` · ${b.latencyMs.relayNetworkFailures} relay timeouts/network failures` : ""}
+            state refresh {b.latencyMs.stages.prepMs.p50.toFixed(0)} /{" "}
+            {b.latencyMs.stages.prepMs.p95.toFixed(0)} ms · simulation{" "}
+            {b.latencyMs.stages.simMs.p50.toFixed(0)} / {b.latencyMs.stages.simMs.p95.toFixed(0)} ms
+            · relay {b.latencyMs.stages.relayMs.p50.toFixed(0)} /{" "}
+            {b.latencyMs.stages.relayMs.p95.toFixed(0)} ms · snapshot age{" "}
+            {(b.latencyMs.stages.snapshotAgeMs.p50 / 1000).toFixed(1)} /{" "}
+            {(b.latencyMs.stages.snapshotAgeMs.p95 / 1000).toFixed(1)} s (
+            {b.latencyMs.stages.snapshotLagBlocks.p50} / {b.latencyMs.stages.snapshotLagBlocks.p95}{" "}
+            blocks behind)
+            {b.latencyMs.relayNetworkFailures
+              ? ` · ${b.latencyMs.relayNetworkFailures} relay timeouts/network failures`
+              : ""}
             {b.latencyMs.eventLoopMs
               ? ` · event-loop delay p99 ${b.latencyMs.eventLoopMs.p99.toFixed(0)} ms (max ${b.latencyMs.eventLoopMs.max.toFixed(0)} ms)`
               : ""}
