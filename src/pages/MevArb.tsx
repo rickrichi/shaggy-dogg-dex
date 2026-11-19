@@ -184,6 +184,7 @@ export interface BackrunSummary {
   missAudit?: MissAuditSummary;
   sessionMissAudit?: MissAuditSummary;
   competitorLosses?: CompetitorLoss[];
+  orderFlow?: Record<string, OrderFlowStats>;
   risk?: RiskSnapshot;
   tier2?: Tier2TelemetrySummary;
   tier3?: Tier3TelemetrySummary;
@@ -267,6 +268,48 @@ export interface CompetitorLoss {
   ourBidWei: string | null;
   ourNetEth: number | null;
   sendLagMs: number | null;
+}
+
+export interface OrderFlowStats {
+  connected: boolean;
+  lastEventAt: string | null;
+  lastError: string | null;
+  txs: number;
+  traced: number;
+  traceErrors: number;
+  droppedBusy: number;
+  withSwaps: number;
+  priced: number;
+  worthSending: number;
+  bestNetEth: number | null;
+}
+
+const FEED_NAME: Record<string, string> = {
+  mempool: "Public mempool",
+  mevblocker: "MEV Blocker",
+};
+
+function OrderFlowFeeds({ feeds }: { feeds: Record<string, OrderFlowStats> | undefined }) {
+  const entries = Object.entries(feeds ?? {});
+  if (!entries.length) return null;
+  return (
+    <>
+      {entries.map(([name, f]) => (
+        <div
+          key={name}
+          className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground"
+        >
+          <strong className="text-foreground">{FEED_NAME[name] ?? name} feed</strong> ·{" "}
+          {f.connected ? "connected" : `not connected${f.lastError ? ` (${f.lastError})` : ""}`} ·{" "}
+          {f.txs} txs · {f.traced} simulated · {f.withSwaps} moved our pools · {f.priced} routes
+          priced · {f.worthSending} worth sending
+          {f.bestNetEth !== null ? ` · best net ${f.bestNetEth.toFixed(4)} ETH` : ""}
+          {f.traceErrors ? ` · ${f.traceErrors} trace errors` : ""}
+          {f.droppedBusy ? ` · ${f.droppedBusy} skipped (busy)` : ""}
+        </div>
+      ))}
+    </>
+  );
 }
 
 const ETHERSCAN = "https://etherscan.io";
@@ -867,6 +910,7 @@ function BackrunCard({ b, now }: { b: BackrunSummary; now: number }) {
           </div>
         ) : null}
         <CompetitorLosses losses={b.competitorLosses} />
+        <OrderFlowFeeds feeds={b.orderFlow} />
         {b.blindDiagnostics ? (
           <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
             Blind fanout diagnostics: {b.blindDiagnostics.attempted} attempted ·{" "}
