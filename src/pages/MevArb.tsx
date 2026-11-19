@@ -297,25 +297,43 @@ const EXPLORER: Record<string, string> = {
 };
 const NAME: Record<string, string> = { base: "Base", ethereum: "Ethereum" };
 
+const CONTROL_FETCH_TIMEOUT_MS = 20_000;
+// The server's challenge expires after 120 s, so a later signature would be rejected anyway.
+const CONTROL_SIGN_TIMEOUT_MS = 110_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 function Tier2Telemetry({ t }: { t: Tier2TelemetrySummary | undefined }) {
   const queryClient = useQueryClient();
-  const [pending, setPending] = useState(false);
+  const [pending, setPending] = useState<string | null>(null);
   const [controlError, setControlError] = useState<string | null>(null);
   if (!t?.enabled) return null;
   const rate = `${(t.agreementRate * 100).toFixed(1)}%`;
   const setAuthority = async (enabled: boolean) => {
-    setPending(true);
+    setPending("Authorizing…");
     setControlError(null);
     try {
-      const provider = window.ethereum;
-      if (!provider)
-        throw new Error("Connect an authorized browser wallet to change this setting.");
-      const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
-      const address = accounts[0];
-      if (!address) throw new Error("No wallet account is connected.");
+      // Use the wallet connected through the site's Connect button, not raw window.ethereum:
+      // with several extensions installed, window.ethereum can be a different wallet whose
+      // prompt never appears, leaving the request pending forever. Loaded on click so the
+      // read-only dashboard does not initialize wallet connectors.
+      const [{ wagmiConfig }, { getAccount, signMessage }] = await Promise.all([
+        import("@/wagmi"),
+        import("wagmi/actions"),
+      ]);
+      const account = getAccount(wagmiConfig);
+      const address = account.address;
+      if (!account.isConnected || !address)
+        throw new Error("Connect the executor-owner wallet with the Connect button first.");
       const challengeResponse = await fetch(
         `/api/mev/arb/control/tier2/challenge?address=${encodeURIComponent(address)}&enabled=${enabled}`,
-        { cache: "no-store" }
+        { cache: "no-store", signal: AbortSignal.timeout(CONTROL_FETCH_TIMEOUT_MS) }
       );
       const challenge = (await challengeResponse.json()) as {
         nonce?: string;
@@ -324,23 +342,33 @@ function Tier2Telemetry({ t }: { t: Tier2TelemetrySummary | undefined }) {
       };
       if (!challengeResponse.ok || !challenge.nonce || !challenge.message)
         throw new Error(challenge.error ?? "Could not authorize the Tier 2 change.");
-      const signature = await provider.request({
-        method: "personal_sign",
-        params: [challenge.message, address],
-      });
-      if (typeof signature !== "string") throw new Error("The wallet did not return a signature.");
+      setPending("Confirm in wallet…");
+      const signature = await withTimeout(
+        signMessage(wagmiConfig, { account: address, message: challenge.message }),
+        CONTROL_SIGN_TIMEOUT_MS,
+        "The wallet did not respond. Open your wallet extension, then try again."
+      );
+      setPending("Applying…");
       const response = await fetch("/api/mev/arb/control/tier2", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ address, enabled, nonce: challenge.nonce, signature }),
+        signal: AbortSignal.timeout(CONTROL_FETCH_TIMEOUT_MS),
       });
       const result = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(result.error ?? "Tier 2 control failed.");
       await queryClient.invalidateQueries({ queryKey: ["mev-arb-summary"] });
     } catch (error) {
-      setControlError(error instanceof Error ? error.message : "Tier 2 control failed.");
+      const message = error instanceof Error ? error.message : "Tier 2 control failed.";
+      setControlError(
+        error instanceof Error && error.name === "TimeoutError"
+          ? "The control server did not respond. Try again."
+          : /reject|denied/i.test(message)
+            ? "Signature request was rejected."
+            : message
+      );
     } finally {
-      setPending(false);
+      setPending(null);
     }
   };
   return (
@@ -357,13 +385,11 @@ function Tier2Telemetry({ t }: { t: Tier2TelemetrySummary | undefined }) {
           <Switch
             className="h-5 w-9 [&>span]:size-4 [&>span]:data-[state=checked]:translate-x-4"
             checked={t.authorityEnabled}
-            disabled={pending || (!t.authorityEnabled && !t.eligible)}
+            disabled={pending !== null || (!t.authorityEnabled && !t.eligible)}
             onCheckedChange={(enabled) => void setAuthority(enabled)}
             aria-label="Tier 2 execution authority"
           />
-          <span>
-            {pending ? "Updating…" : t.authorityEnabled ? "Execution enabled" : "Shadow only"}
-          </span>
+          <span>{pending ?? (t.authorityEnabled ? "Execution enabled" : "Shadow only")}</span>
         </label>
       </div>
       {controlError ? <div className="mt-1 text-destructive">{controlError}</div> : null}
