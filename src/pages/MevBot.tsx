@@ -9,6 +9,8 @@ import MevArb from "./MevArb";
 // Read-only summary published by the aave-mev searcher on the market-data VM. vercel.json forwards
 // /api/mev/* there; in development Vite proxies it.
 export const MEV_SUMMARY_PATH = "/api/mev/summary";
+/** Same liquidator, run against SparkLend (an Aave v3 fork) as its own container. */
+export const SPARK_SUMMARY_PATH = "/api/mev/spark/summary";
 const STALE_MS = 120_000;
 
 export interface OpportunityRow {
@@ -113,10 +115,10 @@ export interface MevSummary {
   decisions: Record<string, number>;
 }
 
-async function fetchSummary(): Promise<MevSummary> {
+async function fetchSummary(path: string = MEV_SUMMARY_PATH): Promise<MevSummary> {
   let res: Response;
   try {
-    res = await fetch(MEV_SUMMARY_PATH, { signal: AbortSignal.timeout(15_000) });
+    res = await fetch(path, { signal: AbortSignal.timeout(15_000) });
   } catch {
     throw new Error("The bot's server did not answer.");
   }
@@ -189,16 +191,16 @@ function LifecycleBadge({ row }: { row: OpportunityRow }) {
       ? "bg-emerald-600"
       : state === "landed"
         ? "bg-sky-600"
-      : state === "submitted"
-        ? "bg-amber-500 text-amber-950"
-        : "bg-violet-600";
+        : state === "submitted"
+          ? "bg-amber-500 text-amber-950"
+          : "bg-violet-600";
   return <Badge className={tone}>{state}</Badge>;
 }
 
 export default function MevBot() {
   const q = useQuery({
     queryKey: ["mev-summary"],
-    queryFn: fetchSummary,
+    queryFn: () => fetchSummary(),
     refetchInterval: 15_000,
   });
   const s = q.data;
@@ -279,14 +281,22 @@ export default function MevBot() {
                   {fmtEth(s.simulatedOpportunityTotalEth ?? s.sumProfitEth)}
                 </div>
                 <p className="mt-1 max-w-2xl text-xs text-muted-foreground">
-                  Sum of mutually exclusive historical projections. This is not earned, landed, or realized P&amp;L.
+                  Sum of mutually exclusive historical projections. This is not earned, landed, or
+                  realized P&amp;L.
                 </p>
               </div>
-              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground" aria-label="Execution evidence legend">
-                <Badge className="bg-violet-600">simulated</Badge><span>chain-state replay</span>
-                <Badge className="bg-amber-500 text-amber-950">submitted</Badge><span>sent to relay</span>
-                <Badge className="bg-sky-600">landed</Badge><span>included on-chain</span>
-                <Badge className="bg-emerald-600">realized</Badge><span>balance-delta P&amp;L</span>
+              <div
+                className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
+                aria-label="Execution evidence legend"
+              >
+                <Badge className="bg-violet-600">simulated</Badge>
+                <span>chain-state replay</span>
+                <Badge className="bg-amber-500 text-amber-950">submitted</Badge>
+                <span>sent to relay</span>
+                <Badge className="bg-sky-600">landed</Badge>
+                <span>included on-chain</span>
+                <Badge className="bg-emerald-600">realized</Badge>
+                <span>balance-delta P&amp;L</span>
               </div>
             </CardContent>
           </Card>
@@ -394,7 +404,9 @@ export default function MevBot() {
                   <div>
                     <div className="text-xs text-muted-foreground">Settlement profit</div>
                     <div className="font-medium tabular-nums">{fmtSettlement(s.best)}</div>
-                    {s.best.profitRaw ? <div className="text-xs text-muted-foreground">raw {s.best.profitRaw}</div> : null}
+                    {s.best.profitRaw ? (
+                      <div className="text-xs text-muted-foreground">raw {s.best.profitRaw}</div>
+                    ) : null}
                   </div>
                   <div>
                     <div className="text-xs text-muted-foreground">ETH equivalent</div>
@@ -425,26 +437,39 @@ export default function MevBot() {
                   </div>
                   <div>
                     <div className="text-xs text-muted-foreground">Evidence status</div>
-                    <div className="mt-1"><LifecycleBadge row={s.best} /></div>
+                    <div className="mt-1">
+                      <LifecycleBadge row={s.best} />
+                    </div>
                   </div>
                   <div>
                     <div className="text-xs text-muted-foreground">Realized result</div>
                     <div className="font-medium tabular-nums">
-                      {s.best.realizedProfit !== undefined && s.best.realizedProfit !== null && s.best.settlementSymbol
+                      {s.best.realizedProfit !== undefined &&
+                      s.best.realizedProfit !== null &&
+                      s.best.settlementSymbol
                         ? `${s.best.realizedProfit.toLocaleString(undefined, { maximumFractionDigits: 6 })} ${s.best.settlementSymbol}`
                         : "—"}
                     </div>
                     {s.best.realizedProfitEth !== undefined && s.best.realizedProfitEth !== null ? (
-                      <div className="text-xs text-muted-foreground">{fmtEth(s.best.realizedProfitEth)}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {fmtEth(s.best.realizedProfitEth)}
+                      </div>
                     ) : null}
                   </div>
                   <div>
                     <div className="text-xs text-muted-foreground">On-chain proof</div>
                     {s.best.tx ? (
-                      <a className="inline-flex items-center gap-1 underline" href={`${ES}/tx/${s.best.tx}`} target="_blank" rel="noreferrer">
+                      <a
+                        className="inline-flex items-center gap-1 underline"
+                        href={`${ES}/tx/${s.best.tx}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
                         {short(s.best.tx)} <ExternalLink className="size-3" />
                       </a>
-                    ) : <span className="text-muted-foreground">—</span>}
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </div>
                   <div>
                     <div className="text-xs text-muted-foreground">Projection</div>
@@ -464,79 +489,146 @@ export default function MevBot() {
             <CardContent>
               {s.recentOpportunities.length ? (
                 <>
-                <div className="space-y-3 md:hidden">
-                  {s.recentOpportunities.map((r) => (
-                    <article key={`mobile-${r.block}-${r.user}-${r.t}`} className="border-l-2 border-violet-300 pl-3 text-sm dark:border-violet-800">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="font-medium">{r.pair}</div>
-                          <div className="text-xs text-muted-foreground">HF {r.hf.toFixed(4)} · {ago(r.t, now)}</div>
-                        </div>
-                        <LifecycleBadge row={r} />
-                      </div>
-                      <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2">
-                        <div><dt className="text-xs text-muted-foreground">Settlement</dt><dd className="tabular-nums">{fmtSettlement(r)}</dd></div>
-                        <div><dt className="text-xs text-muted-foreground">Projected net</dt><dd className="tabular-nums">{fmtEth(r.netEth)}</dd></div>
-                        <div><dt className="text-xs text-muted-foreground">Realized</dt><dd className="tabular-nums">{r.realizedProfit !== undefined && r.realizedProfit !== null && r.settlementSymbol ? `${r.realizedProfit.toLocaleString(undefined, { maximumFractionDigits: 6 })} ${r.settlementSymbol}` : "—"}</dd></div>
-                        <div><dt className="text-xs text-muted-foreground">Proof</dt><dd>{r.tx ? <a className="inline-flex items-center gap-1 underline" href={`${ES}/tx/${r.tx}`} target="_blank" rel="noreferrer">{short(r.tx)} <ExternalLink className="size-3" /></a> : "—"}</dd></div>
-                      </dl>
-                    </article>
-                  ))}
-                </div>
-                <div className="hidden overflow-x-auto md:block">
-                <table className="w-full text-sm">
-                  <thead className="text-left text-xs text-muted-foreground">
-                    <tr>
-                      <th className="py-1 pr-3">When</th>
-                      <th className="pr-3">Borrower</th>
-                      <th className="pr-3">Pair</th>
-                      <th className="pr-3">Health</th>
-                      <th className="pr-3">Settlement profit</th>
-                      <th className="pr-3">ETH equivalent</th>
-                      <th className="pr-3">Gas</th>
-                      <th className="pr-3">Builder</th>
-                      <th className="pr-3">Projected net</th>
-                      <th className="pr-3">Realized</th>
-                      <th className="pr-3">Proof</th>
-                      <th>Projection</th>
-                      <th className="sticky right-0 bg-background py-1 pl-3 shadow-[-8px_0_12px_-12px_hsl(var(--foreground))]">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                  <div className="space-y-3 md:hidden">
                     {s.recentOpportunities.map((r) => (
-                      <tr key={`${r.block}-${r.user}-${r.t}`} className="border-t">
-                        <td className="whitespace-nowrap py-1 pr-3">{ago(r.t, now)}</td>
-                        <td className="pr-3">
-                          <a
-                            className="underline"
-                            href={`${ES}/address/${r.user}`}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            {short(r.user)}
-                          </a>
-                        </td>
-                        <td className="pr-3">{r.pair}</td>
-                        <td className="pr-3 tabular-nums">{r.hf.toFixed(4)}</td>
-                        <td className="whitespace-nowrap pr-3 tabular-nums">{fmtSettlement(r)}</td>
-                        <td className="whitespace-nowrap pr-3 tabular-nums">{fmtEth(r.profitEth)}</td>
-                        <td className="pr-3 tabular-nums">{fmtEth(r.gasEth)}</td>
-                        <td className="whitespace-nowrap pr-3 tabular-nums">{fmtEth(r.bribeEth ?? null)}</td>
-                        <td className="whitespace-nowrap pr-3 tabular-nums">{fmtEth(r.netEth)}</td>
-                        <td className="whitespace-nowrap pr-3 tabular-nums">
-                          {r.realizedProfit !== undefined && r.realizedProfit !== null && r.settlementSymbol
-                            ? `${r.realizedProfit.toLocaleString(undefined, { maximumFractionDigits: 6 })} ${r.settlementSymbol}`
-                            : "—"}
-                          {r.realizedProfitEth !== undefined && r.realizedProfitEth !== null ? <div className="text-xs text-muted-foreground">{fmtEth(r.realizedProfitEth)}</div> : null}
-                        </td>
-                        <td className="pr-3">{r.tx ? <a className="inline-flex items-center gap-1 underline" href={`${ES}/tx/${r.tx}`} target="_blank" rel="noreferrer">{short(r.tx)} <ExternalLink className="size-3" /></a> : "—"}</td>
-                        <td>{verdict(r.decision)}</td>
-                        <td className="sticky right-0 bg-background py-1 pl-3 shadow-[-8px_0_12px_-12px_hsl(var(--foreground))]"><LifecycleBadge row={r} /></td>
-                      </tr>
+                      <article
+                        key={`mobile-${r.block}-${r.user}-${r.t}`}
+                        className="border-l-2 border-violet-300 pl-3 text-sm dark:border-violet-800"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="font-medium">{r.pair}</div>
+                            <div className="text-xs text-muted-foreground">
+                              HF {r.hf.toFixed(4)} · {ago(r.t, now)}
+                            </div>
+                          </div>
+                          <LifecycleBadge row={r} />
+                        </div>
+                        <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2">
+                          <div>
+                            <dt className="text-xs text-muted-foreground">Settlement</dt>
+                            <dd className="tabular-nums">{fmtSettlement(r)}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs text-muted-foreground">Projected net</dt>
+                            <dd className="tabular-nums">{fmtEth(r.netEth)}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs text-muted-foreground">Realized</dt>
+                            <dd className="tabular-nums">
+                              {r.realizedProfit !== undefined &&
+                              r.realizedProfit !== null &&
+                              r.settlementSymbol
+                                ? `${r.realizedProfit.toLocaleString(undefined, { maximumFractionDigits: 6 })} ${r.settlementSymbol}`
+                                : "—"}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs text-muted-foreground">Proof</dt>
+                            <dd>
+                              {r.tx ? (
+                                <a
+                                  className="inline-flex items-center gap-1 underline"
+                                  href={`${ES}/tx/${r.tx}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  {short(r.tx)} <ExternalLink className="size-3" />
+                                </a>
+                              ) : (
+                                "—"
+                              )}
+                            </dd>
+                          </div>
+                        </dl>
+                      </article>
                     ))}
-                  </tbody>
-                </table>
-                </div>
+                  </div>
+                  <div className="hidden overflow-x-auto md:block">
+                    <table className="w-full text-sm">
+                      <thead className="text-left text-xs text-muted-foreground">
+                        <tr>
+                          <th className="py-1 pr-3">When</th>
+                          <th className="pr-3">Borrower</th>
+                          <th className="pr-3">Pair</th>
+                          <th className="pr-3">Health</th>
+                          <th className="pr-3">Settlement profit</th>
+                          <th className="pr-3">ETH equivalent</th>
+                          <th className="pr-3">Gas</th>
+                          <th className="pr-3">Builder</th>
+                          <th className="pr-3">Projected net</th>
+                          <th className="pr-3">Realized</th>
+                          <th className="pr-3">Proof</th>
+                          <th>Projection</th>
+                          <th className="sticky right-0 bg-background py-1 pl-3 shadow-[-8px_0_12px_-12px_hsl(var(--foreground))]">
+                            Status
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {s.recentOpportunities.map((r) => (
+                          <tr key={`${r.block}-${r.user}-${r.t}`} className="border-t">
+                            <td className="whitespace-nowrap py-1 pr-3">{ago(r.t, now)}</td>
+                            <td className="pr-3">
+                              <a
+                                className="underline"
+                                href={`${ES}/address/${r.user}`}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                {short(r.user)}
+                              </a>
+                            </td>
+                            <td className="pr-3">{r.pair}</td>
+                            <td className="pr-3 tabular-nums">{r.hf.toFixed(4)}</td>
+                            <td className="whitespace-nowrap pr-3 tabular-nums">
+                              {fmtSettlement(r)}
+                            </td>
+                            <td className="whitespace-nowrap pr-3 tabular-nums">
+                              {fmtEth(r.profitEth)}
+                            </td>
+                            <td className="pr-3 tabular-nums">{fmtEth(r.gasEth)}</td>
+                            <td className="whitespace-nowrap pr-3 tabular-nums">
+                              {fmtEth(r.bribeEth ?? null)}
+                            </td>
+                            <td className="whitespace-nowrap pr-3 tabular-nums">
+                              {fmtEth(r.netEth)}
+                            </td>
+                            <td className="whitespace-nowrap pr-3 tabular-nums">
+                              {r.realizedProfit !== undefined &&
+                              r.realizedProfit !== null &&
+                              r.settlementSymbol
+                                ? `${r.realizedProfit.toLocaleString(undefined, { maximumFractionDigits: 6 })} ${r.settlementSymbol}`
+                                : "—"}
+                              {r.realizedProfitEth !== undefined && r.realizedProfitEth !== null ? (
+                                <div className="text-xs text-muted-foreground">
+                                  {fmtEth(r.realizedProfitEth)}
+                                </div>
+                              ) : null}
+                            </td>
+                            <td className="pr-3">
+                              {r.tx ? (
+                                <a
+                                  className="inline-flex items-center gap-1 underline"
+                                  href={`${ES}/tx/${r.tx}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  {short(r.tx)} <ExternalLink className="size-3" />
+                                </a>
+                              ) : (
+                                "—"
+                              )}
+                            </td>
+                            <td>{verdict(r.decision)}</td>
+                            <td className="sticky right-0 bg-background py-1 pl-3 shadow-[-8px_0_12px_-12px_hsl(var(--foreground))]">
+                              <LifecycleBadge row={r} />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </>
               ) : (
                 <span className="text-sm text-muted-foreground">None yet.</span>
@@ -606,7 +698,92 @@ export default function MevBot() {
           </p>
         </>
       ) : null}
+      <SparkLendCard />
       <MevArb />
     </div>
+  );
+}
+
+/** Compact card for the SparkLend liquidator (same bot and summary format as Aave). */
+function SparkLendCard() {
+  const q = useQuery({
+    queryKey: ["mev-summary", "spark"],
+    queryFn: () => fetchSummary(SPARK_SUMMARY_PATH),
+    refetchInterval: 15_000,
+  });
+  const s = q.data;
+  const now = Date.now();
+  const live = !!s?.lastBlockAt && now - Date.parse(s.lastBlockAt) < STALE_MS;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+          SparkLend liquidations
+          {s ? (
+            <>
+              <Badge variant={live ? "default" : "secondary"}>
+                {live ? "Running" : s.lastBlockAt ? "Not responding" : "Indexing borrowers"}
+              </Badge>
+              <Badge variant="outline">
+                {s.mode === "live" ? "LIVE — sends bundles" : "Shadow — watches, never trades"}
+              </Badge>
+            </>
+          ) : null}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        <p className="text-muted-foreground">
+          The same liquidator, run against SparkLend (an Aave v3 fork): it simulates each possible
+          liquidation on the real chain state and records whether it would be worth sending.
+        </p>
+        {q.isLoading ? (
+          <div className="flex items-center gap-2">
+            <Loader2 className="size-4 animate-spin" /> Loading…
+          </div>
+        ) : null}
+        {q.isError ? (
+          <div className="flex items-center gap-2 text-destructive">
+            <AlertTriangle className="size-4" /> {(q.error as Error).message}
+          </div>
+        ) : null}
+        {s ? (
+          <>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+              <Stat
+                label="Last block checked"
+                value={s.lastBlock ? `#${s.lastBlock}` : "—"}
+                hint={ago(s.lastBlockAt, now)}
+              />
+              <Stat label="Borrowers watched" value={s.borrowersIndexed.toLocaleString()} />
+              <Stat
+                label="Close to liquidation"
+                value={s.hotAccounts.toLocaleString()}
+                hint="health factor under 1.05"
+              />
+              <Stat
+                label="Liquidations simulated"
+                value={s.totals.opportunities.toLocaleString()}
+              />
+              <Stat
+                label="Worth sending"
+                value={s.totals.viable.toLocaleString()}
+                hint="profit after gas and bribe"
+              />
+              <Stat
+                label="Taken by others"
+                value={s.totals.competitorLiquidations.toLocaleString()}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Best so far:{" "}
+              {s.best
+                ? `${s.best.pair} · ${fmtEth(s.best.netEth)} net · ${s.best.decision}`
+                : "none yet"}{" "}
+              · started {ago(s.startedAt, now)}
+            </p>
+          </>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }

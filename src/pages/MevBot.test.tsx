@@ -3,7 +3,13 @@ import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ARB_SUMMARY_PATH, type ArbSummary, fmtSigned } from "./MevArb";
-import MevBot, { fmtEth, fmtSettlement, MEV_SUMMARY_PATH, type MevSummary } from "./MevBot";
+import MevBot, {
+  fmtEth,
+  fmtSettlement,
+  MEV_SUMMARY_PATH,
+  type MevSummary,
+  SPARK_SUMMARY_PATH,
+} from "./MevBot";
 
 const summary = (over: Partial<MevSummary> = {}): MevSummary => ({
   version: 1,
@@ -122,8 +128,14 @@ const arb = (): ArbSummary => ({
 /** Answers each summary URL with its own body. */
 const byUrl = (
   mev: () => Response,
-  arbRes: () => Response = () => new Response(JSON.stringify(arb()))
-) => vi.fn((url: string) => Promise.resolve(url === ARB_SUMMARY_PATH ? arbRes() : mev()));
+  arbRes: () => Response = () => new Response(JSON.stringify(arb())),
+  sparkRes: () => Response = () => new Response("{}", { status: 404 })
+) =>
+  vi.fn((url: string) =>
+    Promise.resolve(
+      url === ARB_SUMMARY_PATH ? arbRes() : url === SPARK_SUMMARY_PATH ? sparkRes() : mev()
+    )
+  );
 
 const renderPage = () =>
   render(
@@ -144,6 +156,23 @@ describe("MEV bot page", () => {
     expect(fmtSettlement(summary().best!)).toBe("0.0018 USDC");
     const { settlementProfit: _omitted, ...withoutSettlement } = summary().best!;
     expect(fmtSettlement(withoutSettlement)).toBe("—");
+  });
+
+  it("shows the SparkLend card from its own endpoint while it indexes borrowers", async () => {
+    const fetchMock = byUrl(
+      () => new Response("{}", { status: 503 }),
+      undefined,
+      () =>
+        new Response(
+          JSON.stringify(summary({ lastBlock: null, lastBlockAt: null, borrowersIndexed: 1234 }))
+        )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    renderPage();
+    expect(await screen.findByText("Indexing borrowers")).toBeTruthy();
+    expect(fetchMock.mock.calls.map((c) => c[0])).toContain(SPARK_SUMMARY_PATH);
+    expect(screen.getByText("SparkLend liquidations")).toBeTruthy();
+    expect(screen.getByText("1,234")).toBeTruthy();
   });
 
   it("shows the live summary from the bot's endpoint", async () => {
