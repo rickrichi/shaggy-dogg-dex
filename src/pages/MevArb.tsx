@@ -183,6 +183,7 @@ export interface BackrunSummary {
   };
   missAudit?: MissAuditSummary;
   sessionMissAudit?: MissAuditSummary;
+  competitorLosses?: CompetitorLoss[];
   risk?: RiskSnapshot;
   tier2?: Tier2TelemetrySummary;
   tier3?: Tier3TelemetrySummary;
@@ -245,6 +246,103 @@ const MISS_LABEL: Record<MissOutcome, string> = {
   would_have_reverted: "stale or no longer profitable",
   inconclusive: "inconclusive after audit failures",
 };
+
+export interface CompetitorLoss {
+  t: string;
+  hash: string;
+  pair: string;
+  block: string;
+  builder: string | null;
+  userTx: string | null;
+  userIndex: number | null;
+  competitor: {
+    tx: string;
+    from: string | null;
+    to: string | null;
+    index: number | null;
+    priorityFeeWei: string | null;
+    coinbaseTransferWei: string | null;
+    pools: string[];
+  };
+  ourBidWei: string | null;
+  ourNetEth: number | null;
+  sendLagMs: number | null;
+}
+
+const ETHERSCAN = "https://etherscan.io";
+
+function ethOf(wei: string | null): string {
+  if (wei === null) return "?";
+  try {
+    const eth = Number(BigInt(wei)) / 1e18;
+    return eth === 0 ? "0" : eth < 0.0001 ? eth.toExponential(1) : eth.toFixed(4);
+  } catch {
+    return "?";
+  }
+}
+
+function addWei(a: string | null, b: string | null): string | null {
+  try {
+    return (BigInt(a ?? "0") + BigInt(b ?? "0")).toString();
+  } catch {
+    return null;
+  }
+}
+
+function lagText(ms: number | null): string {
+  if (ms === null) return "send timing not recorded";
+  const s = (Math.abs(ms) / 1000).toFixed(2);
+  return ms > 0
+    ? `we sent ${s} s after the block started (too late)`
+    : `we sent ${s} s before the block`;
+}
+
+function CompetitorLosses({ losses }: { losses: CompetitorLoss[] | undefined }) {
+  if (!losses?.length) return null;
+  const short = (h: string) => `${h.slice(0, 8)}…`;
+  return (
+    <details className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+      <summary className="cursor-pointer">
+        <strong className="text-foreground">Lost to competitors</strong> · last {losses.length}
+      </summary>
+      <ul className="mt-1 space-y-1">
+        {losses.map((l) => {
+          const paid =
+            l.competitor.coinbaseTransferWei === null
+              ? `${ethOf(l.competitor.priorityFeeWei)} ETH priority fee + direct builder payment not traced`
+              : `${ethOf(addWei(l.competitor.priorityFeeWei, l.competitor.coinbaseTransferWei))} ETH to the builder`;
+          return (
+            <li key={l.hash} className="break-words">
+              {new Date(l.t).toLocaleString()} · {l.pair} · block{" "}
+              <a
+                className="underline"
+                href={`${ETHERSCAN}/block/${l.block}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                #{l.block}
+              </a>{" "}
+              · winner{" "}
+              <a
+                className="underline"
+                href={`${ETHERSCAN}/tx/${l.competitor.tx}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {short(l.competitor.tx)}
+              </a>{" "}
+              at position {l.competitor.index ?? "?"}
+              {l.userIndex !== null ? ` (user swap at ${l.userIndex})` : ""} paid {paid} · we bid{" "}
+              {ethOf(l.ourBidWei)} ETH
+              {l.ourNetEth !== null ? ` (est. net ${l.ourNetEth.toFixed(4)} ETH)` : ""} ·{" "}
+              {lagText(l.sendLagMs)}
+            </li>
+          );
+        })}
+      </ul>
+    </details>
+  );
+}
 
 function missBreakdown(a: MissAuditSummary) {
   return (Object.entries(a.outcomes) as Array<[MissOutcome, number]>)
@@ -768,6 +866,7 @@ function BackrunCard({ b, now }: { b: BackrunSummary; now: number }) {
             {b.missAudit.queueDropped ?? 0} queue drops.
           </div>
         ) : null}
+        <CompetitorLosses losses={b.competitorLosses} />
         {b.blindDiagnostics ? (
           <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
             Blind fanout diagnostics: {b.blindDiagnostics.attempted} attempted ·{" "}

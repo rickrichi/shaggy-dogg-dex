@@ -525,6 +525,29 @@ describe("MEV-Share backrun card", () => {
           errors: 1,
           queueDropped: 0,
         },
+        competitorLosses: [
+          {
+            t: "2026-11-18T14:44:13Z",
+            hash: "0x39d5",
+            pair: "LINK/USDC",
+            block: "26442616",
+            builder: null,
+            userTx: null,
+            userIndex: 157,
+            competitor: {
+              tx: "0x08e635dbd0ecada455fb",
+              from: null,
+              to: null,
+              index: 158,
+              priorityFeeWei: "0",
+              coinbaseTransferWei: "3000000000000000",
+              pools: ["v4 0.3%"],
+            },
+            ourBidWei: "1000000000000000",
+            ourNetEth: 0.0072,
+            sendLagMs: 1756,
+          },
+        ],
         latencyMs: {
           samples: 3,
           avgTotalMs: 900,
@@ -572,5 +595,8 @@ describe("MEV-Share backrun card", () => {
       screen.getByText(/Reliability: current session 1 retries · 1 RPC errors · 0 queue drops/)
     ).toBeTruthy();
     expect(screen.getByText(/lifetime 3 retries · 4 RPC errors · 1 queue drops/)).toBeTruthy();
+    expect(screen.getByText(/Lost to competitors/)).toBeTruthy();
+    expect(screen.getByText(/paid 0.0030 ETH to the builder · we bid 0.0010 ETH/)).toBeTruthy();
+    expect(screen.getByText(/we sent 1.76 s after the block started \(too late\)/)).toBeTruthy();
   });
 });
