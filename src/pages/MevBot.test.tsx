@@ -244,6 +244,69 @@ describe("MEV bot page", () => {
     expect(screen.getByText("1,234")).toBeTruthy();
   });
 
+  it("shows the Gold Spoke card from the main summary's spoke section", async () => {
+    const spoke: MevSummary["spoke"] = {
+      borrowers: 305,
+      withDebt: 155,
+      lowestHf: 0.8957,
+      updates: 7,
+      pushedUnder: 3,
+      opportunities: 2,
+      viable: 1,
+      simFailed: 1,
+      liquidatableSeen: 1,
+      competitorLiquidations: 4,
+      competitorSeenByUs: 2,
+      recent: [
+        {
+          t: new Date().toISOString(),
+          block: "26454914",
+          user: "0xf3Cd996000000000000000000000000000000001",
+          hf: 0.8221,
+          debt: "USDC",
+          legs: ["50% direct", "50% 2-hop"],
+          funding: "morpho",
+          profitEth: 1.6172,
+          gasEth: 0.003,
+          bribeEth: 1.6139,
+          netEth: 0.0032,
+          decision: "send",
+        },
+      ],
+      recentCompetitors: [
+        {
+          t: new Date().toISOString(),
+          block: "26453215",
+          tx: "0x9345433551f009aead9e39c3f23280e8dabcdcdc43bc0e067e57f7b391429c79",
+          user: "0x76a94edd7e04bc9ede0108c74e36b0f916b90ca3",
+          liquidator: "0x3d2b05e4f8fd3218c27d50caa6b0025dfc42a57a",
+          seenByUs: false,
+        },
+      ],
+    };
+    vi.stubGlobal(
+      "fetch",
+      byUrl(() => new Response(JSON.stringify(summary({ spoke }))))
+    );
+    renderPage();
+    expect(await screen.findByText("Aave V4 Gold Spoke liquidations")).toBeTruthy();
+    expect(screen.getByText("0.896")).toBeTruthy();
+    expect(screen.getByText("3 borrowers pushed under")).toBeTruthy();
+    expect(screen.getByText("50% direct + 50% 2-hop · morpho")).toBeTruthy();
+    expect(screen.getByText("1.6139 ETH")).toBeTruthy();
+    expect(screen.getByText("Gold Spoke liquidations by others")).toBeTruthy();
+  });
+
+  it("hides the Gold Spoke card on bot builds without a spoke section", async () => {
+    vi.stubGlobal(
+      "fetch",
+      byUrl(() => new Response(JSON.stringify(summary())))
+    );
+    renderPage();
+    expect(await screen.findByText("Liquidations other bots made")).toBeTruthy();
+    expect(screen.queryByText("Aave V4 Gold Spoke liquidations")).toBeNull();
+  });
+
   it("shows the live summary from the bot's endpoint", async () => {
     const fetchMock = byUrl(() => new Response(JSON.stringify(summary())));
     vi.stubGlobal("fetch", fetchMock);

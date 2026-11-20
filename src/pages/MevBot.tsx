@@ -113,6 +113,46 @@ export interface MevSummary {
   recentOpportunities: OpportunityRow[];
   recentCompetitors: CompetitorRow[];
   decisions: Record<string, number>;
+  /** Aave V4 Gold Spoke liquidations (shadow). Absent on bot builds before 2026-11-20. */
+  spoke?: GoldSpokeSummary;
+}
+
+export interface GoldSpokeRow {
+  t: string;
+  block: string;
+  user: string;
+  hf: number;
+  debt: string;
+  legs: string[];
+  funding: "morpho" | "aave";
+  profitEth: number;
+  gasEth: number;
+  bribeEth: number;
+  netEth: number | null;
+  decision: string;
+}
+
+export interface GoldSpokeSummary {
+  borrowers: number;
+  withDebt: number;
+  lowestHf: number | null;
+  updates: number;
+  pushedUnder: number;
+  opportunities: number;
+  viable: number;
+  simFailed: number;
+  liquidatableSeen: number;
+  competitorLiquidations: number;
+  competitorSeenByUs: number;
+  recent: GoldSpokeRow[];
+  recentCompetitors: Array<{
+    t: string;
+    block: string;
+    tx: string;
+    user: string;
+    liquidator: string;
+    seenByUs: boolean;
+  }>;
 }
 
 async function fetchSummary(path: string = MEV_SUMMARY_PATH): Promise<MevSummary> {
@@ -698,12 +738,168 @@ export default function MevBot() {
           </p>
         </>
       ) : null}
+      {s?.spoke ? <GoldSpokeCard spoke={s.spoke} now={now} /> : null}
       <SparkLendCard />
       {LENDING_MONITORS.map((m) => (
         <LendingMonitorCard key={m.path} {...m} />
       ))}
       <MevArb />
     </div>
+  );
+}
+
+/** Aave V4 Gold Spoke: borrowers priced behind each gold price update (shadow, from the main bot). */
+export function GoldSpokeCard({ spoke: p, now }: { spoke: GoldSpokeSummary; now: number }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+          Aave V4 Gold Spoke liquidations
+          <Badge variant="outline">Shadow — prices every gold update, never trades</Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        <p className="text-muted-foreground">
+          Gold Spoke borrowers post XAUt and borrow stablecoins. When Chainlink&apos;s gold price
+          drops, some fall under health 1 and are liquidated right behind the update. The bot
+          re-checks every borrower behind each gold update and prices each liquidation exactly
+          (flash loan, the Spoke&apos;s liquidation, XAUt sale, builder bid) without sending it.
+        </p>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+          <Stat
+            label="Borrowers indexed"
+            value={p.borrowers.toLocaleString()}
+            hint={`${p.withDebt.toLocaleString()} with debt`}
+          />
+          <Stat
+            label="Lowest health"
+            value={p.lowestHf === null ? "—" : p.lowestHf.toFixed(3)}
+            hint="under 1 can be liquidated"
+          />
+          <Stat
+            label="Gold updates checked"
+            value={p.updates.toLocaleString()}
+            hint={`${p.pushedUnder.toLocaleString()} borrowers pushed under`}
+          />
+          <Stat
+            label="Priced"
+            value={p.opportunities.toLocaleString()}
+            hint={`${p.viable.toLocaleString()} worth bidding on · ${p.simFailed.toLocaleString()} failed`}
+          />
+          <Stat
+            label="Under 1 between updates"
+            value={p.liquidatableSeen.toLocaleString()}
+            hint="found by the 12 s check"
+          />
+          <Stat
+            label="Taken by others"
+            value={p.competitorLiquidations.toLocaleString()}
+            hint={`${p.competitorSeenByUs.toLocaleString()} we had priced`}
+          />
+        </div>
+        {p.recent.length ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="py-1 pr-3">When</th>
+                  <th className="pr-3">Borrower</th>
+                  <th className="pr-3">Health</th>
+                  <th className="pr-3">Debt</th>
+                  <th className="pr-3">XAUt sale</th>
+                  <th className="pr-3">Profit</th>
+                  <th className="pr-3">Bid</th>
+                  <th>Decision</th>
+                </tr>
+              </thead>
+              <tbody>
+                {p.recent.map((r) => (
+                  <tr key={r.t + r.user + r.debt} className="border-t">
+                    <td className="whitespace-nowrap py-1 pr-3">{ago(r.t, now)}</td>
+                    <td className="pr-3">
+                      <a
+                        className="underline"
+                        href={`${ES}/address/${r.user}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {short(r.user)}
+                      </a>
+                    </td>
+                    <td className="pr-3 tabular-nums">{r.hf.toFixed(4)}</td>
+                    <td className="pr-3">{r.debt}</td>
+                    <td className="pr-3">
+                      {r.legs.join(" + ")} · {r.funding}
+                    </td>
+                    <td className="pr-3 tabular-nums">{fmtEth(r.profitEth)}</td>
+                    <td className="pr-3 tabular-nums">
+                      {r.decision === "send" ? fmtEth(r.bribeEth) : "—"}
+                    </td>
+                    <td>{verdict(r.decision)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            No borrower priced yet: none has been pushed under by a gold update since this watch
+            started.
+          </p>
+        )}
+        {p.recentCompetitors.length ? (
+          <div className="overflow-x-auto">
+            <div className="mb-1 text-xs text-muted-foreground">
+              Gold Spoke liquidations by others
+            </div>
+            <table className="w-full text-sm">
+              <thead className="text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="py-1 pr-3">When</th>
+                  <th className="pr-3">Borrower</th>
+                  <th className="pr-3">Liquidator</th>
+                  <th className="pr-3">Had we priced it?</th>
+                  <th>Transaction</th>
+                </tr>
+              </thead>
+              <tbody>
+                {p.recentCompetitors.map((c) => (
+                  <tr key={c.tx + c.user} className="border-t">
+                    <td className="whitespace-nowrap py-1 pr-3">{ago(c.t, now)}</td>
+                    <td className="pr-3">{short(c.user)}</td>
+                    <td className="pr-3">
+                      <a
+                        className="underline"
+                        href={`${ES}/address/${c.liquidator}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {short(c.liquidator)}
+                      </a>
+                    </td>
+                    <td className="pr-3">{c.seenByUs ? "yes" : "no"}</td>
+                    <td>
+                      <a
+                        className="inline-flex items-center gap-1 underline"
+                        href={`${ES}/tx/${c.tx}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {short(c.tx)} <ExternalLink className="size-3" />
+                      </a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+        <p className="text-xs text-muted-foreground">
+          Profits and bids are simulated behind the real update, before any is sent. Sending needs
+          the Gold Spoke executor deployed (not yet).
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 
