@@ -297,6 +297,35 @@ describe("MEV bot page", () => {
     expect(screen.getByText("Gold Spoke liquidations by others")).toBeTruthy();
   });
 
+  it("shows the Gold Spoke card as live with bundle counts once an executor is configured", async () => {
+    const spoke: MevSummary["spoke"] = {
+      live: true,
+      submissions: 3,
+      accepted: 2,
+      borrowers: 305,
+      withDebt: 155,
+      lowestHf: 1.07,
+      updates: 9,
+      pushedUnder: 3,
+      opportunities: 3,
+      viable: 3,
+      simFailed: 0,
+      liquidatableSeen: 0,
+      competitorLiquidations: 1,
+      competitorSeenByUs: 1,
+      recent: [],
+      recentCompetitors: [],
+    };
+    vi.stubGlobal(
+      "fetch",
+      byUrl(() => new Response(JSON.stringify(summary({ spoke }))))
+    );
+    renderPage();
+    expect(await screen.findByText("LIVE — sends bundles behind gold updates")).toBeTruthy();
+    expect(screen.getByText("Bundles sent")).toBeTruthy();
+    expect(screen.getByText("2 accepted by the relay")).toBeTruthy();
+  });
+
   it("hides the Gold Spoke card on bot builds without a spoke section", async () => {
     vi.stubGlobal(
       "fetch",

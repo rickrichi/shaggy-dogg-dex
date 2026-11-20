@@ -144,6 +144,10 @@ export interface GoldSpokeSummary {
   liquidatableSeen: number;
   competitorLiquidations: number;
   competitorSeenByUs: number;
+  /** True once a verified Gold Spoke executor is configured: bundles are sent. */
+  live?: boolean;
+  submissions?: number;
+  accepted?: number;
   recent: GoldSpokeRow[];
   recentCompetitors: Array<{
     t: string;
@@ -755,7 +759,11 @@ export function GoldSpokeCard({ spoke: p, now }: { spoke: GoldSpokeSummary; now:
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center gap-2 text-base">
           Aave V4 Gold Spoke liquidations
-          <Badge variant="outline">Shadow — prices every gold update, never trades</Badge>
+          {p.live ? (
+            <Badge className="bg-emerald-600">LIVE — sends bundles behind gold updates</Badge>
+          ) : (
+            <Badge variant="outline">Shadow — prices every gold update, never trades</Badge>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
@@ -786,11 +794,19 @@ export function GoldSpokeCard({ spoke: p, now }: { spoke: GoldSpokeSummary; now:
             value={p.opportunities.toLocaleString()}
             hint={`${p.viable.toLocaleString()} worth bidding on · ${p.simFailed.toLocaleString()} failed`}
           />
-          <Stat
-            label="Under 1 between updates"
-            value={p.liquidatableSeen.toLocaleString()}
-            hint="found by the 12 s check"
-          />
+          {p.live ? (
+            <Stat
+              label="Bundles sent"
+              value={(p.submissions ?? 0).toLocaleString()}
+              hint={`${(p.accepted ?? 0).toLocaleString()} accepted by the relay`}
+            />
+          ) : (
+            <Stat
+              label="Under 1 between updates"
+              value={p.liquidatableSeen.toLocaleString()}
+              hint="found by the 12 s check"
+            />
+          )}
           <Stat
             label="Taken by others"
             value={p.competitorLiquidations.toLocaleString()}
@@ -895,8 +911,9 @@ export function GoldSpokeCard({ spoke: p, now }: { spoke: GoldSpokeSummary; now:
           </div>
         ) : null}
         <p className="text-xs text-muted-foreground">
-          Profits and bids are simulated behind the real update, before any is sent. Sending needs
-          the Gold Spoke executor deployed (not yet).
+          {p.live
+            ? "Profits and bids are simulated behind the real update; worth-bidding liquidations are re-checked through the deployed executor and sent as one bundle behind the update."
+            : "Profits and bids are simulated behind the real update, before any is sent. Sending needs the Gold Spoke executor deployed (not yet)."}
         </p>
       </CardContent>
     </Card>
