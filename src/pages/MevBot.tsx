@@ -789,6 +789,7 @@ const AUTHORITY_LABELS: Record<string, string> = {
   "liquidator-shadow": "Aave V3 + Gold Spoke liquidator · parity run (shadow)",
   "arb-ethereum": "Uniswap arbitrage · Ethereum (live)",
   "arb-base": "Uniswap arbitrage · Base (live)",
+  spark: "SparkLend",
   compound: "Compound III",
   morpho: "Morpho Blue",
   euler: "Euler v2",
