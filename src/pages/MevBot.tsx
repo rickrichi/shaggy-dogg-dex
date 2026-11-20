@@ -765,6 +765,20 @@ export const LENDING_MONITORS = [
     description:
       "Watches every borrower of every Euler vault with an oracle. An unhealthy account can be liquidated at a discount of 1 − health factor, capped per vault; the reward shown is that discount on the whole debt.",
   },
+  ...(
+    [
+      ["arbitrum", "Arbitrum"],
+      ["base", "Base"],
+      ["optimism", "Optimism"],
+      ["polygon", "Polygon"],
+      ["avalanche", "Avalanche"],
+    ] as const
+  ).map(([key, label]) => ({
+    title: `Aave V3 liquidations — ${label}`,
+    path: `/api/mev/aave-${key}/summary`,
+    marketsLabel: "Reserves",
+    description: `Watches every Aave V3 borrower on ${label}. An account under health 1 can be liquidated for its collateral's bonus (typically 4–10%); the reward shown is the best collateral/debt pair under Aave's close-factor rules, after the protocol's share.`,
+  })),
 ] as const;
 
 async function fetchMonitor(path: string): Promise<LendingMonitorSummary> {
