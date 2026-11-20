@@ -831,9 +831,9 @@ export function MevAuthorityCard({ now }: { now: number }) {
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
         <p className="text-muted-foreground">
-          One host running every strategy as a plug-in, with one health check. The Aave V3 + Gold
-          Spoke liquidator and the Uniswap arbitrage bot above join it last, once every plug-in here
-          has matched the service it replaces.
+          One host running every strategy, with one health check. The live liquidator and arbitrage
+          bot run inside it as supervised processes at full priority; every shadow monitor runs as a
+          plug-in.
         </p>
         {q.isLoading ? (
           <div className="flex items-center gap-2">
