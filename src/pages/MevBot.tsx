@@ -743,12 +743,160 @@ export default function MevBot() {
         </>
       ) : null}
       {s?.spoke ? <GoldSpokeCard spoke={s.spoke} now={now} /> : null}
+      <MevAuthorityCard now={now} />
       <SparkLendCard />
       {LENDING_MONITORS.map((m) => (
         <LendingMonitorCard key={m.path} {...m} />
       ))}
       <MevArb />
     </div>
+  );
+}
+
+export const AUTHORITY_SUMMARY_PATH = "/api/mev/authority/summary";
+
+export interface AuthorityInstance {
+  name: string;
+  kind: string;
+  state: "starting" | "running" | "restarting";
+  healthy: boolean;
+  restarts: number;
+  lastError: string | null;
+  summary: {
+    protocol: string;
+    mode: "shadow" | "live";
+    lastBlock: string | null;
+    lastBlockAt: string | null;
+    backfill: { from: string; syncedTo: string; target: string | null; done: boolean };
+    markets: number;
+    positions: number;
+    hot: number;
+    liquidatableNow: number;
+  } | null;
+}
+
+export interface AuthoritySummary {
+  version: 1;
+  startedAt: string;
+  updatedAt: string;
+  healthy: number;
+  total: number;
+  instances: AuthorityInstance[];
+}
+
+const AUTHORITY_LABELS: Record<string, string> = {
+  compound: "Compound III",
+  morpho: "Morpho Blue",
+  euler: "Euler v2",
+  "aave-arbitrum": "Aave V3 · Arbitrum",
+  "aave-base": "Aave V3 · Base",
+  "aave-optimism": "Aave V3 · Optimism",
+  "aave-polygon": "Aave V3 · Polygon",
+  "aave-avalanche": "Aave V3 · Avalanche",
+};
+
+/** MEV Authority: every strategy plug-in running in one host, with one health check. */
+export function MevAuthorityCard({ now }: { now: number }) {
+  const q = useQuery({
+    queryKey: ["mev-authority"],
+    queryFn: async (): Promise<AuthoritySummary> => {
+      let res: Response;
+      try {
+        res = await fetch(AUTHORITY_SUMMARY_PATH, { signal: AbortSignal.timeout(15_000) });
+      } catch {
+        throw new Error("The MEV Authority host did not answer.");
+      }
+      if (!res.ok) throw new Error(`The MEV Authority host answered HTTP ${res.status}.`);
+      return (await res.json()) as AuthoritySummary;
+    },
+    refetchInterval: 15_000,
+  });
+  const a = q.data;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+          MEV Authority
+          {a ? (
+            <Badge variant={a.healthy === a.total ? "default" : "secondary"}>
+              {a.healthy}/{a.total} healthy
+            </Badge>
+          ) : null}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        <p className="text-muted-foreground">
+          One host running every strategy as a plug-in, with one health check. The Aave V3 + Gold
+          Spoke liquidator and the Uniswap arbitrage bot above join it last, once every plug-in here
+          has matched the service it replaces.
+        </p>
+        {q.isLoading ? (
+          <div className="flex items-center gap-2">
+            <Loader2 className="size-4 animate-spin" /> Loading…
+          </div>
+        ) : null}
+        {q.isError ? (
+          <div className="flex items-center gap-2 text-destructive">
+            <AlertTriangle className="size-4" /> {(q.error as Error).message}
+          </div>
+        ) : null}
+        {a ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="py-1 pr-3">Strategy</th>
+                  <th className="pr-3">Status</th>
+                  <th className="pr-3">Mode</th>
+                  <th className="pr-3">Last block</th>
+                  <th className="pr-3">Positions</th>
+                  <th className="pr-3">Near liquidation</th>
+                  <th>Liquidatable now</th>
+                </tr>
+              </thead>
+              <tbody>
+                {a.instances.map((i) => {
+                  const s = i.summary;
+                  const status = !s
+                    ? i.state
+                    : !s.backfill.done
+                      ? `indexing ${s.backfill.target ? Math.round(((Number(s.backfill.syncedTo) - Number(s.backfill.from)) / Math.max(1, Number(s.backfill.target) - Number(s.backfill.from))) * 100) : 0}%`
+                      : i.healthy
+                        ? "running"
+                        : s.lastBlockAt
+                          ? "stale"
+                          : "first pass";
+                  return (
+                    <tr key={i.name} className="border-t">
+                      <td className="py-1 pr-3">{AUTHORITY_LABELS[i.name] ?? i.name}</td>
+                      <td className="pr-3">
+                        <Badge variant={i.healthy ? "default" : "secondary"}>{status}</Badge>
+                        {i.restarts ? (
+                          <span className="ml-1 text-xs text-muted-foreground">
+                            {i.restarts} restarts
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="pr-3">{s?.mode ?? "—"}</td>
+                      <td className="pr-3 tabular-nums">
+                        {s?.lastBlock ? `#${s.lastBlock} · ${ago(s.lastBlockAt, now)}` : "—"}
+                      </td>
+                      <td className="pr-3 tabular-nums">
+                        {s ? s.positions.toLocaleString() : "—"}
+                      </td>
+                      <td className="pr-3 tabular-nums">{s ? s.hot.toLocaleString() : "—"}</td>
+                      <td className="tabular-nums">
+                        {s ? s.liquidatableNow.toLocaleString() : "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }
 

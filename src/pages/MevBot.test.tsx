@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ARB_SUMMARY_PATH, type ArbSummary, fmtSigned } from "./MevArb";
 import MevBot, {
+  AUTHORITY_SUMMARY_PATH,
+  type AuthoritySummary,
   fmtEth,
   fmtSettlement,
   LENDING_MONITORS,
@@ -132,17 +134,20 @@ const byUrl = (
   mev: () => Response,
   arbRes: () => Response = () => new Response(JSON.stringify(arb())),
   sparkRes: () => Response = () => new Response("{}", { status: 404 }),
-  monitorRes: (url: string) => Response = () => new Response("{}", { status: 404 })
+  monitorRes: (url: string) => Response = () => new Response("{}", { status: 404 }),
+  authorityRes: () => Response = () => new Response("{}", { status: 404 })
 ) =>
   vi.fn((url: string) =>
     Promise.resolve(
-      url === ARB_SUMMARY_PATH
-        ? arbRes()
-        : url === SPARK_SUMMARY_PATH
-          ? sparkRes()
-          : LENDING_MONITORS.some((m) => m.path === url)
-            ? monitorRes(url)
-            : mev()
+      url === AUTHORITY_SUMMARY_PATH
+        ? authorityRes()
+        : url === ARB_SUMMARY_PATH
+          ? arbRes()
+          : url === SPARK_SUMMARY_PATH
+            ? sparkRes()
+            : LENDING_MONITORS.some((m) => m.path === url)
+              ? monitorRes(url)
+              : mev()
     )
   );
 
@@ -324,6 +329,63 @@ describe("MEV bot page", () => {
     expect(await screen.findByText("LIVE — sends bundles behind gold updates")).toBeTruthy();
     expect(screen.getByText("Bundles sent")).toBeTruthy();
     expect(screen.getByText("2 accepted by the relay")).toBeTruthy();
+  });
+
+  it("shows the MEV Authority overview with every plug-in's state", async () => {
+    const at = new Date().toISOString();
+    const inst = (
+      name: string,
+      healthy: boolean,
+      done: boolean,
+      positions: number
+    ): AuthoritySummary["instances"][number] => ({
+      name,
+      kind: name.startsWith("aave-") ? "aave-l2" : name,
+      state: "running",
+      healthy,
+      restarts: 0,
+      lastError: null,
+      summary: {
+        protocol: name,
+        mode: "shadow",
+        lastBlock: done ? "26455800" : null,
+        lastBlockAt: done ? at : null,
+        backfill: { from: "0", syncedTo: done ? "100" : "40", target: "100", done },
+        markets: 3,
+        positions,
+        hot: 12,
+        liquidatableNow: 1,
+      },
+    });
+    const authority: AuthoritySummary = {
+      version: 1,
+      startedAt: at,
+      updatedAt: at,
+      healthy: 2,
+      total: 3,
+      instances: [
+        inst("compound", true, true, 1263),
+        inst("aave-base", true, false, 0),
+        { ...inst("euler", false, true, 942), healthy: false, restarts: 2 },
+      ],
+    };
+    vi.stubGlobal(
+      "fetch",
+      byUrl(
+        () => new Response(JSON.stringify(summary())),
+        undefined,
+        undefined,
+        undefined,
+        () => new Response(JSON.stringify(authority))
+      )
+    );
+    renderPage();
+    expect(await screen.findByText("MEV Authority")).toBeTruthy();
+    expect(await screen.findByText("2/3 healthy")).toBeTruthy();
+    expect(screen.getByText("Compound III")).toBeTruthy();
+    expect(screen.getByText("indexing 40%")).toBeTruthy();
+    expect(screen.getByText("1,263")).toBeTruthy();
+    expect(screen.getByText("2 restarts")).toBeTruthy();
   });
 
   it("hides the Gold Spoke card on bot builds without a spoke section", async () => {
