@@ -786,6 +786,7 @@ export interface AuthoritySummary {
 
 const AUTHORITY_LABELS: Record<string, string> = {
   liquidator: "Aave V3 + Gold Spoke liquidator (live)",
+  "liquidator-shadow": "Aave V3 + Gold Spoke liquidator · parity run (shadow)",
   "arb-ethereum": "Uniswap arbitrage · Ethereum (live)",
   "arb-base": "Uniswap arbitrage · Base (live)",
   compound: "Compound III",
