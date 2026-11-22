@@ -256,6 +256,15 @@ describe("MEV bot page", () => {
       lowestHf: 0.8957,
       updates: 7,
       pushedUnder: 3,
+      currentlyUnder: 1,
+      uniqueEverUnder: 2,
+      freshCrossings: 2,
+      cumulativeUnderObservations: 3,
+      collateralDrivenCrossings: 2,
+      debtDrivenCrossings: 0,
+      minRequiredGoldMove: 3.36,
+      tenSmallestRequiredMoves: [3.36, 6.73, 13.45],
+      maxObservedGoldMove: 1.25,
       opportunities: 2,
       viable: 1,
       simFailed: 1,
@@ -296,7 +305,10 @@ describe("MEV bot page", () => {
     renderPage();
     expect(await screen.findByText("Aave V4 Gold Spoke liquidations")).toBeTruthy();
     expect(screen.getByText("0.896")).toBeTruthy();
-    expect(screen.getByText("3 borrowers pushed under")).toBeTruthy();
+    expect(screen.getByText("3 cumulative under observations")).toBeTruthy();
+    expect(screen.getByText("Currently under 1")).toBeTruthy();
+    expect(screen.getByText("3.36%")).toBeTruthy();
+    expect(screen.getByText(/Ten smallest required gold declines/)).toBeTruthy();
     expect(screen.getByText("50% direct + 50% 2-hop · morpho")).toBeTruthy();
     expect(screen.getByText("1.6139 ETH")).toBeTruthy();
     expect(screen.getByText("Gold Spoke liquidations by others")).toBeTruthy();
@@ -307,6 +319,8 @@ describe("MEV bot page", () => {
       live: true,
       submissions: 3,
       accepted: 2,
+      rejected: 1,
+      rejectionReasons: { "bundle simulation failed": 1 },
       borrowers: 305,
       withDebt: 155,
       lowestHf: 1.07,
@@ -328,7 +342,8 @@ describe("MEV bot page", () => {
     renderPage();
     expect(await screen.findByText("LIVE — sends bundles behind gold updates")).toBeTruthy();
     expect(screen.getByText("Bundles sent")).toBeTruthy();
-    expect(screen.getByText("2 accepted by the relay")).toBeTruthy();
+    expect(screen.getByText("2 accepted · 1 rejected")).toBeTruthy();
+    expect(screen.getByText("Relay rejections: bundle simulation failed (1)")).toBeTruthy();
   });
 
   it("shows the MEV Authority overview with every plug-in's state", async () => {

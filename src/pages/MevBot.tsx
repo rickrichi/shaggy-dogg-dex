@@ -137,7 +137,17 @@ export interface GoldSpokeSummary {
   withDebt: number;
   lowestHf: number | null;
   updates: number;
+  /** Deprecated producer alias for cumulativeUnderObservations. */
   pushedUnder: number;
+  currentlyUnder?: number;
+  uniqueEverUnder?: number;
+  freshCrossings?: number;
+  cumulativeUnderObservations?: number;
+  collateralDrivenCrossings?: number;
+  debtDrivenCrossings?: number;
+  minRequiredGoldMove?: number | null;
+  tenSmallestRequiredMoves?: number[];
+  maxObservedGoldMove?: number | null;
   opportunities: number;
   viable: number;
   simFailed: number;
@@ -148,6 +158,8 @@ export interface GoldSpokeSummary {
   live?: boolean;
   submissions?: number;
   accepted?: number;
+  rejected?: number;
+  rejectionReasons?: Record<string, number>;
   recent: GoldSpokeRow[];
   recentCompetitors: Array<{
     t: string;
@@ -248,7 +260,9 @@ function EquityAuctionCard({
   const n = nets.length;
   const rawMean = n ? nets.reduce((a, b) => a + b, 0) / n : 0;
   const variance =
-    n > 1 ? nets.reduce((a, b) => a + (b - rawMean) ** 2, 0) / (n - 1) : Math.max(1e-8, rawMean ** 2);
+    n > 1
+      ? nets.reduce((a, b) => a + (b - rawMean) ** 2, 0) / (n - 1)
+      : Math.max(1e-8, rawMean ** 2);
   const tau2 = 0.005 ** 2;
   const priorPrec = 1 / tau2;
   const dataPrec = n ? n / Math.max(1e-12, variance) : 0;
@@ -281,7 +295,8 @@ function EquityAuctionCard({
   return (
     <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs">
       <div className="font-semibold text-emerald-700 dark:text-emerald-300">
-        Commercial Equity &amp; Bribe-Auction Optimizer (Inverse-Hazard F_S, Bayesian &amp; HJB Jump-Kelly)
+        Commercial Equity &amp; Bribe-Auction Optimizer (Inverse-Hazard F_S, Bayesian &amp; HJB
+        Jump-Kelly)
       </div>
       <div className="mt-1 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         <div>
@@ -300,8 +315,8 @@ function EquityAuctionCard({
         </div>
         <div>
           <span className="text-muted-foreground">HJB Jump-Kelly / Policy:</span>{" "}
-          <strong className="tabular-nums">{(jumpKelly * 100).toFixed(0)}%</strong> · Half-Kelly · Floor{" "}
-          <strong>0.00005 ETH</strong>
+          <strong className="tabular-nums">{(jumpKelly * 100).toFixed(0)}%</strong> · Half-Kelly ·
+          Floor <strong>0.00005 ETH</strong>
         </div>
       </div>
     </div>
@@ -997,6 +1012,8 @@ export function MevAuthorityCard({ now }: { now: number }) {
 
 /** Aave V4 Gold Spoke: borrowers priced behind each gold price update (shadow, from the main bot). */
 export function GoldSpokeCard({ spoke: p, now }: { spoke: GoldSpokeSummary; now: number }) {
+  const cumulativeUnder = p.cumulativeUnderObservations ?? p.pushedUnder;
+  const requiredMoves = p.tenSmallestRequiredMoves ?? [];
   return (
     <Card>
       <CardHeader>
@@ -1014,7 +1031,7 @@ export function GoldSpokeCard({ spoke: p, now }: { spoke: GoldSpokeSummary; now:
           Gold Spoke borrowers post XAUt and borrow stablecoins. When Chainlink&apos;s gold price
           drops, some fall under health 1 and are liquidated right behind the update. The bot
           re-checks every borrower behind each gold update and prices each liquidation exactly
-          (flash loan, the Spoke&apos;s liquidation, XAUt sale, builder bid) without sending it.
+          (flash loan, the Spoke&apos;s liquidation, XAUt sale, builder bid).
         </p>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
           <Stat
@@ -1030,7 +1047,7 @@ export function GoldSpokeCard({ spoke: p, now }: { spoke: GoldSpokeSummary; now:
           <Stat
             label="Gold updates checked"
             value={p.updates.toLocaleString()}
-            hint={`${p.pushedUnder.toLocaleString()} borrowers pushed under`}
+            hint={`${cumulativeUnder.toLocaleString()} cumulative under observations`}
           />
           <Stat
             label="Priced"
@@ -1041,7 +1058,7 @@ export function GoldSpokeCard({ spoke: p, now }: { spoke: GoldSpokeSummary; now:
             <Stat
               label="Bundles sent"
               value={(p.submissions ?? 0).toLocaleString()}
-              hint={`${(p.accepted ?? 0).toLocaleString()} accepted by the relay`}
+              hint={`${(p.accepted ?? 0).toLocaleString()} accepted · ${(p.rejected ?? 0).toLocaleString()} rejected`}
             />
           ) : (
             <Stat
@@ -1056,6 +1073,48 @@ export function GoldSpokeCard({ spoke: p, now }: { spoke: GoldSpokeSummary; now:
             hint={`${p.competitorSeenByUs.toLocaleString()} we had priced`}
           />
         </div>
+        {p.currentlyUnder !== undefined ? (
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <Stat
+              label="Currently under 1"
+              value={p.currentlyUnder.toLocaleString()}
+              hint="on the latest gold update"
+            />
+            <Stat
+              label="Unique ever under"
+              value={(p.uniqueEverUnder ?? 0).toLocaleString()}
+              hint={`${(p.freshCrossings ?? 0).toLocaleString()} fresh crossings`}
+            />
+            <Stat
+              label="Crossing drivers"
+              value={`${(p.collateralDrivenCrossings ?? 0).toLocaleString()} / ${(p.debtDrivenCrossings ?? 0).toLocaleString()}`}
+              hint="collateral decline / debt rise"
+            />
+            <Stat
+              label="Required gold move"
+              value={p.minRequiredGoldMove == null ? "—" : `${p.minRequiredGoldMove.toFixed(2)}%`}
+              hint={
+                p.maxObservedGoldMove == null
+                  ? "no decoded move yet"
+                  : `${p.maxObservedGoldMove.toFixed(2)}% max observed`
+              }
+            />
+          </div>
+        ) : null}
+        {requiredMoves.length ? (
+          <p className="text-xs text-muted-foreground">
+            Ten smallest required gold declines:{" "}
+            {requiredMoves.map((move) => `${move.toFixed(2)}%`).join(" · ")}
+          </p>
+        ) : null}
+        {p.rejectionReasons && Object.keys(p.rejectionReasons).length ? (
+          <p className="text-xs text-muted-foreground">
+            Relay rejections:{" "}
+            {Object.entries(p.rejectionReasons)
+              .map(([reason, count]) => `${reason} (${count})`)
+              .join(" · ")}
+          </p>
+        ) : null}
         {p.recent.length ? (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
