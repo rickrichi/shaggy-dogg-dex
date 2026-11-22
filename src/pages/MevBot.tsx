@@ -250,32 +250,58 @@ function EquityAuctionCard({
   const variance =
     n > 1 ? nets.reduce((a, b) => a + (b - rawMean) ** 2, 0) / (n - 1) : Math.max(1e-8, rawMean ** 2);
   const tau2 = 0.005 ** 2;
-  const omega = n ? (variance / n) / (variance / n + tau2) : 1;
-  const shrunkMean = (1 - omega) * rawMean;
+  const priorPrec = 1 / tau2;
+  const dataPrec = n ? n / Math.max(1e-12, variance) : 0;
+  const postVar = 1 / (priorPrec + dataPrec);
+  const omega = priorPrec / (priorPrec + dataPrec);
+  const shrunkMean = postVar * dataPrec * rawMean;
+  const bayesianKelly = shrunkMean > 0 ? Math.min(1, shrunkMean / (variance + postVar)) : 0;
+  // HJB jump-adjusted Kelly solver: sum_i (Y_i / (1 + f * Y_i)) = 0
+  const scale = Math.max(0.01, Math.sqrt(variance) * 4);
+  const jumps = nets.map((r) => Math.max(-0.95, r / scale));
+  let jumpKelly = 0;
+  if (jumps.length > 0) {
+    const foc = (f: number) =>
+      -f * 0.0025 + jumps.reduce((s, y) => s + y / Math.max(1e-6, 1 + f * y), 0) / jumps.length;
+    if (foc(0) > 0) {
+      let lo = 0;
+      let hi = 1;
+      for (let i = 0; i < 30; i++) {
+        const mid = 0.5 * (lo + hi);
+        if (foc(mid) > 0) lo = mid;
+        else hi = mid;
+      }
+      jumpKelly = 0.5 * (lo + hi);
+    }
+  }
+  const posShares = shares.filter((s) => s < 1);
+  const medShare = posShares.length ? posShares[Math.floor(posShares.length / 2)]! : 0.95;
+  const nEff = Math.max(2, Math.round(1 / Math.max(0.005, 1 - medShare)));
 
   return (
     <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs">
       <div className="font-semibold text-emerald-700 dark:text-emerald-300">
-        Commercial Equity &amp; Bribe-Auction Optimizer (Empirical F_S &amp; Bayes-Shrunk Kelly)
+        Commercial Equity &amp; Bribe-Auction Optimizer (Inverse-Hazard F_S, Bayesian &amp; HJB Jump-Kelly)
       </div>
       <div className="mt-1 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         <div>
-          <span className="text-muted-foreground">Standalone EV-Optimal Bid (s*):</span>{" "}
+          <span className="text-muted-foreground">Inverse-Hazard Optimal Bid (s*):</span>{" "}
           <strong className="tabular-nums">{(best.s * 100).toFixed(1)}%</strong> (win prob{" "}
-          {(best.p * 100).toFixed(1)}%, retain {((1 - best.s) * 100).toFixed(1)}%)
+          {(best.p * 100).toFixed(1)}%, n_eff≈{nEff})
         </div>
         <div>
           <span className="text-muted-foreground">Overbidders (share ≥ 100%):</span>{" "}
           <strong className="tabular-nums">{overbidPct.toFixed(1)}%</strong> (bundled with DEX arb)
         </div>
         <div>
-          <span className="text-muted-foreground">Bayes-Shrunk Edge (μ_shrunk):</span>{" "}
-          <strong className="tabular-nums">{fmtEth(shrunkMean)}</strong> (shrinkage ω=
-          {(omega * 100).toFixed(1)}%)
+          <span className="text-muted-foreground">Bayesian Edge (E[μ|data]):</span>{" "}
+          <strong className="tabular-nums">{fmtEth(shrunkMean)}</strong> (ω=
+          {(omega * 100).toFixed(1)}%, f*_Bayes={(bayesianKelly * 100).toFixed(0)}%)
         </div>
         <div>
-          <span className="text-muted-foreground">Bankroll Policy:</span>{" "}
-          <strong>Half-Kelly (0.5 f*)</strong> · Beneficiary floor <strong>0.00005 ETH</strong>
+          <span className="text-muted-foreground">HJB Jump-Kelly / Policy:</span>{" "}
+          <strong className="tabular-nums">{(jumpKelly * 100).toFixed(0)}%</strong> · Half-Kelly · Floor{" "}
+          <strong>0.00005 ETH</strong>
         </div>
       </div>
     </div>
