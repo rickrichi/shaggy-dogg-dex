@@ -56,6 +56,10 @@ describe("project tokens", () => {
       initialSupply: "1,000,000",
       typeLabel: "Mintable, admin-controlled",
     });
+    expect(find("DSNAK")).toMatchObject({
+      initialSupply: "10,000,000,000,000",
+      typeLabel: "Fixed supply, no admin",
+    });
     expect(find("MRWD")).toMatchObject({
       initialSupply: "1,000,000,000,000",
       typeLabel: "Fixed supply, no admin",

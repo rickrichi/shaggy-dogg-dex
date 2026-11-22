@@ -1,8 +1,8 @@
-# Shaggy Mutt DEX & Mutt Rewards ($MRWD)
+# Shaggy Mutt DEX, Mutt Rewards ($MRWD) & Doggy Snacks ($DSNAK)
 
-> Official canonical entity, contract, and liquidity registry for Shaggy Mutt DEX (https://dex.lumsian.com) and Mutt Rewards ($MRWD) on Base Mainnet (Chain ID 8453).
+> Official canonical entity, contract, and liquidity registry for Shaggy Mutt DEX (https://dex.lumsian.com), Mutt Rewards ($MRWD), Doggy Snacks ($DSNAK), and Shaggy Dogg ($SD) on Base Mainnet (Chain ID 8453).
 
-## Canonical Token Identity: Mutt Rewards (MRWD)
+## Canonical Token Identity 1: Mutt Rewards (MRWD)
 - **Name:** Mutt Rewards (plural)
 - **Symbol:** MRWD
 - **Network:** Base Mainnet (Ethereum Layer 2, Chain ID `8453`)
@@ -16,6 +16,20 @@
 - **Technical Whitepaper:** https://dex.lumsian.com/whitepaper
 - **Sourcify Exact-Match Verification:** https://repo.sourcify.dev/8453/0xC17227AAa33C54634B6cE7AD0bf33A156563c179
 - **BaseScan Token Page:** https://basescan.org/token/0xC17227AAa33C54634B6cE7AD0bf33A156563c179
+
+## Canonical Token Identity 2: Doggy Snacks (DSNAK / Doggy Snack)
+- **Name:** Doggy Snacks (plural on-chain; also searched in the singular as "Doggy Snack")
+- **Symbol:** DSNAK
+- **Network:** Base Mainnet (Ethereum Layer 2, Chain ID `8453`)
+- **ERC-20 Contract Address:** `0x3F6eB1ddBFc665A8760BC77d00125bA486871CfB`
+- **CAIP-19 Identifier:** `eip155:8453/erc20:0x3F6eB1ddBFc665A8760BC77d00125bA486871CfB`
+- **Total Supply:** `10,000,000,000,000` (10 trillion DSNAK, 18 decimals, fixed supply minted once, 0% transfer tax, ownerless)
+- **Classification:** Ecosystem reward and micro-utility token on Base Mainnet (unrelated to `DSNAKE` on BNB Chain/Solana or `D-SNOK`)
+- **Canonical Pool:** `0x8e9d795e7dd4eab277f6d2bbe24f4db2ffaaeae4` (Uniswap V3 DSNAK/WETH 1.00% pool on Base, created 2026-11-06)
+- **Official Token Page:** https://dex.lumsian.com/dsnak
+- **Direct Swap Page (ETH -> DSNAK):** https://dex.lumsian.com/swap?input=ETH&output=0x3F6eB1ddBFc665A8760BC77d00125bA486871CfB
+- **GeckoTerminal Pool Page:** https://www.geckoterminal.com/base/pools/0x8e9d795e7dd4eab277f6d2bbe24f4db2ffaaeae4
+- **BaseScan Token Page:** https://basescan.org/token/0x3F6eB1ddBFc665A8760BC77d00125bA486871CfB
 
 ## Companion Base Mainnet Contracts (Chain ID 8453)
 - **MuttIncentiveScheduler:** `0xCAbf284806b800d9A771B55857B9fCF735ea7109` (600B MRWD LP reward reserve across 16 quarters; Quarter 1 active on `UniswapV3Staker` `0x42bE4D6527829FeFA1493e1fb9F3676d2425C3C1` with 55.45B MRWD funded)
@@ -31,7 +45,9 @@
 ## Primary URLs
 - [Shaggy Mutt DEX Home](https://dex.lumsian.com/)
 - [Official Mutt Rewards ($MRWD) Page](https://dex.lumsian.com/mrwd)
+- [Official Doggy Snacks ($DSNAK) Page](https://dex.lumsian.com/dsnak)
 - [Swap ETH -> MRWD](https://dex.lumsian.com/swap?input=ETH&output=MRWD)
+- [Swap ETH -> DSNAK](https://dex.lumsian.com/swap?input=ETH&output=0x3F6eB1ddBFc665A8760BC77d00125bA486871CfB)
 - [Staking & V3 LP Rewards](https://dex.lumsian.com/stake)
 - [Protocol Hub & 56-Aggregator Audit](https://dex.lumsian.com/protocol)
 - [Technical Whitepaper (HTML)](https://dex.lumsian.com/whitepaper)

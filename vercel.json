@@ -62,6 +62,10 @@
       "destination": "/mrwd.html"
     },
     {
+      "source": "/dsnak",
+      "destination": "/dsnak.html"
+    },
+    {
       "source": "/api/mrwd/pool.json",
       "destination": "/api/mrwd/pool"
     },

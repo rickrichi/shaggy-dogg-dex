@@ -39,6 +39,14 @@ export const CANONICAL_LAUNCHED_TOKENS: LaunchedTokenRecord[] = [
     "Governance token for the Shaggy Dogg ecosystem."
   ),
   projectToken(
+    "0x3F6eB1ddBFc665A8760BC77d00125bA486871CfB",
+    "Doggy Snacks",
+    "DSNAK",
+    "10,000,000,000,000",
+    "Fixed supply, no admin",
+    "Ecosystem reward and micro-utility token on Base paired in the DSNAK/WETH 1% Uniswap V3 pool."
+  ),
+  projectToken(
     "0xC17227AAa33C54634B6cE7AD0bf33A156563c179",
     "Mutt Rewards",
     "MRWD",

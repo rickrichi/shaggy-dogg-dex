@@ -1,12 +1,12 @@
 {
   "name": "Shaggy Mutt DEX Official Token List",
-  "timestamp": "2026-11-04T09:00:00.000Z",
+  "timestamp": "2026-11-22T12:45:00.000Z",
   "version": {
     "major": 2,
-    "minor": 0,
+    "minor": 1,
     "patch": 0
   },
-  "keywords": ["shaggy", "mutt", "mrwd", "base", "defi", "utility"],
+  "keywords": ["shaggy", "mutt", "mrwd", "dsnak", "doggy snacks", "base", "defi", "utility"],
   "logoURI": "https://dex.lumsian.com/android-chrome-192x192.png",
   "tokens": [
     {
@@ -20,6 +20,19 @@
         "website": "https://dex.lumsian.com/mrwd",
         "description": "Mutt Rewards (MRWD) is a fixed-supply utility and liquidity-incentive token on Base. It rewards liquidity providers in the canonical MRWD/WETH 0.30% Uniswap V3 pool (0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5), unlocks Equilnyxs Pro via MuttProStaking, and powers sponsored-operation rewards.",
         "canonicalPool": "0xa7D4D975988DAa77B46c5d637717e2dFE07FbDB5"
+      }
+    },
+    {
+      "chainId": 8453,
+      "address": "0x3F6eB1ddBFc665A8760BC77d00125bA486871CfB",
+      "name": "Doggy Snacks",
+      "symbol": "DSNAK",
+      "decimals": 18,
+      "logoURI": "https://dex.lumsian.com/android-chrome-192x192.png",
+      "extensions": {
+        "website": "https://dex.lumsian.com/dsnak",
+        "description": "Doggy Snacks (DSNAK, also searched as singular 'Doggy Snack') is a fixed-supply (10T), ownerless ERC-20 utility token on Base Mainnet paired with WETH in the canonical Uniswap V3 1.00% pool (0x8e9d795e7dd4eab277f6d2bbe24f4db2ffaaeae4).",
+        "canonicalPool": "0x8e9d795e7dd4eab277f6d2bbe24f4db2ffaaeae4"
       }
     },
     {
