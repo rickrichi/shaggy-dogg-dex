@@ -1,10 +1,12 @@
 import { useContext, useState } from "react";
 
 import {
+  encodeFunctionData,
   formatEther,
   getAddress,
   type Hex,
   isAddress,
+  parseAbi,
   parseEther,
 } from "viem";
 import {
@@ -120,6 +122,37 @@ function ArbExecutorDeployCardInner() {
     } catch {
       // Omitting overrides delegates fee estimation to the wallet/provider.
       return {};
+    }
+  };
+
+  const handleSetMaxBribe = async (newMaxEth: string) => {
+    setLocalError(null);
+    const execAddr = liveAddresses[targetChain];
+    if (!isAddress(execAddr)) return;
+    try {
+      if (activeChainId !== chainConfig.chainId) {
+        await switchChainAsync({ chainId: chainConfig.chainId });
+      }
+      const feeOverrides = await getDynamicEip1559Fees();
+      const data = encodeFunctionData({
+        abi: parseAbi(["function setMaxBribeWei(uint256 next)"]),
+        functionName: "setMaxBribeWei",
+        args: [parseEther(newMaxEth)],
+      });
+      const hash = await sendTransactionAsync({
+        chainId: chainConfig.chainId,
+        to: getAddress(execAddr),
+        data,
+        value: 0n,
+        ...(targetChain === "ethereum" ? { gas: 60_000n, ...feeOverrides } : {}),
+      });
+      setFundTxByChain((prev) => ({ ...prev, [targetChain]: hash }));
+    } catch (err) {
+      const msg =
+        (err as { shortMessage?: string; message?: string })?.shortMessage ||
+        (err as { message?: string })?.message ||
+        "setMaxBribeWei transaction cancelled or failed.";
+      setLocalError(msg);
     }
   };
 
@@ -364,6 +397,16 @@ function ArbExecutorDeployCardInner() {
                 >
                   Top Up {chainConfig.name} Operator Gas (+0.002 ETH)
                 </Button>
+                {targetChain === "ethereum" ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!isShaggyConnected || isSending}
+                    onClick={() => handleSetMaxBribe("10")}
+                  >
+                    Raise On-Chain V4 MaxBribe Cap to 10 ETH (Owner)
+                  </Button>
+                ) : null}
               </div>
             </div>
           ) : null}
