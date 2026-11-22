@@ -219,6 +219,69 @@ function WinnerLine({ label, w }: { label: string; w: WinnerStats }) {
   );
 }
 
+/** Empirical Bribe-Auction CDF F_S(s), EV-optimal share s* & Bayes-shrunk Kelly equity panel. */
+function EquityAuctionCard({
+  winners,
+  opportunities,
+}: {
+  winners: NonNullable<MevSummary["winners"]>;
+  opportunities: OpportunityRow[];
+}) {
+  const shares = winners.recent
+    .map((w) => w.share)
+    .filter((s): s is number => s !== null && Number.isFinite(s) && s >= 0)
+    .sort((a, b) => a - b);
+  if (!shares.length) return null;
+  const overbidders = shares.filter((s) => s >= 1).length;
+  const overbidPct = (overbidders / shares.length) * 100;
+  const grid = [0.7, 0.8, 0.85, 0.9, 0.92, 0.95, 0.97, 0.98, 0.99, 0.995, 0.998];
+  let best = { s: 0.99, p: 0, ev: 0 };
+  for (const s of grid) {
+    const beaten = shares.filter((x) => x <= s).length;
+    const p = (beaten + 1) / (shares.length + 2);
+    const ev = p * (1 - s);
+    if (ev > best.ev) best = { s, p, ev };
+  }
+  const nets = opportunities
+    .filter((o) => o.decision === "send" && o.netEth !== null)
+    .map((o) => o.netEth!);
+  const n = nets.length;
+  const rawMean = n ? nets.reduce((a, b) => a + b, 0) / n : 0;
+  const variance =
+    n > 1 ? nets.reduce((a, b) => a + (b - rawMean) ** 2, 0) / (n - 1) : Math.max(1e-8, rawMean ** 2);
+  const tau2 = 0.005 ** 2;
+  const omega = n ? (variance / n) / (variance / n + tau2) : 1;
+  const shrunkMean = (1 - omega) * rawMean;
+
+  return (
+    <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs">
+      <div className="font-semibold text-emerald-700 dark:text-emerald-300">
+        Commercial Equity &amp; Bribe-Auction Optimizer (Empirical F_S &amp; Bayes-Shrunk Kelly)
+      </div>
+      <div className="mt-1 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <div>
+          <span className="text-muted-foreground">Standalone EV-Optimal Bid (s*):</span>{" "}
+          <strong className="tabular-nums">{(best.s * 100).toFixed(1)}%</strong> (win prob{" "}
+          {(best.p * 100).toFixed(1)}%, retain {((1 - best.s) * 100).toFixed(1)}%)
+        </div>
+        <div>
+          <span className="text-muted-foreground">Overbidders (share ≥ 100%):</span>{" "}
+          <strong className="tabular-nums">{overbidPct.toFixed(1)}%</strong> (bundled with DEX arb)
+        </div>
+        <div>
+          <span className="text-muted-foreground">Bayes-Shrunk Edge (μ_shrunk):</span>{" "}
+          <strong className="tabular-nums">{fmtEth(shrunkMean)}</strong> (shrinkage ω=
+          {(omega * 100).toFixed(1)}%)
+        </div>
+        <div>
+          <span className="text-muted-foreground">Bankroll Policy:</span>{" "}
+          <strong>Half-Kelly (0.5 f*)</strong> · Beneficiary floor <strong>0.00005 ETH</strong>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const verdict = (d: string) =>
   d === "send" ? (
     <Badge className="bg-violet-600">projected viable</Badge>
@@ -389,6 +452,7 @@ export default function MevBot() {
                 </p>
                 <WinnerLine label="Right after an oracle update" w={s.winners.oracleBackruns} />
                 <WinnerLine label="Other liquidations" w={s.winners.other} />
+                <EquityAuctionCard winners={s.winners} opportunities={s.recentOpportunities} />
                 {s.winners.recent.length ? (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
