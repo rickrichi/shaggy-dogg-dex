@@ -27,8 +27,8 @@ import {
   SHAGGY_DOGG_OWNER,
 } from "@/config/arbExecutorArtifact";
 
-const DEFAULT_ETHEREUM_EXECUTOR_V2 = "0x41f40bae5318f2c67a4d04d1dc7a42d53a346ae7";
-const DEFAULT_BASE_EXECUTOR_V2 = "0x5FAca3396c177ad8a9D84655772a8a00038fD639";
+const DEFAULT_ETHEREUM_EXECUTOR_V4 = "0xa4ee94804d177382429c9cd77214a4d23ceccbdb";
+const DEFAULT_BASE_EXECUTOR_V3 = "0x39e0AeA4D34DccAc91909e9EE1579c8568EdD413";
 
 export function ArbExecutorDeployCard() {
   const wagmiConfig = useContext(WagmiContext);
@@ -45,9 +45,9 @@ function ArbExecutorDeployCardInner() {
   const ownerInput = SHAGGY_DOGG_OWNER;
   const beneficiaryInput = SHAGGY_DOGG_OWNER;
   const operatorInput = DEFAULT_OPERATOR_ADDRESS;
-  const v2Addresses: Record<"ethereum" | "base", string> = {
-    ethereum: DEFAULT_ETHEREUM_EXECUTOR_V2,
-    base: DEFAULT_BASE_EXECUTOR_V2,
+  const liveAddresses: Record<"ethereum" | "base", string> = {
+    ethereum: DEFAULT_ETHEREUM_EXECUTOR_V4,
+    base: DEFAULT_BASE_EXECUTOR_V3,
   };
   const [fundTxByChain, setFundTxByChain] = useState<Partial<Record<"ethereum" | "base", Hex>>>({});
   const [localError, setLocalError] = useState<string | null>(null);
@@ -66,7 +66,7 @@ function ArbExecutorDeployCardInner() {
     chainId: 8453,
   });
   const { data: execEthBalance } = useBalance({
-    address: (v2Addresses.ethereum || DEFAULT_ETHEREUM_EXECUTOR_V2) as `0x${string}`,
+    address: (liveAddresses.ethereum || DEFAULT_ETHEREUM_EXECUTOR_V4) as `0x${string}`,
     chainId: 1,
   });
   const { data: opEthBalance } = useBalance({
@@ -154,17 +154,19 @@ function ArbExecutorDeployCardInner() {
     "ARB_CHAINS=base,ethereum",
     "ARB_MODE=live",
     "LIVE_CONFIRM=I_ACCEPT_LOSSES",
-    `ARB_EXECUTOR_ETHEREUM=${v2Addresses.ethereum || DEFAULT_ETHEREUM_EXECUTOR_V2}`,
-    `ARB_EXECUTOR_BASE=${v2Addresses.base || DEFAULT_BASE_EXECUTOR_V2}`,
+    `ARB_EXECUTOR_ETHEREUM=${liveAddresses.ethereum || DEFAULT_ETHEREUM_EXECUTOR_V4}`,
+    `ARB_EXECUTOR_BASE=${liveAddresses.base || DEFAULT_BASE_EXECUTOR_V3}`,
     "# Paste ARB_OPERATOR_PRIVATE_KEY and FLASHBOTS_AUTH_KEY from Desktop/mev-live-keys-DO-NOT-SHARE.txt",
   ].join("\n");
+
+  const contractVersion = targetChain === "ethereum" ? "V4" : "V3";
 
   return (
     <Card className="border-emerald-500/40">
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
         <div>
           <CardTitle className="text-lg">
-            Live Flash-Swap Executor (ArbExecutorV2.sol)
+            Live Flash-Swap Executor (ArbExecutorV4.sol / V3.sol)
           </CardTitle>
           <CardDescription>
             Zero-capital Uniswap v4 flash-borrow executor · Pre-configured for ShaggyDogg (
@@ -180,7 +182,7 @@ function ArbExecutorDeployCardInner() {
               setTargetChain("ethereum");
             }}
           >
-            Ethereum Mainnet (V2 Deployed ✅)
+            Ethereum Mainnet (V4 Live ✅)
           </Button>
           <Button
             size="sm"
@@ -190,7 +192,7 @@ function ArbExecutorDeployCardInner() {
               setTargetChain("base");
             }}
           >
-            Base Mainnet (V2 Deployed ✅)
+            Base Mainnet (V3 Live ✅)
           </Button>
         </div>
       </CardHeader>
@@ -201,8 +203,8 @@ function ArbExecutorDeployCardInner() {
           <div>
             <strong>Live Bot Balances:</strong>{" "}
             <span className="ml-2">
-              Ethereum V2 Executor Bribe Float:{" "}
-              <strong className="text-emerald-600">{execEthBalNum.toFixed(4)} ETH</strong>
+              Ethereum V4 Executor Float:{" "}
+              <strong className="text-emerald-600">{execEthBalNum.toFixed(4)} ETH</strong> (profit-funded bids active)
             </span>{" "}
             ·{" "}
             <span>
@@ -264,7 +266,7 @@ function ArbExecutorDeployCardInner() {
               <code className="text-xs">{address}</code>
             </div>
             <span className="text-xs text-muted-foreground">
-              V2 verified on {chainConfig.name}
+              {contractVersion} verified &amp; live on {chainConfig.name}
             </span>
           </div>
         ) : (
@@ -324,43 +326,45 @@ function ArbExecutorDeployCardInner() {
           </div>
         </div>
 
-        <div className="space-y-3 rounded-md border-2 border-violet-500/60 bg-violet-500/5 p-3">
+        <div className="space-y-3 rounded-md border-2 border-emerald-500/60 bg-emerald-500/5 p-3">
           <div>
-            <div className="font-semibold text-violet-700 dark:text-violet-300">
-              ArbExecutorV2 — staged upgrade
+            <div className="font-semibold text-emerald-700 dark:text-emerald-300">
+              {targetChain === "ethereum"
+                ? "ArbExecutorV4 — active in production (profit-funded WETH & stablecoin bids)"
+                : "ArbExecutorV3 — active in production (hardened two-step ownership & profit-funded bids)"}
             </div>
             <p className="text-xs text-muted-foreground">
-              Adds live post-swap sizing, per-venue v2 fees, and WETH-profit-funded builder bribes.
-              Both deployments have been byte-for-byte verified on-chain. The configuration below
-              is ready to activate V2 on the VM.
+              {targetChain === "ethereum"
+                ? "Pays builder bribes directly out of trade profit (unwrapping WETH profit or selling stablecoin profit on the deepest Uniswap V3 0.05% pool inside executeFunded). No executor ETH float is required."
+                : "Executes flash-swap arbitrage across Uniswap V2/V3/V4 on Base Mainnet with two-step ownership protection and atomic beneficiary settlement."}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <Badge className="bg-violet-600 text-white">V2 deployed & verified</Badge>
+            <Badge className="bg-emerald-600 text-white">{contractVersion} deployed, verified &amp; active</Badge>
           </div>
-          {v2Addresses[targetChain] ? (
+          {liveAddresses[targetChain] ? (
             <div className="space-y-2 text-xs">
               <div>
-                Verified deployment candidate: {" "}
+                Active production executor:{" "}
                 <a
-                  href={`${chainConfig.explorerUrl}/address/${v2Addresses[targetChain]}`}
+                  href={`${chainConfig.explorerUrl}/address/${liveAddresses[targetChain]}`}
                   target="_blank"
                   rel="noreferrer"
                   className="font-mono font-semibold underline"
                 >
-                  {v2Addresses[targetChain]}
+                  {liveAddresses[targetChain]}
                 </a>
               </div>
-              {targetChain === "ethereum" ? (
+              <div className="flex flex-wrap gap-2">
                 <Button
                   size="sm"
-                  className="bg-violet-600 text-white hover:bg-violet-700"
+                  className="bg-emerald-600 text-white hover:bg-emerald-700"
                   disabled={!isConnected || isSending}
-                  onClick={() => handleFund(v2Addresses.ethereum, "0.0005")}
+                  onClick={() => handleFund(operatorInput, "0.002")}
                 >
-                  Fund Ethereum V2 Bribe Float (0.0005 ETH)
+                  Top Up {chainConfig.name} Operator Gas (+0.002 ETH)
                 </Button>
-              ) : null}
+              </div>
             </div>
           ) : null}
         </div>
@@ -371,7 +375,7 @@ function ArbExecutorDeployCardInner() {
           </div>
         ) : null}
 
-        <div className="rounded-md border border-violet-500/40 bg-violet-500/5 p-3">
+        <div className="rounded-md border border-emerald-500/40 bg-emerald-500/5 p-3">
           {currentFundTxHash ? (
             <a
               href={`${chainConfig.explorerUrl}/tx/${currentFundTxHash}`}
@@ -379,12 +383,12 @@ function ArbExecutorDeployCardInner() {
               rel="noreferrer"
               className="mb-3 block text-xs underline"
             >
-              V2 funding tx {currentFundTxHash.slice(0, 10)}…
+              Operator gas funding tx {currentFundTxHash.slice(0, 10)}…
             </a>
           ) : null}
           <div>
               <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
-                <span>VM Config (`/etc/uni-arb.env` on GCE `market-data`):</span>
+                <span>Active VM Config (`/etc/mev-authority/arb-ethereum.env` on GCE `market-data`):</span>
                 <Button
                   size="sm"
                   variant="ghost"
