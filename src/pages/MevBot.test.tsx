@@ -216,7 +216,7 @@ describe("MEV bot page", () => {
     expect(screen.getByText(/Required-move ranking is instrumented/)).toBeTruthy();
     expect(screen.getByText("Preemption guard")).toBeTruthy();
     expect(screen.getByText(/F′\(x_in\) − x_in ≥ Π_min \+ G_used·P_gas/)).toBeTruthy();
-    expect(screen.getByText("Backrun window: 100 blocks, chosen for reach.")).toBeTruthy();
+    expect(screen.getByText("Backrun window: 1,000 blocks, chosen for reach.")).toBeTruthy();
     expect(screen.getByText("No on-chain block deadline.")).toBeTruthy();
   });
 
