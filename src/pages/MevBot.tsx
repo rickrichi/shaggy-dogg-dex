@@ -565,10 +565,11 @@ export function MevExecutionFieldGuide({ summary }: { summary: MevSummary | unde
                 </span>
               </li>
               <li className="border-l-2 border-emerald-500/60 pl-3">
-                <strong>Target-block window: 3 blocks, chosen for reach.</strong>
+                <strong>Backrun window: 100 blocks, chosen for reach.</strong>
                 <span className="block text-muted-foreground">
-                  Bundles stay valid for block+1 through block+3, giving three chances at inclusion
-                  instead of one. A late landing is still protected by the minProfit revert.
+                  Arbitrage backruns stay valid for block+1 through block+100, so a slow user swap
+                  can still be backrun when it finally lands. A late landing is still protected by
+                  the minProfit revert.
                 </span>
               </li>
               <li className="border-l-2 border-amber-500/60 pl-3">
