@@ -1,10 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Bot, ExternalLink, Loader2 } from "lucide-react";
+import { AlertTriangle, Bot, ChevronDown, ExternalLink, Loader2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import MevArb from "./MevArb";
+
+import type { ReactNode } from "react";
 
 // Read-only summary published by the aave-mev searcher on the market-data VM. vercel.json forwards
 // /api/mev/* there; in development Vite proxies it.
@@ -323,6 +325,307 @@ function EquityAuctionCard({
   );
 }
 
+function GuideModule({
+  number,
+  title,
+  tag,
+  children,
+}: {
+  number: string;
+  title: string;
+  tag: string;
+  children: ReactNode;
+}) {
+  return (
+    <section
+      className="border-l-2 border-indigo-500/35 pl-3"
+      aria-labelledby={`mev-guide-${number}`}
+    >
+      <div className="flex flex-wrap items-baseline gap-2">
+        <span className="font-mono text-[10px] font-semibold tracking-[0.18em] text-indigo-600 dark:text-indigo-300">
+          {number}
+        </span>
+        <h3 id={`mev-guide-${number}`} className="text-sm font-semibold">
+          {title}
+        </h3>
+        <Badge variant="outline" className="text-[10px] font-normal text-muted-foreground">
+          {tag}
+        </Badge>
+      </div>
+      <div className="mt-2 space-y-2 text-[13px] leading-relaxed text-muted-foreground sm:text-sm">
+        {children}
+      </div>
+    </section>
+  );
+}
+
+const Formula = ({ children }: { children: ReactNode }) => (
+  <div className="overflow-x-auto border-l-2 border-emerald-500/60 bg-emerald-500/5 px-3 py-2 font-mono text-xs leading-relaxed text-foreground sm:text-[13px]">
+    {children}
+  </div>
+);
+
+/** Operator-facing research notes: formulas are decision aids, not evidence of realized profit. */
+export function MevExecutionFieldGuide({ summary }: { summary: MevSummary | undefined }) {
+  const measuredWinnerShare = summary?.winners?.oracleBackruns.shareMedian;
+  const spoke = summary?.spoke;
+  return (
+    <Card className="overflow-hidden border-indigo-500/25">
+      <details className="group">
+        <summary className="cursor-pointer list-none border-b border-transparent px-6 py-5 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden [&[open]]:border-border">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-indigo-600 dark:text-indigo-300">
+                Research terminal · model → simulate → measure
+              </div>
+              <h2 className="mt-1 text-base font-semibold">MEV Execution Field Guide</h2>
+              <p className="mt-1 max-w-3xl text-xs leading-relaxed text-muted-foreground">
+                Correct sizing math, auction-aware execution and risk gates. These are operating
+                models—not proof of landed or realized profit.
+              </p>
+            </div>
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-700 dark:text-indigo-300">
+              <span className="group-open:hidden">Open field guide</span>
+              <span className="hidden group-open:inline">Close field guide</span>
+              <ChevronDown
+                className="size-4 transition-transform group-open:rotate-180"
+                aria-hidden="true"
+              />
+            </span>
+          </div>
+        </summary>
+
+        <CardContent className="space-y-6 pt-5">
+          <section
+            className="border border-amber-500/35 bg-amber-500/5 p-4"
+            aria-labelledby="mev-guide-corrections"
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className="bg-amber-500 text-amber-950">Correction</Badge>
+              <h3 id="mev-guide-corrections" className="text-sm font-semibold">
+                CPMM direction and marginal output
+              </h3>
+            </div>
+            <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground sm:text-sm">
+              With P_ref quoted as Y per X, selling X into the pool is profitable when α·y/x &gt;
+              P_ref. The reciprocal convention reverses the direction: the earlier expression only
+              applies when P_ref is X per Y and the trade is Y→X.
+            </p>
+            <div className="mt-3 grid gap-2 md:grid-cols-2">
+              <Formula>Δx* = (sqrt(α·x·y / P_ref) − x) / α</Formula>
+              <Formula>marginal output = α·x·y / (x + α·Δx)²</Formula>
+            </div>
+          </section>
+
+          <div className="grid gap-x-8 gap-y-6 md:grid-cols-2">
+            <GuideModule number="01" title="Single-pool sizing" tag="curve aware">
+              <p>
+                For v3/v4 concentrated liquidity, solve the marginal-price condition inside each
+                tick&apos;s virtual reserves and cross the boundary when the optimum overruns it.
+                Concavity makes bisection or Newton across initialized ticks practical.
+              </p>
+              <p>
+                Hooks, dynamic fees and non-CPMM curves require fork-state simulation and numerical
+                maximization. Treat α as size- and block-dependent.
+              </p>
+              <Formula>gross surplus &gt; gas / (1 − bid share)</Formula>
+            </GuideModule>
+
+            <GuideModule number="02" title="LVR sanity bound" tag="capacity">
+              <Formula>LVR ≈ σ²·V / 8 per unit time</Formula>
+              <p>
+                This is an approximate continuous-time upper sanity bound that ignores fees. Fees
+                create a no-trade band; discrete blocks bunch the available take when a threshold is
+                crossed. Compare projected aggregate profit with pool value and volatility before
+                treating it as economically plausible.
+              </p>
+            </GuideModule>
+
+            <GuideModule number="03" title="Routing and funding" tag="atomic first">
+              <p>
+                Smooth multi-hop and multi-path curves support dual or marginal-price solvers, but
+                the executable model must also choose atomic leg order and price Morpho, Balancer,
+                Aave or inventory funding as c_fund.
+              </p>
+              <Formula>E[Π_non-atomic] = E[Π] − λ·Var(ΔP over hedge lag τ)</Formula>
+            </GuideModule>
+
+            <GuideModule number="04" title="Liquidation corners" tag="repay caps">
+              <Formula>Π = (LB − 1)·V_repaid − slippage − gas − bid</Formula>
+              <p>
+                Profit is normally linear in repay size, so test corner candidates: applicable close
+                factors, position cap, pool liquidity and flash-funding capacity. Verify live V3.3
+                close-factor parameters rather than assuming 50% or 100%.
+              </p>
+              <Formula>d* = (1 − HF₀) / (g·HF₀ − h)</Formula>
+              <p>For Gold Spoke updates, rank by required move—not health factor alone.</p>
+            </GuideModule>
+
+            <GuideModule number="05" title="Bidding is the auction" tag="empirical">
+              <Formula>b(v) = v − ∫₀ᵛ F(t)^(n−1)dt / F(v)^(n−1)</Formula>
+              <Formula>s* = argmax F(s)·(1 − s)</Formula>
+              <p>
+                Fit P_win(s) from winner shares and our submitted outcomes. Value combined bundles
+                as bundles: extra users, pairs, routes and funding can justify a bid no isolated leg
+                can support.
+              </p>
+              <p className="text-foreground">
+                Live oracle-winner median:{" "}
+                {measuredWinnerShare === null || measuredWinnerShare === undefined
+                  ? "not measured"
+                  : pct(measuredWinnerShare)}
+                .
+              </p>
+            </GuideModule>
+
+            <GuideModule number="06" title="Market structure" tag="revalidate">
+              <p>
+                Flashbots supports builder multiplexing, but its published builder set can change:
+                fan out and record inclusion by builder. Ethereum&apos;s post-Fusaka default block
+                gas limit is 60M with an approximately 16.78M per-transaction cap; re-measure gas
+                instead of carrying older assumptions forward.
+              </p>
+              <p>
+                ePBS / EIP-7732 and block access lists are still Glamsterdam test/devnet work; a Q4
+                2026 mainnet date is not confirmed. Arbitrum One now uses priority-gas auctions—the
+                Timeboost express lane and delay are decommissioned. Base Flashblocks publishes
+                pending-state updates around every 200ms. Keep each sequencer model independent from
+                Ethereum priority-fee assumptions.
+              </p>
+            </GuideModule>
+
+            <GuideModule number="07" title="CEX–DEX and carry" tag="markouts">
+              <Formula>markout(τ) = E[V_(t+τ) − V_t | fill]</Formula>
+              <p>
+                Measure adverse selection per venue and size bucket; edge must clear markout, fees
+                and asynchronous inventory-rebalance carry. For basis trades include venue funding
+                clamps/caps, liquidation and ADL tail costs, then compare annualized return on
+                capital—not notional.
+              </p>
+            </GuideModule>
+
+            <GuideModule number="08" title="Risk and validation" tag="shadow first">
+              <Formula>score = E[Π] − λ·CVaR</Formula>
+              <p>
+                Cap exposure with fractional Kelly. Replay real blocks and full bundles, then
+                compare predicted, submitted, landed and realized results. Run new paths in shadow
+                and use seenByUs against competitor wins before enabling execution.
+              </p>
+            </GuideModule>
+          </div>
+
+          <section className="border-t pt-5" aria-labelledby="mev-preemption-guard">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-mono text-[10px] font-semibold tracking-[0.18em] text-indigo-600 dark:text-indigo-300">
+                09
+              </span>
+              <h3 id="mev-preemption-guard" className="text-sm font-semibold">
+                Preemption guard
+              </h3>
+              <Badge variant="outline" className="text-[10px] font-normal text-muted-foreground">
+                atomic bounds · private flow
+              </Badge>
+            </div>
+            <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground sm:text-sm">
+              A competitor that lands first moves the reserves, changing F into F′. The executor
+              must then revert rather than fill at a loss. Contract checks limit the damage when
+              we are preempted. Private submission makes preemption less likely.
+            </p>
+            <div className="mt-3 grid gap-2 md:grid-cols-2">
+              <Formula>F′(x_in) − x_in ≥ Π_min + G_used·P_gas</Formula>
+              <Formula>B = α·(F′(x_in) − x_in − C_gas), 0 &lt; α &lt; 1, B ≤ maxBribeWei</Formula>
+            </div>
+            <ul className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+              <li className="border-l-2 border-emerald-500/60 pl-3">
+                <strong>Profit invariant enforced on-chain.</strong>
+                <span className="block text-muted-foreground">
+                  The executor measures the realized quote and reverts with ProfitTooLow when
+                  net &lt; minProfit, which leaves the state at S₀.
+                </span>
+              </li>
+              <li className="border-l-2 border-emerald-500/60 pl-3">
+                <strong>Bribe paid from realized profit.</strong>
+                <span className="block text-muted-foreground">
+                  block.coinbase is paid from the arbitrage output and clamped by maxBribeWei. A
+                  reverted bundle pays no builder bid.
+                </span>
+              </li>
+              <li className="border-l-2 border-emerald-500/60 pl-3">
+                <strong>No public mempool.</strong>
+                <span className="block text-muted-foreground">
+                  Ethereum backruns go through mev_sendBundle behind the user transaction. Base goes
+                  to the sequencer. A reverting backrun is dropped from the bundle.
+                </span>
+              </li>
+              <li className="border-l-2 border-emerald-500/60 pl-3">
+                <strong>Pinned-state simulation.</strong>
+                <span className="block text-muted-foreground">
+                  Each candidate is simulated at the hint&apos;s block with the shared post-state
+                  applied. If net is below the floor, it is dropped off-chain.
+                </span>
+              </li>
+              <li className="border-l-2 border-emerald-500/60 pl-3">
+                <strong>Target-block window: 3 blocks, chosen for reach.</strong>
+                <span className="block text-muted-foreground">
+                  Bundles stay valid for block+1 through block+3, giving three chances at inclusion
+                  instead of one. A late landing is still protected by the minProfit revert.
+                </span>
+              </li>
+              <li className="border-l-2 border-amber-500/60 pl-3">
+                <strong>No on-chain block deadline.</strong>
+                <span className="block text-muted-foreground">
+                  The deployed executors rely on the bundle&apos;s inclusion window, not a
+                  block.number check. Adding one would require redeploying the contracts.
+                </span>
+              </li>
+            </ul>
+          </section>
+
+          <section className="border-t pt-5" aria-labelledby="mev-operator-queue">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 id="mev-operator-queue" className="text-sm font-semibold">
+                Operator queue
+              </h3>
+              <Badge className="bg-emerald-600">instrumentation online</Badge>
+            </div>
+            <ol className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+              <li className="border-l-2 border-foreground/25 pl-3">
+                <strong>1 · Fit the empirical bid curve.</strong>
+                <span className="block text-muted-foreground">
+                  Join winner shares to our bid, outcome and relay evidence.
+                </span>
+              </li>
+              <li className="border-l-2 border-foreground/25 pl-3">
+                <strong>2 · Validate the 111.05 ETH payment.</strong>
+                <span className="block text-muted-foreground">
+                  Audit decoding and accounting before using it as auction truth.
+                </span>
+              </li>
+              <li className="border-l-2 border-emerald-500/60 pl-3">
+                <strong>3 · Diagnose bundle delivery.</strong>
+                <span className="block text-muted-foreground">
+                  Sent / accepted / rejected and rejection reasons are instrumented; use the next
+                  sample to isolate relay failures.
+                </span>
+              </li>
+              <li className="border-l-2 border-emerald-500/60 pl-3">
+                <strong>4 · Calibrate Gold crossings.</strong>
+                <span className="block text-muted-foreground">
+                  Required-move ranking is instrumented
+                  {spoke?.minRequiredGoldMove == null
+                    ? "; awaiting a new decoded update"
+                    : `; current minimum ${spoke.minRequiredGoldMove.toFixed(2)}%`}
+                  .
+                </span>
+              </li>
+            </ol>
+          </section>
+        </CardContent>
+      </details>
+    </Card>
+  );
+}
+
 const verdict = (d: string) =>
   d === "send" ? (
     <Badge className="bg-violet-600">projected viable</Badge>
@@ -391,6 +694,8 @@ export default function MevBot() {
           </CardContent>
         </Card>
       ) : null}
+
+      <MevExecutionFieldGuide summary={s} />
 
       {s ? (
         <>

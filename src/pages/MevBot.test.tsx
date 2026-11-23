@@ -200,6 +200,42 @@ describe("MEV bot page", () => {
     expect(fmtSettlement(withoutSettlement)).toBe("—");
   });
 
+  it("publishes the corrected MEV execution field guide and operator queue", async () => {
+    vi.stubGlobal(
+      "fetch",
+      byUrl(() => new Response(JSON.stringify(summary())))
+    );
+    renderPage();
+    expect(await screen.findByText("MEV Execution Field Guide")).toBeTruthy();
+    expect(
+      screen.getByText(/selling X into the pool is profitable when α·y\/x > P_ref/i)
+    ).toBeTruthy();
+    expect(screen.getByText(/Δx\* = \(sqrt\(α·x·y \/ P_ref\) − x\) \/ α/)).toBeTruthy();
+    expect(screen.getByText(/Arbitrum One now uses priority-gas auctions/i)).toBeTruthy();
+    expect(screen.getByText("2 · Validate the 111.05 ETH payment.")).toBeTruthy();
+    expect(screen.getByText(/Required-move ranking is instrumented/)).toBeTruthy();
+    expect(screen.getByText("Preemption guard")).toBeTruthy();
+    expect(screen.getByText(/F′\(x_in\) − x_in ≥ Π_min \+ G_used·P_gas/)).toBeTruthy();
+    expect(screen.getByText("Target-block window: 3 blocks, chosen for reach.")).toBeTruthy();
+    expect(screen.getByText("No on-chain block deadline.")).toBeTruthy();
+  });
+
+  it("keeps the field-guide thesis available when the live summary fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      byUrl(() => new Response("{}", { status: 503 }))
+    );
+    renderPage();
+    expect(await screen.findByText("The bot's server answered HTTP 503.")).toBeTruthy();
+    expect(screen.getByText("MEV Execution Field Guide")).toBeTruthy();
+    expect(
+      screen.getByText(/These are operating models—not proof of landed or realized profit/)
+    ).toBeTruthy();
+    expect(screen.getByText(/Live oracle-winner median:/).textContent).toContain("not measured");
+    expect(screen.getByText("Open field guide")).toBeTruthy();
+    expect(screen.getByText("Close field guide")).toBeTruthy();
+  });
+
   it("shows each lending monitor from its own endpoint, with backfill progress", async () => {
     const fetchMock = byUrl(
       () => new Response("{}", { status: 503 }),
