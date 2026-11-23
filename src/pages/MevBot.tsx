@@ -428,7 +428,11 @@ export function MevExecutionFieldGuide({ summary }: { summary: MevSummary | unde
                 Hooks, dynamic fees and non-CPMM curves require fork-state simulation and numerical
                 maximization. Treat α as size- and block-dependent.
               </p>
-              <Formula>gross surplus &gt; gas / (1 − bid share)</Formula>
+              <Formula>B = s·(V − g); send when (1 − s)·(V − g) ≥ Π_min</Formula>
+              <p>
+                One bid base everywhere: a share s of profit after gas, which is what the bot
+                computes. V is the simulated profit, g the gas cost.
+              </p>
             </GuideModule>
 
             <GuideModule number="02" title="LVR sanity bound" tag="capacity">
@@ -451,21 +455,35 @@ export function MevExecutionFieldGuide({ summary }: { summary: MevSummary | unde
             </GuideModule>
 
             <GuideModule number="04" title="Liquidation corners" tag="repay caps">
-              <Formula>Π = (LB − 1)·V_repaid − slippage − gas − bid</Formula>
+              <Formula>Π = (LB − 1)·V_repaid − exit cost − gas − bid</Formula>
               <p>
                 Profit is normally linear in repay size, so test corner candidates: applicable close
                 factors, position cap, pool liquidity and flash-funding capacity. Verify live V3.3
                 close-factor parameters rather than assuming 50% or 100%.
               </p>
+              <p>
+                The exit is part of the valuation. On block 26467682 we and the winner repaid the
+                same 1,409,331 USDT; the gross bonus was 33.48 ETH. Our single-route sale left
+                18.95 ETH, a split exit 27.2 ETH (fork replay), and the winner kept 33.17 ETH by
+                selling half into its own inventory. Compare bids to net value, not gross bonus.
+              </p>
               <Formula>d* = (1 − HF₀) / (g·HF₀ − h)</Formula>
-              <p>For Gold Spoke updates, rank by required move—not health factor alone.</p>
+              <p>
+                For Gold Spoke updates, rank by required move, not health factor alone. g is gold&apos;s
+                liquidation-threshold-weighted share of collateral and h its share of debt; the
+                formula is exact only for a gold-only move with the other prices fixed.
+              </p>
             </GuideModule>
 
             <GuideModule number="05" title="Bidding is the auction" tag="empirical">
-              <Formula>b(v) = v − ∫₀ᵛ F(t)^(n−1)dt / F(v)^(n−1)</Formula>
-              <Formula>s* = argmax F(s)·(1 − s)</Formula>
+              <Formula>b(v) = v − ∫₀ᵛ G(t)^(n−1)dt / G(v)^(n−1)</Formula>
+              <Formula>s* = argmax W(s)·(1 − s)</Formula>
               <p>
-                Fit P_win(s) from winner shares and our submitted outcomes. Value combined bundles
+                G is the distribution of bidders&apos; values (the textbook first-price equilibrium,
+                which assumes independent private values). Oracle backruns are closer to common
+                value, since everyone sees the same bonus, so treat b(v) as intuition only. W(s) is
+                the probability that our share s beats the field: fit it from winner shares and our
+                submitted outcomes. Value combined bundles
                 as bundles: extra users, pairs, routes and funding can justify a bid no isolated leg
                 can support.
               </p>
@@ -487,10 +505,11 @@ export function MevExecutionFieldGuide({ summary }: { summary: MevSummary | unde
               </p>
               <p>
                 ePBS / EIP-7732 and block access lists are still Glamsterdam test/devnet work; a Q4
-                2026 mainnet date is not confirmed. Arbitrum One now uses priority-gas auctions—the
-                Timeboost express lane and delay are decommissioned. Base Flashblocks publishes
-                pending-state updates around every 200ms. Keep each sequencer model independent from
-                Ethereum priority-fee assumptions.
+                2026 mainnet date is not confirmed. Arbitrum One is replacing the Timeboost express
+                lane with priority-gas auctions after a DAO vote; confirm the activation date before
+                modelling either. Base Flashblocks publishes pending-state updates around every
+                200ms, and Base plans to deprecate them in the Denim hardfork (not final). Keep each
+                sequencer model independent from Ethereum priority-fee assumptions.
               </p>
             </GuideModule>
 
@@ -533,7 +552,7 @@ export function MevExecutionFieldGuide({ summary }: { summary: MevSummary | unde
             </p>
             <div className="mt-3 grid gap-2 md:grid-cols-2">
               <Formula>F′(x_in) − x_in ≥ Π_min + G_used·P_gas</Formula>
-              <Formula>B = α·(F′(x_in) − x_in − C_gas), 0 &lt; α &lt; 1, B ≤ maxBribeWei</Formula>
+              <Formula>B = s·(F′(x_in) − x_in − C_gas), 0 &lt; s &lt; 1, B ≤ maxBribeWei</Formula>
             </div>
             <ul className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
               <li className="border-l-2 border-emerald-500/60 pl-3">
@@ -598,10 +617,11 @@ export function MevExecutionFieldGuide({ summary }: { summary: MevSummary | unde
                   Join winner shares to our bid, outcome and relay evidence.
                 </span>
               </li>
-              <li className="border-l-2 border-foreground/25 pl-3">
-                <strong>2 · Validate the 111.05 ETH payment.</strong>
+              <li className="border-l-2 border-emerald-500/60 pl-3">
+                <strong>2 · The 111.05 ETH payment is explained.</strong>
                 <span className="block text-muted-foreground">
-                  Audit decoding and accounting before using it as auction truth.
+                  It bought five liquidation pairs in one transaction with a 214.67 ETH gross bonus,
+                  a 51.7% share, not an outlier bid.
                 </span>
               </li>
               <li className="border-l-2 border-emerald-500/60 pl-3">

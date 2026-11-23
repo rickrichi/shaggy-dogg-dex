@@ -211,8 +211,8 @@ describe("MEV bot page", () => {
       screen.getByText(/selling X into the pool is profitable when α·y\/x > P_ref/i)
     ).toBeTruthy();
     expect(screen.getByText(/Δx\* = \(sqrt\(α·x·y \/ P_ref\) − x\) \/ α/)).toBeTruthy();
-    expect(screen.getByText(/Arbitrum One now uses priority-gas auctions/i)).toBeTruthy();
-    expect(screen.getByText("2 · Validate the 111.05 ETH payment.")).toBeTruthy();
+    expect(screen.getByText(/Arbitrum One is replacing the Timeboost express/i)).toBeTruthy();
+    expect(screen.getByText("2 · The 111.05 ETH payment is explained.")).toBeTruthy();
     expect(screen.getByText(/Required-move ranking is instrumented/)).toBeTruthy();
     expect(screen.getByText("Preemption guard")).toBeTruthy();
     expect(screen.getByText(/F′\(x_in\) − x_in ≥ Π_min \+ G_used·P_gas/)).toBeTruthy();
