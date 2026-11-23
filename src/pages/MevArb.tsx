@@ -27,6 +27,36 @@ export interface ArbRow {
   gasEth: number;
   netEth: number;
   decision: string;
+  liquidity?: ExecutableLiquidity;
+}
+
+interface ExecutableLiquidity {
+  ticksCrossed?: number;
+  priceImpactBps?: number;
+  maxExecutableAmount?: number;
+  insufficientDepth?: boolean;
+}
+
+interface ThresholdSensitivity {
+  samples: number;
+  thresholds: Record<string, { opportunities: number; netEth: number }>;
+}
+
+interface BuilderTelemetry {
+  attempts: number;
+  accepted: number;
+  observed: number;
+  included: number;
+  medianInclusionLatencyMs: number | null;
+}
+
+interface LiquidityTelemetry {
+  samples: number;
+  ticksCrossed: number;
+  maxTicksCrossed: number;
+  maxPriceImpactBps: number;
+  maxExecutableAmount: number | null;
+  insufficientDepthRejections: number;
 }
 
 export interface Tier2TelemetrySummary {
@@ -103,6 +133,8 @@ export interface ChainSummary {
   sessionExecution?: ExecutionFunnel;
   risk?: RiskSnapshot;
   tier2?: Tier2TelemetrySummary;
+  thresholdSensitivity?: ThresholdSensitivity;
+  liquidity?: LiquidityTelemetry;
   best: ArbRow | null;
   spreads: Array<{
     pair: string;
@@ -139,6 +171,7 @@ export interface BackrunRow {
   bribeEth: number;
   netEth: number;
   decision: string;
+  liquidity?: ExecutableLiquidity;
   poolOnly?: {
     tx: string;
     blindAmountIn: number;
@@ -212,6 +245,22 @@ export interface BackrunSummary {
     eventLoopMs?: { p50: number; p99: number; max: number; at: string };
   };
   buildersSeen?: Record<string, number>;
+  builders?: Record<string, BuilderTelemetry>;
+  thresholdSensitivity?: ThresholdSensitivity;
+  liquidity?: LiquidityTelemetry;
+  submissionPopulations?: {
+    pricedAccepted: number;
+    blindAccepted: number;
+    relayAttempts: number;
+    rejectedOrUnclassified: number;
+  };
+  nonInclusion?: {
+    userTransactionAbsent: number;
+    bundleUnderbid: number;
+    simulationDivergence: number;
+    nonceConflict: number;
+    unknown: number;
+  };
   best: BackrunRow | null;
   recent: BackrunRow[];
   submissions: ChainSummary["submissions"];
@@ -283,6 +332,11 @@ export interface OrderFlowStats {
   priced: number;
   worthSending: number;
   bestNetEth: number | null;
+  reconnects?: number;
+  disconnects?: number;
+  disconnectedMs?: number;
+  disconnectedSince?: string | null;
+  lastCloseCode?: number | null;
 }
 
 const FEED_NAME: Record<string, string> = {
@@ -308,6 +362,13 @@ function OrderFlowFeeds({ feeds }: { feeds: Record<string, OrderFlowStats> | und
           {f.bestNetEth !== null ? ` · best net ${f.bestNetEth.toFixed(4)} ETH` : ""}
           {f.traceErrors ? ` · ${f.traceErrors} trace errors` : ""}
           {f.droppedBusy ? ` · ${f.droppedBusy} skipped (busy)` : ""}
+          {f.disconnects !== undefined
+            ? ` · ${f.reconnects ?? 0} reconnects / ${f.disconnects} disconnects`
+            : ""}
+          {f.disconnectedMs
+            ? ` · ${(f.disconnectedMs / 1000).toFixed(1)} s disconnected`
+            : ""}
+          {f.lastCloseCode ? ` · last close ${f.lastCloseCode}` : ""}
         </div>
       ))}
     </>
@@ -611,6 +672,25 @@ function ChainCard({ c, now }: { c: ChainSummary; now: number }) {
           profitable before gas · <strong>{c.totals.worthSending} worth sending</strong>
           {c.mode === "live" ? ` · ${c.totals.submissions} sent, ${c.totals.landed} landed` : ""}
         </div>
+        {c.thresholdSensitivity ? (
+          <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+            Shadow net-threshold sensitivity ({c.thresholdSensitivity.samples} priced routes):{" "}
+            {Object.entries(c.thresholdSensitivity.thresholds)
+              .map(([threshold, value]) =>
+                `${threshold} ETH → ${value.opportunities} (${value.netEth.toFixed(6)} ETH)`,
+              )
+              .join(" · ")}
+          </div>
+        ) : null}
+        {c.liquidity ? (
+          <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+            Executable liquidity: {c.liquidity.samples} samples · {c.liquidity.ticksCrossed} tick
+            boundaries crossed (max {c.liquidity.maxTicksCrossed}) · max impact{" "}
+            {c.liquidity.maxPriceImpactBps.toFixed(1)} bps · max executable amount{" "}
+            {c.liquidity.maxExecutableAmount?.toLocaleString() ?? "unknown"} ·{" "}
+            {c.liquidity.insufficientDepthRejections} insufficient-depth rejections
+          </div>
+        ) : null}
         {c.sessionTotals ? (
           <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
             Current session: {c.sessionTotals.simulated} simulated · {c.sessionTotals.worthSending}{" "}
@@ -895,6 +975,44 @@ function BackrunCard({ b, now }: { b: BackrunSummary; now: number }) {
             .
           </div>
         ) : null}
+        {b.submissionPopulations ? (
+          <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+            Submission populations: {b.submissionPopulations.relayAttempts} relay attempts;{" "}
+            {b.submissionPopulations.pricedAccepted} priced accepted +{" "}
+            {b.submissionPopulations.blindAccepted} blind accepted
+            {b.submissionPopulations.rejectedOrUnclassified
+              ? `; ${b.submissionPopulations.rejectedOrUnclassified} rejected or legacy-unclassified attempts`
+              : ""}
+            . Legacy <code>bundlesSent</code> counts priced bundles only.
+          </div>
+        ) : null}
+        {b.thresholdSensitivity ? (
+          <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+            Shadow net-threshold sensitivity ({b.thresholdSensitivity.samples} priced routes):{" "}
+            {Object.entries(b.thresholdSensitivity.thresholds)
+              .map(([threshold, value]) =>
+                `${threshold} ETH → ${value.opportunities} (${value.netEth.toFixed(6)} ETH)`,
+              )
+              .join(" · ")}
+          </div>
+        ) : null}
+        {b.liquidity ? (
+          <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+            Executable liquidity: {b.liquidity.samples} samples · {b.liquidity.ticksCrossed} tick
+            boundaries crossed (max {b.liquidity.maxTicksCrossed}) · max impact{" "}
+            {b.liquidity.maxPriceImpactBps.toFixed(1)} bps · max executable amount{" "}
+            {b.liquidity.maxExecutableAmount?.toLocaleString() ?? "unknown"} ·{" "}
+            {b.liquidity.insufficientDepthRejections} insufficient-depth rejections
+          </div>
+        ) : null}
+        {b.nonInclusion ? (
+          <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+            Non-inclusion attribution: {b.nonInclusion.userTransactionAbsent} user transaction
+            absent · {b.nonInclusion.bundleUnderbid} underbid ·{" "}
+            {b.nonInclusion.simulationDivergence} simulation divergence ·{" "}
+            {b.nonInclusion.nonceConflict} nonce conflict · {b.nonInclusion.unknown} unknown
+          </div>
+        ) : null}
         {b.missAudit &&
         (b.missAudit.total > 0 ||
           (b.missAudit.retries ?? 0) > 0 ||
@@ -928,6 +1046,38 @@ function BackrunCard({ b, now }: { b: BackrunSummary; now: number }) {
             {(b.latencyMs.avgSigningMs ?? 0).toFixed(1)} ms · relay{" "}
             {(b.latencyMs.avgRelayMs ?? b.latencyMs.avgSendMs).toFixed(1)} ms · builders:{" "}
             {Object.keys(b.buildersSeen ?? {}).join(", ") || "default relay set"}
+          </div>
+        ) : null}
+        {b.builders && Object.keys(b.builders).length ? (
+          <div className="overflow-x-auto rounded-md border">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-muted/40 text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2">Builder / relay</th>
+                  <th className="px-3 py-2">Attempts</th>
+                  <th className="px-3 py-2">Accepted</th>
+                  <th className="px-3 py-2">Observed</th>
+                  <th className="px-3 py-2">Included</th>
+                  <th className="px-3 py-2">Median inclusion latency</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(b.builders).map(([name, value]) => (
+                  <tr key={name} className="border-t">
+                    <td className="px-3 py-2 font-medium">{name}</td>
+                    <td className="px-3 py-2 tabular-nums">{value.attempts}</td>
+                    <td className="px-3 py-2 tabular-nums">{value.accepted}</td>
+                    <td className="px-3 py-2 tabular-nums">{value.observed}</td>
+                    <td className="px-3 py-2 tabular-nums">{value.included}</td>
+                    <td className="px-3 py-2 tabular-nums">
+                      {value.medianInclusionLatencyMs === null
+                        ? "—"
+                        : `${value.medianInclusionLatencyMs.toFixed(0)} ms`}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : null}
         {b.latencyMs?.stages ? (
