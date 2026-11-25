@@ -9,7 +9,11 @@
  *  4. Atomic EVM Revert Guard (passes minProfit to on-chain contracts)
  */
 
+import { formatUnits, type Hex } from "viem";
+
 import { ShaggyDoggQuantAiEngine } from "./quant-ai-engine";
+
+import type { AtomicSpreadLoan } from "./flash-routes";
 
 // Uniswap V3 SwapRouter02 on Base: the router the live triangular and Uniswap spread handlers use.
 const UNISWAP_V3_SWAP_ROUTER_02 = "0x2626664c2603336E57B271c5C0b26F421741e481";
@@ -25,6 +29,7 @@ export interface BotConfig {
   };
   readonly tradeCapitalEth: number;
   readonly flashBorrowUsdc: number;
+  readonly flashRouter?: string;
   readonly vipTier: number;
 }
 
@@ -45,6 +50,9 @@ export interface MarketSnapshot {
    * hop has its own fee tier); the engine then adds no fee of its own.
    */
   readonly triangularFeesIncluded?: boolean;
+  /** The selected borrow size quoted through the actual flash route. Null means no usable live quote. */
+  readonly flashQuote?: BorrowQuote | null;
+  readonly crossDexQuote?: AtomicSpreadLoan | null;
   /**
    * Screening gas cost per strategy in USD (live gas price x measured gas units x buffer). Without
    * it the engine falls back to its fixed placeholders.
@@ -58,6 +66,26 @@ export interface MarketSnapshot {
   readonly timestamp: number;
 }
 
+interface BorrowQuote {
+  asset: "USDC" | "WETH";
+  principal: bigint;
+  amountOut: bigint;
+  premium: bigint;
+}
+
+function valueBorrowQuote(quote: BorrowQuote, ethUsd: number) {
+  const decimals = quote.asset === "WETH" ? 18 : 6;
+  const usdPrice = quote.asset === "WETH" ? ethUsd : 1;
+  const borrowAmount = Number(formatUnits(quote.principal, decimals));
+  return {
+    asset: quote.asset,
+    borrowAmount,
+    notionalUsd: borrowAmount * usdPrice,
+    grossProfitUsd: Number(formatUnits(quote.amountOut - quote.principal, decimals)) * usdPrice,
+    flashLoanFeeUsd: Number(formatUnits(quote.premium, decimals)) * usdPrice,
+  };
+}
+
 export interface OpportunityBreakdown {
   readonly grossProfitUsd: number;
   readonly flashLoanFeeUsd: number;
@@ -65,6 +93,26 @@ export interface OpportunityBreakdown {
   readonly netProfitUsd: number;
   readonly minProfitFloorUsd: number;
   readonly returnOnCapitalBps: number;
+}
+
+export interface ArbitrageSessionStats {
+  scansCount: number;
+  opportunitiesDetected: number;
+  submittedTransactions: number;
+  projectedProfitUsd: number;
+}
+
+export function recordArbitrageSubmission(
+  stats: ArbitrageSessionStats,
+  hash: Hex | undefined,
+  projectedNetProfitUsd: number
+): ArbitrageSessionStats {
+  if (!hash) return stats;
+  return {
+    ...stats,
+    submittedTransactions: stats.submittedTransactions + 1,
+    projectedProfitUsd: stats.projectedProfitUsd + projectedNetProfitUsd,
+  };
 }
 
 export interface OpportunityEvaluation {
@@ -128,6 +176,37 @@ export class AiArbitrageBotEngine {
       plan?: OpportunityEvaluation["executionPlan"];
     }> = [];
 
+    const addLoanCandidate = (
+      strategy: "FLASH_LOAN" | "CROSS_DEX",
+      loan: ReturnType<typeof valueBorrowQuote>,
+      gasUsd: number,
+      description: string
+    ) => {
+      const { asset, borrowAmount, notionalUsd, grossProfitUsd, flashLoanFeeUsd } = loan;
+      const netProfitUsd = grossProfitUsd - flashLoanFeeUsd - gasUsd;
+      const inputAmount = `${borrowAmount.toLocaleString()} ${asset}`;
+      candidates.push({
+        strategy,
+        netProfitUsd,
+        grossSpreadPct: (grossProfitUsd / notionalUsd) * 100,
+        gasUsd,
+        confidence: netProfitUsd > 0 ? 99.1 : 20,
+        summary: `${description} (${inputAmount} borrowed)`,
+        breakdown: {
+          grossProfitUsd, flashLoanFeeUsd, estimatedGasUsd: gasUsd, netProfitUsd,
+          minProfitFloorUsd: config.minNetProfitUsd,
+          returnOnCapitalBps: (netProfitUsd / notionalUsd) * 10000,
+        },
+        plan: {
+          targetRouter: config.flashRouter ?? "0xdF77eBFB6e0468aE4e94b13Fc9881427B82178Fd",
+          action: "executeGenericArbitrage",
+          inputAsset: asset,
+          inputAmount,
+          minExpectedOut: `+$${netProfitUsd.toFixed(2)} USD Net Profit`,
+        },
+      });
+    };
+
     // 2. Evaluate Strategy A: Triangular Arbitrage
     if (config.strategies.triangular) {
       try {
@@ -172,7 +251,16 @@ export class AiArbitrageBotEngine {
     }
 
     // 3. Evaluate Strategy B: Cross-DEX Spreads (Uniswap vs Aerodrome)
-    if (config.strategies.crossDex) {
+    if (config.strategies.crossDex && market.crossDexQuote) {
+      const quote = market.crossDexQuote;
+      const ethUsd = Number(formatUnits(quote.usdcMid, 6)) / Number(formatUnits(quote.principal, 18));
+      addLoanCandidate(
+        "CROSS_DEX",
+        valueBorrowQuote({ asset: "WETH", principal: quote.principal, amountOut: quote.wethOut, premium: quote.premium }, ethUsd),
+        market.gasCostUsd?.crossDex ?? 0.08,
+        `Cross-DEX sell on ${quote.sellVenue}, buy on ${quote.buyVenue}`
+      );
+    } else if (config.strategies.crossDex && market.crossDexQuote === undefined) {
       try {
         const dualResult = ShaggyDoggQuantAiEngine.calculateDualPoolCrossDexSpread({
           poolAPrice: market.uniswapEthPrice,
@@ -218,10 +306,14 @@ export class AiArbitrageBotEngine {
     }
 
     // 4. Evaluate Strategy C: Aave v3 Flash Loan Arbitrage
-    if (config.strategies.flashLoan) {
-      const flashGasUsd = market.gasCostUsd?.flashLoan ?? 0.15;
+    const flashGasUsd = market.gasCostUsd?.flashLoan ?? 0.15;
+    if (config.strategies.flashLoan && market.flashQuote) {
+      addLoanCandidate(
+        "FLASH_LOAN", valueBorrowQuote(market.flashQuote, market.wethUsdcPrice), flashGasUsd, "Aave flash loan"
+      );
+    } else if (config.strategies.flashLoan && market.flashQuote === undefined) {
       try {
-        const flashResult = ShaggyDoggQuantAiEngine.calculateAaveFlashArbitrage({
+        const model = ShaggyDoggQuantAiEngine.calculateAaveFlashArbitrage({
           borrowAsset: "USDC",
           borrowAmount: config.flashBorrowUsdc,
           flashPremiumBps: 5, // 0.05%
@@ -234,40 +326,22 @@ export class AiArbitrageBotEngine {
           },
           gasCostUsd: flashGasUsd,
         });
-
-        const flashLoanFeeUsd = config.flashBorrowUsdc * 0.0005; // Exact 0.05% Aave v3 pool premium
-
-        candidates.push({
-          strategy: "FLASH_LOAN",
-          netProfitUsd: flashResult.netProfitUsd,
-          grossSpreadPct: (flashResult.grossProfit / config.flashBorrowUsdc) * 100,
-          gasUsd: flashGasUsd,
-          confidence: flashResult.isProfitable ? 99.1 : 20.0,
-          summary: `Aave Flash Loan ${config.flashBorrowUsdc.toLocaleString()} USDC uncollateralized`,
-          breakdown: {
-            grossProfitUsd: flashResult.grossProfit,
-            flashLoanFeeUsd,
-            estimatedGasUsd: flashGasUsd,
-            netProfitUsd: flashResult.netProfitUsd,
-            minProfitFloorUsd: config.minNetProfitUsd,
-            returnOnCapitalBps: (flashResult.netProfitUsd / config.flashBorrowUsdc) * 10000,
-          },
-          plan: {
-            targetRouter: "0xdF77eBFB6e0468aE4e94b13Fc9881427B82178Fd",
-            action: "requestFlashLoan",
-            inputAsset: "USDC",
-            inputAmount: `${config.flashBorrowUsdc.toLocaleString()} USDC`,
-            minExpectedOut: `+$${flashResult.netProfitUsd.toFixed(2)} USD Net Profit`,
-          },
-        });
+        addLoanCandidate("FLASH_LOAN", {
+          asset: "USDC",
+          borrowAmount: config.flashBorrowUsdc,
+          notionalUsd: config.flashBorrowUsdc,
+          grossProfitUsd: model.grossProfit + model.flashLoanPremium,
+          flashLoanFeeUsd: model.flashLoanPremium,
+        }, flashGasUsd, "Aave flash loan");
       } catch {
-        // Skip on error
+        // Skip on invalid model inputs.
       }
     }
 
     candidates.sort((a, b) => b.netProfitUsd - a.netProfitUsd);
     const best = candidates[0];
     if (!best) {
+      const waitingForFlashQuote = config.strategies.flashLoan && market.flashQuote === null;
       return {
         id: evalId,
         timestamp: timestampStr,
@@ -277,8 +351,10 @@ export class AiArbitrageBotEngine {
         projectedNetProfitUsd: 0,
         estimatedGasCostUsd: 0,
         confidenceScore: 0,
-        summary: "No enabled strategies to evaluate",
-        disqualificationReason: "Enable at least one arbitrage strategy.",
+        summary: waitingForFlashQuote ? "No current flash route quote" : "No enabled strategies to evaluate",
+        disqualificationReason: waitingForFlashQuote
+          ? "Waiting for a fresh flash route quote at the selected borrow amount."
+          : "Enable at least one arbitrage strategy.",
       };
     }
 

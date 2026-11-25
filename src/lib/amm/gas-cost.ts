@@ -22,6 +22,44 @@ export const MEASURED_GAS_UNITS = {
 /** Profit must clear the real fee by this factor, so a gas spike between quote and inclusion still pays. */
 export const GAS_SAFETY_BUFFER = 1.25;
 
+export const bufferedGasFee = (feeWei: bigint) =>
+  (feeWei * BigInt(Math.round(GAS_SAFETY_BUFFER * 100)) + 99n) / 100n;
+
+/** The target and gas must be in the router's output currency. Round required amounts up. */
+export function baseProfitBudget(asset: "USDC" | "WETH", targetUsd: number, ethUsd: number) {
+  if (!Number.isFinite(targetUsd) || targetUsd < 0 || !Number.isFinite(ethUsd) || ethUsd <= 0) {
+    throw new Error("A nonnegative USD profit target and a positive ETH price are required.");
+  }
+  const usdcPerWeth = BigInt(Math.round(ethUsd * 1e6));
+  if (usdcPerWeth <= 0n) throw new Error("ETH price is below USDC precision.");
+  const usdMicros = BigInt(Math.ceil(targetUsd * 1e6));
+  const oneWeth = 10n ** 18n;
+  const ceil = (a: bigint, b: bigint) => (a + b - 1n) / b;
+  return {
+    target: asset === "USDC" ? usdMicros : ceil(usdMicros * oneWeth, usdcPerWeth),
+    feeInAsset: (wei: bigint) => asset === "USDC" ? ceil(wei * usdcPerWeth, oneWeth) : wei,
+  };
+}
+
+/** The L1 data fee changes with calldata. Reprice a tightened minimum before returning the call. */
+export async function feeCheckedCall<T>(
+  build: (minimum: bigint) => T,
+  estimateFee: (call: T) => Promise<bigint>,
+  initialMinimum: bigint,
+  target: bigint,
+  quotedMaximum: bigint,
+  feeInAsset: (wei: bigint) => bigint = (wei) => wei
+): Promise<T | null> {
+  let minimum = initialMinimum > target ? initialMinimum : target;
+  for (let attempt = 0; attempt < 3 && minimum <= quotedMaximum; attempt++) {
+    const call = build(minimum);
+    const required = target + feeInAsset(bufferedGasFee(await estimateFee(call)));
+    if (minimum >= required) return call;
+    minimum = required;
+  }
+  return null;
+}
+
 /** Screening cost in USD: measured units x gas price x buffer. The L1 data fee is checked exactly later. */
 export function screeningGasUsd(units: bigint, gasPriceWei: bigint, ethUsd: number): number {
   return (Number(units * gasPriceWei) / 1e18) * ethUsd * GAS_SAFETY_BUFFER;

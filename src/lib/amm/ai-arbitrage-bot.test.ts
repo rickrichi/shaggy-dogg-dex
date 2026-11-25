@@ -1,7 +1,13 @@
 // src/lib/amm/ai-arbitrage-bot.test.ts
+import { parseUnits } from "viem";
 import { describe, expect, it } from "vitest";
 
-import { AiArbitrageBotEngine, type BotConfig, type MarketSnapshot } from "./ai-arbitrage-bot";
+import {
+  AiArbitrageBotEngine,
+  type BotConfig,
+  type MarketSnapshot,
+  recordArbitrageSubmission,
+} from "./ai-arbitrage-bot";
 
 describe("AiArbitrageBotEngine - Anti-Loss & Auto-Pilot Rules", () => {
   const defaultConfig: BotConfig = {
@@ -27,6 +33,76 @@ describe("AiArbitrageBotEngine - Anti-Loss & Auto-Pilot Rules", () => {
     currentGasGwei: 0.005,
     timestamp: 1790853000000,
   };
+
+  it.each([
+    {
+      asset: "USDC" as const,
+      decimals: 6,
+      amount: "10000",
+      output: "10100",
+      premium: "4",
+      price: 1,
+    },
+    {
+      asset: "WETH" as const,
+      decimals: 18,
+      amount: "2",
+      output: "2.05",
+      premium: "0.001",
+      price: 2000,
+    },
+  ])(
+    "screens the quoted $asset size, output and premium in USD",
+    ({ asset, decimals, amount, output, premium, price }) => {
+      const flashOnly = {
+        ...defaultConfig,
+        strategies: { triangular: false, crossDex: false, flashLoan: true },
+      };
+      const evaluation = AiArbitrageBotEngine.evaluateMarketOpportunity(flashOnly, {
+        ...baseMarket,
+        wethUsdcPrice: 2000,
+        gasCostUsd: { triangular: 0, crossDex: 0, flashLoan: 2 },
+        flashQuote: {
+          asset,
+          principal: parseUnits(amount, decimals),
+          amountOut: parseUnits(output, decimals),
+          premium: parseUnits(premium, decimals),
+        },
+      });
+      expect(evaluation.qualified).toBe(true);
+      expect(evaluation.executionPlan?.inputAsset).toBe(asset);
+      expect(evaluation.executionPlan?.inputAmount).toBe(
+        `${Number(amount).toLocaleString()} ${asset}`
+      );
+      expect(evaluation.breakdown?.grossProfitUsd).toBeCloseTo(100);
+      expect(evaluation.breakdown?.flashLoanFeeUsd).toBeCloseTo(Number(premium) * price);
+      expect(evaluation.projectedNetProfitUsd).toBeCloseTo(100 - Number(premium) * price - 2);
+      expect(
+        AiArbitrageBotEngine.evaluateMarketOpportunity(flashOnly, {
+          ...baseMarket,
+          flashQuote: null,
+        })
+      ).toMatchObject({
+        qualified: false,
+        summary: "No current flash route quote",
+      });
+    }
+  );
+
+  it("counts projected profit only after the wallet returns a transaction hash", () => {
+    const initial = {
+      scansCount: 6,
+      opportunitiesDetected: 2,
+      submittedTransactions: 0,
+      projectedProfitUsd: 0,
+    };
+    expect(recordArbitrageSubmission(initial, undefined, 20)).toBe(initial);
+    expect(recordArbitrageSubmission(initial, "0x1234", 20)).toEqual({
+      ...initial,
+      submittedTransactions: 1,
+      projectedProfitUsd: 20,
+    });
+  });
 
   it("strictly rejects execution when Base gas price exceeds safety ceiling", () => {
     const highGasMarket: MarketSnapshot = {

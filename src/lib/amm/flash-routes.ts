@@ -15,7 +15,10 @@ import {
 } from "@/config/abis";
 
 import { type BotQuoteVenues, encodeV3Path } from "./bot-market-snapshot";
+import { feeCheckedCall } from "./gas-cost";
 import { V3_FEE_TIERS } from "./uniswap-v3";
+
+import type { baseProfitBudget} from "./gas-cost";
 
 const ALL_TIERS: readonly number[] = V3_FEE_TIERS.map((tier) => tier.fee);
 
@@ -37,6 +40,31 @@ export interface SwapStep {
   readonly callData: Hex;
 }
 
+export type FlashArbitrageArgs = readonly [Address, bigint, bigint, Address, readonly SwapStep[]];
+
+/** Both the final swap and the flash router enforce the selected net target plus buffered fees. */
+export async function feeCheckedFlashArgs(
+  loan: { asset: Address; principal: bigint; owed: bigint; edge: bigint; recipient: Address },
+  budget: ReturnType<typeof baseProfitBudget>,
+  buildSteps: (minimumOutput: bigint) => readonly SwapStep[],
+  estimateFee: (args: FlashArbitrageArgs) => Promise<bigint>
+) {
+  return feeCheckedCall<FlashArbitrageArgs>(
+    (minimumProfit) => [
+      loan.asset,
+      loan.principal,
+      minimumProfit,
+      loan.recipient,
+      buildSteps(loan.owed + minimumProfit),
+    ],
+    estimateFee,
+    (loan.edge * 70n) / 100n,
+    budget.target,
+    loan.edge,
+    budget.feeInAsset
+  );
+}
+
 export interface V3Cycle {
   readonly tokens: readonly Address[];
   readonly fees: readonly number[];
@@ -51,6 +79,11 @@ export interface AtomicSpreadQuote {
   readonly uniswapFee: number; // V3 tier used for the Uniswap leg
   readonly usdcMid: bigint; // USDC out of the first leg
   readonly wethOut: bigint; // WETH out of the second leg
+}
+
+export interface AtomicSpreadLoan extends AtomicSpreadQuote {
+  readonly principal: bigint;
+  readonly premium: bigint;
 }
 
 type Quoter = Pick<PublicClient, "multicall">;
@@ -79,7 +112,7 @@ export async function readAavePremiumBps(
 }
 
 export const flashPremium = (amount: bigint, premiumBps: number) =>
-  (amount * BigInt(premiumBps)) / 10_000n;
+  (amount * BigInt(premiumBps) + 9_999n) / 10_000n;
 
 /**
  * Best Uniswap V3 cycle through `tokens` (first == last) over every fee-tier combination.
@@ -185,8 +218,8 @@ export async function quoteAtomicSpread(
     const second = await client.multicall({
       allowFailure: true,
       contracts: [
-        aero(usdc, weth, uniSell.out),
-        ...ALL_TIERS.map((fee) => uni(usdc, weth, aeroSell, fee)),
+        aero(usdc, weth, spreadLeg2Input(uniSell.out)),
+        ...ALL_TIERS.map((fee) => uni(usdc, weth, spreadLeg2Input(aeroSell), fee)),
       ],
     });
     const viaUniThenAero = aeroOut(second[0]);
@@ -218,6 +251,20 @@ export async function quoteAtomicSpread(
   } catch {
     return null;
   }
+}
+
+export async function liveAtomicSpread(
+  client: Pick<PublicClient, "multicall" | "readContract">,
+  venues: BotQuoteVenues,
+  aavePool: Address,
+  principal: bigint
+): Promise<AtomicSpreadLoan | null> {
+  if (principal <= 0n) return null;
+  const [route, premiumBps] = await Promise.all([
+    quoteAtomicSpread(client, venues, principal),
+    readAavePremiumBps(client, aavePool),
+  ]);
+  return route && { ...route, principal, premium: flashPremium(principal, premiumBps) };
 }
 
 /** A Uniswap V3 exactInput step paying `recipient`, reverting below `minimumOut`. */
@@ -278,6 +325,7 @@ export function aerodromeStep(
 // and inclusion does not revert the whole route. The unspent USDC stays in the router (admin can
 // rescueTokens); leg 1's minimum guarantees leg 2 always has its input.
 export const SPREAD_LEG2_BUFFER_BPS = 5n;
+const spreadLeg2Input = (usdcMid: bigint) => (usdcMid * (10_000n - SPREAD_LEG2_BUFFER_BPS)) / 10_000n;
 
 /** The two steps of an atomic spread, with the router (`self`) receiving every leg. */
 export function atomicSpreadSteps(
@@ -289,7 +337,7 @@ export function atomicSpreadSteps(
   deadline: bigint
 ): SwapStep[] {
   const { weth, usdc } = venues;
-  const leg2In = (quote.usdcMid * (10_000n - SPREAD_LEG2_BUFFER_BPS)) / 10_000n;
+  const leg2In = spreadLeg2Input(quote.usdcMid);
   const leg =
     (venue: SpreadVenue) =>
     (from: Address, to: Address, amountIn: bigint, minimumOut: bigint): SwapStep =>

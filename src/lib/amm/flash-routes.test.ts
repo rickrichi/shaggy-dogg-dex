@@ -9,11 +9,14 @@ import {
   type AtomicSpreadQuote,
   atomicSpreadSteps,
   bestV3Cycle,
+  feeCheckedFlashArgs,
   flashPremium,
   flashTriangleTokens,
   quoteAtomicSpread,
   SPREAD_LEG2_BUFFER_BPS,
+  v3ExactInputStep,
 } from "./flash-routes";
+import { baseProfitBudget } from "./gas-cost";
 
 const CBBTC = "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf";
 const V: BotQuoteVenues = {
@@ -68,11 +71,59 @@ describe("flash triangle", () => {
 
   it("computes Aave's premium from basis points", () => {
     expect(flashPremium(parseUnits("100", 6), 5)).toBe(parseUnits("0.05", 6));
+    expect(flashPremium(2_001n, 5)).toBe(2n);
+    expect(flashPremium(1n, 0)).toBe(0n);
+  });
+
+  it("reprices the flash cycle's final USDC minimum including premium and rounded-up gas", async () => {
+    const principal = parseUnits("100", 6);
+    const owed = principal + flashPremium(principal, 5);
+    const budget = baseProfitBudget("USDC", 5, 2000);
+    const feeWei = parseEther("0.0004") + 1n;
+    const estimate = vi.fn().mockResolvedValue(feeWei);
+    const { tokens } = flashTriangleTokens("USDC", V, CBBTC);
+    const args = await feeCheckedFlashArgs(
+      { asset: V.usdc, principal, owed, edge: parseUnits("7", 6), recipient: SELF },
+      budget,
+      (minimum) => [v3ExactInputStep(V.uniswapV3Router, tokens, [100, 500, 500], principal, minimum, SELF)],
+      estimate
+    );
+    const minimumNet = parseUnits("6", 6) + 1n;
+    expect(estimate).toHaveBeenCalledTimes(2);
+    expect(args).toBe(estimate.mock.calls[1]?.[0]);
+    expect(args?.[2]).toBe(minimumNet);
+    const swap = decodeFunctionData({ abi: UNISWAP_V3_SWAP_ROUTER_02_ABI, data: args![4][0]!.callData });
+    expect(swap.args?.[0]).toMatchObject({ amountOutMinimum: owed + minimumNet });
   });
 });
 
 describe("atomic spread", () => {
   const amount = parseEther("1");
+
+  it("enforces the current WETH profit target and the final gas estimate on the spread's buy leg", async () => {
+    const quote: AtomicSpreadQuote = {
+      sellVenue: "AERODROME", buyVenue: "UNISWAP", uniswapFee: 100,
+      usdcMid: parseUnits("2000", 6), wethOut: parseEther("1.004"),
+    };
+    const budget = baseProfitBudget("WETH", 5, 2000);
+    const owed = amount + flashPremium(amount, 5);
+    const fee = parseEther("0.0004");
+    const loan = { asset: V.weth, principal: amount, owed, edge: parseEther("0.0032"), recipient: SELF } as const;
+    const buildSteps = (minimum: bigint) => atomicSpreadSteps(V, quote, amount, minimum, SELF, 999n);
+    const estimate = vi.fn().mockResolvedValue(fee);
+    const args = await feeCheckedFlashArgs(loan, budget, buildSteps, estimate);
+    const minimumNet = parseEther("0.003");
+    expect(args?.[2]).toBe(minimumNet);
+    expect(args).toBe(estimate.mock.calls[1]?.[0]);
+    const swap = decodeFunctionData({ abi: UNISWAP_V3_SWAP_ROUTER_02_ABI, data: args![4][1]!.callData });
+    expect(swap.args?.[0]).toMatchObject({ amountOutMinimum: owed + minimumNet });
+    await expect(feeCheckedFlashArgs(
+      { ...loan, edge: minimumNet - 1n }, budget, buildSteps, estimate
+    )).resolves.toBeNull();
+    await expect(feeCheckedFlashArgs(
+      loan, baseProfitBudget("WETH", 6, 2000), buildSteps, estimate
+    )).resolves.toBeNull();
+  });
 
   it("picks the direction that returns more WETH", async () => {
     const client = {

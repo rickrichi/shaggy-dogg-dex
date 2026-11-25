@@ -91,6 +91,7 @@ export interface LiveBotQuotes {
   readonly triangularPath: V3Path;
   /** WETH out of the full triangular path for `tradeWeth` WETH in, after pool fees. */
   readonly triangularTerminalWeth: number;
+  readonly triangularTerminalWei: bigint;
   /** Fee-free prices and each venue's fee rate, for the cross-DEX comparison. */
   readonly uniswapEthPrice: number;
   readonly uniswapFeeTier: number;
@@ -363,6 +364,7 @@ export async function fetchLiveBotQuotes(
     midAsset: midCandidate,
     triangularPath: chosen.path,
     triangularTerminalWeth: weth2,
+    triangularTerminalWei: chosen.out,
     uniswapEthPrice: uniswapExecutionPrice / (1 - uniswapFeeRate),
     uniswapFeeTier: uni.fee,
     uniswapFeeRate,

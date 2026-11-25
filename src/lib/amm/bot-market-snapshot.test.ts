@@ -11,6 +11,7 @@ import {
   rankMidAssetCandidates,
   v3TriangularSwapCall,
 } from "./bot-market-snapshot";
+import { feeCheckedCall } from "./gas-cost";
 
 const WETH: Address = "0x4200000000000000000000000000000000000006";
 const USDC: Address = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
@@ -184,6 +185,7 @@ describe("fetchLiveBotQuotes (Uniswap V3)", () => {
     expect(quotes?.midAsset.decimals).toBe(6);
     expect(quotes?.triangularPath.fees).toEqual([100, 100, 100]);
     expect(quotes?.triangularTerminalWeth).toBeCloseTo(0.99, 12);
+    expect(quotes?.triangularTerminalWei).toBe(parseEther("0.99"));
 
     // Rates: both usdcMid (2390) and the 6-decimal SIXDEC mid (2389) decoded correctly.
     expect(quotes?.wethUsdcPrice).toBeCloseTo(2390, 6);
@@ -299,5 +301,36 @@ describe("v3TriangularSwapCall", () => {
 
   it("refuses a zero minimum output", () => {
     expect(() => v3TriangularSwapCall(VENUES.uniswapV3Router, path, ONE, 0n, WALLET, 1n)).toThrow();
+  });
+
+  it("encodes and reprices the final output floor with the Base L1 and L2 fee", async () => {
+    const build = (minimum: bigint) =>
+      v3TriangularSwapCall(VENUES.uniswapV3Router, path, ONE, minimum, WALLET, 123n);
+    const target = ONE + parseEther("0.001");
+    const estimate = vi
+      .fn()
+      .mockResolvedValueOnce(200n)
+      .mockResolvedValueOnce(204n)
+      .mockResolvedValueOnce(204n);
+    const call = await feeCheckedCall(
+      build,
+      estimate,
+      target + 50n,
+      target,
+      target + 300n
+    );
+    expect(call).toBeTruthy();
+    expect(call).toBe(estimate.mock.calls[2]?.[0]);
+    const swap = decodeFunctionData({ abi: UNISWAP_V3_SWAP_ROUTER_02_ABI, data: call!.args[1][0] });
+    expect(swap.args?.[0]).toMatchObject({ amountIn: ONE, amountOutMinimum: target + 255n });
+
+    const noEdge = await feeCheckedCall(
+      build,
+      async () => 204n,
+      target + 50n,
+      target,
+      target + 254n
+    );
+    expect(noEdge).toBeNull();
   });
 });
