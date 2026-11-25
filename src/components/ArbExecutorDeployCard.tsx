@@ -296,7 +296,7 @@ function ArbExecutorDeployCardInner() {
                 Target Owner &amp; Beneficiary: <code>{SHAGGY_DOGG_OWNER}</code>
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex max-w-full flex-wrap gap-2">
               <Button size="sm" onClick={() => openWalletModal(false)}>
                 Connect MetaMask
               </Button>
