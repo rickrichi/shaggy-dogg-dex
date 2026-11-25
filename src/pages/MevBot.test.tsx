@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ARB_SUMMARY_PATH, type ArbSummary, fmtSigned } from "./MevArb";
@@ -545,7 +545,12 @@ describe("MEV bot page", () => {
     expect(
       await screen.findByText("Oracle-update backruns (Chainlink SVR via MEV-Share)")
     ).toBeTruthy();
-    expect(screen.getByText(/120 oracle updates seen since restart/)).toBeTruthy();
+    expect(
+      screen.getByText(/Since restart, the bot received 120 oracle hints · 3 could not be replayed/)
+    ).toBeTruthy();
+    expect(
+      screen.getByText(/Across recorded history, 14 updates moved an Aave price/)
+    ).toBeTruthy();
     expect(screen.getByText(/5 borrowers pushed under 1/)).toBeTruthy();
     expect(screen.getByText("1 worth sending")).toBeTruthy();
     expect(screen.getByText(/2 liquidations by other bots/)).toBeTruthy();
@@ -617,6 +622,27 @@ describe("MEV bot page", () => {
     );
     renderPage();
     expect(await screen.findByText(/HTTP 502/)).toBeTruthy();
+  });
+
+  it("marks a previously running bot as stale even when the cached summary stays the same", () => {
+    vi.useFakeTimers();
+    try {
+      const client = new QueryClient({ defaultOptions: { queries: { enabled: false } } });
+      client.setQueryData(["mev-summary"], summary());
+      render(
+        <QueryClientProvider client={client}>
+          <MevBot />
+        </QueryClientProvider>
+      );
+      expect(screen.getByText("Running")).toBeTruthy();
+      act(() => {
+        vi.advanceTimersByTime(120_000);
+      });
+      expect(screen.getByText("Not responding")).toBeTruthy();
+      expect(screen.getAllByText("2 min ago").length).toBeGreaterThan(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("shows the Uniswap arbitrage scanner per chain", async () => {
@@ -789,7 +815,7 @@ describe("MEV-Share backrun card", () => {
         chain: "ethereum",
         mode: "live",
         connected: true,
-        lastEventAt: new Date().toISOString(),
+        lastEventAt: new Date(Date.now() - 180_000).toISOString(),
         totals: {
           events: 10,
           swapHints: 1,
@@ -803,6 +829,7 @@ describe("MEV-Share backrun card", () => {
           profitableBeforeGas: 0,
           worthSending: 0,
           bundlesSent: 4,
+          blindBundlesSent: 7,
           landed: 0,
           errors: 0,
           rateLimited: 0,
@@ -892,6 +919,15 @@ describe("MEV-Share backrun card", () => {
         submissions: [],
       },
     };
+    const backrun = withStages.backrun!;
+    backrun.sessionTotals = { ...backrun.totals, bundlesSent: 0, blindBundlesSent: 3 };
+    backrun.orderFlow!.liquidation = {
+      ...backrun.orderFlow!.mevblocker!,
+      connected: false,
+      lastError: null,
+      withSwaps: 0,
+      bestNetEth: null,
+    };
     vi.stubGlobal(
       "fetch",
       byUrl(
@@ -901,6 +937,13 @@ describe("MEV-Share backrun card", () => {
     );
     renderPage();
     expect(await screen.findByText(/1 awaiting outcome/)).toBeTruthy();
+    expect(screen.getByText("Connected · no recent hints")).toBeTruthy();
+    const session = screen.getByText(/Current session:.*0 priced accepted · 3 blind accepted/);
+    expect(session.textContent).toContain(
+      "Lifetime: 0 simulated · 4 priced accepted · 7 blind accepted"
+    );
+    const listener = screen.getByText("Combined liquidation backrun feed");
+    expect(listener.parentElement?.textContent).toContain("listener inactive");
     expect(screen.getByText(/2 unresolved across restarts/)).toBeTruthy();
     expect(screen.getByText(/hint→relay 800 \/ 1200 ms/)).toBeTruthy();
     expect(screen.getByText(/0 \/ 1 blocks behind/)).toBeTruthy();

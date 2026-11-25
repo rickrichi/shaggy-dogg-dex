@@ -1,8 +1,12 @@
+import { useEffect, useState } from "react";
+
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, Bot, ChevronDown, ExternalLink, Loader2 } from "lucide-react";
+import { avalanche } from "viem/chains";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CHAIN_CONFIG } from "@/config/chains/config";
 
 import MevArb from "./MevArb";
 
@@ -678,7 +682,11 @@ export default function MevBot() {
     refetchInterval: 15_000,
   });
   const s = q.data;
-  const now = Date.now();
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 15_000);
+    return () => window.clearInterval(timer);
+  }, []);
   const live = !!s?.lastBlockAt && now - Date.parse(s.lastBlockAt) < STALE_MS;
 
   return (
@@ -701,7 +709,8 @@ export default function MevBot() {
         Watches every Aave V3 borrower on Ethereum mainnet. When one can be liquidated it simulates
         the whole trade (flash loan, liquidation, swap, repay) on the real chain state, prices gas
         and a builder bribe, and records whether it would have been worth sending. In shadow mode
-        nothing is signed or sent. This page is read-only.
+        nothing is signed or sent. Anyone can view the telemetry. Operator actions require a
+        connected wallet.
       </p>
 
       {q.isLoading ? (
@@ -792,8 +801,12 @@ export default function MevBot() {
                   health factor 1 and simulates liquidating them right behind it.
                 </p>
                 <p>
-                  {s.oracle.hints.toLocaleString()} oracle updates seen since restart ·{" "}
-                  {s.oracle.aaveUpdates.toLocaleString()} moved an Aave price ·{" "}
+                  Since restart, the bot received {s.oracle.hints.toLocaleString()} oracle hints ·{" "}
+                  {s.oracle.unreplayable.toLocaleString()} could not be replayed.
+                </p>
+                <p>
+                  Across recorded history, {s.oracle.aaveUpdates.toLocaleString()} updates moved an
+                  Aave price ·{" "}
                   {s.oracle.positionsPushedUnder.toLocaleString()} borrowers pushed under 1 ·{" "}
                   {s.oracle.opportunities.toLocaleString()} liquidations simulated ·{" "}
                   <strong>{s.oracle.viable.toLocaleString()} worth sending</strong>
@@ -801,8 +814,7 @@ export default function MevBot() {
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {s.oracle.competitorTargets} liquidations by other bots were of borrowers we saw
-                  an update push under 1 · {s.oracle.simFailed} simulations reverted ·{" "}
-                  {s.oracle.unreplayable} updates already landed before we could replay them
+                  an update push under 1 · {s.oracle.simFailed} simulations reverted
                 </p>
               </CardContent>
             </Card>
@@ -1177,11 +1189,11 @@ export default function MevBot() {
       ) : null}
       {s?.spoke ? <GoldSpokeCard spoke={s.spoke} now={now} /> : null}
       <MevAuthorityCard now={now} />
-      <SparkLendCard />
+      <SparkLendCard now={now} />
       {LENDING_MONITORS.map((m) => (
-        <LendingMonitorCard key={m.path} {...m} />
+        <LendingMonitorCard key={m.path} {...m} now={now} />
       ))}
-      <MevArb />
+      <MevArb now={now} />
     </div>
   );
 }
@@ -1218,10 +1230,10 @@ export interface AuthoritySummary {
 }
 
 const AUTHORITY_LABELS: Record<string, string> = {
-  liquidator: "Aave V3 + Gold Spoke liquidator (live)",
-  "liquidator-shadow": "Aave V3 + Gold Spoke liquidator · parity run (shadow)",
-  "arb-ethereum": "Uniswap arbitrage · Ethereum (live)",
-  "arb-base": "Uniswap arbitrage · Base (live)",
+  liquidator: "Aave V3 + Gold Spoke liquidator",
+  "liquidator-shadow": "Aave V3 + Gold Spoke liquidator · parity run",
+  "arb-ethereum": "Uniswap arbitrage · Ethereum",
+  "arb-base": "Uniswap arbitrage · Base",
   spark: "SparkLend",
   compound: "Compound III",
   morpho: "Morpho Blue",
@@ -1250,14 +1262,15 @@ export function MevAuthorityCard({ now }: { now: number }) {
     refetchInterval: 15_000,
   });
   const a = q.data;
+  const staleReport = !!a && now - Date.parse(a.updatedAt) >= STALE_MS;
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center gap-2 text-base">
           MEV Authority
           {a ? (
-            <Badge variant={a.healthy === a.total ? "default" : "secondary"}>
-              {a.healthy}/{a.total} healthy
+            <Badge variant={staleReport || a.healthy !== a.total ? "secondary" : "default"}>
+              {a.healthy}/{a.total} healthy{staleReport ? ` at last report · ${ago(a.updatedAt, now)}` : ""}
             </Badge>
           ) : null}
         </CardTitle>
@@ -1295,10 +1308,11 @@ export function MevAuthorityCard({ now }: { now: number }) {
               <tbody>
                 {a.instances.map((i) => {
                   const s = i.summary;
-                  const status = !s
+                  const progress = s ? backfillPct(s.backfill) : null;
+                  const status = !s || i.state !== "running"
                     ? i.state
                     : !s.backfill.done
-                      ? `indexing ${s.backfill.target ? Math.round(((Number(s.backfill.syncedTo) - Number(s.backfill.from)) / Math.max(1, Number(s.backfill.target) - Number(s.backfill.from))) * 100) : 0}%`
+                      ? `indexing${progress === null ? "" : ` ${progress}%`}`
                       : i.healthy
                         ? "running"
                         : s.lastBlockAt
@@ -1610,15 +1624,16 @@ export const LENDING_MONITORS = [
   },
   ...(
     [
-      ["arbitrum", "Arbitrum"],
-      ["base", "Base"],
-      ["optimism", "Optimism"],
-      ["polygon", "Polygon"],
-      ["avalanche", "Avalanche"],
+      ["arbitrum", "Arbitrum", CHAIN_CONFIG[42161].explorerUrl],
+      ["base", "Base", CHAIN_CONFIG[8453].explorerUrl],
+      ["optimism", "Optimism", CHAIN_CONFIG[10].explorerUrl],
+      ["polygon", "Polygon", CHAIN_CONFIG[137].explorerUrl],
+      ["avalanche", "Avalanche", avalanche.blockExplorers.default.url],
     ] as const
-  ).map(([key, label]) => ({
+  ).map(([key, label, explorerUrl]) => ({
     title: `Aave V3 liquidations — ${label}`,
     path: `/api/mev/aave-${key}/summary`,
+    explorerUrl,
     marketsLabel: "Reserves",
     description: `Watches every Aave V3 borrower on ${label}. An account under health 1 can be liquidated for its collateral's bonus (typically 4–10%); the reward shown is the best collateral/debt pair under Aave's close-factor rules, after the protocol's share.`,
   })),
@@ -1639,10 +1654,13 @@ const fmtAmount = (v: number, unit: string) =>
   `${v.toLocaleString(undefined, { maximumFractionDigits: unit === "USD" ? 0 : 4 })} ${unit}`;
 
 const backfillPct = (b: LendingMonitorSummary["backfill"]) => {
-  if (b.done || !b.target) return 100;
+  if (b.done) return 100;
+  if (!b.target) return null;
   const from = Number(b.from);
   const span = Number(b.target) - from;
-  return span > 0 ? Math.max(0, Math.min(100, ((Number(b.syncedTo) - from) / span) * 100)) : 100;
+  if (span <= 0) return null;
+  const percent = ((Number(b.syncedTo) - from) / span) * 100;
+  return Number.isFinite(percent) ? Math.max(0, Math.min(100, Math.round(percent))) : null;
 };
 
 /** Card for one shadow liquidation monitor (Compound III, Morpho Blue or Euler v2). */
@@ -1651,11 +1669,15 @@ export function LendingMonitorCard({
   path,
   marketsLabel,
   description,
+  explorerUrl = CHAIN_CONFIG[1].explorerUrl,
+  now,
 }: {
   title: string;
   path: string;
   marketsLabel: string;
   description: string;
+  explorerUrl?: string;
+  now: number;
 }) {
   const q = useQuery({
     queryKey: ["lending-monitor", path],
@@ -1663,9 +1685,8 @@ export function LendingMonitorCard({
     refetchInterval: 15_000,
   });
   const s = q.data;
-  const now = Date.now();
   const live = !!s?.lastBlockAt && now - Date.parse(s.lastBlockAt) < STALE_MS;
-  const pct = s ? backfillPct(s.backfill) : 0;
+  const pct = s ? backfillPct(s.backfill) : null;
   return (
     <Card>
       <CardHeader>
@@ -1674,10 +1695,10 @@ export function LendingMonitorCard({
           {s ? (
             <>
               <Badge variant={live ? "default" : "secondary"}>
-                {live
-                  ? "Running"
-                  : !s.backfill.done
-                    ? `Indexing history ${pct.toFixed(0)}%`
+                {!s.backfill.done
+                  ? `Indexing history${pct === null ? "" : ` ${pct}%`}`
+                  : live
+                    ? "Running"
                     : "Not responding"}
               </Badge>
               <Badge variant="outline">
@@ -1703,9 +1724,11 @@ export function LendingMonitorCard({
           <>
             {!s.backfill.done ? (
               <div className="space-y-1">
-                <div className="h-2 w-full overflow-hidden rounded bg-muted">
-                  <div className="h-full bg-violet-600" style={{ width: `${pct}%` }} />
-                </div>
+                {pct !== null ? (
+                  <div className="h-2 w-full overflow-hidden rounded bg-muted">
+                    <div className="h-full bg-violet-600" style={{ width: `${pct}%` }} />
+                  </div>
+                ) : null}
                 <p className="text-xs text-muted-foreground">
                   Reading borrower history: block {Number(s.backfill.syncedTo).toLocaleString()} of{" "}
                   {s.backfill.target ? Number(s.backfill.target).toLocaleString() : "—"}
@@ -1763,7 +1786,7 @@ export function LendingMonitorCard({
                         <td className="pr-3">
                           <a
                             className="inline-flex items-center gap-1 underline"
-                            href={`${ES}/address/${r.account}`}
+                            href={`${explorerUrl}/address/${r.account}`}
                             target="_blank"
                             rel="noreferrer"
                           >
@@ -1787,14 +1810,13 @@ export function LendingMonitorCard({
 }
 
 /** Compact card for the SparkLend liquidator (same bot and summary format as Aave). */
-function SparkLendCard() {
+function SparkLendCard({ now }: { now: number }) {
   const q = useQuery({
     queryKey: ["mev-summary", "spark"],
     queryFn: () => fetchSummary(SPARK_SUMMARY_PATH),
     refetchInterval: 15_000,
   });
   const s = q.data;
-  const now = Date.now();
   const live = !!s?.lastBlockAt && now - Date.parse(s.lastBlockAt) < STALE_MS;
   return (
     <Card>

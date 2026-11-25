@@ -1,4 +1,4 @@
-import { useContext, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 
 import {
   encodeFunctionData,
@@ -32,6 +32,13 @@ import {
 const DEFAULT_ETHEREUM_EXECUTOR_V4 = "0xa4ee94804d177382429c9cd77214a4d23ceccbdb";
 const DEFAULT_BASE_EXECUTOR_V3 = "0x39e0AeA4D34DccAc91909e9EE1579c8568EdD413";
 
+function balanceLabel({ data, isError }: { data: { value: bigint } | undefined; isError: boolean }) {
+  if (isError) return "Unavailable";
+  if (!data) return "Loading…";
+  if (data.value > 0n && data.value < parseEther("0.0001")) return "<0.0001 ETH";
+  return `${Number(formatEther(data.value)).toFixed(4)} ETH`;
+}
+
 export function ArbExecutorDeployCard() {
   const wagmiConfig = useContext(WagmiContext);
   if (!wagmiConfig) return null;
@@ -53,29 +60,36 @@ function ArbExecutorDeployCardInner() {
   };
   const [fundTxByChain, setFundTxByChain] = useState<Partial<Record<"ethereum" | "base", Hex>>>({});
   const [localError, setLocalError] = useState<string | null>(null);
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copying" | "copied" | "failed">("idle");
+
+  useEffect(() => {
+    if (copyStatus !== "copied") return;
+    const timeout = window.setTimeout(() => setCopyStatus("idle"), 2000);
+    return () => window.clearTimeout(timeout);
+  }, [copyStatus]);
 
   const chainConfig = ARB_DEPLOY_CHAINS[targetChain];
   const publicClient = usePublicClient({ chainId: chainConfig.chainId });
   const currentFundTxHash = fundTxByChain[targetChain];
 
-  const { data: ethBalance } = useBalance({
-    address: address ?? SHAGGY_DOGG_OWNER,
+  const walletAddress = isConnected && address ? address : SHAGGY_DOGG_OWNER;
+  const ethBalance = useBalance({
+    address: walletAddress,
     chainId: 1,
   });
-  const { data: baseBalance } = useBalance({
-    address: address ?? SHAGGY_DOGG_OWNER,
+  const baseBalance = useBalance({
+    address: walletAddress,
     chainId: 8453,
   });
-  const { data: execEthBalance } = useBalance({
+  const execEthBalance = useBalance({
     address: (liveAddresses.ethereum || DEFAULT_ETHEREUM_EXECUTOR_V4) as `0x${string}`,
     chainId: 1,
   });
-  const { data: opEthBalance } = useBalance({
+  const opEthBalance = useBalance({
     address: (isAddress(operatorInput) ? operatorInput : DEFAULT_OPERATOR_ADDRESS) as `0x${string}`,
     chainId: 1,
   });
-  const { data: opBaseBalance } = useBalance({
+  const opBaseBalance = useBalance({
     address: (isAddress(operatorInput) ? operatorInput : DEFAULT_OPERATOR_ADDRESS) as `0x${string}`,
     chainId: 8453,
   });
@@ -86,28 +100,19 @@ function ArbExecutorDeployCardInner() {
     Boolean(address) &&
     address!.toLowerCase() === SHAGGY_DOGG_OWNER.toLowerCase();
 
-  const ethBalNum = ethBalance ? Number(formatEther(ethBalance.value)) : 0;
-  const baseBalNum = baseBalance ? Number(formatEther(baseBalance.value)) : 0;
-  const execEthBalNum = execEthBalance ? Number(formatEther(execEthBalance.value)) : 0;
-  const opEthBalNum = opEthBalance ? Number(formatEther(opEthBalance.value)) : 0;
-  const opBaseBalNum = opBaseBalance ? Number(formatEther(opBaseBalance.value)) : 0;
   const needsEthBridge =
-    targetChain === "ethereum" && ethBalNum < 0.0002 && baseBalNum > 0.001;
+    isConnected &&
+    address &&
+    targetChain === "ethereum" &&
+    ethBalance.isSuccess &&
+    baseBalance.isSuccess &&
+    ethBalance.data.value < parseEther("0.0002") &&
+    baseBalance.data.value > parseEther("0.001");
 
   const openWalletModal = (preferQr: boolean) => {
     window.dispatchEvent(
       new CustomEvent("shaggy:open-wallet-connect", { detail: { preferQr } }),
     );
-  };
-
-  const copyText = async (key: string, value: string) => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopiedKey(key);
-      setTimeout(() => setCopiedKey((prev) => (prev === key ? null : prev)), 2000);
-    } catch {
-      /* ignore clipboard failures */
-    }
   };
 
   const getDynamicEip1559Fees = async () => {
@@ -189,15 +194,24 @@ function ArbExecutorDeployCardInner() {
     "LIVE_CONFIRM=I_ACCEPT_LOSSES",
     `ARB_EXECUTOR_ETHEREUM=${liveAddresses.ethereum || DEFAULT_ETHEREUM_EXECUTOR_V4}`,
     `ARB_EXECUTOR_BASE=${liveAddresses.base || DEFAULT_BASE_EXECUTOR_V3}`,
-    "# Paste ARB_OPERATOR_PRIVATE_KEY and FLASHBOTS_AUTH_KEY from Desktop/mev-live-keys-DO-NOT-SHARE.txt",
   ].join("\n");
+
+  const copyConfig = async () => {
+    setCopyStatus("copying");
+    try {
+      await navigator.clipboard.writeText(envSnippet);
+      setCopyStatus("copied");
+    } catch {
+      setCopyStatus("failed");
+    }
+  };
 
   const contractVersion = targetChain === "ethereum" ? "V4" : "V3";
 
   return (
-    <Card className="border-emerald-500/40">
+    <Card className="min-w-0 border-emerald-500/40 [&_code]:break-all">
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
-        <div>
+        <div className="min-w-0">
           <CardTitle className="text-lg">
             Live Flash-Swap Executor (ArbExecutorV4.sol / V3.sol)
           </CardTitle>
@@ -206,10 +220,11 @@ function ArbExecutorDeployCardInner() {
             <code className="text-xs">{SHAGGY_DOGG_OWNER}</code>)
           </CardDescription>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex max-w-full flex-wrap items-center gap-2">
           <Button
             size="sm"
             variant={targetChain === "ethereum" ? "default" : "outline"}
+            aria-pressed={targetChain === "ethereum"}
             onClick={() => {
               setLocalError(null);
               setTargetChain("ethereum");
@@ -220,6 +235,7 @@ function ArbExecutorDeployCardInner() {
           <Button
             size="sm"
             variant={targetChain === "base" ? "default" : "outline"}
+            aria-pressed={targetChain === "base"}
             onClick={() => {
               setLocalError(null);
               setTargetChain("base");
@@ -236,41 +252,38 @@ function ArbExecutorDeployCardInner() {
           <div>
             <strong>Live Bot Balances:</strong>{" "}
             <span className="ml-2">
-              Ethereum V4 Executor Float:{" "}
-              <strong className="text-emerald-600">{execEthBalNum.toFixed(4)} ETH</strong> (profit-funded bids active)
+              Ethereum V4 Executor Float: <strong>{balanceLabel(execEthBalance)}</strong>
             </span>{" "}
             ·{" "}
             <span>
-              Ethereum Operator Gas:{" "}
-              <strong className="text-emerald-600">{opEthBalNum.toFixed(4)} ETH</strong>
+              Ethereum Operator Gas: <strong>{balanceLabel(opEthBalance)}</strong>
             </span>{" "}
             ·{" "}
             <span>
-              Base Operator Gas:{" "}
-              <strong className="text-emerald-600">{opBaseBalNum.toFixed(4)} ETH</strong>
+              Base Operator Gas: <strong>{balanceLabel(opBaseBalance)}</strong>
             </span>
           </div>
           <div className="text-muted-foreground">
-            ShaggyDogg Wallet: {baseBalNum.toFixed(4)} ETH (Base) · {ethBalNum.toFixed(4)} ETH (L1)
+            {isConnected && address && !isShaggyConnected
+              ? "Connected wallet"
+              : "ShaggyDogg wallet"}
+            : {balanceLabel(baseBalance)} (Base) · {balanceLabel(ethBalance)} (L1)
           </div>
         </div>
 
         {needsEthBridge ? (
           <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-xs">
-            <strong>Why Ethereum Mainnet didn&apos;t go through:</strong> Your{" "}
-            <strong>$16.47 ({baseBalNum.toFixed(4)} ETH)</strong> is currently on{" "}
-            <strong>Base Mainnet</strong>, while your <strong>Ethereum Mainnet (L1)</strong> balance
-            is <strong>{ethBalNum.toFixed(4)} ETH</strong>. Click{" "}
+            Your connected wallet holds <strong>{balanceLabel(baseBalance)}</strong> on Base and{" "}
+            <strong>{balanceLabel(ethBalance)}</strong> on Ethereum Mainnet.{" "}
             <a
-              href="https://relay.link/bridge/ethereum?fromChainId=8453&amount=0.004"
+              href="https://relay.link/bridge/ethereum?fromChainId=8453"
               target="_blank"
               rel="noreferrer"
               className="font-semibold underline"
             >
-              Bridge 0.004 ETH (Base → Ethereum L1)
-            </a>{" "}
-            to move funds to Ethereum Mainnet. Review the bridge quote, fees, destination amount,
-            and network before approving any transaction.
+              View Base → Ethereum bridge
+            </a>
+            . Review the quote, fees, destination amount, and network before approving a transfer.
           </div>
         ) : null}
 
@@ -278,7 +291,7 @@ function ArbExecutorDeployCardInner() {
         {!isConnected ? (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-muted/40 p-3">
             <div>
-              <div className="font-medium">Connect MetaMask (`ShaggyDogg`) to deploy</div>
+              <div className="font-medium">Connect a wallet to fund operator gas</div>
               <div className="text-xs text-muted-foreground">
                 Target Owner &amp; Beneficiary: <code>{SHAGGY_DOGG_OWNER}</code>
               </div>
@@ -304,11 +317,8 @@ function ArbExecutorDeployCardInner() {
           </div>
         ) : (
           <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-xs">
-            <strong>Note:</strong> MetaMask is currently connected to <code>{address}</code>, not
-            ShaggyDogg (<code>{SHAGGY_DOGG_OWNER}</code>). You can switch accounts in MetaMask so
-            ShaggyDogg pays the deployment gas, or deploy right now —{" "}
-            <code>{SHAGGY_DOGG_OWNER}</code> is still hard-set as the on-chain{" "}
-            <strong>Owner &amp; Beneficiary</strong> below.
+            Connected wallet <code>{address}</code> can fund operator gas. Connect the ShaggyDogg
+            owner wallet to change executor settings.
           </div>
         )}
 
@@ -373,7 +383,9 @@ function ArbExecutorDeployCardInner() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <Badge className="bg-emerald-600 text-white">{contractVersion} deployed, verified &amp; active</Badge>
+            <Badge className="bg-emerald-600 text-white">
+              {contractVersion} deployed, verified &amp; active
+            </Badge>
           </div>
           {liveAddresses[targetChain] ? (
             <div className="space-y-2 text-xs">
@@ -383,7 +395,7 @@ function ArbExecutorDeployCardInner() {
                   href={`${chainConfig.explorerUrl}/address/${liveAddresses[targetChain]}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="font-mono font-semibold underline"
+                  className="break-all font-mono font-semibold underline"
                 >
                   {liveAddresses[targetChain]}
                 </a>
@@ -391,7 +403,7 @@ function ArbExecutorDeployCardInner() {
               <div className="flex flex-wrap gap-2">
                 <Button
                   size="sm"
-                  className="bg-emerald-600 text-white hover:bg-emerald-700"
+                  className="h-auto min-h-9 whitespace-normal bg-emerald-600 py-1.5 text-white hover:bg-emerald-700"
                   disabled={!isConnected || isSending}
                   onClick={() => handleFund(operatorInput, "0.002")}
                 >
@@ -401,6 +413,7 @@ function ArbExecutorDeployCardInner() {
                   <Button
                     size="sm"
                     variant="outline"
+                    className="h-auto min-h-9 whitespace-normal py-1.5"
                     disabled={!isShaggyConnected || isSending}
                     onClick={() => handleSetMaxBribe("10")}
                   >
@@ -426,24 +439,33 @@ function ArbExecutorDeployCardInner() {
               rel="noreferrer"
               className="mb-3 block text-xs underline"
             >
-              Operator gas funding tx {currentFundTxHash.slice(0, 10)}…
+              View transaction {currentFundTxHash.slice(0, 10)}…
             </a>
           ) : null}
           <div>
-              <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
-                <span>Active VM Config (`/etc/mev-authority/arb-ethereum.env` on GCE `market-data`):</span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-6 px-2 text-xs"
-                  onClick={() => copyText("env", envSnippet)}
-                >
-                  {copiedKey === "env" ? "Copied!" : "Copy Config"}
-                </Button>
-              </div>
-              <pre className="overflow-x-auto rounded border bg-background p-2 font-mono text-xs">
-                {envSnippet}
-              </pre>
+            <div className="mb-1 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+              <span>
+                Shared Ethereum and Base configuration example for{" "}
+                <code>/etc/mev-authority/arb-ethereum.env</code>
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-xs"
+                disabled={copyStatus === "copying"}
+                onClick={copyConfig}
+              >
+                {copyStatus === "copied" ? "Copied!" : "Copy Config"}
+              </Button>
+            </div>
+            {copyStatus === "failed" && (
+              <p role="status" className="mb-1 text-xs">
+                Copy failed. Select and copy the configuration below.
+              </p>
+            )}
+            <pre className="overflow-x-auto rounded border bg-background p-2 font-mono text-xs">
+              {envSnippet}
+            </pre>
           </div>
         </div>
       </CardContent>

@@ -351,28 +351,33 @@ function OrderFlowFeeds({ feeds }: { feeds: Record<string, OrderFlowStats> | und
   return (
     <>
       {entries.map(([name, f]) => {
-        const isUp = f.connected || name === "liquidation";
+        const isListener = name === "liquidation";
+        const status = f.connected
+          ? isListener
+            ? "listener enabled"
+            : "connected"
+          : isListener
+            ? "listener inactive"
+            : "not connected";
         return (
-        <div
-          key={name}
-          className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground"
-        >
-          <strong className="text-foreground">{FEED_NAME[name] ?? name} feed</strong> ·{" "}
-          {isUp ? "connected" : `not connected${f.lastError ? ` (${f.lastError})` : ""}`} ·{" "}
-          {f.txs} txs · {f.traced} simulated · {f.withSwaps} moved our pools
-          {f.noRoute ? ` (${f.noRoute} opened no price gap)` : ""} · {f.priced} routes priced ·{" "}
-          {f.worthSending} worth sending
-          {f.bestNetEth !== null ? ` · best net ${f.bestNetEth.toFixed(4)} ETH` : ""}
-          {f.traceErrors ? ` · ${f.traceErrors} trace errors` : ""}
-          {f.droppedBusy ? ` · ${f.droppedBusy} skipped (busy)` : ""}
-          {f.disconnects !== undefined
-            ? ` · ${f.reconnects ?? 0} reconnects / ${f.disconnects} disconnects`
-            : ""}
-          {f.disconnectedMs
-            ? ` · ${(f.disconnectedMs / 1000).toFixed(1)} s disconnected`
-            : ""}
-          {f.lastCloseCode ? ` · last close ${f.lastCloseCode}` : ""}
-        </div>
+          <div
+            key={name}
+            className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground"
+          >
+            <strong className="text-foreground">{FEED_NAME[name] ?? name} feed</strong> · {status}
+            {!f.connected && f.lastError ? ` (${f.lastError})` : ""} · {f.txs} txs · {f.traced}{" "}
+            simulated · {f.withSwaps} moved our pools
+            {f.noRoute ? ` (${f.noRoute} opened no price gap)` : ""} · {f.priced} routes priced ·{" "}
+            {f.worthSending} worth sending
+            {f.bestNetEth !== null ? ` · best net ${f.bestNetEth.toFixed(4)} ETH` : ""}
+            {f.traceErrors ? ` · ${f.traceErrors} trace errors` : ""}
+            {f.droppedBusy ? ` · ${f.droppedBusy} skipped (busy)` : ""}
+            {f.disconnects !== undefined
+              ? ` · ${f.reconnects ?? 0} reconnects / ${f.disconnects} disconnects`
+              : ""}
+            {f.disconnectedMs ? ` · ${(f.disconnectedMs / 1000).toFixed(1)} s disconnected` : ""}
+            {f.lastCloseCode ? ` · last close ${f.lastCloseCode}` : ""}
+          </div>
         );
       })}
     </>
@@ -705,7 +710,8 @@ function ChainCard({ c, now }: { c: ChainSummary; now: number }) {
         ) : null}
         {c.execution ? (
           <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-            Current-session execution: {(c.sessionExecution ?? c.execution).attempts} attempts →{" "}
+            {c.sessionExecution ? "Current-session" : "Lifetime"} execution:{" "}
+            {(c.sessionExecution ?? c.execution).attempts} attempts →{" "}
             {(c.sessionExecution ?? c.execution).accepted} relay/sequencer accepted →{" "}
             <strong>{(c.sessionExecution ?? c.execution).landed} landed</strong> ·{" "}
             {(c.sessionExecution ?? c.execution).rejected} rejected ·{" "}
@@ -872,16 +878,30 @@ function ChainCard({ c, now }: { c: ChainSummary; now: number }) {
   );
 }
 
+function acceptedBundles(totals: BackrunSummary["totals"]) {
+  const priced = `${totals.bundlesSent.toLocaleString()} priced accepted`;
+  return totals.blindBundlesSent === undefined
+    ? priced
+    : `${priced} · ${totals.blindBundlesSent.toLocaleString()} blind accepted`;
+}
+
 function BackrunCard({ b, now }: { b: BackrunSummary; now: number }) {
-  const live = b.connected && !!b.lastEventAt && now - Date.parse(b.lastEventAt) < STALE_MS;
+  const recentHint = !!b.lastEventAt && now - Date.parse(b.lastEventAt) < STALE_MS;
+  const feedStatus = !b.connected
+    ? "Not connected"
+    : recentHint
+      ? "Listening"
+      : b.lastEventAt
+        ? "Connected · no recent hints"
+        : "Connected · awaiting first hint";
   const t = b.totals;
   return (
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="flex flex-wrap items-center gap-2 text-base">
           Ethereum backruns (Flashbots MEV-Share)
-          <Badge variant={live ? "default" : "destructive"}>
-            {live ? "Listening" : "Not connected"}
+          <Badge variant={!b.connected ? "destructive" : recentHint ? "default" : "secondary"}>
+            {feedStatus}
           </Badge>
           <Badge variant="outline">
             {b.mode === "live" ? "LIVE — sends bundles" : "Shadow — simulates, never sends"}
@@ -949,20 +969,21 @@ function BackrunCard({ b, now }: { b: BackrunSummary; now: number }) {
           <strong>{t.worthSending} worth sending</strong>
           {t.blindWorthSending !== undefined ? ` (${t.blindWorthSending} blind)` : ""}
           {b.mode === "live"
-            ? ` · ${t.bundlesSent} priced bundles + ${t.blindBundlesSent ?? 0} blind bundles sent, ${t.landed} landed`
+            ? ` · ${acceptedBundles(t)} · ${t.landed} landed`
             : ""}
         </div>
         {b.sessionTotals ? (
           <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
             Current session: {b.sessionTotals.simulated} simulated · {b.sessionTotals.worthSending}{" "}
-            worth sending · {b.sessionTotals.bundlesSent} accepted · {b.sessionTotals.landed}{" "}
-            landed. Lifetime: {t.simulated} simulated · {t.bundlesSent} accepted · {t.landed}{" "}
+            worth sending · {acceptedBundles(b.sessionTotals)} · {b.sessionTotals.landed}{" "}
+            landed. Lifetime: {t.simulated} simulated · {acceptedBundles(t)} · {t.landed}{" "}
             landed.
           </div>
         ) : null}
         {b.execution ? (
           <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-            Current-session submission audit: {(b.sessionExecution ?? b.execution).attempts}{" "}
+            {b.sessionExecution ? "Current-session" : "Lifetime"} submission audit:{" "}
+            {(b.sessionExecution ?? b.execution).attempts}{" "}
             attempts → {(b.sessionExecution ?? b.execution).accepted} relay accepted →{" "}
             <strong>{(b.sessionExecution ?? b.execution).landed} landed</strong> ·{" "}
             {(b.sessionExecution ?? b.execution).rejected} rejected ·{" "}
@@ -1183,9 +1204,8 @@ function BackrunCard({ b, now }: { b: BackrunSummary; now: number }) {
   );
 }
 
-export default function MevArb() {
+export default function MevArb({ now }: { now: number }) {
   const q = useQuery({ queryKey: ["mev-arb-summary"], queryFn: fetchArb, refetchInterval: 15_000 });
-  const now = Date.now();
   return (
     <section className="space-y-3">
       <h2 className="flex items-center gap-2 text-xl font-bold">
@@ -1209,7 +1229,7 @@ export default function MevArb() {
         </Card>
       ) : null}
       {q.data ? (
-        <div className="grid gap-4">
+        <div className="grid grid-cols-1 gap-4">
           {q.data.chains.map((c) => (
             <ChainCard key={c.chain} c={c} now={now} />
           ))}
