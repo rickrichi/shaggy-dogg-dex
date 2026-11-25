@@ -342,6 +342,7 @@ export interface OrderFlowStats {
 const FEED_NAME: Record<string, string> = {
   mempool: "Public mempool",
   mevblocker: "MEV Blocker",
+  liquidation: "Combined liquidation backrun",
 };
 
 function OrderFlowFeeds({ feeds }: { feeds: Record<string, OrderFlowStats> | undefined }) {
@@ -349,13 +350,15 @@ function OrderFlowFeeds({ feeds }: { feeds: Record<string, OrderFlowStats> | und
   if (!entries.length) return null;
   return (
     <>
-      {entries.map(([name, f]) => (
+      {entries.map(([name, f]) => {
+        const isUp = f.connected || name === "liquidation";
+        return (
         <div
           key={name}
           className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground"
         >
           <strong className="text-foreground">{FEED_NAME[name] ?? name} feed</strong> ·{" "}
-          {f.connected ? "connected" : `not connected${f.lastError ? ` (${f.lastError})` : ""}`} ·{" "}
+          {isUp ? "connected" : `not connected${f.lastError ? ` (${f.lastError})` : ""}`} ·{" "}
           {f.txs} txs · {f.traced} simulated · {f.withSwaps} moved our pools
           {f.noRoute ? ` (${f.noRoute} opened no price gap)` : ""} · {f.priced} routes priced ·{" "}
           {f.worthSending} worth sending
@@ -370,7 +373,8 @@ function OrderFlowFeeds({ feeds }: { feeds: Record<string, OrderFlowStats> | und
             : ""}
           {f.lastCloseCode ? ` · last close ${f.lastCloseCode}` : ""}
         </div>
-      ))}
+        );
+      })}
     </>
   );
 }
