@@ -227,6 +227,7 @@ export const AppRoutes = (): JSX.Element => (
         <Route path="/mev" element={<MevBot />} />
         <Route path="/dex/setup" element={<DexSetup />} />
         <Route path="/legacy/liquidity" element={<Liquidity />} />
+        <Route path="/dex" element={<BaseDex key="swap" />} />
         <Route path="/own-dex" element={<BaseDex key="swap" />} />
         <Route path="/stake" element={<Stake />} />
         <Route path="/stake/dexes" element={<DexStaking />} />

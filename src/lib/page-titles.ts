@@ -4,6 +4,8 @@ const pageNames: Record<string, string> = {
   "/swap/compare": "Compare Swaps",
   "/swap": "Swap",
   "/liquidity": "Liquidity",
+  "/dex": "Base DEX",
+  "/own-dex": "Base DEX",
   "/dex/setup": "DEX Setup",
   "/legacy/liquidity": "Legacy Liquidity",
   "/stake": "VIP Staking",
