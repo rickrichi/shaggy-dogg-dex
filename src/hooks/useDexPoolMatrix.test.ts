@@ -4,10 +4,14 @@ import { describe, expect, it, vi } from "vitest";
 import {
   BASE_DEX_VENUES,
   MRWD_ADDRESS,
+  USDC_ADDRESS,
   WETH_ADDRESS,
 } from "@/config/dex-venues";
 
-import { inspectVenuePools } from "./useDexPoolMatrix";
+import {
+  inspectVenuePools,
+  inspectVenuePoolsMultiQuote,
+} from "./useDexPoolMatrix";
 
 const POOL = "0x1111111111111111111111111111111111111111" as const;
 
@@ -62,5 +66,37 @@ describe("inspectVenuePools", () => {
     );
     expect(result.state).toBe("inactive");
     expect(result.pools[0]?.liquidity).toBe("inactive");
+  });
+
+  it("checks both WETH and USDC direct pools and merges active pools across quotes", async () => {
+    const venue = BASE_DEX_VENUES.find((item) => item.name === "Uniswap V2")!;
+    const USDC_POOL = "0x2222222222222222222222222222222222222222" as const;
+    const readContract = vi.fn(async (request: Record<string, unknown>) => {
+      if (request.functionName === "getPair") {
+        const args = request.args as readonly [string, string];
+        return args[1].toLowerCase() === USDC_ADDRESS.toLowerCase()
+          ? USDC_POOL
+          : zeroAddress;
+      }
+      return [100n, 200n, 1];
+    });
+    const result = await inspectVenuePoolsMultiQuote(
+      { readContract },
+      venue,
+      MRWD_ADDRESS,
+      [
+        { address: WETH_ADDRESS, symbol: "WETH" },
+        { address: USDC_ADDRESS, symbol: "USDC" },
+      ],
+    );
+    expect(result.state).toBe("live");
+    expect(result.pools).toEqual([
+      {
+        address: USDC_POOL,
+        liquidity: "active",
+        quoteAddress: USDC_ADDRESS,
+        quoteSymbol: "USDC",
+      },
+    ]);
   });
 });

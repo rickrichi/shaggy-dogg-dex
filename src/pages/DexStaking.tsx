@@ -38,11 +38,25 @@ import {
 import { BASE_MAINNET_TOKENS } from "@/config/tokens";
 import {
   type PoolCheckState,
+  type QuoteTarget,
   useDexPoolMatrix,
 } from "@/hooks/useDexPoolMatrix";
 import { useStakedPortfolio } from "@/hooks/useStakedPortfolio";
 import { projectTokensFor } from "@/lib/launchpad/storage";
 import { cn } from "@/lib/utils";
+
+type QuoteMode = "both" | "WETH" | "USDC";
+
+const FEATURED_BASE_SYMBOLS = [
+  "ETH",
+  "USDC",
+  "SD",
+  "MRWD",
+  "AERO",
+  "cbBTC",
+  "BRETT",
+  "DEGEN",
+] as const;
 
 const ERC20_ABI = [
   {
@@ -83,6 +97,7 @@ interface WalletToken {
   decimals: number;
   balance: bigint;
   native?: boolean;
+  featured?: boolean;
   stakedIn?: string[];
   tradeNote?: string | undefined;
 }
@@ -146,6 +161,7 @@ export default function DexStaking() {
   const importSequence = useRef(0);
   const [selectedId, setSelectedId] = useState<string>();
   const [selectedVenue, setSelectedVenue] = useState("Uniswap V3");
+  const [quoteMode, setQuoteMode] = useState<QuoteMode>("both");
   const [search, setSearch] = useState("");
   const detailRef = useRef<HTMLElement>(null);
   const portfolio = useQuery({
@@ -257,6 +273,43 @@ export default function DexStaking() {
             },
       );
     }
+    // Always include featured Base tokens so users can inspect direct pools
+    // even before connecting a wallet or for tokens they don't currently hold.
+    for (const sym of FEATURED_BASE_SYMBOLS) {
+      const cfg = BASE_MAINNET_TOKENS.find(
+        (t) => t.symbol.toUpperCase() === sym.toUpperCase(),
+      );
+      if (!cfg) continue;
+      if (cfg.kind === "native") {
+        if (!map.has("native:eth")) {
+          map.set("native:eth", {
+            id: "native:eth",
+            address: WETH_ADDRESS,
+            poolAddress: WETH_ADDRESS,
+            symbol: "ETH",
+            name: "Ether (checked as WETH)",
+            decimals: 18,
+            balance: 0n,
+            native: true,
+            featured: true,
+          });
+        }
+      } else {
+        const id = `erc20:${cfg.address.toLowerCase()}`;
+        if (!map.has(id)) {
+          map.set(id, {
+            id,
+            address: cfg.address,
+            poolAddress: cfg.address,
+            symbol: cfg.symbol,
+            name: cfg.name,
+            decimals: cfg.decimals,
+            balance: 0n,
+            featured: true,
+          });
+        }
+      }
+    }
     return [...map.values()];
   }, [address, imports, portfolio.data, staked.data]);
   useEffect(() => {
@@ -275,12 +328,36 @@ export default function DexStaking() {
   }, [selectedId, tokens]);
   const selectedToken = tokens.find((token) => token.id === selectedId);
   const queryToken = selectedToken?.poolAddress;
-  const quote =
-    queryToken?.toLowerCase() === WETH_ADDRESS.toLowerCase()
-      ? USDC_ADDRESS
-      : WETH_ADDRESS;
-  const quoteSymbol = quote === USDC_ADDRESS ? "USDC" : "WETH";
-  const matrix = useDexPoolMatrix(queryToken, quote);
+  const isWethToken =
+    queryToken?.toLowerCase() === WETH_ADDRESS.toLowerCase();
+  const isUsdcToken =
+    queryToken?.toLowerCase() === USDC_ADDRESS.toLowerCase();
+  const effectiveQuoteMode: QuoteMode = isWethToken
+    ? "USDC"
+    : isUsdcToken
+      ? "WETH"
+      : quoteMode;
+  const quoteTargets = useMemo<readonly QuoteTarget[]>(() => {
+    if (effectiveQuoteMode === "WETH") {
+      return [{ address: WETH_ADDRESS, symbol: "WETH" }];
+    }
+    if (effectiveQuoteMode === "USDC") {
+      return [{ address: USDC_ADDRESS, symbol: "USDC" }];
+    }
+    return [
+      { address: WETH_ADDRESS, symbol: "WETH" },
+      { address: USDC_ADDRESS, symbol: "USDC" },
+    ];
+  }, [effectiveQuoteMode]);
+  const quoteDisplayLabel =
+    effectiveQuoteMode === "both"
+      ? "WETH & USDC"
+      : effectiveQuoteMode;
+  const primaryQuote =
+    effectiveQuoteMode === "USDC" ? USDC_ADDRESS : WETH_ADDRESS;
+  const primaryQuoteSymbol =
+    primaryQuote === USDC_ADDRESS ? "USDC" : "WETH";
+  const matrix = useDexPoolMatrix(queryToken, quoteTargets);
   const selectedResult = matrix.data?.find(
     (result) => result.venue.name === selectedVenue,
   );
@@ -442,7 +519,7 @@ export default function DexStaking() {
           Refresh pools
         </Button>
       </header>
-      {blocked ? (
+      {blocked && (
         <section className="border border-indigo-200 bg-indigo-50 p-6 dark:border-indigo-900 dark:bg-indigo-950/40">
           <div className="flex gap-3">
             <Wallet className="size-5 text-indigo-600" />
@@ -452,8 +529,8 @@ export default function DexStaking() {
               </h2>
               <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
                 {!isConnected
-                  ? "Connect to load your Base balances and stakes and inspect direct pools."
-                  : "This explorer reads Base factories. Switch networks to continue."}
+                  ? "Connect to load your Base balances and stakes, or browse featured Base tokens and direct WETH & USDC pools below."
+                  : "This explorer reads Base factories. Switch networks to manage Base positions, or browse direct pools below."}
               </p>
               <div className="mt-4">
                 {!isConnected ? (
@@ -467,211 +544,255 @@ export default function DexStaking() {
             </div>
           </div>
         </section>
-      ) : (
-        <section
-          aria-label="Wallet token command bar"
-          className="border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950"
-        >
-          <p className="mb-4 text-xs font-semibold text-slate-500">
-            Connected wallet · {address ? short(address) : "unavailable"}
+      )}
+      <section
+        aria-label="Wallet token command bar"
+        className="border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950"
+      >
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs font-semibold text-slate-500">
+            {isConnected && address
+              ? `Connected wallet · ${short(address)}`
+              : "Public explorer mode · Featured Base tokens"}
           </p>
-          <div className="grid min-w-0 gap-5 lg:grid-cols-[1.2fr_1fr]">
-            <div className="min-w-0">
-              <label
-                htmlFor="token-search"
-                className="text-xs font-black uppercase tracking-[.16em] text-indigo-600"
-              >
-                Portfolio token
-              </label>
-              <div className="relative mt-2">
-                <Search className="absolute left-3 top-3 size-4 text-slate-400" />
-                <Input
-                  id="token-search"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search symbol, name, or address"
-                  className="pl-9"
-                />
+          <div
+            role="group"
+            aria-label="Quote asset filter"
+            className="flex flex-wrap items-center gap-1.5 text-xs"
+          >
+            <span className="mr-1 font-bold uppercase tracking-wider text-slate-500">
+              Direct quote:
+            </span>
+            {(
+              [
+                ["both", "WETH + USDC"],
+                ["WETH", "WETH only"],
+                ["USDC", "USDC only"],
+              ] as const
+            ).map(([mode, modeLabel]) => {
+              const disabled =
+                (isWethToken && mode !== "USDC") ||
+                (isUsdcToken && mode !== "WETH");
+              const active = effectiveQuoteMode === mode;
+              return (
+                <button
+                  key={mode}
+                  type="button"
+                  disabled={disabled}
+                  aria-pressed={active}
+                  onClick={() => setQuoteMode(mode)}
+                  className={cn(
+                    "border px-2.5 py-1 font-bold transition focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-45",
+                    active
+                      ? "border-indigo-600 bg-indigo-600 text-white"
+                      : "border-slate-200 bg-slate-50 text-slate-700 hover:border-indigo-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300",
+                  )}
+                >
+                  {modeLabel}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div className="grid min-w-0 gap-5 lg:grid-cols-[1.2fr_1fr]">
+          <div className="min-w-0">
+            <label
+              htmlFor="token-search"
+              className="text-xs font-black uppercase tracking-[.16em] text-indigo-600"
+            >
+              {isConnected ? "Portfolio & featured tokens" : "Featured Base tokens"}
+            </label>
+            <div className="relative mt-2">
+              <Search className="absolute left-3 top-3 size-4 text-slate-400" />
+              <Input
+                id="token-search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search symbol, name, or address"
+                className="pl-9"
+              />
+            </div>
+            {portfolio.isLoading ? (
+              <p className="mt-3 flex gap-2 text-sm text-slate-500">
+                <Loader2 className="size-4 animate-spin" />
+                Loading positive balances…
+              </p>
+            ) : portfolio.isError ? (
+              <div className="mt-3 flex items-center gap-2 text-sm text-red-700">
+                <span>Could not load wallet balances.</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => portfolio.refetch()}
+                >
+                  Retry
+                </Button>
               </div>
-              {portfolio.isLoading ? (
-                <p className="mt-3 flex gap-2 text-sm text-slate-500">
-                  <Loader2 className="size-4 animate-spin" />
-                  Loading positive balances…
-                </p>
-              ) : portfolio.isError ? (
-                <div className="mt-3 flex items-center gap-2 text-sm text-red-700">
-                  <span>Could not load wallet balances.</span>
+            ) : null}
+            {filtered.length ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {filtered.map((token) => (
+                  <button
+                    key={token.id}
+                    type="button"
+                    aria-pressed={selectedId === token.id}
+                    onClick={() => setSelectedId(token.id)}
+                    className={cn(
+                      "border px-3 py-2 text-left focus-visible:ring-2 focus-visible:ring-indigo-500",
+                      selectedId === token.id
+                        ? "border-indigo-600 bg-indigo-50 dark:bg-indigo-950/50"
+                        : "border-slate-200 dark:border-slate-700",
+                    )}
+                  >
+                    <b className="block max-w-36 truncate text-sm">
+                      {token.symbol}
+                    </b>
+                    <span className="block text-[11px] text-slate-500">
+                      {token.balance > 0n || !token.featured
+                        ? Number(
+                            formatUnits(token.balance, token.decimals),
+                          ).toLocaleString(undefined, {
+                            maximumSignificantDigits: 6,
+                          })
+                        : "Base token"}
+                    </span>
+                    {token.stakedIn && (
+                      <span className="block text-[11px] font-semibold text-indigo-700 dark:text-indigo-300">
+                        {token.stakedIn.join(" · ")}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            ) : search ? (
+              <div className="mt-3 flex items-center gap-2 text-sm text-slate-500">
+                <span>No tokens match your search.</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setSearch("")}
+                >
+                  Clear search
+                </Button>
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-slate-500">
+                {portfolio.data?.failedChecks
+                  ? "Some balances could not be checked. Retry before concluding this wallet is empty."
+                  : "No supported balances or stakes found. Import a Base ERC-20."}
+              </p>
+            )}
+            {staked.isError && (
+              <div className="mt-3 flex items-center gap-2 text-sm text-red-700">
+                <span>Could not load your staked tokens.</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => staked.refetch()}
+                >
+                  Retry
+                </Button>
+              </div>
+            )}
+            {staked.data?.incomplete && (
+              <p
+                role="status"
+                className="mt-3 text-xs font-semibold text-amber-900 dark:text-amber-200"
+              >
+                Some staking reads failed, so this list may be incomplete.
+              </p>
+            )}
+            {!portfolio.isLoading &&
+              !portfolio.isError &&
+              balanceFailures > 0 && (
+                <div
+                  role="status"
+                  className="mt-3 flex flex-wrap items-center gap-2 border border-amber-200 bg-amber-50 p-2 text-xs font-semibold text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
+                >
+                  <span>
+                    {balanceFailures} balance{" "}
+                    {balanceFailures === 1 ? "read" : "reads"} failed.
+                    Successful holdings are shown, but this list may be
+                    incomplete.
+                  </span>
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => portfolio.refetch()}
+                    disabled={portfolio.isFetching}
                   >
-                    Retry
-                  </Button>
-                </div>
-              ) : filtered.length ? (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {filtered.map((token) => (
-                    <button
-                      key={token.id}
-                      type="button"
-                      aria-pressed={selectedId === token.id}
-                      onClick={() => setSelectedId(token.id)}
+                    <RefreshCw
                       className={cn(
-                        "border px-3 py-2 text-left focus-visible:ring-2 focus-visible:ring-indigo-500",
-                        selectedId === token.id
-                          ? "border-indigo-600 bg-indigo-50 dark:bg-indigo-950/50"
-                          : "border-slate-200 dark:border-slate-700",
+                        "mr-1 size-3",
+                        portfolio.isFetching && "animate-spin",
                       )}
-                    >
-                      <b className="block max-w-36 truncate text-sm">
-                        {token.symbol}
-                      </b>
-                      <span className="block text-[11px] text-slate-500">
-                        {Number(
-                          formatUnits(token.balance, token.decimals),
-                        ).toLocaleString(undefined, {
-                          maximumSignificantDigits: 6,
-                        })}
-                      </span>
-                      {token.stakedIn && (
-                        <span className="block text-[11px] font-semibold text-indigo-700 dark:text-indigo-300">
-                          {token.stakedIn.join(" · ")}
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              ) : search ? (
-                <div className="mt-3 flex items-center gap-2 text-sm text-slate-500">
-                  <span>No tokens match your search.</span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setSearch("")}
-                  >
-                    Clear search
-                  </Button>
-                </div>
-              ) : (
-                <p className="mt-3 text-sm text-slate-500">
-                  {portfolio.data?.failedChecks
-                    ? "Some balances could not be checked. Retry before concluding this wallet is empty."
-                    : "No supported balances or stakes found. Import a Base ERC-20."}
-                </p>
-              )}
-              {staked.isError && (
-                <div className="mt-3 flex items-center gap-2 text-sm text-red-700">
-                  <span>Could not load your staked tokens.</span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => staked.refetch()}
-                  >
-                    Retry
+                    />
+                    Retry balances
                   </Button>
                 </div>
               )}
-              {staked.data?.incomplete && (
-                <p
-                  role="status"
-                  className="mt-3 text-xs font-semibold text-amber-900 dark:text-amber-200"
-                >
-                  Some staking reads failed, so this list may be incomplete.
-                </p>
-              )}
-              {!portfolio.isLoading &&
-                !portfolio.isError &&
-                balanceFailures > 0 && (
-                  <div
-                    role="status"
-                    className="mt-3 flex flex-wrap items-center gap-2 border border-amber-200 bg-amber-50 p-2 text-xs font-semibold text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
-                  >
-                    <span>
-                      {balanceFailures} balance{" "}
-                      {balanceFailures === 1 ? "read" : "reads"} failed.
-                      Successful holdings are shown, but this list may be
-                      incomplete.
-                    </span>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => portfolio.refetch()}
-                      disabled={portfolio.isFetching}
-                    >
-                      <RefreshCw
-                        className={cn(
-                          "mr-1 size-3",
-                          portfolio.isFetching && "animate-spin",
-                        )}
-                      />
-                      Retry balances
-                    </Button>
-                  </div>
-                )}
-            </div>
-            <div className="min-w-0 border-slate-200 lg:border-l lg:pl-5 dark:border-slate-800">
-              <label
-                htmlFor="custom-token"
-                className="text-xs font-black uppercase tracking-[.16em]"
-              >
-                Import custom token
-              </label>
-              <div className="mt-2 flex gap-2">
-                <Input
-                  id="custom-token"
-                  value={importAddress}
-                  onChange={(e) => setImportAddress(e.target.value)}
-                  placeholder="0x… ERC-20 address"
-                  aria-invalid={Boolean(importError)}
-                  aria-describedby={
-                    importError ? "custom-token-error" : undefined
-                  }
-                />
-                <Button
-                  onClick={importToken}
-                  disabled={!importAddress || importPending}
-                >
-                  {importPending ? (
-                    <Loader2 className="mr-2 size-4 animate-spin" />
-                  ) : (
-                    <Import className="mr-2 size-4" />
-                  )}
-                  {importPending ? "Checking" : "Import"}
-                </Button>
-              </div>
-              {importError && (
-                <p
-                  id="custom-token-error"
-                  role="alert"
-                  className="mt-2 text-xs font-semibold text-red-700"
-                >
-                  {importError}
-                </p>
-              )}
-              {selectedToken && (
-                <dl className="mt-3 grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs">
-                  <dt className="text-slate-500">Selected</dt>
-                  <dd className="break-words font-bold">
-                    {selectedToken.name}
-                  </dd>
-                  <dt className="text-slate-500">Contract</dt>
-                  <dd className="truncate font-mono">
-                    {selectedToken.native
-                      ? "Native ETH → WETH for pools"
-                      : short(selectedToken.address)}
-                  </dd>
-                  <dt className="text-slate-500">Direct pair</dt>
-                  <dd className="font-bold">
-                    {selectedToken.symbol}/{quoteSymbol}
-                  </dd>
-                </dl>
-              )}
-            </div>
           </div>
-        </section>
-      )}
-      {selectedToken && !blocked && (
+          <div className="min-w-0 border-slate-200 lg:border-l lg:pl-5 dark:border-slate-800">
+            <label
+              htmlFor="custom-token"
+              className="text-xs font-black uppercase tracking-[.16em]"
+            >
+              Import custom token
+            </label>
+            <div className="mt-2 flex gap-2">
+              <Input
+                id="custom-token"
+                value={importAddress}
+                onChange={(e) => setImportAddress(e.target.value)}
+                placeholder="0x… ERC-20 address"
+                aria-invalid={Boolean(importError)}
+                aria-describedby={
+                  importError ? "custom-token-error" : undefined
+                }
+              />
+              <Button
+                onClick={importToken}
+                disabled={!importAddress || importPending}
+              >
+                {importPending ? (
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                ) : (
+                  <Import className="mr-2 size-4" />
+                )}
+                {importPending ? "Checking" : "Import"}
+              </Button>
+            </div>
+            {importError && (
+              <p
+                id="custom-token-error"
+                role="alert"
+                className="mt-2 text-xs font-semibold text-red-700"
+              >
+                {importError}
+              </p>
+            )}
+            {selectedToken && (
+              <dl className="mt-3 grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs">
+                <dt className="text-slate-500">Selected</dt>
+                <dd className="break-words font-bold">
+                  {selectedToken.name}
+                </dd>
+                <dt className="text-slate-500">Contract</dt>
+                <dd className="truncate font-mono">
+                  {selectedToken.native
+                    ? "Native ETH → WETH for pools"
+                    : short(selectedToken.address)}
+                </dd>
+                <dt className="text-slate-500">Direct pairs checked</dt>
+                <dd className="font-bold">
+                  {selectedToken.symbol}/{quoteDisplayLabel}
+                </dd>
+              </dl>
+            )}
+          </div>
+        </div>
+      </section>
+      {selectedToken && (
         <>
           <section
             aria-label="Route pool rewards explanation"
@@ -682,7 +803,7 @@ export default function DexStaking() {
               [
                 Layers3,
                 "02 · Pool",
-                `${selectedToken.symbol}/${quoteSymbol} is checked directly at its factory.`,
+                `${selectedToken.symbol}/${quoteDisplayLabel} is checked directly at its factory.`,
               ],
               [
                 CircleDollarSign,
@@ -736,7 +857,7 @@ export default function DexStaking() {
                 Venue ledger
               </p>
               <h2 className="text-xl font-black">
-                Direct {selectedToken.symbol}/{quoteSymbol} pools
+                Direct {selectedToken.symbol}/{quoteDisplayLabel} pools
               </h2>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -751,6 +872,13 @@ export default function DexStaking() {
                   venue.name,
                   result?.pools.map((pool) => pool.address) ?? [],
                 );
+                const activeQuotes = [
+                  ...new Set(
+                    (result?.pools ?? [])
+                      .filter((p) => p.liquidity === "active" && p.quoteSymbol)
+                      .map((p) => p.quoteSymbol!),
+                  ),
+                ];
                 return (
                   <button
                     key={venue.name}
@@ -780,6 +908,18 @@ export default function DexStaking() {
                         {label[s]}
                       </Badge>
                     </div>
+                    {activeQuotes.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {activeQuotes.map((qs) => (
+                          <span
+                            key={qs}
+                            className="rounded border border-emerald-200 bg-emerald-50/80 px-1.5 py-0.5 font-mono text-[10px] font-bold text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300"
+                          >
+                            {selectedToken.symbol}/{qs}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     <div
                       aria-hidden="true"
                       className="mt-4 flex items-center gap-1.5 text-[11px] font-bold uppercase"
@@ -844,7 +984,7 @@ export default function DexStaking() {
                   {selectedResult?.pools.length ? (
                     selectedResult.pools.map((pool) => (
                       <div
-                        key={pool.address}
+                        key={`${pool.address}:${pool.quoteSymbol ?? ""}`}
                         className="flex justify-between gap-2"
                       >
                         <a
@@ -857,6 +997,9 @@ export default function DexStaking() {
                           <ExternalLink className="ml-1 inline size-3" />
                         </a>
                         <span>
+                          {pool.quoteSymbol
+                            ? `${selectedToken.symbol}/${pool.quoteSymbol} · `
+                            : ""}
                           {pool.fee
                             ? `${pool.fee / 10_000}%`
                             : pool.stable === undefined
@@ -905,7 +1048,10 @@ export default function DexStaking() {
               ) : (
                 <Button asChild size="sm" variant="outline">
                   <a
-                    href={aerodromeDepositUrl(selectedToken.poolAddress, quote)}
+                    href={aerodromeDepositUrl(
+                      selectedToken.poolAddress,
+                      primaryQuote,
+                    )}
                     target="_blank"
                     rel="noreferrer"
                   >
@@ -923,14 +1069,14 @@ export default function DexStaking() {
               tokenName={selectedToken.name}
               tokenSymbol={selectedToken.symbol}
               tokenAddress={selectedToken.address}
-              quoteSymbol={quoteSymbol}
-              quoteAddress={quote}
+              quoteSymbol={primaryQuoteSymbol}
+              quoteAddress={primaryQuote}
               native={Boolean(selectedToken.native)}
               poolExists={Boolean(selectedResult?.pools.length)}
               poolActive={state === "live"}
             />
           )}
-          {rewardProgram && (
+          {rewardProgram && !blocked && (
             <section id="live-staking-controls">
               <MrwdLpStakerPanel />
             </section>
@@ -941,7 +1087,7 @@ export default function DexStaking() {
               <strong className="text-slate-900 dark:text-white">
                 Liquidity risk:
               </strong>{" "}
-              Providing {selectedToken.symbol}/{quoteSymbol} exposes you to
+              Providing {selectedToken.symbol}/{quoteDisplayLabel} exposes you to
               price divergence, range risk on V3, and smart-contract risk. A
               discovered pool can still have negligible depth.
             </p>

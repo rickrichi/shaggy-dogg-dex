@@ -28,6 +28,25 @@ describe("DexStaking", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("allows browsing featured Base tokens and quote filter controls while disconnected", () => {
+    render(<DexStaking />);
+    expect(
+      screen.getByRole("button", { name: /^ETH Base token$/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^USDC Base token$/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^SD Base token$/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^MRWD Base token$/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "WETH + USDC" }),
+    ).toBeInTheDocument();
+  });
+
   it("keeps the canonical Base capability list dynamic and ordered", () => {
     expect(BASE_DEX_VENUES).toHaveLength(7);
     expect(BASE_DEX_VENUES.map((venue) => venue.name)).toEqual([

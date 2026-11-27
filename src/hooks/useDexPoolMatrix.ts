@@ -52,11 +52,17 @@ const V3_POOL_ABI = [
 
 export type PoolCheckState =
   "live" | "inactive" | "missing" | "partial" | "unsupported" | "error";
+export interface QuoteTarget {
+  address: Address;
+  symbol: string;
+}
 export interface DiscoveredPool {
   address: Address;
   fee?: number;
   stable?: boolean;
   liquidity: "active" | "inactive" | "unknown";
+  quoteAddress?: Address;
+  quoteSymbol?: string;
 }
 export interface PoolDiscovery {
   venue: DexVenueCapability;
@@ -75,6 +81,7 @@ export async function inspectVenuePools(
   venue: DexVenueCapability,
   token: Address,
   quote: Address,
+  quoteSymbol?: string,
 ): Promise<PoolDiscovery> {
   if (!venue.factory)
     return { venue, state: "unsupported", pools: [], failedChecks: 0 };
@@ -132,6 +139,9 @@ export async function inspectVenuePools(
               : {}),
             ...(checks[index]?.stable !== undefined
               ? { stable: checks[index]!.stable }
+              : {}),
+            ...(quoteSymbol !== undefined
+              ? { quoteAddress: quote, quoteSymbol }
               : {}),
           },
         ]
@@ -200,24 +210,116 @@ export async function inspectVenuePools(
   };
 }
 
+export async function inspectVenuePoolsMultiQuote(
+  client: Reader,
+  venue: DexVenueCapability,
+  token: Address,
+  quotes: readonly QuoteTarget[],
+): Promise<PoolDiscovery> {
+  if (!venue.factory)
+    return { venue, state: "unsupported", pools: [], failedChecks: 0 };
+  const validQuotes = quotes.filter(
+    (q) => q.address.toLowerCase() !== token.toLowerCase(),
+  );
+  if (!validQuotes.length)
+    return { venue, state: "missing", pools: [], failedChecks: 0 };
+  if (validQuotes.length === 1) {
+    return inspectVenuePools(
+      client,
+      venue,
+      token,
+      validQuotes[0]!.address,
+      validQuotes[0]!.symbol,
+    );
+  }
+  const results = await Promise.all(
+    validQuotes.map((q) =>
+      inspectVenuePools(client, venue, token, q.address, q.symbol),
+    ),
+  );
+  const pools = results.flatMap((r) => r.pools);
+  const failedChecks = results.reduce((sum, r) => sum + r.failedChecks, 0);
+  const allErrored = results.every((r) => r.state === "error");
+  if (!pools.length) {
+    if (allErrored) {
+      return {
+        venue,
+        state: "error",
+        pools: [],
+        failedChecks,
+        error: "All factory reads failed",
+      };
+    }
+    if (failedChecks > 0) {
+      return {
+        venue,
+        state: "partial",
+        pools: [],
+        failedChecks,
+        error: "Some factory reads failed; absence is not confirmed",
+      };
+    }
+    return { venue, state: "missing", pools: [], failedChecks: 0 };
+  }
+  const state: PoolCheckState = failedChecks
+    ? "partial"
+    : pools.some((pool) => pool.liquidity === "active")
+      ? "live"
+      : "inactive";
+  return {
+    venue,
+    state,
+    pools,
+    failedChecks,
+    ...(failedChecks
+      ? { error: "Some on-chain reads failed; partial results shown" }
+      : {}),
+  };
+}
+
 export function useDexPoolMatrix(
   token?: Address,
-  quote?: Address,
+  quoteOrQuotes?: Address | readonly QuoteTarget[],
   chainId = 8453,
 ) {
   const client = usePublicClient({ chainId });
+  const quotes: readonly QuoteTarget[] =
+    typeof quoteOrQuotes === "string"
+      ? [{ address: quoteOrQuotes, symbol: "" }]
+      : (quoteOrQuotes ?? []);
+  const validQuotes = quotes.filter(
+    (q) => token && q.address.toLowerCase() !== token.toLowerCase(),
+  );
+  const quoteKey = validQuotes
+    .map((q) => `${q.symbol}:${q.address.toLowerCase()}`)
+    .join(",");
   return useQuery({
-    queryKey: ["dex-pool-matrix", chainId, token, quote],
-    enabled: Boolean(
-      client && token && quote && token.toLowerCase() !== quote.toLowerCase(),
-    ),
+    queryKey: ["dex-pool-matrix", chainId, token, quoteKey],
+    enabled: Boolean(client && token && validQuotes.length > 0),
     staleTime: 20_000,
     queryFn: async () => {
-      if (!client || !token || !quote)
+      if (!client || !token || !validQuotes.length)
         throw new Error("Pool reader is not ready.");
+      if (typeof quoteOrQuotes === "string") {
+        return Promise.all(
+          BASE_DEX_VENUES.map((venue) =>
+            inspectVenuePools(
+              client as unknown as Reader,
+              venue,
+              token,
+              quoteOrQuotes,
+            ),
+          ),
+        );
+      }
       return Promise.all(
         BASE_DEX_VENUES.map((venue) =>
-          inspectVenuePools(client as unknown as Reader, venue, token, quote),
+          inspectVenuePoolsMultiQuote(
+            client as unknown as Reader,
+            venue,
+            token,
+            validQuotes,
+          ),
         ),
       );
     },
