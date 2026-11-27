@@ -985,9 +985,17 @@ export function CeDeFiStudio({
               <tbody className="divide-y divide-slate-100 font-mono">
                 {filteredVenues.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
-                      <Loader2 className="mx-auto mb-2 size-5 animate-spin text-purple-600" />
-                      Connecting to exchange WebSockets...
+                    <td colSpan={8} role="status" className="px-4 py-8 text-center text-slate-500">
+                      {isLive ? (
+                        <>
+                          No exchange is streaming {selectedSymbol}. Choose one of the listed pairs.
+                        </>
+                      ) : (
+                        <>
+                          <Loader2 className="mx-auto mb-2 size-5 animate-spin text-purple-600" />
+                          Connecting to exchange WebSockets...
+                        </>
+                      )}
                     </td>
                   </tr>
                 ) : (

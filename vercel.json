@@ -62,6 +62,10 @@
       "destination": "/arbitrage/live-desk"
     },
     {
+      "source": "/arbitrage/cedefi/:pair",
+      "destination": "/arbitrage/cedefi"
+    },
+    {
       "source": "/mrwd",
       "destination": "/mrwd.html"
     },

@@ -393,7 +393,7 @@ export default function Arbitrage() {
 
   // Resolve canonical symbol from route param (e.g. "ETH-USDC" -> "ETH/USDC") or fallback to search param or default "ETH/USD"
   const rawSymbol = routeSymbol || searchParams.get("symbol");
-  const cleanSymbol = rawSymbol ? rawSymbol.replace("-", "/") : "ETH/USD";
+  const cleanSymbol = rawSymbol ? rawSymbol.replace("-", "/").toUpperCase() : "ETH/USD";
 
   const [activeArbitrageTab, setActiveArbitrageTab] = useState<string>(canonicalTab);
   const [selectedMatrixSymbol, setSelectedMatrixSymbol] = useState<string>(cleanSymbol);
@@ -407,8 +407,11 @@ export default function Arbitrage() {
       location.pathname === "/launchpad/arbitrage/"
     ) {
       navigate("/launchpad/arbitrage/matrix", { replace: true });
+    } else if (routeTab && !TAB_ALIASES[routeTab.toLowerCase()]) {
+      // Unknown tab: send it to the matrix URL instead of rendering the matrix under a bogus path.
+      navigate(`${basePath}/matrix`, { replace: true });
     }
-  }, [location.pathname, navigate]);
+  }, [location.pathname, navigate, routeTab, basePath]);
 
   // Keep state synced when route param changes (e.g. Back/Forward button)
   useEffect(() => {

@@ -19,7 +19,10 @@ export function goldenFleasRelayTransport(network: "ethereum" | "base" | "polygo
   const origin = (globalThis as { location?: { origin?: string } }).location?.origin;
   if (!origin?.startsWith("http")) return [];
   const url = new URL(`/api/rpc/${network}`, origin).href;
-  return [http(url, { batch: { batchSize: 20, wait: 16 }, timeout: 8_000, retryCount: 0 })];
+  // The relay rejects bodies over 64 KB (MAX_BODY_BYTES in api/_rpc-guard.ts) with HTTP 413. A
+  // default-sized multicall chunk is roughly 3.3 KB of JSON, so 20 per batch overflowed the cap on
+  // the triangular path search; 10 keeps batches near 33 KB.
+  return [http(url, { batch: { batchSize: 10, wait: 16 }, timeout: 8_000, retryCount: 0 })];
 }
 
 export function createBaseReadTransport() {
