@@ -75,6 +75,15 @@ function baseLink(kind: "address" | "tx", value: string) {
   return `${explorer}/${kind}/${value}`;
 }
 
+function formatDurationWithHours(seconds: number): string {
+  if (seconds <= 0) return "0 sec";
+  const hours = seconds / 3600;
+  if (Number.isInteger(hours) && hours >= 1) {
+    return `${seconds.toLocaleString()} sec (${hours}h)`;
+  }
+  return `${seconds.toLocaleString()} sec`;
+}
+
 function Field({
   id,
   label,
@@ -104,7 +113,7 @@ function Field({
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
           disabled={disabled}
-          className={`h-10 border-slate-200 bg-white font-mono text-sm focus-visible:ring-indigo-500 ${unit ? "pr-16" : ""}`}
+          className={`h-10 rounded-xl border-slate-200 bg-white font-mono text-sm focus-visible:ring-purple-500 ${unit ? "pr-16" : ""}`}
           autoComplete="off"
         />
         {unit && (
@@ -521,12 +530,12 @@ export function PaymasterOperationsConsole() {
 
   return (
     <section className="space-y-5" aria-labelledby="paymaster-console-title">
-      <Card className="overflow-hidden border-indigo-200 bg-white shadow-sm">
-        <div className="h-1 bg-gradient-to-r from-indigo-700 via-violet-600 to-emerald-500" />
+      <Card className="overflow-hidden rounded-3xl border border-purple-200/80 bg-white/95 shadow-xl ring-1 ring-purple-500/10 backdrop-blur-xl">
+        <div className="h-1 bg-gradient-to-r from-indigo-700 via-purple-600 to-emerald-500" />
         <CardHeader className="pb-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-indigo-700">
+              <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-purple-700">
                 <ShieldCheck className="size-4" /> Base · ERC-4337{" "}
                 {status?.entryPoint.toLowerCase() === BASE_ENTRYPOINT_V07.toLowerCase()
                   ? "v0.7 (MetaMask 7702 + Simple7702)"
@@ -538,7 +547,7 @@ export function PaymasterOperationsConsole() {
               >
                 Paymaster operations
               </CardTitle>
-              <CardDescription className="mt-1 max-w-2xl text-sm leading-relaxed">
+              <CardDescription className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-600">
                 Sponsor ETH gas and reward successful smart-account operations with one configured
                 ERC-20 token. Users can select eligible Base portfolio tokens as their action asset;
                 that asset is independent of the reward token.
@@ -548,8 +557,8 @@ export function PaymasterOperationsConsole() {
               <Badge
                 className={
                   ready
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                    : "border-amber-200 bg-amber-50 text-amber-900"
+                    ? "border-emerald-200 bg-emerald-50 px-3 py-1 text-emerald-800"
+                    : "border-amber-200 bg-amber-50 px-3 py-1 text-amber-900"
                 }
               >
                 {ready ? "Onchain resources ready" : status.paused ? "Paused" : "Funding needed"}
@@ -559,13 +568,13 @@ export function PaymasterOperationsConsole() {
         </CardHeader>
         <CardContent className="space-y-5">
           {!isConnected && (
-            <div className="flex items-center gap-2 rounded-lg border border-indigo-100 bg-indigo-50 p-3 text-sm text-indigo-900">
-              <Wallet className="size-4 shrink-0" /> Connect a wallet to deploy or fund. You can
-              still inspect an existing paymaster.
+            <div className="flex items-center gap-2.5 rounded-2xl border border-purple-200/80 bg-purple-50/70 p-3.5 text-sm text-purple-950">
+              <Wallet className="size-4 shrink-0 text-purple-700" /> Connect a wallet to deploy or
+              fund. You can still inspect an existing paymaster.
             </div>
           )}
           {isConnected && chainId !== base.id && (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-3.5 text-sm text-amber-950">
               <span>
                 Transactions require Base mainnet (chain 8453). Portfolio token choices appear after
                 switching.
@@ -580,7 +589,7 @@ export function PaymasterOperationsConsole() {
               </Button>
             </div>
           )}
-          <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+          <div className="grid gap-3 rounded-2xl border border-slate-200/90 bg-slate-50/80 p-4 md:grid-cols-[1fr_auto] md:items-end">
             <Field
               id="paymaster-attach"
               label="Attach an existing Base paymaster"
@@ -590,7 +599,7 @@ export function PaymasterOperationsConsole() {
             />
             <Button
               variant="outline"
-              className="border-indigo-200 text-indigo-800 hover:bg-indigo-50"
+              className="rounded-xl border-purple-200 bg-white font-semibold text-purple-800 hover:bg-purple-50"
               disabled={!!pending || loading}
               onClick={() => void attach()}
             >
@@ -604,7 +613,7 @@ export function PaymasterOperationsConsole() {
                   Attached address {status ? "· verified on Base" : "· verification needed"}
                 </p>
                 <a
-                  className="inline-flex max-w-full items-center gap-1 break-all font-mono text-indigo-700 underline underline-offset-2 hover:text-indigo-900"
+                  className="inline-flex max-w-full items-center gap-1 break-all font-mono text-purple-700 underline underline-offset-2 hover:text-purple-950"
                   href={baseLink("address", contractAddress)}
                   target="_blank"
                   rel="noreferrer"
@@ -635,6 +644,8 @@ export function PaymasterOperationsConsole() {
                     setNotice("");
                     try {
                       localStorage.removeItem(storageKey);
+                      // Audit Fix #3: Notify sibling components when paymaster is detached
+                      window.dispatchEvent(new Event("paymaster-address-changed"));
                     } catch {
                       /* Session state is already detached. */
                     }
@@ -653,7 +664,7 @@ export function PaymasterOperationsConsole() {
           {error && (
             <p
               role="alert"
-              className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900"
+              className="flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 p-3.5 text-sm text-rose-900"
             >
               <AlertTriangle className="mt-0.5 size-4 shrink-0" />
               {error}
@@ -662,7 +673,7 @@ export function PaymasterOperationsConsole() {
           {notice && (
             <p
               role="status"
-              className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900"
+              className="flex items-start gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-3.5 text-sm text-emerald-900"
             >
               <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
               {notice}
@@ -670,7 +681,7 @@ export function PaymasterOperationsConsole() {
           )}
           {lastHash && (
             <a
-              className="inline-flex items-center gap-1 break-all font-mono text-xs font-semibold text-indigo-700 underline underline-offset-2"
+              className="inline-flex items-center gap-1 break-all font-mono text-xs font-semibold text-purple-700 underline underline-offset-2"
               href={baseLink("tx", lastHash)}
               target="_blank"
               rel="noreferrer"
@@ -684,14 +695,14 @@ export function PaymasterOperationsConsole() {
 
       {status ? (
         <>
-          <Card className="overflow-hidden border-slate-200 bg-white shadow-sm">
+          <Card className="overflow-hidden rounded-3xl border border-purple-200/80 bg-white/95 shadow-lg ring-1 ring-purple-500/5 backdrop-blur-xl">
             <CardContent className="p-0">
-              <div className="grid divide-y divide-slate-200 md:grid-cols-3 md:divide-x md:divide-y-0">
-                <div className="p-5">
-                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-indigo-700">
+              <div className="grid divide-y divide-slate-200/80 md:grid-cols-3 md:divide-x md:divide-y-0">
+                <div className="p-6">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-purple-700">
                     <Fuel className="size-4" /> ETH gas deposit
                   </div>
-                  <p className="mt-2 break-all font-mono text-xl font-bold tabular-nums text-slate-950">
+                  <p className="mt-2 break-all font-mono text-2xl font-bold tabular-nums text-slate-950">
                     {formatEther(status.deposit)}{" "}
                     <span className="text-sm font-semibold text-slate-500">ETH</span>
                   </p>
@@ -699,11 +710,11 @@ export function PaymasterOperationsConsole() {
                     EntryPoint balance · pays sponsored gas
                   </p>
                 </div>
-                <div className="p-5">
-                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-violet-700">
+                <div className="p-6">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-indigo-700">
                     <LockKeyhole className="size-4" /> ETH stake
                   </div>
-                  <p className="mt-2 break-all font-mono text-xl font-bold tabular-nums text-slate-950">
+                  <p className="mt-2 break-all font-mono text-2xl font-bold tabular-nums text-slate-950">
                     {formatEther(status.stake)}{" "}
                     <span className="text-sm font-semibold text-slate-500">ETH</span>
                   </p>
@@ -715,11 +726,11 @@ export function PaymasterOperationsConsole() {
                       : "No stake locked"}
                   </p>
                 </div>
-                <div className="bg-emerald-50/60 p-5">
+                <div className="bg-gradient-to-br from-emerald-50/80 to-teal-50/50 p-6">
                   <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-emerald-800">
                     <Coins className="size-4" /> ERC-20 reward pool
                   </div>
-                  <p className="mt-2 break-all font-mono text-xl font-bold tabular-nums text-slate-950">
+                  <p className="mt-2 break-all font-mono text-2xl font-bold tabular-nums text-slate-950">
                     {formatUnits(status.availableRewards, status.rewardDecimals)}{" "}
                     <span className="text-sm font-semibold text-slate-500">
                       {status.rewardSymbol}
@@ -731,14 +742,14 @@ export function PaymasterOperationsConsole() {
                   </p>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-x-6 gap-y-2 border-t border-slate-200 bg-slate-50 px-5 py-3 text-xs text-slate-700">
+              <div className="flex flex-wrap gap-x-6 gap-y-2 border-t border-slate-200/80 bg-slate-50/90 px-6 py-3.5 text-xs text-slate-700">
                 <span>
                   EntryPoint{" "}
                   {status.entryPoint.toLowerCase() === BASE_ENTRYPOINT_V07.toLowerCase()
                     ? "v0.7"
                     : "v0.8"}{" "}
                   <a
-                    className="break-all font-mono text-indigo-700 underline"
+                    className="break-all font-mono text-purple-700 underline"
                     href={baseLink("address", status.entryPoint)}
                     target="_blank"
                     rel="noreferrer"
@@ -749,7 +760,7 @@ export function PaymasterOperationsConsole() {
                 <span>
                   Owner{" "}
                   <a
-                    className="break-all font-mono text-indigo-700 underline"
+                    className="break-all font-mono text-purple-700 underline"
                     href={baseLink("address", status.owner)}
                     target="_blank"
                     rel="noreferrer"
@@ -763,7 +774,7 @@ export function PaymasterOperationsConsole() {
                 <span>
                   Reward token{" "}
                   <a
-                    className="break-all font-mono text-indigo-700 underline"
+                    className="break-all font-mono text-purple-700 underline"
                     href={baseLink("address", status.rewardToken)}
                     target="_blank"
                     rel="noreferrer"
@@ -781,9 +792,11 @@ export function PaymasterOperationsConsole() {
           </Card>
 
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,1fr)]">
-            <Card className="border-slate-200 bg-white shadow-sm">
+            <Card className="rounded-3xl border border-purple-200/70 bg-white/95 shadow-md">
               <CardHeader>
-                <CardTitle className="text-lg text-slate-950">Fund the paymaster</CardTitle>
+                <CardTitle className="text-lg font-bold text-slate-950">
+                  Fund the paymaster
+                </CardTitle>
                 <CardDescription>
                   Each action asks your wallet for confirmation. ETH gas, ETH stake, and reward
                   tokens are separate balances.
@@ -801,7 +814,7 @@ export function PaymasterOperationsConsole() {
                   />
                   <Button
                     disabled={!fundEnabled}
-                    className="bg-indigo-700 hover:bg-indigo-800"
+                    className="rounded-xl bg-gradient-to-r from-purple-700 to-indigo-700 text-white hover:from-purple-800 hover:to-indigo-800"
                     onClick={() => submitFunding("deposit")}
                   >
                     Deposit ETH
@@ -827,6 +840,7 @@ export function PaymasterOperationsConsole() {
                     />
                     <Button
                       variant="outline"
+                      className="rounded-xl"
                       disabled={!ownerEnabled}
                       onClick={() => submitFunding("stake")}
                     >
@@ -845,6 +859,7 @@ export function PaymasterOperationsConsole() {
                   />
                   <Button
                     variant="outline"
+                    className="rounded-xl"
                     disabled={!fundEnabled}
                     onClick={() => submitFunding("rewards")}
                   >
@@ -859,33 +874,39 @@ export function PaymasterOperationsConsole() {
               </CardContent>
             </Card>
 
-            <Card className="border-slate-200 bg-white shadow-sm">
+            <Card className="rounded-3xl border border-purple-200/70 bg-white/95 shadow-md">
               <CardHeader>
-                <CardTitle className="text-lg text-slate-950">Sponsorship state</CardTitle>
+                <CardTitle className="text-lg font-bold text-slate-950">
+                  Sponsorship state
+                </CardTitle>
                 <CardDescription>Current contract limits from Base mainnet.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 text-sm">
                 <div className="flex justify-between gap-4 border-b border-slate-100 pb-3">
                   <span className="text-slate-600">Per successful operation</span>
-                  <strong className="break-all text-right font-mono text-slate-950">
+                  <strong className="break-all text-right font-mono tabular-nums text-slate-950">
                     {formatUnits(status.rewardAmount, status.rewardDecimals)} {status.rewardSymbol}
                   </strong>
                 </div>
                 <div className="flex justify-between gap-4 border-b border-slate-100 pb-3">
                   <span className="text-slate-600">Maximum ETH cost</span>
-                  <strong className="break-all text-right font-mono text-slate-950">
+                  <strong className="break-all text-right font-mono tabular-nums text-slate-950">
                     {formatEther(status.maxCostPerOp)} ETH
                   </strong>
                 </div>
                 <div className="flex justify-between gap-4 border-b border-slate-100 pb-3">
                   <span className="text-slate-600">Per-account cooldown</span>
-                  <strong className="font-mono text-slate-950">{status.cooldownSeconds} sec</strong>
+                  <strong className="font-mono tabular-nums text-slate-950">
+                    {formatDurationWithHours(status.cooldownSeconds)}
+                  </strong>
                 </div>
                 <div className="flex justify-between gap-4 border-b border-slate-100 pb-3">
                   <span className="text-slate-600">Unstake delay</span>
-                  <strong className="font-mono text-slate-950">{status.unstakeDelaySec} sec</strong>
+                  <strong className="font-mono tabular-nums text-slate-950">
+                    {formatDurationWithHours(status.unstakeDelaySec)}
+                  </strong>
                 </div>
-                <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-700">
+                <div className="flex items-center gap-2.5 rounded-2xl border border-slate-200 bg-slate-50/90 p-3.5 text-xs leading-relaxed text-slate-700">
                   {ready ? (
                     <CheckCircle2 className="size-4 shrink-0 text-emerald-700" />
                   ) : (
@@ -903,9 +924,9 @@ export function PaymasterOperationsConsole() {
 
           {isOwner && (
             <div className="grid gap-5 xl:grid-cols-2">
-              <Card className="border-indigo-100 bg-white shadow-sm">
+              <Card className="rounded-3xl border border-purple-200/70 bg-white/95 shadow-md">
                 <CardHeader>
-                  <CardTitle className="text-lg text-slate-950">Owner controls</CardTitle>
+                  <CardTitle className="text-lg font-bold text-slate-950">Owner controls</CardTitle>
                   <CardDescription>
                     Only the current onchain owner can change these parameters.
                   </CardDescription>
@@ -992,7 +1013,7 @@ export function PaymasterOperationsConsole() {
                       variant={status.paused ? "default" : "outline"}
                       className={
                         status.paused
-                          ? "bg-indigo-700 hover:bg-indigo-800"
+                          ? "bg-purple-700 hover:bg-purple-800"
                           : "border-amber-300 text-amber-900 hover:bg-amber-50"
                       }
                       disabled={!ownerEnabled}
@@ -1016,9 +1037,11 @@ export function PaymasterOperationsConsole() {
                 </CardContent>
               </Card>
 
-              <Card className="border-slate-200 bg-white shadow-sm">
+              <Card className="rounded-3xl border border-purple-200/70 bg-white/95 shadow-md">
                 <CardHeader>
-                  <CardTitle className="text-lg text-slate-950">Withdraw & unlock</CardTitle>
+                  <CardTitle className="text-lg font-bold text-slate-950">
+                    Withdraw &amp; unlock
+                  </CardTitle>
                   <CardDescription>
                     Withdrawals send funds to the recipient you enter. Reserved rewards cannot be
                     withdrawn.
@@ -1066,9 +1089,9 @@ export function PaymasterOperationsConsole() {
                       Withdraw tokens
                     </Button>
                   </div>
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3.5 text-xs text-slate-700">
                     <div className="flex items-center gap-2 font-semibold text-slate-900">
-                      <LockKeyhole className="size-4 text-violet-700" /> Stake lock
+                      <LockKeyhole className="size-4 text-purple-700" /> Stake lock
                     </div>
                     <p className="mt-1">
                       {stakeUnlocking
@@ -1105,16 +1128,19 @@ export function PaymasterOperationsConsole() {
             </div>
           )}
           {!isOwner && (
-            <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+            <p className="rounded-2xl border border-slate-200/90 bg-slate-50/90 p-3.5 text-sm text-slate-700">
               Read-only view. Owner controls are available only to{" "}
-              <span className="break-all font-mono">{status.owner}</span> on Base.
+              <span className="break-all font-mono font-semibold text-slate-900">
+                {status.owner}
+              </span>{" "}
+              on Base.
             </p>
           )}
         </>
       ) : !loading && !contractAddress ? (
-        <Card className="border-indigo-100 bg-white shadow-sm">
+        <Card className="rounded-3xl border border-purple-200/80 bg-white/95 shadow-lg">
           <CardHeader>
-            <CardTitle className="text-lg text-slate-950">
+            <CardTitle className="text-lg font-bold text-slate-950">
               Deploy a sponsored reward paymaster
             </CardTitle>
             <CardDescription>
@@ -1162,13 +1188,13 @@ export function PaymasterOperationsConsole() {
                 unit="ETH"
               />
             </div>
-            <div className="rounded-lg border border-indigo-100 bg-indigo-50/70 p-3 text-xs leading-relaxed text-indigo-950">
+            <div className="rounded-2xl border border-purple-100 bg-purple-50/70 p-3.5 text-xs leading-relaxed text-purple-950">
               The connected wallet becomes owner. Deployment creates the contract only; fund its ETH
               deposit and reward pool afterward. A separate signing service and bundler are required
               to sponsor user operations.
             </div>
             <Button
-              className="bg-indigo-700 hover:bg-indigo-800"
+              className="rounded-xl bg-gradient-to-r from-purple-700 to-indigo-700 text-white hover:from-purple-800 hover:to-indigo-800"
               disabled={!isBaseWallet || !!pending || !tokenMeta || !!tokenError}
               onClick={deploy}
             >

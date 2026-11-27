@@ -3,11 +3,15 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArrowRightLeft,
+  ArrowUpRight,
   CheckCircle2,
   Coins,
+  Fuel,
   Lock,
   Send,
+  ShieldAlert,
   Sparkles,
+  Wallet,
 } from "lucide-react";
 import { createSmartAccountClient } from "permissionless";
 import {
@@ -57,10 +61,13 @@ import {
   type PaymasterStatus,
   readPaymasterStatus,
   rewardTokenAbi,
+  SIMPLE_7702_ACCOUNT_ON_BASE,
+  SPONSORED_REWARD_PAYMASTER_ON_BASE,
 } from "@/lib/paymaster/client";
 
 const MUTT_PRO_STAKING_ON_BASE = "0x67dBC193bF510225EBf189ab25dC3b34a32c1766" as const;
 const PAYMASTER_STORAGE_KEY = "shaggy-sponsored-reward-paymaster-base-8453";
+const SIMPLE_7702_DESIGNATOR = `0xef0100${SIMPLE_7702_ACCOUNT_ON_BASE.slice(2).toLowerCase()}`;
 
 const metamaskDelegatorAbi = parseAbi([
   "function execute(bytes32 mode, bytes executionCalldata) payable",
@@ -199,8 +206,9 @@ export function PaymasterPortfolioTransfer() {
     };
   }, [address, publicClient]);
 
-  const activePaymasterAddress: Address | null = useMemo(
-    () => customPaymasterAddress ?? config?.paymaster ?? null,
+  // Fall back to SPONSORED_REWARD_PAYMASTER_ON_BASE so live on-chain status loads immediately on Base
+  const activePaymasterAddress: Address = useMemo(
+    () => customPaymasterAddress ?? config?.paymaster ?? SPONSORED_REWARD_PAYMASTER_ON_BASE,
     [customPaymasterAddress, config?.paymaster]
   );
 
@@ -221,7 +229,16 @@ export function PaymasterPortfolioTransfer() {
     void refreshPaymasterStatus();
   }, [refreshPaymasterStatus]);
 
+  const rewardLabel = useMemo(
+    () =>
+      paymasterStatus
+        ? `${formatUnits(paymasterStatus.rewardAmount, paymasterStatus.rewardDecimals)} ${paymasterStatus.rewardSymbol}`
+        : "100 MRWD",
+    [paymasterStatus]
+  );
+
   const isMetaMaskDelegator = walletBytecode === METAMASK_DESIGNATOR;
+  const isSimple7702Delegator = walletBytecode === SIMPLE_7702_DESIGNATOR;
   // Shown before the user tries. No browser wallet can currently complete a sponsored operation;
   // see sponsoredAccountProblem for the reason per wallet type.
   const walletAccountProblem =
@@ -230,6 +247,14 @@ export function PaymasterPortfolioTransfer() {
     isMetaMaskDelegator &&
     !!paymasterStatus &&
     paymasterStatus.entryPoint.toLowerCase() !== BASE_ENTRYPOINT_V07.toLowerCase();
+
+  const connectedWalletTypeLabel = useMemo(() => {
+    if (!isConnected || !address) return "Disconnected (Browser Wallet / EOA)";
+    if (isMetaMaskDelegator) return "MetaMask 7702 Smart Account";
+    if (isSimple7702Delegator) return "Simple 7702 Account (v0.8)";
+    if (walletBytecode && walletBytecode !== "0x") return "Custom Delegated / Smart Account";
+    return "EOA / Standard Browser Wallet";
+  }, [isConnected, address, isMetaMaskDelegator, isSimple7702Delegator, walletBytecode]);
 
   useEffect(() => {
     const query = address ? `?wallet=${address}` : "";
@@ -272,6 +297,7 @@ export function PaymasterPortfolioTransfer() {
     [tokens]
   );
 
+  // Audit Fix #7: Do not read balanceOf(tokenAddress) when disconnected (!address)
   useEffect(() => {
     if (!publicClient || !isAddress(customAddress)) {
       setCustomToken(null);
@@ -290,12 +316,14 @@ export function PaymasterPortfolioTransfer() {
         abi: rewardTokenAbi,
         functionName: "decimals",
       }),
-      publicClient.readContract({
-        address: tokenAddress,
-        abi: rewardTokenAbi,
-        functionName: "balanceOf",
-        args: [address ?? tokenAddress],
-      }),
+      address
+        ? publicClient.readContract({
+            address: tokenAddress,
+            abi: rewardTokenAbi,
+            functionName: "balanceOf",
+            args: [address],
+          })
+        : Promise.resolve(0n),
     ])
       .then(([symbol, decimals, balance]) => {
         if (active) {
@@ -377,6 +405,42 @@ export function PaymasterPortfolioTransfer() {
     return found ?? null;
   }, [baseSwapTokens, buyTokenSelection, customBuyToken]);
 
+  // Audit Fix #5: Automatically prevent same-token swap selection when user picks a sell token
+  useEffect(() => {
+    if (
+      operationType === "swap" &&
+      token &&
+      resolvedBuyToken &&
+      resolvedBuyToken.address.toLowerCase() === token.address.toLowerCase()
+    ) {
+      const wethLower = CANONICAL_BASE_CONTRACTS.WETH.toLowerCase();
+      const nextTarget =
+        token.address.toLowerCase() === wethLower
+          ? CANONICAL_BASE_CONTRACTS.USDC
+          : CANONICAL_BASE_CONTRACTS.WETH;
+      if (buyTokenSelection.toLowerCase() !== nextTarget.toLowerCase()) {
+        setBuyTokenSelection(nextTarget);
+      }
+    }
+  }, [operationType, token, resolvedBuyToken, buyTokenSelection]);
+
+  const isSameSwapToken =
+    operationType === "swap" &&
+    Boolean(
+      token &&
+        resolvedBuyToken &&
+        resolvedBuyToken.address.toLowerCase() === token.address.toLowerCase()
+    );
+
+  const handleSelectPercentage = useCallback(
+    (pct: 25 | 50 | 75 | 100) => {
+      if (!token || token.balance <= 0n) return;
+      const portion = pct === 100 ? token.balance : (token.balance * BigInt(pct)) / 100n;
+      setAmount(formatUnits(portion, token.decimals));
+    },
+    [token]
+  );
+
   // Live Swap Quote preview when on Swap tab
   useEffect(() => {
     setSwapQuoteInfo(null);
@@ -456,7 +520,7 @@ export function PaymasterPortfolioTransfer() {
       return Boolean(token && recipient.trim() && amount.trim());
     }
     if (operationType === "swap") {
-      return Boolean(token && resolvedBuyToken && amount.trim());
+      return Boolean(token && resolvedBuyToken && !isSameSwapToken && amount.trim());
     }
     if (operationType === "stake") {
       if (!activeStakingAddress) return false;
@@ -476,6 +540,7 @@ export function PaymasterPortfolioTransfer() {
     recipient,
     amount,
     resolvedBuyToken,
+    isSameSwapToken,
     activeStakingAddress,
     stakeAction,
   ]);
@@ -618,6 +683,9 @@ export function PaymasterPortfolioTransfer() {
       } else if (operationType === "swap") {
         if (!token) throw new Error("Choose a portfolio token to swap.");
         if (!resolvedBuyToken) throw new Error("Choose an output token.");
+        if (resolvedBuyToken.address.toLowerCase() === token.address.toLowerCase()) {
+          throw new Error("Choose an output token different from the sell token.");
+        }
         const units = parseUnits(amount.trim(), token.decimals);
         if (units <= 0n || units > token.balance) {
           throw new Error("Enter an amount within your token balance.");
@@ -955,18 +1023,30 @@ export function PaymasterPortfolioTransfer() {
   }
 
   return (
-    <Card className="border-indigo-100 bg-white shadow-sm">
-      <CardHeader>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <CardTitle>Sponsored Portfolio Operations</CardTitle>
-            <CardDescription className="mt-1">
+    <Card className="overflow-hidden rounded-3xl border border-purple-200/80 bg-white/95 shadow-xl ring-1 ring-purple-500/10 backdrop-blur-xl">
+      <div className="h-1 bg-gradient-to-r from-purple-700 via-fuchsia-600 to-pink-600" />
+      <CardHeader className="border-b border-slate-100 pb-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-purple-700">
+              <Sparkles className="size-3.5" /> Gasless ERC-4337 Execution Terminal
+            </div>
+            <CardTitle className="text-2xl font-bold tracking-tight text-slate-950">
+              Sponsored Portfolio Operations
+            </CardTitle>
+            <CardDescription className="max-w-3xl text-sm leading-relaxed text-slate-600">
               Transfer, swap, or stake any ERC-20 token you hold on Base. The paymaster covers ETH
-              network gas and rewards your wallet with <strong>100 MRWD</strong> upon a successful
-              operation. No MRWD is ever charged as a fee.
+              network gas and rewards your wallet with <strong>{rewardLabel}</strong> upon a
+              successful operation. No MRWD is ever charged as a fee.
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <Badge
+              variant="outline"
+              className="border-emerald-300 bg-emerald-50/90 px-3 py-1 font-mono text-xs font-bold text-emerald-900"
+            >
+              +{rewardLabel} / op
+            </Badge>
             {isMetaMaskDelegator && (
               <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-indigo-900">
                 <Sparkles className="mr-1 size-3" /> MetaMask Smart Account (EIP-7702 · v0.7)
@@ -977,7 +1057,7 @@ export function PaymasterPortfolioTransfer() {
                 variant="outline"
                 className={
                   config.eligibilityMode === "open_portfolio"
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                    ? "border-purple-200 bg-purple-50 text-purple-900"
                     : "border-indigo-200 bg-indigo-50 text-indigo-800"
                 }
               >
@@ -989,14 +1069,21 @@ export function PaymasterPortfolioTransfer() {
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-5">
+
+      <CardContent className="space-y-5 pt-6">
         {!isConnected && (
-          <p className="text-sm text-slate-600">
-            Connect your wallet to load your Base portfolio tokens and execute sponsored actions.
-          </p>
+          <div className="flex items-center gap-2.5 rounded-2xl border border-purple-200/80 bg-purple-50/70 px-4 py-3 text-sm text-purple-950">
+            <Wallet className="size-4 shrink-0 text-purple-700" />
+            <span>
+              Connect your wallet to load your Base portfolio tokens and execute sponsored actions.
+            </span>
+          </div>
         )}
         {isConnected && chainId !== base.id && (
-          <p className="text-sm text-amber-800">Switch to Base to load your portfolio tokens.</p>
+          <div className="flex items-center gap-2.5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <AlertTriangle className="size-4 shrink-0 text-amber-700" />
+            <span>Switch to Base to load your portfolio tokens.</span>
+          </div>
         )}
         {configError && (
           <p role="alert" className="text-sm text-rose-700">
@@ -1015,7 +1102,7 @@ export function PaymasterPortfolioTransfer() {
         )}
 
         {needsV07PaymasterUpgrade && (
-          <div className="rounded-xl border border-amber-300 bg-amber-50/90 p-4 text-sm text-amber-950">
+          <div className="rounded-2xl border border-amber-300 bg-amber-50/90 p-4 text-sm text-amber-950">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="max-w-2xl space-y-1">
                 <p className="flex items-center gap-1.5 font-semibold text-amber-950">
@@ -1057,7 +1144,7 @@ export function PaymasterPortfolioTransfer() {
         {isMetaMaskDelegator &&
           paymasterStatus &&
           paymasterStatus.entryPoint.toLowerCase() === BASE_ENTRYPOINT_V07.toLowerCase() && (
-            <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/70 px-3.5 py-2.5 text-xs text-emerald-900">
+            <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-xs text-emerald-900">
               <CheckCircle2 className="size-4 shrink-0 text-emerald-700" />
               <span>
                 MetaMask Smart Account (EIP-7702) paired with EntryPoint v0.7 Paymaster (
@@ -1069,12 +1156,53 @@ export function PaymasterPortfolioTransfer() {
             </div>
           )}
 
+        {/* 2026 Smart Account Compatibility & Readiness Diagnostic Card */}
         <div
           role="status"
-          className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-3.5 py-2.5 text-xs text-amber-900"
+          className="rounded-2xl border border-amber-200/90 bg-gradient-to-br from-amber-50/90 via-white to-amber-50/50 p-4 text-xs text-amber-950 shadow-sm"
         >
-          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-700" />
-          <span>{walletAccountProblem ?? SPONSORSHIP_UNAVAILABLE_REASONS}</span>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200/70 pb-3">
+            <div className="flex items-center gap-2 font-bold uppercase tracking-wider text-amber-900">
+              <ShieldAlert className="size-4 shrink-0 text-amber-700" />
+              ERC-4337 / EIP-7702 Account Abstraction Readiness
+            </div>
+            <span className="rounded-full border border-amber-300/80 bg-amber-100/80 px-2.5 py-0.5 font-mono text-[11px] font-semibold text-amber-900">
+              {connectedWalletTypeLabel}
+            </span>
+          </div>
+
+          <div className="mt-3 grid gap-2.5 sm:grid-cols-3">
+            <div className="rounded-xl border border-slate-200/80 bg-white/90 p-2.5">
+              <span className="text-[11px] font-medium text-slate-500">1. Wallet Delegation</span>
+              <p className="mt-0.5 font-mono font-semibold text-slate-900">
+                {connectedWalletTypeLabel}
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-200/80 bg-white/90 p-2.5">
+              <span className="text-[11px] font-medium text-slate-500">2. Target EntryPoint</span>
+              <p className="mt-0.5 font-mono font-semibold text-slate-900">
+                v0.7 · {BASE_ENTRYPOINT_V07.slice(0, 6)}…{BASE_ENTRYPOINT_V07.slice(-5)}
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-200/80 bg-white/90 p-2.5">
+              <span className="text-[11px] font-medium text-slate-500">
+                3. Active Paymaster &amp; Pool
+              </span>
+              <p className="mt-0.5 font-mono font-semibold text-slate-900">
+                {activePaymasterAddress.slice(0, 6)}…{activePaymasterAddress.slice(-4)}
+                {paymasterStatus
+                  ? ` · ${Number(
+                      formatUnits(paymasterStatus.availableRewards, paymasterStatus.rewardDecimals)
+                    ).toLocaleString()} ${paymasterStatus.rewardSymbol}`
+                  : ""}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-amber-900">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-700" />
+            <span>{walletAccountProblem ?? SPONSORSHIP_UNAVAILABLE_REASONS}</span>
+          </div>
         </div>
 
         <Tabs
@@ -1085,103 +1213,173 @@ export function PaymasterPortfolioTransfer() {
             setTxHash(null);
           }}
         >
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="transfer" className="flex items-center gap-1.5">
+          <TabsList className="grid h-12 w-full grid-cols-3 rounded-2xl bg-slate-100/90 p-1">
+            <TabsTrigger
+              value="transfer"
+              className="flex items-center gap-1.5 rounded-xl text-xs font-semibold data-[state=active]:bg-white data-[state=active]:text-purple-900 data-[state=active]:shadow-sm sm:text-sm"
+            >
               <Send className="size-3.5" /> Transfer Token
             </TabsTrigger>
-            <TabsTrigger value="swap" className="flex items-center gap-1.5">
+            <TabsTrigger
+              value="swap"
+              className="flex items-center gap-1.5 rounded-xl text-xs font-semibold data-[state=active]:bg-white data-[state=active]:text-purple-900 data-[state=active]:shadow-sm sm:text-sm"
+            >
               <ArrowRightLeft className="size-3.5" /> Swap Token
             </TabsTrigger>
-            <TabsTrigger value="stake" className="flex items-center gap-1.5">
+            <TabsTrigger
+              value="stake"
+              className="flex items-center gap-1.5 rounded-xl text-xs font-semibold data-[state=active]:bg-white data-[state=active]:text-purple-900 data-[state=active]:shadow-sm sm:text-sm"
+            >
               <Lock className="size-3.5" /> Stake / Vault
             </TabsTrigger>
           </TabsList>
 
           {/* Shared Portfolio Token Selector for Transfer & Swap */}
           {(operationType === "transfer" || operationType === "swap") && (
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="paymaster-token">Portfolio token (Base ERC-20)</Label>
-                <select
-                  id="paymaster-token"
-                  value={selected}
-                  onChange={(event) => setSelected(event.target.value)}
-                  className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
-                >
-                  <option value="">Choose a Base token from your portfolio</option>
-                  {choices.map((choice) => (
-                    <option key={choice.address} value={choice.address}>
-                      {choice.symbol} · {formatUnits(choice.balance, choice.decimals)}
-                    </option>
-                  ))}
-                  <option value="custom">Enter any Base ERC-20 contract…</option>
-                </select>
-              </div>
-              {selected === "custom" && (
+            <div className="mt-4 rounded-2xl border border-slate-200/90 bg-slate-50/80 p-4">
+              <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label htmlFor="paymaster-custom-token">Base token contract</Label>
-                  <Input
-                    id="paymaster-custom-token"
-                    value={customAddress}
-                    onChange={(event) => setCustomAddress(event.target.value)}
-                    placeholder="0x…"
-                  />
-                  {customToken && (
-                    <p className="text-xs text-slate-600">
-                      {customToken.symbol} balance:{" "}
-                      {formatUnits(customToken.balance, customToken.decimals)}
-                    </p>
-                  )}
+                  <div className="flex items-center justify-between gap-2">
+                    <Label htmlFor="paymaster-token" className="text-xs font-semibold text-slate-700">
+                      Portfolio token (Base ERC-20)
+                    </Label>
+                    {token && (
+                      <span className="font-mono text-xs font-semibold text-purple-800">
+                        Balance: {formatUnits(token.balance, token.decimals)} {token.symbol}
+                      </span>
+                    )}
+                  </div>
+                  <select
+                    id="paymaster-token"
+                    value={selected}
+                    onChange={(event) => setSelected(event.target.value)}
+                    className="flex h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 shadow-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+                  >
+                    <option value="">Choose a Base token from your portfolio</option>
+                    {choices.map((choice) => (
+                      <option key={choice.address} value={choice.address}>
+                        {choice.symbol} · {formatUnits(choice.balance, choice.decimals)}
+                      </option>
+                    ))}
+                    <option value="custom">Enter any Base ERC-20 contract…</option>
+                  </select>
                 </div>
-              )}
+                {selected === "custom" && (
+                  <div className="space-y-1.5">
+                    <Label
+                      htmlFor="paymaster-custom-token"
+                      className="text-xs font-semibold text-slate-700"
+                    >
+                      Base token contract
+                    </Label>
+                    <Input
+                      id="paymaster-custom-token"
+                      value={customAddress}
+                      onChange={(event) => setCustomAddress(event.target.value)}
+                      placeholder="0x…"
+                      className="h-10 rounded-xl border-slate-200 bg-white font-mono text-sm"
+                    />
+                    {customToken && (
+                      <p className="font-mono text-xs text-slate-600">
+                        {customToken.symbol} balance:{" "}
+                        {formatUnits(customToken.balance, customToken.decimals)}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
           <TabsContent value="transfer" className="mt-4 space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 rounded-2xl border border-slate-200/90 bg-slate-50/80 p-4 md:grid-cols-2">
               <div className="space-y-1.5">
-                <Label htmlFor="paymaster-recipient">Recipient address</Label>
+                <Label htmlFor="paymaster-recipient" className="text-xs font-semibold text-slate-700">
+                  Recipient address
+                </Label>
                 <Input
                   id="paymaster-recipient"
                   value={recipient}
                   onChange={(event) => setRecipient(event.target.value)}
                   placeholder="0x…"
+                  className="h-10 rounded-xl border-slate-200 bg-white font-mono text-sm"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="paymaster-amount">Amount {token ? `(${token.symbol})` : ""}</Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="paymaster-amount" className="text-xs font-semibold text-slate-700">
+                    Amount {token ? `(${token.symbol})` : ""}
+                  </Label>
+                  {token && token.balance > 0n && (
+                    <div className="flex items-center gap-1">
+                      {([25, 50, 75, 100] as const).map((pct) => (
+                        <button
+                          key={pct}
+                          type="button"
+                          onClick={() => handleSelectPercentage(pct)}
+                          className="rounded-md border border-purple-200 bg-white px-1.5 py-0.5 font-mono text-[10px] font-bold text-purple-800 transition hover:bg-purple-50"
+                        >
+                          {pct === 100 ? "MAX" : `${pct}%`}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <Input
                   id="paymaster-amount"
                   value={amount}
                   onChange={(event) => setAmount(event.target.value)}
                   inputMode="decimal"
                   placeholder="0.0"
+                  className="h-10 rounded-xl border-slate-200 bg-white font-mono text-sm tabular-nums"
                 />
               </div>
             </div>
           </TabsContent>
 
           <TabsContent value="swap" className="mt-4 space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 rounded-2xl border border-slate-200/90 bg-slate-50/80 p-4 md:grid-cols-3">
               <div className="space-y-1.5">
-                <Label htmlFor="paymaster-swap-amount">
-                  Sell Amount {token ? `(${token.symbol})` : ""}
-                </Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label
+                    htmlFor="paymaster-swap-amount"
+                    className="text-xs font-semibold text-slate-700"
+                  >
+                    Sell Amount {token ? `(${token.symbol})` : ""}
+                  </Label>
+                  {token && token.balance > 0n && (
+                    <div className="flex items-center gap-1">
+                      {([25, 50, 75, 100] as const).map((pct) => (
+                        <button
+                          key={pct}
+                          type="button"
+                          onClick={() => handleSelectPercentage(pct)}
+                          className="rounded-md border border-purple-200 bg-white px-1.5 py-0.5 font-mono text-[10px] font-bold text-purple-800 transition hover:bg-purple-50"
+                        >
+                          {pct === 100 ? "MAX" : `${pct}%`}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <Input
                   id="paymaster-swap-amount"
                   value={amount}
                   onChange={(event) => setAmount(event.target.value)}
                   inputMode="decimal"
                   placeholder="0.0"
+                  className="h-10 rounded-xl border-slate-200 bg-white font-mono text-sm tabular-nums"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="paymaster-buy-token">Buy Token (Base DEX Route)</Label>
+                <Label htmlFor="paymaster-buy-token" className="text-xs font-semibold text-slate-700">
+                  Buy Token (Base DEX Route)
+                </Label>
                 <select
                   id="paymaster-buy-token"
                   value={buyTokenSelection}
                   onChange={(event) => setBuyTokenSelection(event.target.value)}
-                  className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
+                  className="flex h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 shadow-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
                 >
                   {baseSwapTokens.map((item) => (
                     <option key={`${item.symbol}-${item.address}`} value={item.address}>
@@ -1192,26 +1390,40 @@ export function PaymasterPortfolioTransfer() {
                 </select>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="paymaster-slippage">Max Slippage (%)</Label>
+                <Label htmlFor="paymaster-slippage" className="text-xs font-semibold text-slate-700">
+                  Max Slippage (%)
+                </Label>
                 <Input
                   id="paymaster-slippage"
                   value={slippagePct}
                   onChange={(event) => setSlippagePct(event.target.value)}
                   inputMode="decimal"
                   placeholder="1.0"
+                  className="h-10 rounded-xl border-slate-200 bg-white font-mono text-sm tabular-nums"
                 />
               </div>
             </div>
             {buyTokenSelection === "custom" && (
-              <div className="space-y-1.5">
-                <Label htmlFor="paymaster-custom-buy">Custom output ERC-20 contract</Label>
+              <div className="space-y-1.5 rounded-2xl border border-slate-200/90 bg-slate-50/80 p-4">
+                <Label
+                  htmlFor="paymaster-custom-buy"
+                  className="text-xs font-semibold text-slate-700"
+                >
+                  Custom output ERC-20 contract
+                </Label>
                 <Input
                   id="paymaster-custom-buy"
                   value={customBuyAddress}
                   onChange={(event) => setCustomBuyAddress(event.target.value)}
                   placeholder="0x…"
+                  className="h-10 rounded-xl border-slate-200 bg-white font-mono text-sm"
                 />
               </div>
+            )}
+            {isSameSwapToken && (
+              <p className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2 text-xs font-medium text-amber-900">
+                Choose an output token different from {token?.symbol} to calculate a Base DEX route.
+              </p>
             )}
             {quotingSwap && (
               <p className="text-xs text-slate-500">
@@ -1219,12 +1431,12 @@ export function PaymasterPortfolioTransfer() {
               </p>
             )}
             {swapQuoteInfo && (
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-indigo-100 bg-indigo-50/70 px-3.5 py-2.5 text-xs text-indigo-950">
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-purple-200 bg-purple-50/80 px-4 py-3 text-xs text-purple-950">
                 <span>
                   Best route via <strong>{swapQuoteInfo.venue}</strong> (Approve + Swap batched
                   atomically if needed)
                 </span>
-                <span className="font-mono font-bold">
+                <span className="font-mono font-bold tabular-nums">
                   Est. Output:{" "}
                   {Number(swapQuoteInfo.estimatedOut) > 0 &&
                   Number(swapQuoteInfo.estimatedOut) < 0.0001
@@ -1239,16 +1451,32 @@ export function PaymasterPortfolioTransfer() {
           </TabsContent>
 
           <TabsContent value="stake" className="mt-4 space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 rounded-2xl border border-slate-200/90 bg-slate-50/80 p-4 md:grid-cols-3">
               <div className="space-y-1.5">
-                <Label htmlFor="paymaster-staking-vault">Staking Contract</Label>
+                <Label
+                  htmlFor="paymaster-staking-vault"
+                  className="text-xs font-semibold text-slate-700"
+                >
+                  Staking Contract
+                </Label>
                 <select
                   id="paymaster-staking-vault"
                   value={stakingVaultChoice}
-                  onChange={(event) =>
-                    setStakingVaultChoice(event.target.value as "mutt_pro" | "custom")
-                  }
-                  className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
+                  onChange={(event) => {
+                    const nextVault = event.target.value as "mutt_pro" | "custom";
+                    setStakingVaultChoice(nextVault);
+                    // Audit Fix #6: Reset stakeAction if switching to mutt_pro while "unstake" is selected
+                    if (nextVault === "mutt_pro" && stakeAction === "unstake") {
+                      setStakeAction("stake");
+                    }
+                    if (
+                      nextVault === "custom" &&
+                      (stakeAction === "relockAll" || stakeAction === "withdrawMatured")
+                    ) {
+                      setStakeAction("stake");
+                    }
+                  }}
+                  className="flex h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 shadow-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
                 >
                   <option value="mutt_pro">
                     MuttProStaking (MRWD · {MUTT_PRO_STAKING_ON_BASE.slice(0, 10)}…)
@@ -1257,12 +1485,17 @@ export function PaymasterPortfolioTransfer() {
                 </select>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="paymaster-stake-action">Staking Action</Label>
+                <Label
+                  htmlFor="paymaster-stake-action"
+                  className="text-xs font-semibold text-slate-700"
+                >
+                  Staking Action
+                </Label>
                 <select
                   id="paymaster-stake-action"
                   value={stakeAction}
                   onChange={(event) => setStakeAction(event.target.value as StakeActionType)}
-                  className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
+                  className="flex h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 shadow-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
                 >
                   <option value="stake">Stake Tokens (Auto-batches Approve + Stake)</option>
                   {stakingVaultChoice === "mutt_pro" ? (
@@ -1279,20 +1512,29 @@ export function PaymasterPortfolioTransfer() {
               </div>
               {(stakeAction === "stake" || stakeAction === "unstake") && (
                 <div className="space-y-1.5">
-                  <Label htmlFor="paymaster-stake-amount">Amount</Label>
+                  <Label
+                    htmlFor="paymaster-stake-amount"
+                    className="text-xs font-semibold text-slate-700"
+                  >
+                    Amount
+                  </Label>
                   <Input
                     id="paymaster-stake-amount"
                     value={amount}
                     onChange={(event) => setAmount(event.target.value)}
                     inputMode="decimal"
                     placeholder="0.0"
+                    className="h-10 rounded-xl border-slate-200 bg-white font-mono text-sm tabular-nums"
                   />
                 </div>
               )}
             </div>
             {stakingVaultChoice === "custom" && (
-              <div className="space-y-1.5">
-                <Label htmlFor="paymaster-custom-vault">
+              <div className="space-y-1.5 rounded-2xl border border-slate-200/90 bg-slate-50/80 p-4">
+                <Label
+                  htmlFor="paymaster-custom-vault"
+                  className="text-xs font-semibold text-slate-700"
+                >
                   Launchpad FeeDiscountStaking Contract Address
                 </Label>
                 <Input
@@ -1300,30 +1542,40 @@ export function PaymasterPortfolioTransfer() {
                   value={customStakingVault}
                   onChange={(event) => setCustomStakingVault(event.target.value)}
                   placeholder="0x… staking contract deployed via Launchpad"
+                  className="h-10 rounded-xl border-slate-200 bg-white font-mono text-sm"
                 />
               </div>
             )}
           </TabsContent>
         </Tabs>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
-          <p className="max-w-xl text-xs text-slate-600">
-            <Coins className="mr-1 inline size-3.5 text-emerald-700" />
-            Sponsored operations need a smart account on your existing Base address; see the notice
-            above for whether your wallet can use one today.
-          </p>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+          <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600">
+            <span className="inline-flex items-center gap-1.5">
+              <Coins className="size-3.5 text-emerald-700" />
+              Sponsored operations need a smart account on your existing Base address; see the
+              notice above for whether your wallet can use one today.
+            </span>
+            {paymasterStatus && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 font-mono text-[11px] text-slate-700">
+                <Fuel className="size-3 text-purple-600" />
+                Gas Pool: {formatEther(paymasterStatus.deposit)} ETH · Cooldown:{" "}
+                {paymasterStatus.cooldownSeconds}s
+              </span>
+            )}
+          </div>
           <Button
             onClick={() => void executeSponsoredOperation()}
             disabled={!canSubmit || walletAccountProblem !== null}
-            className="bg-indigo-700 hover:bg-indigo-800"
+            className="rounded-xl bg-gradient-to-r from-purple-700 via-fuchsia-600 to-pink-600 px-5 font-semibold text-white shadow-md hover:from-purple-800 hover:via-fuchsia-700 hover:to-pink-700"
           >
             {pending
               ? "Waiting for wallet & bundler…"
               : operationType === "transfer"
-                ? "Send with sponsored gas (+100 MRWD)"
+                ? `Send with sponsored gas (+${rewardLabel})`
                 : operationType === "swap"
-                  ? "Swap with sponsored gas (+100 MRWD)"
-                  : "Execute staking with sponsored gas (+100 MRWD)"}
+                  ? `Swap with sponsored gas (+${rewardLabel})`
+                  : `Execute staking with sponsored gas (+${rewardLabel})`}
           </Button>
         </div>
 
@@ -1333,15 +1585,15 @@ export function PaymasterPortfolioTransfer() {
           </p>
         )}
         {txHash && (
-          <p className="text-sm text-emerald-700">
+          <p className="flex items-center gap-1.5 text-sm font-medium text-emerald-700">
             Sponsored operation submitted:{" "}
             <a
-              className="underline"
+              className="inline-flex items-center gap-1 font-mono underline"
               target="_blank"
               rel="noreferrer"
               href={`https://basescan.org/tx/${txHash}`}
             >
-              {txHash.slice(0, 10)}…
+              {txHash.slice(0, 10)}… <ArrowUpRight className="size-3.5" />
             </a>
           </p>
         )}
