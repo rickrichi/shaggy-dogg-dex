@@ -115,8 +115,8 @@ export function LiveVenueComparison(props: LiveVenueComparisonProps) {
           <CardTitle>Live execution</CardTitle>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
-          Live quotes and trading run in the Shaggy Dogg desktop app with your own exchange
-          accounts. The spreads on this page are live and read-only.
+          Exchange account balances, executable quotes, and order history are available in the
+          Shaggy Dogg desktop app with your connected accounts.
         </CardContent>
       </Card>
     );
@@ -153,6 +153,7 @@ function LiveVenueComparisonPanel({ symbol, notional, onExecuted }: LiveVenueCom
     generation.current += 1;
     setRoutes([]);
     setPreview(null);
+    if (notional <= 0) return;
     const poll = async () => {
       try {
         const params = new URLSearchParams({ symbol, notional: String(notional) });

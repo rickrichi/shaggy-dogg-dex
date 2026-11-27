@@ -69,6 +69,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AERODROME_ROUTER_ABI, ERC20_ABI } from "@/config/abis";
 import { UNISWAP_V3_QUOTER_V2_BASE, UNISWAP_V3_ROUTER_BASE } from "@/config/contracts";
+import { ARB_PRIVATE_API } from "@/config/crypto-arb";
 import { BASE_MAINNET_TOKENS } from "@/config/tokens";
 import { TRIANGULAR_CANDIDATES } from "@/config/triangular-candidates";
 import { useCeFiArbStream } from "@/hooks/useCeFiArbStream";
@@ -265,15 +266,16 @@ const PAGE_META = {
   },
   live: {
     id: "live",
-    name: "Kraken ↔ Alpaca Live Desk",
+    name: ARB_PRIVATE_API ? "Kraken ↔ Alpaca Live Desk" : "Live Market Desk",
     shortLabel: "Live Desk",
-    badge: "LIVE Accounts",
+    badge: ARB_PRIVATE_API ? "Exchange accounts" : "Read-only",
     badgeBg: "border-rose-300 bg-rose-100 text-rose-800",
     gradient: "from-rose-600 via-red-600 to-orange-500",
     icon: Radio,
-    category: "Live Cross-Venue Execution",
-    subtitle:
-      "Live Kraken and Alpaca balances, account-tier fees, quote age and depth, expected net proceeds, and broker-reported fills, partial fills and remaining exposure.",
+    category: ARB_PRIVATE_API ? "Live Cross-Venue Execution" : "Public market data",
+    subtitle: ARB_PRIVATE_API
+      ? "Live Kraken and Alpaca balances, account-tier fees, quote age and depth, expected net proceeds, and broker-reported fills, partial fills and remaining exposure."
+      : "Compare BTC and ETH exchange quotes. For ETH, compare USDC-to-WETH routes on Base.",
     documentTitle: "🔴 Live Desk | Shaggy Dogg Arbitrage",
   },
   console: {
@@ -361,14 +363,15 @@ export default function Arbitrage() {
   const { writeContractAsync } = useWriteContract();
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
-  const { data: blockNumber } = useBlockNumber({ watch: true });
+  const { data: blockNumber } = useBlockNumber({ chainId: BASE_CHAIN_ID, watch: true });
   const { data: gasPriceData } = useGasPrice({
     chainId: BASE_CHAIN_ID,
     query: { refetchInterval: 10_000 },
   });
 
   const isBaseNetwork = chainId === BASE_CHAIN_ID;
-  const gasPriceGwei = gasPriceData ? Number((Number(gasPriceData) / 1e9).toFixed(4)) : 0.005;
+  const gasPriceGwei =
+    gasPriceData !== undefined ? Number((Number(gasPriceData) / 1e9).toFixed(4)) : 0.005;
 
   // ── Global Execution Mode (Live Unrestricted vs Sandbox) ──────────────────
   const [isLiveMode, setIsLiveMode] = useState<boolean>(true);
@@ -390,7 +393,7 @@ export default function Arbitrage() {
 
   // Resolve canonical symbol from route param (e.g. "ETH-USDC" -> "ETH/USDC") or fallback to search param or default "ETH/USD"
   const rawSymbol = routeSymbol || searchParams.get("symbol");
-  const cleanSymbol = rawSymbol ? decodeURIComponent(rawSymbol).replace("-", "/") : "ETH/USD";
+  const cleanSymbol = rawSymbol ? rawSymbol.replace("-", "/") : "ETH/USD";
 
   const [activeArbitrageTab, setActiveArbitrageTab] = useState<string>(canonicalTab);
   const [selectedMatrixSymbol, setSelectedMatrixSymbol] = useState<string>(cleanSymbol);
@@ -2052,7 +2055,7 @@ export default function Arbitrage() {
                 : currentMeta.name}
             </h1>
 
-            {isBotRunning ? (
+            {activeArbitrageTab === "live" ? null : isBotRunning ? (
               <Badge className="flex items-center gap-1.5 border-emerald-500 bg-emerald-600 px-3 py-1 font-black text-white shadow-sm shadow-emerald-200">
                 <span className="size-2 animate-ping rounded-full bg-white" />
                 🤖 AI AUTO-PILOT ACTIVE
@@ -2060,7 +2063,7 @@ export default function Arbitrage() {
             ) : isLiveMode ? (
               <Badge className="flex items-center gap-1.5 border-rose-500 bg-rose-600 px-3 py-1 font-black text-white shadow-sm shadow-rose-200">
                 <span className="size-2 animate-ping rounded-full bg-white" />
-                {activeArbitrageTab === "live" || activeArbitrageTab === "cedefi"
+                {activeArbitrageTab === "cedefi"
                   ? "EXCHANGE DESK · CONFIRMED ORDERS"
                   : "LIVE MAINNET"}
               </Badge>
@@ -2081,44 +2084,46 @@ export default function Arbitrage() {
         </div>
 
         {/* Global Controls & Mode Toggle */}
-        <div className="flex flex-wrap items-center gap-2">
-          {activeArbitrageTab === "cedefi" && (
-            <Button
-              size="sm"
-              onClick={handleBackToMatrix}
-              className="border-2 border-emerald-400 bg-emerald-600 font-black text-white shadow-sm hover:bg-emerald-700"
-            >
-              <ArrowLeft className="mr-1.5 size-4" /> 📊 Return to 100 Pairs
-            </Button>
-          )}
+        {activeArbitrageTab !== "live" && (
+          <div className="flex flex-wrap items-center gap-2">
+            {activeArbitrageTab === "cedefi" && (
+              <Button
+                size="sm"
+                onClick={handleBackToMatrix}
+                className="border-2 border-emerald-400 bg-emerald-600 font-black text-white shadow-sm hover:bg-emerald-700"
+              >
+                <ArrowLeft className="mr-1.5 size-4" /> 📊 Return to 100 Pairs
+              </Button>
+            )}
 
-          <Button
-            variant={isLiveMode ? "default" : "outline"}
-            size="sm"
-            onClick={() => setIsLiveMode(!isLiveMode)}
-            className={
-              isLiveMode
-                ? "border-rose-600 bg-rose-600 font-bold text-white hover:bg-rose-700"
-                : "border-slate-300 font-bold text-slate-700"
-            }
-          >
-            {isLiveMode ? "⚡ Mode: Live Mainnet" : "🧪 Mode: Sandbox Simulation"}
-          </Button>
-
-          <a
-            href={`https://basescan.org/address/${customBorrowerAddress}`}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
             <Button
-              variant="outline"
+              variant={isLiveMode ? "default" : "outline"}
               size="sm"
-              className="border-slate-300 text-slate-700 hover:bg-slate-50"
+              onClick={() => setIsLiveMode(!isLiveMode)}
+              className={
+                isLiveMode
+                  ? "border-rose-600 bg-rose-600 font-bold text-white hover:bg-rose-700"
+                  : "border-slate-300 font-bold text-slate-700"
+              }
             >
-              Borrower Contract <ExternalLink className="ml-1.5 size-3.5" />
+              {isLiveMode ? "⚡ Mode: Live Mainnet" : "🧪 Mode: Sandbox Simulation"}
             </Button>
-          </a>
-        </div>
+
+            <a
+              href={`https://basescan.org/address/${customBorrowerAddress}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-slate-300 text-slate-700 hover:bg-slate-50"
+              >
+                Borrower Contract <ExternalLink className="ml-1.5 size-3.5" />
+              </Button>
+            </a>
+          </div>
+        )}
       </div>
 
       {/* Network & Live Wallet Status Banner */}
@@ -2149,7 +2154,9 @@ export default function Arbitrage() {
 
             <div className="flex items-center gap-1.5">
               <span className="font-semibold text-slate-700">Network:</span>
-              {isBaseNetwork ? (
+              {!isConnected ? (
+                <span>Wallet disconnected</span>
+              ) : isBaseNetwork ? (
                 <Badge className="border-blue-300 bg-blue-100 font-bold text-blue-900">
                   🔵 Base (8453)
                 </Badge>
@@ -2163,12 +2170,14 @@ export default function Arbitrage() {
             <div className="flex items-center gap-1.5">
               <Cpu className="size-3.5 text-purple-600" />
               <span className="font-semibold text-slate-700">Base Gas:</span>
-              <span className="font-mono font-bold text-purple-900">{gasPriceGwei} Gwei</span>
+              <span className="font-mono font-bold text-purple-900">
+                {gasPriceData === undefined ? "Unavailable" : `${gasPriceGwei} Gwei`}
+              </span>
             </div>
 
             {blockNumber && (
               <div className="hidden items-center gap-1.5 sm:flex">
-                <span className="font-semibold text-slate-700">Block:</span>
+                <span className="font-semibold text-slate-700">Base block:</span>
                 <span className="font-mono text-slate-600">#{blockNumber.toString()}</span>
               </div>
             )}
@@ -2189,7 +2198,7 @@ export default function Arbitrage() {
 
       {/* Main Execution Tabs - Auto-Pilot Prominently Featured */}
       <Tabs value={activeArbitrageTab} onValueChange={handleTabChange} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-1 border border-purple-100 bg-white/70 p-1 shadow-sm sm:grid-cols-8">
+        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 border border-purple-100 bg-white/70 p-1 shadow-sm sm:grid-cols-4 xl:grid-cols-8">
           <TabsTrigger
             value="matrix"
             className="flex items-center gap-2 font-bold text-emerald-800 data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
@@ -2808,7 +2817,13 @@ export default function Arbitrage() {
 
         {/* ── TAB: KRAKEN ↔ ALPACA LIVE DESK ── */}
         <TabsContent value="live" className="space-y-6">
-          <LiveDeskTab symbol={selectedMatrixSymbol} onSelectSymbol={setSelectedMatrixSymbol} />
+          <LiveDeskTab
+            symbol={cleanSymbol}
+            snapshot={cefiStream.snapshot}
+            onSelectSymbol={(symbol) =>
+              navigate(`${basePath}/live-desk/${symbol.replace("/", "-")}`)
+            }
+          />
         </TabsContent>
 
         {/* ── TAB 1: TRIANGULAR ARBITRAGE SOLVER ── */}

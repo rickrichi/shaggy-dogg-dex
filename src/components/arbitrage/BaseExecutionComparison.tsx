@@ -35,11 +35,10 @@ export function BaseExecutionComparison({ notional }: { notional: number }) {
         <CardTitle>Base DEX execution comparison</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
-        <p>
-          Buy WETH with {formatUnits(amount, 6)} USDC on Base. Kraken and Alpaca above quote ETH in
-          USD; USD and USDC are separate assets.
-        </p>
-        {quote.isPending ? (
+        <p>Buy WETH with {formatUnits(amount, 6)} USDC on Base. Exchange books quote ETH in USD.</p>
+        {!client ? (
+          <p>Base RPC unavailable.</p>
+        ) : quote.isPending ? (
           <p>Reading Base pools…</p>
         ) : quote.isError ? (
           <p role="alert">Base quotes unavailable. {quote.error.message}</p>
@@ -74,7 +73,7 @@ export function BaseExecutionComparison({ notional }: { notional: number }) {
           or partial leg leaves exposure.
         </p>
         <Link className="text-purple-700 underline" to="/swap/compare?input=USDC&output=WETH">
-          Review and sign the Base leg
+          Open Base swap comparison
         </Link>
         <p className="text-xs text-slate-500">
           Match the filled base quantity when hedging. Reconcile the exchange order and Base receipt

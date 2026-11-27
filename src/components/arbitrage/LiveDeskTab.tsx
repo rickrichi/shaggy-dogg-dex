@@ -4,10 +4,13 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ARB_PRIVATE_API } from "@/config/crypto-arb";
 import { useLiveAccounts } from "@/hooks/useLiveAccounts";
 
 import { BaseExecutionComparison } from "./BaseExecutionComparison";
 import { LiveVenueComparison } from "./LiveVenueComparison";
+
+import type { Snapshot } from "@/types/crypto-arb";
 
 // Pairs with both an Alpaca (ARB_ALPACA_SYMBOLS) and a Kraken live book.
 type StreamedAccount = ReturnType<typeof useLiveAccounts>["alpacaAccount"];
@@ -33,9 +36,11 @@ function AccountCard({
       <CardHeader className="pb-2">
         <CardTitle className="flex flex-wrap items-center gap-2 text-sm">
           {venue}
-          <Badge className="bg-rose-600 text-white">
-            {account?.mode === "paper" ? "PAPER" : "LIVE"}
-          </Badge>
+          {account && (
+            <Badge className="bg-rose-600 text-white">
+              {account?.mode === "paper" ? "PAPER" : "LIVE"}
+            </Badge>
+          )}
           {account?.tradingEnabled === false && (
             <Badge variant="destructive">Trading blocked</Badge>
           )}
@@ -119,15 +124,60 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
+function PublicMarketQuotes({ snapshot, symbol }: { snapshot: Snapshot | null; symbol: string }) {
+  const books = snapshot?.venues.filter((venue) => venue.symbol === symbol) ?? [];
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{symbol} exchange quotes</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {books.length === 0 ? (
+          <p>Public quotes unavailable for {symbol}.</p>
+        ) : (
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr>
+                <th>Exchange</th>
+                <th>Bid (USD)</th>
+                <th>Ask (USD)</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {books.map((book) => {
+                const age = (book.ageMs ?? Infinity) + Math.max(0, Date.now() - snapshot!.ts);
+                const state = book.status === "live" && age > 5000 ? "stale" : book.status;
+                return (
+                  <tr key={book.exchange}>
+                    <td>{book.exchange}</td>
+                    <td>{book.bid != null && book.bid > 0 ? usd(book.bid) : "—"}</td>
+                    <td>{book.ask != null && book.ask > 0 ? usd(book.ask) : "—"}</td>
+                    <td>{state}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export function LiveDeskTab({
   symbol,
+  snapshot,
   onSelectSymbol,
 }: {
   symbol: string;
+  snapshot: Snapshot | null;
   onSelectSymbol: (symbol: string) => void;
 }) {
   const { alpacaAccount, krakenAccount, connected, refresh } = useLiveAccounts();
-  const [notional, setNotional] = useState(100);
+  const [budget, setBudget] = useState("100");
+  const notional = Number(budget);
+  const valid = Number.isFinite(notional) && notional >= 1 && notional <= 1_000_000;
   const active = (LIVE_SYMBOLS as readonly string[]).includes(symbol) ? symbol : "ETH/USD";
   const base = active.split("/")[0] ?? active;
 
@@ -139,6 +189,7 @@ export function LiveDeskTab({
             <button
               key={s}
               type="button"
+              aria-pressed={s === active}
               onClick={() => onSelectSymbol(s)}
               className={`rounded-md border px-3 py-1.5 text-xs font-bold ${
                 s === active
@@ -150,34 +201,48 @@ export function LiveDeskTab({
             </button>
           ))}
         </div>
-        <div className="space-y-1">
-          <Label htmlFor="live-desk-budget" className="text-xs">
-            Budget (USD)
-          </Label>
-          <Input
-            id="live-desk-budget"
-            type="number"
-            min={1}
-            value={notional}
-            onChange={(e) => {
-              const v = e.currentTarget.valueAsNumber;
-              if (Number.isFinite(v) && v > 0) setNotional(v);
-            }}
-            className="w-28"
-          />
+        {(ARB_PRIVATE_API || active === "ETH/USD") && (
+          <div className="space-y-1">
+            <Label htmlFor="live-desk-budget" className="text-xs">
+              {ARB_PRIVATE_API ? "Budget (USD)" : "Base quote amount (USDC)"}
+            </Label>
+            <Input
+              id="live-desk-budget"
+              type="number"
+              min={1}
+              max={1_000_000}
+              step="any"
+              value={budget}
+              aria-invalid={!valid}
+              aria-describedby={valid ? undefined : "live-desk-budget-error"}
+              onChange={(e) => setBudget(e.currentTarget.value)}
+              className="w-28"
+            />
+            {!valid && (
+              <p id="live-desk-budget-error" className="text-xs text-rose-700">
+                Enter an amount from 1 to 1,000,000.
+              </p>
+            )}
+          </div>
+        )}
+        {ARB_PRIVATE_API && (
+          <span className={`text-xs ${connected ? "text-emerald-600" : "text-amber-600"}`}>
+            ● {connected ? "Balances streaming" : "Balances reconnecting…"}
+          </span>
+        )}
+      </div>
+
+      {ARB_PRIVATE_API ? (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <AccountCard venue="Alpaca" account={alpacaAccount} base={base} />
+          <AccountCard venue="Kraken" account={krakenAccount} base={base} />
         </div>
-        <span className={`text-xs ${connected ? "text-emerald-600" : "text-amber-600"}`}>
-          ● {connected ? "Balances streaming" : "Balances reconnecting…"}
-        </span>
-      </div>
+      ) : (
+        <PublicMarketQuotes snapshot={snapshot} symbol={active} />
+      )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <AccountCard venue="Alpaca" account={alpacaAccount} base={base} />
-        <AccountCard venue="Kraken" account={krakenAccount} base={base} />
-      </div>
-
-      <LiveVenueComparison symbol={active} notional={notional} onExecuted={refresh} />
-      {active === "ETH/USD" && <BaseExecutionComparison notional={notional} />}
+      <LiveVenueComparison symbol={active} notional={valid ? notional : 0} onExecuted={refresh} />
+      {valid && active === "ETH/USD" && <BaseExecutionComparison notional={notional} />}
     </div>
   );
 }
