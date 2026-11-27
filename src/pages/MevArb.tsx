@@ -14,6 +14,7 @@ export const ARB_SUMMARY_PATH = "/api/mev/arb/summary";
 const STALE_MS = 120_000;
 
 export interface ArbRow {
+  shortfallEth?: number;
   t: string;
   block: string;
   pair: string;
@@ -156,6 +157,14 @@ export interface ChainSummary {
 }
 
 export interface BackrunRow {
+  opportunityId?: string;
+  auditOutcome?: string;
+  receiptGasWei?: string;
+  receiptProfitQuote?: number;
+  receiptQuote?: string;
+  outcome?: string;
+  targetBlock?: string;
+  bundleHash?: string | null;
   t: string;
   block: string;
   pair: string;
@@ -182,6 +191,7 @@ export interface BackrunRow {
 }
 
 export interface BackrunSummary {
+  opportunities?: BackrunRow[];
   chain: string;
   mode: "shadow" | "live";
   connected: boolean;
@@ -804,7 +814,7 @@ function ChainCard({ c, now }: { c: ChainSummary; now: number }) {
                       {r.amountIn.toPrecision(4)} {r.quote}
                     </td>
                     <td className="pr-3 tabular-nums">{fmtSigned(r.profitQuote, r.quote)}</td>
-                    <td className="pr-3 tabular-nums">{fmtSigned(r.netEth, "ETH")}</td>
+                    <td className="pr-3 tabular-nums">{fmtSigned(r.netEth, "ETH")}{c.chain === "base" && r.shortfallEth !== undefined && r.shortfallEth > 0 && <div className="text-xs text-muted-foreground">{r.shortfallEth.toPrecision(3)} ETH below floor</div>}</td>
                     <td>
                       {r.decision === "send" ? (
                         <Badge className="bg-emerald-600">worth sending</Badge>
@@ -966,7 +976,7 @@ function BackrunCard({ b, now }: { b: BackrunSummary; now: number }) {
             ? ` — ${t.poolOnlyLanded} matched after landing, ${t.poolOnlySimulated ?? 0} priced`
             : ""}
           ) · {t.simulated} simulated · {t.profitableBeforeGas} profitable before gas ·{" "}
-          <strong>{t.worthSending} worth sending</strong>
+          <strong>{t.worthSending} cleared the simulated floor (includes post-trade replay)</strong>
           {t.blindWorthSending !== undefined ? ` (${t.blindWorthSending} blind)` : ""}
           {b.mode === "live"
             ? ` · ${acceptedBundles(t)} · ${t.landed} landed`
@@ -975,7 +985,7 @@ function BackrunCard({ b, now }: { b: BackrunSummary; now: number }) {
         {b.sessionTotals ? (
           <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
             Current session: {b.sessionTotals.simulated} simulated · {b.sessionTotals.worthSending}{" "}
-            worth sending · {acceptedBundles(b.sessionTotals)} · {b.sessionTotals.landed}{" "}
+            cleared the simulated floor (includes replay) · {acceptedBundles(b.sessionTotals)} · {b.sessionTotals.landed}{" "}
             landed. Lifetime: {t.simulated} simulated · {acceptedBundles(t)} · {t.landed}{" "}
             landed.
           </div>
@@ -1127,6 +1137,19 @@ function BackrunCard({ b, now }: { b: BackrunSummary; now: number }) {
               ? ` · event-loop delay p99 ${b.latencyMs.eventLoopMs.p99.toFixed(0)} ms (max ${b.latencyMs.eventLoopMs.max.toFixed(0)} ms)`
               : ""}
           </div>
+        ) : null}
+        {b.opportunities?.length ? (
+          <section aria-label="Priced backrun outcomes" className="space-y-2">
+            <h4 className="font-semibold">Why did this backrun land or miss?</h4>
+            <div className="overflow-x-auto"><table className="w-full text-left text-xs">
+              <thead><tr><th>Opportunity</th><th>Route</th><th>Estimated net</th><th>Gas / builder bid</th><th>Target block</th><th>Outcome</th></tr></thead>
+              <tbody>{b.opportunities.map(r => <tr key={r.opportunityId} className="border-t">
+                <td className="pr-3">{r.opportunityId}</td><td>{r.pair} · {r.buy} → {r.sell}</td>
+                <td>{fmtSigned(r.netEth, "ETH")}</td><td>{fmtSigned(r.gasEth, "ETH")} / {fmtSigned(r.bribeEth, "ETH")}</td>
+                <td>{r.targetBlock ?? "—"}</td><td>{r.outcome ?? "Unknown"}{r.auditOutcome && <div>{r.auditOutcome.split("_").join(" ")}</div>}{r.receiptProfitQuote !== undefined && <div>Executor profit {r.receiptProfitQuote} {r.receiptQuote}</div>}{r.receiptGasWei && <div>Gas paid {fmtSigned(Number(r.receiptGasWei) / 1e18, "ETH")}</div>}</td>
+              </tr>)}</tbody>
+            </table></div>
+          </section>
         ) : null}
         {b.recent.length ? (
           <div className="overflow-x-auto">
