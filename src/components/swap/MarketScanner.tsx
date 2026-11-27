@@ -1,13 +1,23 @@
 // src/components/swap/MarketScanner.tsx
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { Activity, Play, RefreshCw, Square } from "lucide-react";
+import {
+  Activity,
+  AlertCircle,
+  Play,
+  Radar,
+  RefreshCw,
+  Square,
+  TrendingDown,
+  TrendingUp,
+  Wallet,
+} from "lucide-react";
 import { type Address, formatUnits } from "viem";
 import { useAccount, usePublicClient } from "wagmi";
 
 import { IndicativeBadge } from "@/components/IndicativeBadge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { getTokensForChain, isErc20Token, type Token } from "@/config/tokens";
 import { fetchPrices } from "@/lib/api/prices";
 
@@ -95,13 +105,13 @@ function describeScannerError(error: unknown): string {
   const message = error instanceof Error ? error.message : "";
   if (message === "unsupported_chain") return "Market data is not available on this network.";
   if (error instanceof DOMException && error.name === "AbortError") {
-    return "Price data unavailable: the price service did not answer in time. Retrying every 15 seconds.";
+    return "Feed offline — the price service did not answer in time. Retrying every 15 seconds.";
   }
-  if (message === "HTTP 429") return "Price data unavailable: too many requests. Retrying shortly.";
+  if (message === "HTTP 429") return "Feed offline — too many requests. Retrying shortly.";
   if (message === "market_data_unavailable") {
-    return "Price data unavailable: the price service is not responding. Retrying every 15 seconds.";
+    return "Feed offline — the price service is not responding. Retrying every 15 seconds.";
   }
-  return `Price data unavailable${message ? ` (${message})` : ""}. Retrying every 15 seconds.`;
+  return `Feed offline${message ? ` (${message})` : ""}. Retrying every 15 seconds.`;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -298,181 +308,254 @@ export function MarketScanner() {
         : "Scanning...";
 
   const emptyMessage = (
-    <div className="bg-slate-50 p-3 text-sm text-slate-500">
-      {isLoading ? "Scanning markets..." : "Scanner results will appear here."}
+    <div className="flex items-center justify-center gap-2 bg-slate-50/70 p-6 text-xs font-medium text-slate-500">
+      <Radar className={`size-4 text-purple-500 ${isLoading ? "animate-spin" : ""}`} />
+      <span>{isLoading ? "Scanning markets..." : "Scanner results will appear here."}</span>
     </div>
   );
 
   return (
-    <Card className="mt-6 border-slate-200/70 bg-white/70 p-4 shadow-sm backdrop-blur-sm">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <Activity className="size-4 text-purple-600" />
-            <h2 className="text-sm font-semibold text-slate-900">Market Scanner</h2>
+    <Card className="overflow-hidden rounded-3xl border border-purple-200/80 bg-white/95 shadow-lg ring-1 ring-purple-500/5 backdrop-blur-xl">
+      <CardHeader className="border-b border-slate-100/90 bg-gradient-to-r from-purple-50/40 via-white to-pink-50/40 px-4 pb-3.5 pt-4 sm:px-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-2.5">
+            <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-purple-100 to-pink-100 text-purple-700">
+              <Activity className="size-4" />
+            </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold leading-none tracking-tight text-slate-900">
+                  Market Scanner
+                </h2>
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold uppercase ${
+                    enabled
+                      ? error
+                        ? "bg-red-100 text-red-800"
+                        : "bg-emerald-100 text-emerald-800"
+                      : "bg-slate-100 text-slate-500"
+                  }`}
+                >
+                  <span
+                    className={`size-1.5 rounded-full ${
+                      enabled
+                        ? error
+                          ? "bg-red-500"
+                          : "animate-pulse bg-emerald-500"
+                        : "bg-slate-400"
+                    }`}
+                  />
+                  {enabled ? (error ? "Retry 15s" : "Live 15s") : "Standby"}
+                </span>
+              </div>
+              <p
+                className={`mt-1 font-mono text-xs ${error ? "font-semibold text-red-600" : "text-slate-500"}`}
+                aria-live="polite"
+              >
+                {status}
+              </p>
+            </div>
           </div>
-          <p
-            className={`mt-1 text-xs ${error ? "text-red-600" : "text-slate-500"}`}
-            aria-live="polite"
-          >
-            {status}
-          </p>
-        </div>
 
-        <div className="flex items-center gap-2">
-          {enabled && (
+          <div className="flex items-center gap-2">
+            {enabled && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={runScanner}
+                disabled={isLoading}
+                className="gap-1.5 rounded-xl border-slate-200/90 text-xs font-semibold"
+              >
+                <RefreshCw className={`size-3.5 ${isLoading ? "animate-spin" : ""}`} />
+                Sync
+              </Button>
+            )}
             <Button
               type="button"
-              variant="outline"
               size="sm"
-              onClick={runScanner}
-              disabled={isLoading}
-              className="gap-2"
+              onClick={() => setEnabled((on) => !on)}
+              className={`gap-1.5 rounded-xl text-xs font-bold shadow-sm transition ${
+                enabled
+                  ? "bg-slate-900 text-white hover:bg-slate-800"
+                  : "bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700"
+              }`}
             >
-              <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} />
-              Sync
+              {enabled ? <Square className="size-3.5" /> : <Play className="size-3.5" />}
+              {enabled ? "Stop Scanner" : "Start Scanner"}
             </Button>
-          )}
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => setEnabled((on) => !on)}
-            className="gap-2 bg-slate-900 text-white hover:bg-slate-800"
-          >
-            {enabled ? <Square className="size-4" /> : <Play className="size-4" />}
-            {enabled ? "Stop Scanner" : "Start Scanner"}
-          </Button>
+          </div>
         </div>
-      </div>
+      </CardHeader>
 
-      <div className="mt-4 flex gap-1" role="group" aria-label="Scanner view">
-        {(
-          [
-            ["movers", "Top movers"],
-            ["holdings", "My holdings"],
-          ] as const
-        ).map(([value, label]) => (
-          <button
-            key={value}
-            type="button"
-            aria-pressed={view === value}
-            onClick={() => setView(value)}
-            className={`rounded-md px-3 py-1 text-xs font-medium ${
-              view === value ? "bg-purple-100 text-purple-700" : "text-slate-500 hover:bg-slate-100"
-            }`}
+      <CardContent className="space-y-3 px-4 pb-4 pt-3.5 sm:px-5">
+        <div className="flex items-center justify-between gap-2">
+          <div
+            className="inline-flex rounded-xl border border-slate-200/80 bg-slate-100/80 p-1"
+            role="group"
+            aria-label="Scanner view"
           >
-            {label}
-          </button>
-        ))}
-      </div>
+            {(
+              [
+                ["movers", "Top movers"],
+                ["holdings", "My holdings"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={view === value}
+                onClick={() => setView(value)}
+                className={`rounded-lg px-3.5 py-1 text-xs font-bold transition ${
+                  view === value
+                    ? "bg-white text-purple-700 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
 
-      <div className="mt-2 overflow-hidden rounded-md border border-slate-100">
-        {error ? (
-          <div className="bg-red-50 p-3 text-sm text-red-700">{error}</div>
-        ) : view === "movers" ? (
-          movers.length > 0 ? (
+          <span className="hidden font-mono text-[11px] text-slate-400 sm:inline">
+            {view === "movers" ? "24h firm liquidity movers" : "On-chain multicall balances"}
+          </span>
+        </div>
+
+        <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white">
+          {error ? (
+            <div className="flex items-center gap-2 bg-red-50/90 p-3.5 text-xs font-medium text-red-700">
+              <AlertCircle className="size-4 shrink-0 text-red-600" />
+              <span>{error}</span>
+            </div>
+          ) : view === "movers" ? (
+            movers.length > 0 ? (
+              <div className="divide-y divide-slate-100">
+                <div className="grid grid-cols-[1fr_auto_auto] items-center gap-3 bg-slate-50/80 px-4 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                  <span>Asset</span>
+                  <span>Spot USD</span>
+                  <span className="text-right">24h Delta</span>
+                </div>
+                {movers.map((row) => {
+                  const isUp = row.change24hPercent >= 0;
+                  return (
+                    <div
+                      key={row.key}
+                      className="grid grid-cols-[1fr_auto_auto] items-center gap-3 bg-white px-4 py-2.5 text-sm transition hover:bg-purple-50/30"
+                    >
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-purple-100/80 font-mono text-[10px] font-semibold text-purple-800">
+                          {row.symbol.slice(0, 3)}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="font-bold text-slate-900">{row.symbol}</p>
+                          <p className="truncate text-xs text-slate-500">{row.name}</p>
+                        </div>
+                      </div>
+                      <p className="font-mono text-sm font-semibold tabular-nums text-slate-800">
+                        {formatUsd(row.priceUsd)}
+                      </p>
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 font-mono text-xs font-semibold tabular-nums ${
+                          isUp
+                            ? "bg-emerald-50 text-emerald-700"
+                            : "bg-red-50 text-red-700"
+                        }`}
+                      >
+                        {isUp ? (
+                          <TrendingUp className="size-3" />
+                        ) : (
+                          <TrendingDown className="size-3" />
+                        )}
+                        {isUp ? "+" : ""}
+                        {row.change24hPercent.toFixed(2)}%
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              emptyMessage
+            )
+          ) : !isConnected || !address ? (
+            <div className="flex items-center justify-center gap-2 bg-slate-50/80 p-5 text-xs font-medium text-slate-500">
+              <Wallet className="size-4 text-slate-400" />
+              <span>Connect a wallet to see your holdings.</span>
+            </div>
+          ) : balanceError ? (
+            <div className="bg-amber-50 p-3.5 text-xs font-medium text-amber-800">
+              Could not read your wallet balances. Retrying with the next scan.
+            </div>
+          ) : !balances ? (
+            emptyMessage
+          ) : holdings.length === 0 ? (
+            <div className="bg-slate-50/80 p-5 text-center text-xs font-medium text-slate-500">
+              No balances in this network&apos;s token list.
+            </div>
+          ) : (
             <div className="divide-y divide-slate-100">
-              {movers.map((row) => (
+              {holdings.map(({ token, amount, row }) => (
                 <div
-                  key={row.key}
-                  className="grid grid-cols-[1fr_auto_auto] items-center gap-3 bg-white/60 px-3 py-2 text-sm"
+                  key={tokenKey(token)}
+                  className="grid grid-cols-[1fr_auto_auto] items-center gap-3 bg-white px-4 py-2.5 text-sm transition hover:bg-purple-50/30"
                 >
                   <div className="min-w-0">
-                    <p className="font-semibold text-slate-900">{row.symbol}</p>
-                    <p className="truncate text-xs text-slate-500">{row.name}</p>
+                    <p className="font-bold text-slate-900">{token.symbol}</p>
+                    <p className="truncate font-mono text-xs text-slate-500">
+                      {amountFormat.format(amount)} {token.symbol}
+                    </p>
                   </div>
-                  <p className="font-mono text-slate-700">{formatUsd(row.priceUsd)}</p>
-                  <p
-                    className={
-                      row.change24hPercent >= 0
-                        ? "font-mono text-emerald-600"
-                        : "font-mono text-red-600"
-                    }
-                  >
-                    {row.change24hPercent >= 0 ? "+" : ""}
-                    {row.change24hPercent.toFixed(2)}%
+                  <div className="flex flex-col items-end gap-0.5">
+                    <p className="font-mono text-xs font-medium tabular-nums text-slate-700">
+                      {row ? formatUsd(row.priceUsd) : "No price"}
+                    </p>
+                    {row?.indicative && <IndicativeBadge liquidityUsd={row.liquidityUsd} />}
+                  </div>
+                  <p className="min-w-20 text-right font-mono text-sm font-semibold tabular-nums text-slate-900">
+                    {row ? `${row.indicative ? "≈ " : ""}${formatUsd(amount * row.priceUsd)}` : "—"}
                   </p>
                 </div>
               ))}
-            </div>
-          ) : (
-            emptyMessage
-          )
-        ) : !isConnected || !address ? (
-          <div className="bg-slate-50 p-3 text-sm text-slate-500">
-            Connect a wallet to see your holdings.
-          </div>
-        ) : balanceError ? (
-          <div className="bg-amber-50 p-3 text-sm text-amber-800">
-            Could not read your wallet balances. Retrying with the next scan.
-          </div>
-        ) : !balances ? (
-          emptyMessage
-        ) : holdings.length === 0 ? (
-          <div className="bg-slate-50 p-3 text-sm text-slate-500">
-            No balances in this network&apos;s token list.
-          </div>
-        ) : (
-          <div className="divide-y divide-slate-100">
-            {holdings.map(({ token, amount, row }) => (
-              <div
-                key={tokenKey(token)}
-                className="grid grid-cols-[1fr_auto_auto] items-center gap-3 bg-white/60 px-3 py-2 text-sm"
-              >
-                <div className="min-w-0">
-                  <p className="font-semibold text-slate-900">{token.symbol}</p>
-                  <p className="truncate text-xs text-slate-500">
-                    {amountFormat.format(amount)} {token.symbol}
-                  </p>
-                </div>
-                <div className="flex flex-col items-end gap-0.5">
-                  <p className="font-mono text-slate-700">
-                    {row ? formatUsd(row.priceUsd) : "No price"}
-                  </p>
-                  {row?.indicative && <IndicativeBadge liquidityUsd={row.liquidityUsd} />}
-                </div>
-                <p className="min-w-20 text-right font-mono text-slate-900">
-                  {row ? `${row.indicative ? "≈ " : ""}${formatUsd(amount * row.priceUsd)}` : "—"}
-                </p>
+              <div className="flex items-center justify-between bg-slate-50/90 px-4 py-2.5 text-sm">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Total
+                </span>
+                <span className="font-mono font-semibold tabular-nums text-slate-900">
+                  {formatUsd(holdingsValue.firm)}
+                  {holdingsValue.indicative > 0 && (
+                    <span className="ml-2 text-xs font-normal text-amber-700">
+                      + ≈ {formatUsd(holdingsValue.indicative)} indicative
+                    </span>
+                  )}
+                </span>
               </div>
-            ))}
-            <div className="flex items-center justify-between bg-slate-50/80 px-3 py-2 text-sm">
-              <span className="text-slate-500">Total</span>
-              <span className="font-mono font-semibold text-slate-900">
-                {formatUsd(holdingsValue.firm)}
-                {holdingsValue.indicative > 0 && (
-                  <span className="ml-2 text-xs font-normal text-amber-700">
-                    + ≈ {formatUsd(holdingsValue.indicative)} indicative
-                  </span>
-                )}
-              </span>
             </div>
-          </div>
-        )}
-      </div>
-
-      {coverage && !error && (
-        <div className="mt-2 space-y-1 text-xs text-slate-500">
-          {coverage.indicative.length > 0 && (
-            <p>
-              Indicative only (pool under the price service&apos;s liquidity floor, easy to move):{" "}
-              {coverage.indicative.join(", ")}
-            </p>
-          )}
-          {coverage.unpriced.length > 0 && (
-            <p>
-              No pool to price: {coverage.unpriced.slice(0, 8).join(", ")}
-              {coverage.unpriced.length > 8 ? ` and ${coverage.unpriced.length - 8} more` : ""}
-            </p>
-          )}
-          {coverage.failed > 0 && (
-            <p>
-              {coverage.failed} {coverage.failed === 1 ? "token" : "tokens"} did not answer in time;
-              the next scan retries them.
-            </p>
           )}
         </div>
-      )}
+
+        {coverage && !error && (
+          <div className="space-y-1 rounded-xl bg-slate-50/80 px-3 py-2 text-xs text-slate-500">
+            {coverage.indicative.length > 0 && (
+              <p>
+                Indicative only (pool under the price service&apos;s liquidity floor, easy to
+                move): {coverage.indicative.join(", ")}
+              </p>
+            )}
+            {coverage.unpriced.length > 0 && (
+              <p>
+                No pool to price: {coverage.unpriced.slice(0, 8).join(", ")}
+                {coverage.unpriced.length > 8 ? ` and ${coverage.unpriced.length - 8} more` : ""}
+              </p>
+            )}
+            {coverage.failed > 0 && (
+              <p>
+                {coverage.failed} {coverage.failed === 1 ? "token" : "tokens"} did not answer in
+                time; the next scan retries them.
+              </p>
+            )}
+          </div>
+        )}
+      </CardContent>
     </Card>
   );
 }
