@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
   ArrowRightLeft,
@@ -57,8 +58,8 @@ import {
 } from "@/lib/paymaster/artifact";
 import {
   BASE_ENTRYPOINT_V07,
+  BASE_ENTRYPOINT_V08,
   MRWD_ON_BASE,
-  type PaymasterStatus,
   readPaymasterStatus,
   rewardTokenAbi,
   SIMPLE_7702_ACCOUNT_ON_BASE,
@@ -168,7 +169,7 @@ export function PaymasterPortfolioTransfer() {
       return null;
     }
   });
-  const [paymasterStatus, setPaymasterStatus] = useState<PaymasterStatus | null>(null);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const syncSavedPaymaster = () => {
@@ -212,31 +213,18 @@ export function PaymasterPortfolioTransfer() {
     [customPaymasterAddress, config?.paymaster]
   );
 
-  const refreshPaymasterStatus = useCallback(async () => {
-    if (!publicClient || !activePaymasterAddress) {
-      setPaymasterStatus(null);
-      return;
-    }
-    try {
-      const status = await readPaymasterStatus(publicClient, activePaymasterAddress);
-      setPaymasterStatus(status);
-    } catch {
-      setPaymasterStatus(null);
-    }
-  }, [publicClient, activePaymasterAddress]);
-
-  useEffect(() => {
-    void refreshPaymasterStatus();
-  }, [refreshPaymasterStatus]);
-
-  const rewardLabel = useMemo(
-    () =>
-      paymasterStatus
-        ? `${formatUnits(paymasterStatus.rewardAmount, paymasterStatus.rewardDecimals)} ${paymasterStatus.rewardSymbol}`
-        : "100 MRWD",
-    [paymasterStatus]
-  );
-
+  const statusQuery = useQuery({
+    queryKey: ["base-paymaster-status", activePaymasterAddress.toLowerCase()],
+    queryFn: () => {
+      if (!publicClient) throw new Error("Base RPC unavailable");
+      return readPaymasterStatus(publicClient, activePaymasterAddress);
+    },
+    enabled: !!publicClient,
+  });
+  const paymasterStatus = statusQuery.isError ? undefined : statusQuery.data;
+  const rewardLabel = paymasterStatus
+    ? `${formatUnits(paymasterStatus.rewardAmount, paymasterStatus.rewardDecimals)} ${paymasterStatus.rewardSymbol}`
+    : null;
   const isMetaMaskDelegator = walletBytecode === METAMASK_DESIGNATOR;
   const isSimple7702Delegator = walletBytecode === SIMPLE_7702_DESIGNATOR;
   // Shown before the user tries. No browser wallet can currently complete a sponsored operation;
@@ -245,8 +233,10 @@ export function PaymasterPortfolioTransfer() {
     address && walletBytecode !== null ? sponsoredAccountProblem(walletBytecode) : null;
   const needsV07PaymasterUpgrade =
     isMetaMaskDelegator &&
+    chainId === base.id &&
     !!paymasterStatus &&
-    paymasterStatus.entryPoint.toLowerCase() !== BASE_ENTRYPOINT_V07.toLowerCase();
+    paymasterStatus.owner.toLowerCase() === address?.toLowerCase() &&
+    paymasterStatus.entryPoint.toLowerCase() === BASE_ENTRYPOINT_V08.toLowerCase();
 
   const connectedWalletTypeLabel = useMemo(() => {
     if (!isConnected || !address) return "Disconnected (Browser Wallet / EOA)";
@@ -548,23 +538,22 @@ export function PaymasterPortfolioTransfer() {
   async function upgradePaymasterForMetaMask() {
     setError("");
     setTxHash(null);
-    if (!address || !walletClient || !publicClient) return;
+    if (!needsV07PaymasterUpgrade || !address || !walletClient || !publicClient) return;
     setUpgradingPaymaster(true);
     try {
-      if (chainId !== base.id) {
-        await switchChainAsync({ chainId: base.id });
+      const oldStatus = await readPaymasterStatus(publicClient, activePaymasterAddress);
+      if (
+        oldStatus.owner.toLowerCase() !== address.toLowerCase() ||
+        oldStatus.entryPoint.toLowerCase() !== BASE_ENTRYPOINT_V08.toLowerCase() ||
+        oldStatus.deposit !== paymasterStatus.deposit ||
+        oldStatus.availableRewards !== paymasterStatus.availableRewards
+      ) {
+        throw new Error("The paymaster changed. Review its refreshed details before migrating.");
       }
-      const oldStatus = paymasterStatus;
-      const isOldOwner = oldStatus && oldStatus.owner.toLowerCase() === address.toLowerCase();
-      const signerAddr =
-        config?.signerAddress ??
-        oldStatus?.signer ??
-        ("0x852Cd18B109Be741d04bBcb98CB2BD766D9A7d70" as Address);
-      const rewardAmt = oldStatus?.rewardAmount ?? parseUnits("100", 18);
+      const signerAddr = config?.signerAddress ?? oldStatus.signer;
+      const rewardAmt = oldStatus.rewardAmount;
       const maxCostAmt = parseUnits("0.0001", 18);
-
-      // Step 1: If user owns the v0.8 paymaster and it has ETH deposit, withdraw ETH first so wallet has extra gas
-      if (isOldOwner && oldStatus.deposit > 0n) {
+      if (oldStatus.deposit > 0n) {
         setUpgradeStep(
           `Step 1/4: Withdrawing ${formatEther(oldStatus.deposit)} ETH deposit from v0.8 paymaster…`
         );
@@ -576,7 +565,11 @@ export function PaymasterPortfolioTransfer() {
           account: address,
           chain: base,
         });
-        await publicClient.waitForTransactionReceipt({ hash: withdrawEthHash });
+        if (
+          (await publicClient.waitForTransactionReceipt({ hash: withdrawEthHash })).status !==
+          "success"
+        )
+          throw new Error("Deposit withdrawal reverted.");
       }
 
       // Step 2: Deploy EntryPoint v0.7 SponsoredRewardPaymaster (compatible with MetaMask 7702)
@@ -591,7 +584,7 @@ export function PaymasterPortfolioTransfer() {
       const deployReceipt = await publicClient.waitForTransactionReceipt({
         hash: deployHash,
       });
-      if (!deployReceipt.contractAddress) {
+      if (deployReceipt.status !== "success" || !deployReceipt.contractAddress) {
         throw new Error("Deployment receipt did not include a contract address.");
       }
       const newPaymaster = getAddress(deployReceipt.contractAddress);
@@ -604,7 +597,7 @@ export function PaymasterPortfolioTransfer() {
       setCustomPaymasterAddress(newPaymaster);
 
       // Step 3: Move MRWD rewards directly from old v0.8 paymaster to new v0.7 paymaster
-      if (isOldOwner && oldStatus.availableRewards > 0n) {
+      if (oldStatus.availableRewards > 0n) {
         setUpgradeStep(
           `Step 3/4: Moving ${formatUnits(oldStatus.availableRewards, oldStatus.rewardDecimals)} MRWD reward pool to new v0.7 paymaster…`
         );
@@ -616,32 +609,33 @@ export function PaymasterPortfolioTransfer() {
           account: address,
           chain: base,
         });
-        await publicClient.waitForTransactionReceipt({ hash: moveRewardsHash });
+        if (
+          (await publicClient.waitForTransactionReceipt({ hash: moveRewardsHash })).status !==
+          "success"
+        )
+          throw new Error("Reward migration reverted.");
       }
 
-      // Step 4: Deposit 0.0001 ETH gas into the new v0.7 paymaster
-      const depositToFund =
-        oldStatus && oldStatus.deposit > 0n ? oldStatus.deposit : parseUnits("0.0001", 18);
-      setUpgradeStep(
-        `Step 4/4: Depositing ${formatEther(depositToFund)} ETH gas into new v0.7 paymaster…`
-      );
-      const depositHash = await walletClient.writeContract({
-        address: newPaymaster,
-        abi: SPONSORED_REWARD_PAYMASTER_ABI,
-        functionName: "deposit",
-        value: depositToFund,
-        account: address,
-        chain: base,
-      });
-      await publicClient.waitForTransactionReceipt({ hash: depositHash });
-
-      setUpgradeStep("");
-      await refreshPaymasterStatus();
+      if (oldStatus.deposit > 0n) {
+        setUpgradeStep(`Depositing the withdrawn ${formatEther(oldStatus.deposit)} ETH…`);
+        const depositHash = await walletClient.writeContract({
+          address: newPaymaster,
+          abi: SPONSORED_REWARD_PAYMASTER_ABI,
+          functionName: "deposit",
+          value: oldStatus.deposit,
+          account: address,
+          chain: base,
+        });
+        if (
+          (await publicClient.waitForTransactionReceipt({ hash: depositHash })).status !== "success"
+        )
+          throw new Error("Funding the new paymaster reverted.");
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Paymaster v0.7 upgrade failed.");
-      setUpgradeStep("");
-      await refreshPaymasterStatus();
     } finally {
+      setUpgradeStep("");
+      await queryClient.invalidateQueries({ queryKey: ["base-paymaster-status"] });
       setUpgradingPaymaster(false);
     }
   }
@@ -1014,7 +1008,9 @@ export function PaymasterPortfolioTransfer() {
       const hash = await smartClient.sendTransaction({ calls });
       setTxHash(hash);
       refetch();
-      void refreshPaymasterStatus();
+      void queryClient.invalidateQueries({
+        queryKey: ["base-paymaster-status", targetPaymaster.toLowerCase()],
+      });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Sponsored operation failed.");
     } finally {
@@ -1035,9 +1031,7 @@ export function PaymasterPortfolioTransfer() {
               Sponsored Portfolio Operations
             </CardTitle>
             <CardDescription className="max-w-3xl text-sm leading-relaxed text-slate-600">
-              Transfer, swap, or stake any ERC-20 token you hold on Base. The paymaster covers ETH
-              network gas and rewards your wallet with <strong>{rewardLabel}</strong> upon a
-              successful operation. No MRWD is ever charged as a fee.
+              Inspect Base portfolio assets and preview transfer, swap, and staking operations.
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -1045,7 +1039,11 @@ export function PaymasterPortfolioTransfer() {
               variant="outline"
               className="border-emerald-300 bg-emerald-50/90 px-3 py-1 font-mono text-xs font-bold text-emerald-900"
             >
-              +{rewardLabel} / op
+              {rewardLabel
+                ? `+${rewardLabel} / op`
+                : statusQuery.isLoading
+                  ? "Loading reward…"
+                  : "Reward unavailable"}
             </Badge>
             {isMetaMaskDelegator && (
               <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-indigo-900">
@@ -1074,9 +1072,7 @@ export function PaymasterPortfolioTransfer() {
         {!isConnected && (
           <div className="flex items-center gap-2.5 rounded-2xl border border-purple-200/80 bg-purple-50/70 px-4 py-3 text-sm text-purple-950">
             <Wallet className="size-4 shrink-0 text-purple-700" />
-            <span>
-              Connect your wallet to load your Base portfolio tokens and execute sponsored actions.
-            </span>
+            <span>Connect your wallet to load your Base portfolio tokens.</span>
           </div>
         )}
         {isConnected && chainId !== base.id && (
@@ -1110,16 +1106,12 @@ export function PaymasterPortfolioTransfer() {
                   MetaMask Smart Account Detected (ERC-4337 EntryPoint v0.7)
                 </p>
                 <p className="text-xs leading-relaxed text-amber-900">
-                  Your wallet is delegated to MetaMask’s{" "}
-                  <code className="rounded bg-amber-100 px-1 py-0.5 font-mono">
-                    EIP7702StatelessDeleGator
-                  </code>{" "}
-                  which executes on <strong>EntryPoint v0.7</strong>, while the currently attached
-                  paymaster (
-                  <code className="font-mono">{activePaymasterAddress?.slice(0, 10)}…</code>) was
-                  deployed for EntryPoint v0.8. Click below to automatically withdraw your ETH
-                  deposit &amp; 10,000 MRWD from the v0.8 paymaster, deploy the EntryPoint v0.7
-                  paymaster, and fund it.
+                  Your wallet pays transaction fees to deploy and fund the new v0.7 paymaster.
+                  Migration moves {formatEther(paymasterStatus.deposit)} ETH from the old paymaster
+                  through your wallet into the new deposit and transfers{" "}
+                  {formatUnits(paymasterStatus.availableRewards, paymasterStatus.rewardDecimals)}{" "}
+                  {paymasterStatus.rewardSymbol} from the old reward pool to the new contract.
+                  Browser-wallet sponsorship remains unavailable after migration.
                 </p>
                 {upgradeStep && (
                   <p className="pt-1 font-mono text-xs font-semibold text-indigo-900">
@@ -1240,7 +1232,10 @@ export function PaymasterPortfolioTransfer() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between gap-2">
-                    <Label htmlFor="paymaster-token" className="text-xs font-semibold text-slate-700">
+                    <Label
+                      htmlFor="paymaster-token"
+                      className="text-xs font-semibold text-slate-700"
+                    >
                       Portfolio token (Base ERC-20)
                     </Label>
                     {token && (
@@ -1294,7 +1289,10 @@ export function PaymasterPortfolioTransfer() {
           <TabsContent value="transfer" className="mt-4 space-y-4">
             <div className="grid gap-4 rounded-2xl border border-slate-200/90 bg-slate-50/80 p-4 md:grid-cols-2">
               <div className="space-y-1.5">
-                <Label htmlFor="paymaster-recipient" className="text-xs font-semibold text-slate-700">
+                <Label
+                  htmlFor="paymaster-recipient"
+                  className="text-xs font-semibold text-slate-700"
+                >
                   Recipient address
                 </Label>
                 <Input
@@ -1307,7 +1305,10 @@ export function PaymasterPortfolioTransfer() {
               </div>
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
-                  <Label htmlFor="paymaster-amount" className="text-xs font-semibold text-slate-700">
+                  <Label
+                    htmlFor="paymaster-amount"
+                    className="text-xs font-semibold text-slate-700"
+                  >
                     Amount {token ? `(${token.symbol})` : ""}
                   </Label>
                   {token && token.balance > 0n && (
@@ -1372,7 +1373,10 @@ export function PaymasterPortfolioTransfer() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="paymaster-buy-token" className="text-xs font-semibold text-slate-700">
+                <Label
+                  htmlFor="paymaster-buy-token"
+                  className="text-xs font-semibold text-slate-700"
+                >
                   Buy Token (Base DEX Route)
                 </Label>
                 <select
@@ -1390,7 +1394,10 @@ export function PaymasterPortfolioTransfer() {
                 </select>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="paymaster-slippage" className="text-xs font-semibold text-slate-700">
+                <Label
+                  htmlFor="paymaster-slippage"
+                  className="text-xs font-semibold text-slate-700"
+                >
                   Max Slippage (%)
                 </Label>
                 <Input
@@ -1566,16 +1573,16 @@ export function PaymasterPortfolioTransfer() {
           </div>
           <Button
             onClick={() => void executeSponsoredOperation()}
-            disabled={!canSubmit || walletAccountProblem !== null}
+            disabled={!canSubmit || walletBytecode === null || walletAccountProblem !== null}
             className="rounded-xl bg-gradient-to-r from-purple-700 via-fuchsia-600 to-pink-600 px-5 font-semibold text-white shadow-md hover:from-purple-800 hover:via-fuchsia-700 hover:to-pink-700"
           >
             {pending
               ? "Waiting for wallet & bundler…"
               : operationType === "transfer"
-                ? `Send with sponsored gas (+${rewardLabel})`
+                ? "Send with sponsored gas"
                 : operationType === "swap"
-                  ? `Swap with sponsored gas (+${rewardLabel})`
-                  : `Execute staking with sponsored gas (+${rewardLabel})`}
+                  ? "Swap with sponsored gas"
+                  : "Execute staking with sponsored gas"}
           </Button>
         </div>
 

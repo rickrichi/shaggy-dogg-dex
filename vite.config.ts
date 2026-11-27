@@ -89,8 +89,8 @@ const SEO_ROUTES = [
     route: '/paymaster',
     file: 'paymaster.html',
     title: 'Sponsored Reward Paymaster (ERC-4337 EntryPoint v0.7) on Base | Shaggy Mutt DEX',
-    heading: 'ERC-4337 Sponsored Reward Paymaster (100 MRWD per Eligible Op)',
-    description: 'Inspect SponsoredRewardPaymaster (0x9cD40EBa4B0793C43FdF8C5A3272073820f77CB4) on Base EntryPoint v0.7, designed to sponsor eligible swaps, transfers, and staking while rewarding 100 MRWD.',
+    heading: 'ERC-4337 Sponsored Reward Paymaster',
+    description: 'Inspect SponsoredRewardPaymaster (0x9cD40EBa4B0793C43FdF8C5A3272073820f77CB4) on Base EntryPoint v0.7, including its current ETH deposit and MRWD reward pool. Browser-wallet sponsorship is currently unavailable.',
   },
   {
     route: '/portfolio',

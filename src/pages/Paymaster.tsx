@@ -19,6 +19,7 @@ import { LaunchpadNav } from "@/components/launchpad/LaunchpadNav";
 import { PaymasterOperationsConsole } from "@/components/paymaster/PaymasterOperationsConsole";
 import { PaymasterPortfolioTransfer } from "@/components/paymaster/PaymasterPortfolioTransfer";
 import { Badge } from "@/components/ui/badge";
+import { SPONSORSHIP_UNAVAILABLE } from "@/lib/paymaster/accounts";
 import {
   BASE_ENTRYPOINT_V07,
   MRWD_ON_BASE,
@@ -35,7 +36,7 @@ function formatCompactGwei(gasPrice: bigint): string {
 
 export default function Paymaster() {
   const { data: blockNumber } = useBlockNumber({ chainId: base.id, watch: true });
-  const { data: gasPrice } = useGasPrice({ chainId: base.id });
+  const { data: gasPrice } = useGasPrice({ chainId: base.id, query: { refetchInterval: 15_000 } });
 
   return (
     <div className="relative min-h-[calc(100vh-80px)] overflow-hidden px-3 py-4 text-slate-900 duration-500 animate-in fade-in sm:px-4 sm:py-6 md:px-8">
@@ -68,7 +69,8 @@ export default function Paymaster() {
             )}
             {blockNumber && (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-white/90 px-3 py-1 font-medium tabular-nums text-slate-700 shadow-sm">
-                <Activity className="size-3.5 shrink-0 text-emerald-600" />#{blockNumber.toLocaleString()}
+                <Activity className="size-3.5 shrink-0 text-emerald-600" />#
+                {blockNumber.toLocaleString()}
               </span>
             )}
           </div>
@@ -78,7 +80,7 @@ export default function Paymaster() {
 
         {/* 2026 Flagship Hero Card */}
         <section className="relative overflow-hidden rounded-3xl border border-purple-200/80 bg-white/95 p-6 shadow-xl ring-1 ring-purple-500/10 backdrop-blur-xl md:p-8">
-          <div className="h-1.5 w-full rounded-full bg-gradient-to-r from-purple-700 via-fuchsia-600 to-emerald-500 mb-6" />
+          <div className="mb-6 h-1.5 w-full rounded-full bg-gradient-to-r from-purple-700 via-fuchsia-600 to-emerald-500" />
 
           <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-start">
             <div className="max-w-3xl space-y-3.5">
@@ -106,9 +108,8 @@ export default function Paymaster() {
               </h1>
 
               <p className="text-sm leading-relaxed text-slate-600 md:text-base">
-                Transfer, swap, or stake any Base ERC-20 token you hold in your portfolio. The
-                paymaster sponsors the network gas in ETH and rewards your existing wallet with MRWD
-                after the operation succeeds. You never pay gas in MRWD.
+                {SPONSORSHIP_UNAVAILABLE} Inspect the Base paymaster’s ETH deposit, reward pool, and
+                sponsorship policy below.
               </p>
             </div>
 

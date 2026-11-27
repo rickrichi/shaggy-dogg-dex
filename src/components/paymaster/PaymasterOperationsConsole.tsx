@@ -49,9 +49,7 @@ const explorer = "https://basescan.org";
 function savedAddress(): Address | undefined {
   try {
     const value = localStorage.getItem(storageKey);
-    return value && isAddress(value)
-      ? getAddress(value)
-      : SPONSORED_REWARD_PAYMASTER_ON_BASE;
+    return value && isAddress(value) ? getAddress(value) : SPONSORED_REWARD_PAYMASTER_ON_BASE;
   } catch {
     return SPONSORED_REWARD_PAYMASTER_ON_BASE;
   }
@@ -538,8 +536,10 @@ export function PaymasterOperationsConsole() {
               <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-purple-700">
                 <ShieldCheck className="size-4" /> Base · ERC-4337{" "}
                 {status?.entryPoint.toLowerCase() === BASE_ENTRYPOINT_V07.toLowerCase()
-                  ? "v0.7 (MetaMask 7702 + Simple7702)"
-                  : "v0.7 / v0.8"}
+                  ? "EntryPoint v0.7"
+                  : status
+                    ? "EntryPoint v0.8"
+                    : ""}
               </div>
               <CardTitle
                 id="paymaster-console-title"
