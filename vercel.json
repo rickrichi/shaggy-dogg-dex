@@ -59,7 +59,7 @@
   "rewrites": [
     {
       "source": "/arbitrage/live-desk/:pair",
-      "destination": "/arbitrage/live-desk.html"
+      "destination": "/arbitrage/live-desk"
     },
     {
       "source": "/mrwd",
