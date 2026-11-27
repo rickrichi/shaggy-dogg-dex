@@ -469,6 +469,7 @@ export default function Arbitrage() {
 
   // Sync document.title
   useEffect(() => {
+    if (activeArbitrageTab === "live") return; // Layout owns the pair-specific desk title.
     const meta = ARBITRAGE_PAGE_META[activeArbitrageTab] || ARBITRAGE_PAGE_META.matrix;
     if (activeArbitrageTab === "cedefi") {
       document.title = `🌐 CeDeFi: ${selectedMatrixSymbol} | Shaggy Dogg Arbitrage`;

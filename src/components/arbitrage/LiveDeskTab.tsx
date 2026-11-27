@@ -178,7 +178,10 @@ export function LiveDeskTab({
   const [budget, setBudget] = useState("100");
   const notional = Number(budget);
   const valid = Number.isFinite(notional) && notional >= 1 && notional <= 1_000_000;
-  const active = (LIVE_SYMBOLS as readonly string[]).includes(symbol) ? symbol : "ETH/USD";
+  const active = symbol.toUpperCase();
+  const supported = LIVE_SYMBOLS.some((pair) => pair === active);
+  const exactUsdc = /^\d+(?:\.\d{0,6}0*)?$/.test(budget);
+  const invalidPrecision = valid && active === "ETH/USD" && !exactUsdc;
   const base = active.split("/")[0] ?? active;
 
   return (
@@ -201,7 +204,7 @@ export function LiveDeskTab({
             </button>
           ))}
         </div>
-        {(ARB_PRIVATE_API || active === "ETH/USD") && (
+        {supported && (ARB_PRIVATE_API || active === "ETH/USD") && (
           <div className="space-y-1">
             <Label htmlFor="live-desk-budget" className="text-xs">
               {ARB_PRIVATE_API ? "Budget (USD)" : "Base quote amount (USDC)"}
@@ -211,16 +214,18 @@ export function LiveDeskTab({
               type="number"
               min={1}
               max={1_000_000}
-              step="any"
+              step={ARB_PRIVATE_API ? "any" : "0.000001"}
               value={budget}
-              aria-invalid={!valid}
-              aria-describedby={valid ? undefined : "live-desk-budget-error"}
+              aria-invalid={!valid || invalidPrecision}
+              aria-describedby={!valid || invalidPrecision ? "live-desk-budget-error" : undefined}
               onChange={(e) => setBudget(e.currentTarget.value)}
               className="w-28"
             />
-            {!valid && (
+            {(!valid || invalidPrecision) && (
               <p id="live-desk-budget-error" className="text-xs text-rose-700">
-                Enter an amount from 1 to 1,000,000.
+                {invalidPrecision
+                  ? "Use a decimal amount with up to six decimal places for the Base USDC quote."
+                  : "Enter an amount from 1 to 1,000,000."}
               </p>
             )}
           </div>
@@ -232,17 +237,29 @@ export function LiveDeskTab({
         )}
       </div>
 
-      {ARB_PRIVATE_API ? (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <AccountCard venue="Alpaca" account={alpacaAccount} base={base} />
-          <AccountCard venue="Kraken" account={krakenAccount} base={base} />
-        </div>
+      {!supported ? (
+        <p role="status">The live desk supports BTC/USD and ETH/USD. Select a pair above.</p>
       ) : (
-        <PublicMarketQuotes snapshot={snapshot} symbol={active} />
-      )}
+        <>
+          {ARB_PRIVATE_API ? (
+            <div className="grid gap-4 lg:grid-cols-2">
+              <AccountCard venue="Alpaca" account={alpacaAccount} base={base} />
+              <AccountCard venue="Kraken" account={krakenAccount} base={base} />
+            </div>
+          ) : (
+            <PublicMarketQuotes snapshot={snapshot} symbol={active} />
+          )}
 
-      <LiveVenueComparison symbol={active} notional={valid ? notional : 0} onExecuted={refresh} />
-      {valid && active === "ETH/USD" && <BaseExecutionComparison notional={notional} />}
+          <LiveVenueComparison
+            symbol={active}
+            notional={valid ? notional : 0}
+            onExecuted={refresh}
+          />
+          {valid && exactUsdc && active === "ETH/USD" && (
+            <BaseExecutionComparison notional={notional} />
+          )}
+        </>
+      )}
     </div>
   );
 }

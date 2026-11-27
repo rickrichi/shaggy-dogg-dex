@@ -51,6 +51,7 @@ export function BaseExecutionComparison({ notional }: { notional: number }) {
             {(["Uniswap V3", "Uniswap V2", "Aerodrome", ...BASE_EXTRA_VENUES] as const).map(
               (venue) => {
                 const route = quote.data.quotes.find((q) => q.route.venue === venue);
+                const filtered = quote.data.excluded.some((q) => q.route.venue === venue);
                 const extraLabel =
                   route && isV3Route(route.route)
                     ? ` (${v3RouteFees(route.route)
@@ -61,7 +62,11 @@ export function BaseExecutionComparison({ notional }: { notional: number }) {
                   <p key={venue}>
                     {venue}
                     {extraLabel}:{" "}
-                    {route ? `${formatUnits(route.output, 18)} WETH` : "No executable pool route"}
+                    {route
+                      ? `${formatUnits(route.output, 18)} WETH`
+                      : filtered
+                        ? "Quote excluded by the cross-venue price check"
+                        : "No quote available"}
                   </p>
                 );
               }

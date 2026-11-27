@@ -58,6 +58,10 @@
   ],
   "rewrites": [
     {
+      "source": "/arbitrage/live-desk/:pair",
+      "destination": "/arbitrage/live-desk.html"
+    },
+    {
       "source": "/mrwd",
       "destination": "/mrwd.html"
     },

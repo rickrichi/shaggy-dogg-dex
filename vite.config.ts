@@ -86,6 +86,13 @@ const SEO_ROUTES = [
     description: 'Stream live WebSocket order-book quotes from Coinbase, Kraken, Binance, Bybit, and OKX alongside Base DEX pool quotes to compare cross-market spreads.',
   },
   {
+    route: "/arbitrage/live-desk",
+    file: "arbitrage/live-desk.html",
+    title: "Live Market Desk | Shaggy Mutt DEX",
+    heading: "Live Market Desk",
+    description: "Compare public BTC/USD and ETH/USD exchange bids and asks, quote freshness, and USDC-to-WETH pool quotes on Base.",
+  },
+  {
     route: '/paymaster',
     file: 'paymaster.html',
     title: 'Sponsored Reward Paymaster (ERC-4337 EntryPoint v0.7) on Base | Shaggy Mutt DEX',

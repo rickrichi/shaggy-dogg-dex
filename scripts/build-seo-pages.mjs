@@ -127,6 +127,16 @@ const SEO_ROUTES = [
     body: "Compare real-time centralized exchange bid/ask spreads against on-chain Base DEX liquidity across major crypto pairs."
   },
   {
+    route: "/arbitrage/live-desk",
+    file: "arbitrage/live-desk.html",
+    title: "Live Market Desk | Shaggy Mutt DEX",
+    heading: "Live Market Desk",
+    description: "Compare public BTC/USD and ETH/USD exchange bids and asks, quote freshness, and USDC-to-WETH pool quotes on Base.",
+    priority: "0.7",
+    changefreq: "daily",
+    body: "Choose a market to compare exchange quotes. Select ETH/USD to compare Base pool quotes for a USDC amount.",
+  },
+  {
     route: "/paymaster",
     file: "paymaster.html",
     priority: "0.7",
