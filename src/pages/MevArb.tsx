@@ -159,6 +159,7 @@ export interface ChainSummary {
 export interface BackrunRow {
   opportunityId?: string;
   auditOutcome?: string;
+  auditDiagnosis?: string;
   receiptGasWei?: string;
   receiptProfitQuote?: number;
   receiptQuote?: string;
@@ -290,9 +291,32 @@ type MissOutcome =
 interface MissAuditSummary {
   total: number;
   outcomes: Partial<Record<MissOutcome, number>>;
+  diagnoses?: Record<string, number>;
   retries?: number;
   errors?: number;
   queueDropped?: number;
+}
+
+const MISS_DIAGNOSIS_LABEL: Record<string, string> = {
+  higher_paying_same_route: "verified same-route outbid (trains Tier 3)",
+  pool_activity_before_prerequisite: "pool moved before prerequisite swap",
+  late_submission: "late submission (before target window)",
+  simulation_failed: "simulation failed",
+  final_plan_rejected: "final plan below profit floor",
+  unconfirmed_competition: "unconfirmed adjacent competition",
+};
+
+function diagnosisLabel(key: string): string {
+  return MISS_DIAGNOSIS_LABEL[key] ?? key.split("_").join(" ");
+}
+
+function diagnosisBreakdown(diagnoses: Record<string, number> | undefined): string {
+  if (!diagnoses) return "";
+  return Object.entries(diagnoses)
+    .filter(([, n]) => n > 0)
+    .sort(([, a], [, b]) => b - a)
+    .map(([k, n]) => `${n} ${diagnosisLabel(k)}`)
+    .join(" · ");
 }
 
 const MISS_LABEL: Record<MissOutcome, string> = {
@@ -477,6 +501,36 @@ function missBreakdown(a: MissAuditSummary) {
     .join(" · ");
 }
 
+export interface RouteObservedRate {
+  settledTransactions: number;
+  landed: number;
+  reverted: number;
+  winRate: number;
+  revertRate: number;
+}
+
+export interface RouteSourceBreakdown {
+  eligibleOpportunities: number;
+  unresolvedOpportunities: number;
+  proposedRoutes: Record<string, number>;
+  selectedRoutes: Record<string, number>;
+  knownNetWei: string;
+  netWeiPerEligibleOpportunity: string | null;
+}
+
+export interface RouteReportSnapshot {
+  eligibleOpportunities: number;
+  unresolvedOpportunities: number;
+  proposedRoutes: Record<string, number>;
+  selectedRoutes: Record<string, number>;
+  observedRates: Record<string, RouteObservedRate>;
+  outcomes: Record<string, number>;
+  missDiagnoses: Record<string, number>;
+  bySource?: Record<string, RouteSourceBreakdown>;
+  knownNetWei: string;
+  netWeiPerEligibleOpportunity: string | null;
+}
+
 export interface ArbSummary {
   version: 1 | 2;
   startedAt: string;
@@ -484,6 +538,8 @@ export interface ArbSummary {
   updatedAt: string;
   chains: ChainSummary[];
   backrun?: BackrunSummary;
+  routeReport?: RouteReportSnapshot;
+  sessionRouteReport?: RouteReportSnapshot;
 }
 
 interface ExecutionFunnel {
@@ -1062,6 +1118,15 @@ function BackrunCard({ b, now }: { b: BackrunSummary; now: number }) {
             RPC errors · {b.sessionMissAudit?.queueDropped ?? 0} queue drops; lifetime{" "}
             {b.missAudit.retries ?? 0} retries · {b.missAudit.errors ?? 0} RPC errors ·{" "}
             {b.missAudit.queueDropped ?? 0} queue drops.
+            {diagnosisBreakdown(b.missAudit.diagnoses) ? (
+              <div className="mt-1">
+                <strong className="text-foreground">Miss diagnoses (bid-tuning filter):</strong>{" "}
+                {diagnosisBreakdown(b.sessionMissAudit?.diagnoses)
+                  ? `current session ${diagnosisBreakdown(b.sessionMissAudit?.diagnoses)}; `
+                  : ""}
+                lifetime {diagnosisBreakdown(b.missAudit.diagnoses)}.
+              </div>
+            ) : null}
           </div>
         ) : null}
         <CompetitorLosses losses={b.competitorLosses} />
@@ -1146,7 +1211,7 @@ function BackrunCard({ b, now }: { b: BackrunSummary; now: number }) {
               <tbody>{b.opportunities.map(r => <tr key={r.opportunityId} className="border-t">
                 <td className="pr-3">{r.opportunityId}</td><td>{r.pair} · {r.buy} → {r.sell}</td>
                 <td>{fmtSigned(r.netEth, "ETH")}</td><td>{fmtSigned(r.gasEth, "ETH")} / {fmtSigned(r.bribeEth, "ETH")}</td>
-                <td>{r.targetBlock ?? "—"}</td><td>{r.outcome ?? "Unknown"}{r.auditOutcome && <div>{r.auditOutcome.split("_").join(" ")}</div>}{r.receiptProfitQuote !== undefined && <div>Executor profit {r.receiptProfitQuote} {r.receiptQuote}</div>}{r.receiptGasWei && <div>Gas paid {fmtSigned(Number(r.receiptGasWei) / 1e18, "ETH")}</div>}</td>
+                <td>{r.targetBlock ?? "—"}</td><td>{r.outcome ?? "Unknown"}{r.auditOutcome && <div>{r.auditOutcome.split("_").join(" ")}</div>}{r.auditDiagnosis && r.auditDiagnosis !== r.auditOutcome && <div className="text-muted-foreground">Diagnosis: {diagnosisLabel(r.auditDiagnosis)}</div>}{r.receiptProfitQuote !== undefined && <div>Executor profit {r.receiptProfitQuote} {r.receiptQuote}</div>}{r.receiptGasWei && <div>Gas paid {fmtSigned(Number(r.receiptGasWei) / 1e18, "ETH")}</div>}</td>
               </tr>)}</tbody>
             </table></div>
           </section>
@@ -1227,6 +1292,125 @@ function BackrunCard({ b, now }: { b: BackrunSummary; now: number }) {
   );
 }
 
+function countEntries(record: Record<string, number> | undefined): string {
+  const entries = Object.entries(record ?? {}).filter(([, n]) => n > 0);
+  if (!entries.length) return "none";
+  return entries
+    .sort(([, a], [, b]) => b - a)
+    .map(([k, n]) => `${k} ${n}`)
+    .join(" · ");
+}
+
+function fmtSignedWeiEth(wei: string | null): string {
+  if (wei === null) return "—";
+  try {
+    const v = BigInt(wei);
+    if (v === 0n) return "0 ETH";
+    const neg = v < 0n;
+    const abs = neg ? -v : v;
+    return `${neg ? "−" : ""}${ethOf(abs.toString())} ETH`;
+  } catch {
+    return "—";
+  }
+}
+
+function RouteRolloutCard({
+  lifetime,
+  session,
+}: {
+  lifetime: RouteReportSnapshot;
+  session?: RouteReportSnapshot | undefined;
+}) {
+  const avgBadge =
+    lifetime.netWeiPerEligibleOpportunity !== null
+      ? `Net / eligible: ${fmtSignedWeiEth(lifetime.netWeiPerEligibleOpportunity)}`
+      : lifetime.unresolvedOpportunities > 0
+        ? `Mean withheld (${lifetime.unresolvedOpportunities} unresolved)`
+        : "Awaiting eligible cohort";
+  const diagText = diagnosisBreakdown(lifetime.missDiagnoses);
+  const sources = Object.entries(lifetime.bySource ?? {}).filter(
+    ([, s]) => s.eligibleOpportunities > 0
+  );
+  const rates = Object.entries(lifetime.observedRates ?? {}).filter(
+    ([, r]) => r.settledTransactions > 0
+  );
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+          Ethereum routing &amp; rollout measurement
+          <Badge variant={lifetime.unresolvedOpportunities > 0 ? "secondary" : "outline"}>
+            {avgBadge}
+          </Badge>
+          <Badge variant="outline">V4 private live · standalone public shadow</Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2 text-xs text-muted-foreground">
+        <div>
+          <strong className="text-foreground">Lifetime prospective cohort:</strong>{" "}
+          {lifetime.eligibleOpportunities.toLocaleString()} eligible opportunities
+          {lifetime.unresolvedOpportunities > 0
+            ? ` (${lifetime.unresolvedOpportunities} awaiting receipt settlement)`
+            : ""}{" "}
+          · realized net <strong>{fmtSignedWeiEth(lifetime.knownNetWei)}</strong> · net ETH per
+          eligible opportunity:{" "}
+          <strong className="text-foreground">
+            {lifetime.netWeiPerEligibleOpportunity !== null
+              ? fmtSignedWeiEth(lifetime.netWeiPerEligibleOpportunity)
+              : lifetime.unresolvedOpportunities > 0
+                ? "withheld until pending receipts settle"
+                : "—"}
+          </strong>
+        </div>
+        {session ? (
+          <div>
+            <strong className="text-foreground">Current session:</strong>{" "}
+            {session.eligibleOpportunities.toLocaleString()} eligible · realized net{" "}
+            {fmtSignedWeiEth(session.knownNetWei)} · net / eligible{" "}
+            {session.netWeiPerEligibleOpportunity !== null
+              ? fmtSignedWeiEth(session.netWeiPerEligibleOpportunity)
+              : session.unresolvedOpportunities > 0
+                ? `withheld (${session.unresolvedOpportunities} unresolved)`
+                : "—"}
+          </div>
+        ) : null}
+        <div className="rounded-md border bg-muted/20 px-3 py-2">
+          Proposed routes: <strong>{countEntries(lifetime.proposedRoutes)}</strong> · actual
+          selected routes: <strong>{countEntries(lifetime.selectedRoutes)}</strong> · settled
+          outcomes: <strong>{countEntries(lifetime.outcomes)}</strong>
+        </div>
+        {sources.length > 0 ? (
+          <div className="rounded-md border bg-muted/20 px-3 py-2">
+            By source:{" "}
+            {sources
+              .map(
+                ([src, s]) =>
+                  `${src}: ${s.eligibleOpportunities} eligible (proposed ${countEntries(s.proposedRoutes)}, actual ${countEntries(s.selectedRoutes)}, net ${fmtSignedWeiEth(s.knownNetWei)})`
+              )
+              .join(" · ")}
+          </div>
+        ) : null}
+        {rates.length > 0 ? (
+          <div className="rounded-md border bg-muted/20 px-3 py-2">
+            Observed settlement rates:{" "}
+            {rates
+              .map(
+                ([route, r]) =>
+                  `${route}: ${r.landed}/${r.settledTransactions} won (${(r.winRate * 100).toFixed(1)}%), ${r.reverted} reverted (${(r.revertRate * 100).toFixed(1)}%)`
+              )
+              .join(" · ")}
+          </div>
+        ) : null}
+        {diagText ? (
+          <div className="rounded-md border bg-muted/20 px-3 py-2">
+            Cohort miss &amp; pre-send diagnoses: <strong>{diagText}</strong>
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function MevArb({ now }: { now: number }) {
   const q = useQuery({ queryKey: ["mev-arb-summary"], queryFn: fetchArb, refetchInterval: 15_000 });
   return (
@@ -1253,6 +1437,12 @@ export default function MevArb({ now }: { now: number }) {
       ) : null}
       {q.data ? (
         <div className="grid grid-cols-1 gap-4">
+          {q.data.routeReport ? (
+            <RouteRolloutCard
+              lifetime={q.data.routeReport}
+              session={q.data.sessionRouteReport}
+            />
+          ) : null}
           {q.data.chains.map((c) => (
             <ChainCard key={c.chain} c={c} now={now} />
           ))}

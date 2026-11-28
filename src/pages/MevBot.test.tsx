@@ -844,6 +844,10 @@ describe("MEV-Share backrun card", () => {
             user_swap_not_landed: 1,
             inconclusive: 1,
           },
+          diagnoses: {
+            pool_activity_before_prerequisite: 1,
+            higher_paying_same_route: 1,
+          },
           retries: 3,
           errors: 4,
           queueDropped: 1,
@@ -851,6 +855,7 @@ describe("MEV-Share backrun card", () => {
         sessionMissAudit: {
           total: 2,
           outcomes: { competitor_backran: 1, would_have_succeeded: 1 },
+          diagnoses: { higher_paying_same_route: 1 },
           retries: 1,
           errors: 1,
           queueDropped: 0,
@@ -918,6 +923,37 @@ describe("MEV-Share backrun card", () => {
         recent: [],
         submissions: [],
       },
+      routeReport: {
+        eligibleOpportunities: 4,
+        unresolvedOpportunities: 0,
+        proposedRoutes: { private: 3, public: 1 },
+        selectedRoutes: { private: 3, skip: 1 },
+        observedRates: {
+          private: { settledTransactions: 3, landed: 2, reverted: 0, winRate: 2 / 3, revertRate: 0 },
+        },
+        outcomes: { landed: 2, "not included": 1 },
+        missDiagnoses: { pool_activity_before_prerequisite: 2, higher_paying_same_route: 1 },
+        bySource: {
+          standalone: {
+            eligibleOpportunities: 1,
+            unresolvedOpportunities: 0,
+            proposedRoutes: { public: 1 },
+            selectedRoutes: { skip: 1 },
+            knownNetWei: "0",
+            netWeiPerEligibleOpportunity: "0",
+          },
+          backrun: {
+            eligibleOpportunities: 3,
+            unresolvedOpportunities: 0,
+            proposedRoutes: { private: 3 },
+            selectedRoutes: { private: 3 },
+            knownNetWei: "4000000000000000",
+            netWeiPerEligibleOpportunity: "1333333333333333",
+          },
+        },
+        knownNetWei: "4000000000000000",
+        netWeiPerEligibleOpportunity: "1000000000000000",
+      },
     };
     const backrun = withStages.backrun!;
     backrun.sessionTotals = { ...backrun.totals, bundlesSent: 0, blindBundlesSent: 3 };
@@ -965,5 +1001,10 @@ describe("MEV-Share backrun card", () => {
     expect(screen.getByText(/best net 0.0042 ETH · 2 skipped \(busy\)/)).toBeTruthy();
     expect(screen.getByText(/paid 0.0030 ETH to the builder · we bid 0.0010 ETH/)).toBeTruthy();
     expect(screen.getByText(/we sent 1.76 s after the block started \(too late\)/)).toBeTruthy();
+    expect(screen.getByText(/Ethereum routing & rollout measurement/)).toBeTruthy();
+    expect(screen.getByText(/Net \/ eligible: 0.0010 ETH/)).toBeTruthy();
+    expect(screen.getByText(/Miss diagnoses \(bid-tuning filter\):/)).toBeTruthy();
+    expect(screen.getAllByText(/verified same-route outbid \(trains Tier 3\)/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/pool moved before prerequisite swap/).length).toBeGreaterThan(0);
   });
 });
