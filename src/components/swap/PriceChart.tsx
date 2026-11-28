@@ -1,15 +1,22 @@
-import { CheckCircle2, Layers, RefreshCw, ShieldAlert, Sparkles } from "lucide-react";
+import { Link, useInRouterContext } from "react-router-dom";
+
+import { CheckCircle2, Fuel, Layers, RefreshCw, ShieldAlert, Sparkles, TrendingUp } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { getUniswapV3Deployment } from "@/config/contracts";
-import { BASE_EXTRA_VENUES, type SmartRouteVenue } from "@/lib/amm/smart-routing";
+import {
+  BASE_EXTRA_VENUES,
+  SPONSORED_ROUTE_VENUES,
+  type SmartRouteVenue,
+} from "@/lib/amm/smart-routing";
 import { formatSwapAmount } from "@/lib/format-swap-amount";
 
 import type { UseSwapReturn } from "@/hooks/useSwap";
 
 /** Shares the swap card's quote snapshot, rather than making a unit-size trade. */
 export function PriceChart({ swap }: { swap: UseSwapReturn }) {
+  const inRouter = useInRouterContext();
   const { state, quote, actions } = swap;
   const rawVenues: Array<{ name: SmartRouteVenue; amount: string | undefined }> = [
     ...(getUniswapV3Deployment(state.sellToken.chainId)
@@ -111,11 +118,47 @@ export function PriceChart({ swap }: { swap: UseSwapReturn }) {
         </div>
       </CardHeader>
       <CardContent className="space-y-3.5 px-4 pb-4 pt-4 sm:px-5">
+        {showQuotes &&
+          !quote.preferredVenue &&
+          quote.savingsAmount &&
+          quote.savingsComparedTo &&
+          parseFloat(quote.savingsAmount) > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-emerald-200/90 bg-gradient-to-r from-emerald-50/90 via-teal-50/70 to-white px-3.5 py-2.5 text-xs text-emerald-950 shadow-sm">
+              <div className="flex items-center gap-2 font-semibold">
+                <TrendingUp className="size-4 shrink-0 text-emerald-600" />
+                <span>
+                  Smart Router saves{" "}
+                  <strong className="font-mono text-emerald-800">
+                    +{formatSwapAmount(quote.savingsAmount)} {state.buyToken.symbol}
+                  </strong>{" "}
+                  vs {quote.savingsComparedTo}
+                </span>
+              </div>
+              {inRouter ? (
+                <Link
+                  to="/stake/paymaster"
+                  className="inline-flex items-center gap-1 font-semibold text-purple-700 underline-offset-2 hover:underline"
+                >
+                  <Fuel className="size-3" /> Gasless Paymaster
+                </Link>
+              ) : (
+                <a
+                  href="/stake/paymaster"
+                  className="inline-flex items-center gap-1 font-semibold text-purple-700 underline-offset-2 hover:underline"
+                >
+                  <Fuel className="size-3" /> Gasless Paymaster
+                </a>
+              )}
+            </div>
+          )}
+
         <div className="grid gap-3 sm:grid-cols-2">
           {venues.map(({ name, amount }, index) => {
             const isBest = showQuotes && quote.bestVenue === name;
             const isPicked = quote.preferredVenue === name;
             const isExcluded = quote.excludedVenues?.includes(name) ?? false;
+            const isSponsored = SPONSORED_ROUTE_VENUES.includes(name);
+            const routeMeta = showQuotes && !isExcluded ? quote.venueRouteLabels?.[name] : undefined;
             const numericVal = amount ? parseFloat(amount) : 0;
 
             const deltaPct =
@@ -174,6 +217,19 @@ export function PriceChart({ swap }: { swap: UseSwapReturn }) {
                       </span>
                     )}
                     <p className="font-bold text-slate-900">{name}</p>
+                    {routeMeta && (
+                      <span className="rounded-md border border-slate-200/80 bg-white/90 px-1.5 py-0.5 font-mono text-[10px] font-medium text-slate-600">
+                        {routeMeta}
+                      </span>
+                    )}
+                    {isSponsored && !isExcluded && (
+                      <span
+                        title="Eligible for gasless Portfolio Paymaster sponsorship"
+                        className="rounded-md bg-emerald-50 px-1.5 py-0.5 font-sans text-[10px] font-semibold text-emerald-700"
+                      >
+                        Paymaster
+                      </span>
+                    )}
                   </div>
                   <div className="flex flex-wrap items-center gap-1">
                     {isPicked && (

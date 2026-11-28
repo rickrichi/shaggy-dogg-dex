@@ -18,9 +18,13 @@ vi.mock("wagmi", async () => {
     useAccount: vi.fn(),
     useBlockNumber: vi.fn(() => ({ data: undefined })),
     useGasPrice: vi.fn(() => ({ data: undefined })),
+    usePublicClient: vi.fn(() => undefined),
     useSwitchChain: vi.fn(() => ({ isPending: false, switchChain: vi.fn() })),
   };
 });
+vi.mock("@/lib/api/prices", () => ({
+  fetchPrices: vi.fn(() => new Promise(() => {})),
+}));
 vi.mock("@/hooks/useSwap", () => ({
   useSwap: vi.fn((sellToken: unknown, buyToken: unknown) => ({ state: { sellToken, buyToken } })),
 }));
@@ -64,6 +68,14 @@ describe("Swap page defaults", () => {
   it("never initializes the same token on both sides", () => {
     const pairs = openSwap(8453, "/swap?input=USDC&output=USDC&mode=limit");
     expect(pairs[0]?.[0]).not.toBe(pairs[0]?.[1]);
+  });
+
+  it("preserves native ETH as the buy token when ?output=ETH is present", () => {
+    const pairs = openSwap(
+      8453,
+      "/swap?input=0xC17227AAa33C54634B6cE7AD0bf33A156563c179&output=ETH"
+    );
+    expect(pairs[0]).toEqual(["MRWD", "ETH"]);
   });
 
   it("shows one active mode and a disabled limit preview", () => {

@@ -1,5 +1,5 @@
 // src/pages/Swap.tsx - 2026 DeFi Flagship Standards
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import {
@@ -16,17 +16,25 @@ import {
   Wallet,
   Zap,
 } from "lucide-react";
-import { formatGwei } from "viem";
-import { useAccount, useBlockNumber, useGasPrice, useSwitchChain } from "wagmi";
+import { type Address, erc20Abi, formatGwei, getAddress } from "viem";
+import { useAccount, useBlockNumber, useGasPrice, usePublicClient, useSwitchChain } from "wagmi";
 
 import { MarketScanner } from "@/components/swap/MarketScanner";
 import { PriceChart } from "@/components/swap/PriceChart";
 import { SwapCard } from "@/components/swap/SwapCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getUniswapV2Router, isSwapChain } from "@/config/contracts";
-import { getSwapDropdownTokens, type Token } from "@/config/tokens";
+import {
+  type Erc20Token,
+  getSwapDropdownTokens,
+  isErc20Token,
+  type Token,
+} from "@/config/tokens";
 import { useSwap } from "@/hooks/useSwap";
 import { routeVenuesForChain } from "@/lib/amm/smart-routing";
+import { fetchPrices } from "@/lib/api/prices";
+
+import type { AddressHex } from "@/types/token";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // CONSTANTS
@@ -34,6 +42,8 @@ import { routeVenuesForChain } from "@/lib/amm/smart-routing";
 
 // Swap and Limit open on ETH -> USDC (never a project token); a URL ?output= still picks another.
 const DEFAULT_BUY_SYMBOL = "USDC";
+const CUSTOM_TOKENS_STORAGE_KEY = "shaggy:custom-swap-tokens:v1";
+const NATIVE_PRICE_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 const QUICK_PAIRS: ReadonlyArray<{
   readonly label: string;
@@ -58,10 +68,9 @@ const QUICK_PAIRS: ReadonlyArray<{
 function getInitialToken(
   param: string | null,
   fallbackIndex: number,
-  chainId?: number,
+  chainTokens: readonly Token[],
   fallbackSymbol?: string
 ): Token {
-  const chainTokens = getSwapDropdownTokens(chainId);
   const fallback =
     (fallbackSymbol ? chainTokens.find((t) => t.symbol === fallbackSymbol) : undefined) ??
     chainTokens[fallbackIndex] ??
@@ -106,62 +115,90 @@ function formatCompactGwei(gasPrice: bigint): string {
   return raw.toFixed(4);
 }
 
+function loadSessionCustomTokens(): Erc20Token[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.sessionStorage.getItem(CUSTOM_TOKENS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (item): item is Erc20Token =>
+        Boolean(item) &&
+        typeof item === "object" &&
+        (item as Erc20Token).kind === "erc20" &&
+        typeof (item as Erc20Token).address === "string" &&
+        typeof (item as Erc20Token).symbol === "string" &&
+        typeof (item as Erc20Token).decimals === "number" &&
+        typeof (item as Erc20Token).chainId === "number"
+    );
+  } catch {
+    return [];
+  }
+}
+
 export default function Swap() {
   // ────────────────────────────────────────────────────────────────────────────
   // Hooks (must be called unconditionally at top level)
   // ────────────────────────────────────────────────────────────────────────────
 
   const { chain, isConnected } = useAccount();
-  const activeChainId = chain?.id ?? 8453;
-  const { data: blockNumber } = useBlockNumber({ chainId: activeChainId, watch: true });
-  const { data: gasPrice } = useGasPrice({ chainId: activeChainId });
+  const walletChainId = chain?.id ?? 8453;
   const { isPending: isSwitchingChain, switchChain } = useSwitchChain();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [showSettings, setShowSettings] = useState(false);
+  const [customTokens, setCustomTokens] = useState<Erc20Token[]>(loadSessionCustomTokens);
 
-  // ────────────────────────────────────────────────────────────────────────────
-  // URL State Management
-  // ────────────────────────────────────────────────────────────────────────────
+  // Track query strings written by our own URL sync so internal token switches never trigger
+  // an external-URL reset that wipes `sellAmount` or overwrites `ETH` buyToken back to `USDC`.
+  const lastSyncedSearchRef = useRef<string | null>(null);
+  const [externalUrlSeed, setExternalUrlSeed] = useState(() => ({
+    input: searchParams.get("input"),
+    output: searchParams.get("output"),
+  }));
 
-  const urlParams = useMemo(
-    () => ({
+  useEffect(() => {
+    const current = searchParams.toString();
+    if (lastSyncedSearchRef.current !== null && current === lastSyncedSearchRef.current) {
+      return;
+    }
+    lastSyncedSearchRef.current = current;
+    setExternalUrlSeed({
       input: searchParams.get("input"),
       output: searchParams.get("output"),
-    }),
-    [searchParams]
-  );
-
-  // ────────────────────────────────────────────────────────────────────────────
-  // Local State
-  // ────────────────────────────────────────────────────────────────────────────
-
-  const [showSettings, setShowSettings] = useState(false);
+    });
+  }, [searchParams]);
 
   // ────────────────────────────────────────────────────────────────────────────
   // Token Selection Logic
   // ────────────────────────────────────────────────────────────────────────────
 
-  const chainTokens = useMemo(() => getSwapDropdownTokens(activeChainId), [activeChainId]);
-  const venueCount = useMemo(
-    () => routeVenuesForChain(activeChainId).length,
-    [activeChainId]
-  );
+  const baseDropdownTokens = useMemo(() => {
+    const builtins = getSwapDropdownTokens(walletChainId);
+    if (customTokens.length === 0) return builtins;
+    const existing = new Set(builtins.map((t) => `${t.chainId}:${t.address.toLowerCase()}`));
+    const extras = customTokens.filter(
+      (t) => !existing.has(`${t.chainId}:${t.address.toLowerCase()}`)
+    );
+    return [...builtins, ...extras];
+  }, [walletChainId, customTokens]);
 
   const baseTokens = useMemo(() => {
-    const initialSell = getInitialToken(urlParams.input, 0, activeChainId);
+    const initialSell = getInitialToken(externalUrlSeed.input, 0, baseDropdownTokens);
     const requestedBuy = getInitialToken(
-      urlParams.output,
+      externalUrlSeed.output,
       1,
-      activeChainId,
+      baseDropdownTokens,
       DEFAULT_BUY_SYMBOL
     );
     const initialBuy =
       requestedBuy.address.toLowerCase() !== initialSell.address.toLowerCase()
         ? requestedBuy
-        : (chainTokens.find(
+        : (baseDropdownTokens.find(
             (token) => token.address.toLowerCase() !== initialSell.address.toLowerCase()
           ) ?? requestedBuy);
     return { initialSell, initialBuy };
-  }, [urlParams.input, urlParams.output, activeChainId, chainTokens]);
+  }, [externalUrlSeed.input, externalUrlSeed.output, baseDropdownTokens]);
 
   // ────────────────────────────────────────────────────────────────────────────
   // Swap Hook Instance
@@ -169,6 +206,131 @@ export default function Swap() {
 
   const activeSwap = useSwap(baseTokens.initialSell, baseTokens.initialBuy);
   const { sellToken, buyToken } = activeSwap.state;
+
+  // Reflect the selected token pair's network when disconnected so L1 vs Base L2 badges & venues stay accurate.
+  const displayChainId = isConnected && chain?.id ? chain.id : (sellToken?.chainId ?? walletChainId);
+  const publicClient = usePublicClient({ chainId: displayChainId });
+  const { data: blockNumber } = useBlockNumber({ chainId: displayChainId, watch: true });
+  const { data: gasPrice } = useGasPrice({ chainId: displayChainId });
+
+  const chainTokens = useMemo(() => {
+    const builtins = getSwapDropdownTokens(displayChainId);
+    if (customTokens.length === 0) return builtins;
+    const existing = new Set(builtins.map((t) => `${t.chainId}:${t.address.toLowerCase()}`));
+    const extras = customTokens.filter(
+      (t) => !existing.has(`${t.chainId}:${t.address.toLowerCase()}`)
+    );
+    return [...builtins, ...extras];
+  }, [displayChainId, customTokens]);
+
+  const venueCount = useMemo(
+    () => routeVenuesForChain(displayChainId).length,
+    [displayChainId]
+  );
+
+  // Live USD valuations for the active pair (with instant ETH/USDC rate derivation)
+  const [fetchedUsdPrices, setFetchedUsdPrices] = useState<ReadonlyMap<string, number>>(
+    () => new Map()
+  );
+
+  useEffect(() => {
+    if (!sellToken || !buyToken) return;
+    const ctrl = new AbortController();
+    const erc20Addrs = [sellToken, buyToken]
+      .filter(isErc20Token)
+      .map((t) => t.address as AddressHex);
+    void fetchPrices({
+      chainId: sellToken.chainId,
+      addresses: erc20Addrs,
+      includeThin: true,
+      signal: ctrl.signal,
+      timeoutMs: 6_000,
+    })
+      .then((res) => {
+        if (ctrl.signal.aborted) return;
+        const map = new Map<string, number>();
+        for (const p of res.data.prices) {
+          const addr = p.address.toLowerCase();
+          if (addr === NATIVE_PRICE_ADDRESS) map.set("native", p.priceUsd);
+          else map.set(addr, p.priceUsd);
+        }
+        setFetchedUsdPrices(map);
+      })
+      .catch(() => {
+        // Non-blocking: live quotes still provide instant stablecoin valuation below
+      });
+    return () => ctrl.abort();
+  }, [sellToken, buyToken]);
+
+  const usdPrices = useMemo(() => {
+    const map = new Map(fetchedUsdPrices);
+    const stables = new Set(["USDC", "USDT", "DAI", "USDbC"]);
+    if (sellToken && stables.has(sellToken.symbol) && !map.has(sellToken.address.toLowerCase())) {
+      map.set(sellToken.address.toLowerCase(), 1);
+    }
+    if (buyToken && stables.has(buyToken.symbol) && !map.has(buyToken.address.toLowerCase())) {
+      map.set(buyToken.address.toLowerCase(), 1);
+    }
+    const rate = activeSwap.quote?.rate;
+    if (rate && rate > 0 && sellToken && buyToken) {
+      const sellKey = sellToken.address === "native" ? "native" : sellToken.address.toLowerCase();
+      const buyKey = buyToken.address === "native" ? "native" : buyToken.address.toLowerCase();
+      if (stables.has(buyToken.symbol) && !map.has(sellKey)) {
+        map.set(sellKey, rate);
+      } else if (stables.has(sellToken.symbol) && !map.has(buyKey)) {
+        map.set(buyKey, 1 / rate);
+      }
+    }
+    return map;
+  }, [fetchedUsdPrices, sellToken, buyToken, activeSwap.quote?.rate]);
+
+  const handleImportCustomToken = useCallback(
+    async (rawAddress: Address, side: "sell" | "buy"): Promise<Token | null> => {
+      if (!publicClient || typeof publicClient.multicall !== "function") return null;
+      const checksummed = getAddress(rawAddress);
+      const [symRes, nameRes, decRes] = await publicClient.multicall({
+        allowFailure: true,
+        contracts: [
+          { address: checksummed, abi: erc20Abi, functionName: "symbol" },
+          { address: checksummed, abi: erc20Abi, functionName: "name" },
+          { address: checksummed, abi: erc20Abi, functionName: "decimals" },
+        ],
+      });
+      if (symRes.status !== "success" || decRes.status !== "success") return null;
+      const symbol = String(symRes.result).trim().slice(0, 16);
+      const decimals = Number(decRes.result);
+      if (!symbol || !Number.isInteger(decimals) || decimals < 0 || decimals > 36) return null;
+      const name =
+        nameRes.status === "success" && String(nameRes.result).trim()
+          ? `${String(nameRes.result).trim()} (Custom)`
+          : `${symbol} (Custom)`;
+      const token: Erc20Token = {
+        kind: "erc20",
+        address: checksummed,
+        symbol,
+        name,
+        decimals,
+        chainId: displayChainId,
+      };
+      setCustomTokens((prev) => {
+        const filtered = prev.filter(
+          (t) =>
+            !(t.chainId === token.chainId && t.address.toLowerCase() === token.address.toLowerCase())
+        );
+        const next = [...filtered, token];
+        try {
+          window.sessionStorage.setItem(CUSTOM_TOKENS_STORAGE_KEY, JSON.stringify(next));
+        } catch {
+          // Ignore storage quota issues
+        }
+        return next;
+      });
+      if (side === "sell") activeSwap.actions?.setSellToken(token);
+      else activeSwap.actions?.setBuyToken(token);
+      return token;
+    },
+    [publicClient, displayChainId, activeSwap.actions]
+  );
 
   const mrwdToken = useMemo(
     () => chainTokens.find((t) => t.symbol.toUpperCase() === "MRWD"),
@@ -189,38 +351,71 @@ export default function Swap() {
     (sellSym: string, buySym: string) => {
       const nextSell = chainTokens.find((t) => t.symbol.toUpperCase() === sellSym.toUpperCase());
       const nextBuy = chainTokens.find((t) => t.symbol.toUpperCase() === buySym.toUpperCase());
-      if (nextSell) activeSwap.actions?.setSellToken(nextSell);
-      if (nextBuy) activeSwap.actions?.setBuyToken(nextBuy);
+      if (nextSell && nextSell.symbol !== sellToken.symbol) {
+        activeSwap.actions?.setSellToken(nextSell);
+      }
+      if (nextBuy) {
+        activeSwap.actions?.setBuyToken(nextBuy);
+      }
     },
-    [activeSwap.actions, chainTokens]
+    [activeSwap.actions, chainTokens, sellToken.symbol]
   );
 
+  const handleScannerSelectToken = useCallback(
+    (token: Token) => {
+      if (token.address.toLowerCase() === sellToken.address.toLowerCase()) {
+        const usdc = chainTokens.find((t) => t.symbol === "USDC");
+        if (usdc && usdc.address.toLowerCase() !== token.address.toLowerCase()) {
+          activeSwap.actions?.setBuyToken(usdc);
+        }
+        return;
+      }
+      activeSwap.actions?.setBuyToken(token);
+    },
+    [activeSwap.actions, chainTokens, sellToken.address]
+  );
+
+  const openWalletConnect = useCallback((view: "qr" | "list" = "list") => {
+    window.dispatchEvent(new CustomEvent("shaggy:open-wallet-connect", { detail: { view } }));
+  }, []);
+
   // ────────────────────────────────────────────────────────────────────────────
-  // URL Synchronization
+  // URL Synchronization (Non-Destructive: Preserves ETH buyToken & sellAmount)
   // ────────────────────────────────────────────────────────────────────────────
 
   const updateURL = useCallback(() => {
     const params = new URLSearchParams();
+    const isDefaultPair =
+      sellToken.address === "native" && buyToken.symbol.toUpperCase() === DEFAULT_BUY_SYMBOL;
 
-    // Only add params if they differ from defaults
-    if (sellToken.address !== "native") {
-      params.set("input", sellToken.address);
+    if (!isDefaultPair) {
+      if (sellToken.address !== "native") {
+        params.set("input", sellToken.address);
+      }
+      if (buyToken.address === "native") {
+        params.set("output", "ETH");
+      } else if (buyToken.symbol.toUpperCase() !== DEFAULT_BUY_SYMBOL) {
+        params.set("output", buyToken.address);
+      }
     }
-    if (buyToken.address !== "native") {
-      params.set("output", buyToken.address);
-    }
+
     const newParams = params.toString();
     const currentParams = searchParams.toString();
 
-    // Only update if params actually changed
     if (newParams !== currentParams) {
+      lastSyncedSearchRef.current = newParams;
       setSearchParams(params, { replace: true });
     }
-  }, [sellToken.address, buyToken.address, searchParams, setSearchParams]);
+  }, [sellToken.address, buyToken.address, buyToken.symbol, searchParams, setSearchParams]);
 
   useEffect(() => {
     updateURL();
   }, [updateURL]);
+
+  const explorerBaseUrl =
+    displayChainId === 1 ? "https://etherscan.io" : "https://basescan.org";
+  const activeRouterAddress =
+    activeSwap.quote?.routerAddress ?? getUniswapV2Router(displayChainId);
 
   // ────────────────────────────────────────────────────────────────────────────
   // Render
@@ -244,8 +439,8 @@ export default function Swap() {
               </h1>
               <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-purple-200/80 bg-purple-50/90 px-2 py-0.5 font-mono text-[11px] font-semibold text-purple-800">
                 <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />
-                <span>{activeChainId === 1 ? "Ethereum L1" : "Base L2"}</span>
-                <span className="hidden sm:inline">· Smart Router v2.6</span>
+                <span>{displayChainId === 1 ? "Ethereum L1" : "Base L2"}</span>
+                <span className="hidden sm:inline">· Smart Router v2.7</span>
               </span>
             </div>
 
@@ -288,7 +483,7 @@ export default function Swap() {
                     </button>
                   ) : (
                     <span className="whitespace-nowrap rounded-full bg-emerald-200/80 px-2 py-0.5 text-[11px] font-bold text-emerald-900">
-                      ETH → MRWD active
+                      {sellToken.symbol} → MRWD active
                     </span>
                   )}
                   <Link
@@ -368,7 +563,7 @@ export default function Swap() {
             </span>
             <span className="text-slate-300">•</span>
             <span className="inline-flex items-center gap-1">
-              <Cpu className="size-3.5 text-emerald-600" /> On-chain QuoterV2
+              <Cpu className="size-3.5 text-emerald-600" /> On-chain QuoterV2 · 35% Outlier Guard
             </span>
           </div>
         </div>
@@ -405,6 +600,10 @@ export default function Swap() {
                   <SwapCard
                     swap={activeSwap}
                     tokens={chainTokens}
+                    approveHash={activeSwap.hashes?.approve}
+                    swapHash={activeSwap.hashes?.swap}
+                    isConnected={isConnected}
+                    onConnectWallet={() => openWalletConnect("list")}
                     isCorrectNetwork={
                       !isConnected ||
                       (isSwapChain(chain?.id) && chain?.id === activeSwap.state.sellToken.chainId)
@@ -415,26 +614,25 @@ export default function Swap() {
                     }
                     showSettings={showSettings}
                     onSettingsChange={setShowSettings}
+                    usdPrices={usdPrices}
+                    onImportCustomToken={handleImportCustomToken}
                   />
                 </TabsContent>
               </Tabs>
 
               {!isConnected && (
-                <div className="space-y-2 rounded-2xl border border-amber-200/80 bg-gradient-to-br from-amber-50/90 via-white to-orange-50/80 p-3.5 text-center text-sm text-amber-900 shadow-sm">
-                  <div className="flex items-center justify-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-amber-700">
-                    <Wallet className="size-3.5" /> Read-Only Telemetry Mode
+                <div className="space-y-2 rounded-2xl border border-purple-200/80 bg-gradient-to-br from-purple-50/80 via-white to-pink-50/70 p-3.5 text-center text-sm text-slate-800 shadow-sm">
+                  <div className="flex items-center justify-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-purple-700">
+                    <Wallet className="size-3.5" /> Live Quote &amp; Route Preview Active
                   </div>
-                  <p className="text-xs text-amber-800">
-                    Connect wallet to execute trades. Viewing mode active.
+                  <p className="text-xs text-slate-600">
+                    Compare live on-chain quotes across {venueCount} DEX venues now, or connect your
+                    wallet to execute.
                   </p>
                   <div className="flex flex-wrap items-center justify-center gap-2 pt-0.5">
                     <button
                       type="button"
-                      onClick={() =>
-                        window.dispatchEvent(
-                          new CustomEvent("shaggy:open-wallet-connect", { detail: { view: "qr" } })
-                        )
-                      }
+                      onClick={() => openWalletConnect("qr")}
                       className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:from-purple-700 hover:to-pink-700"
                     >
                       <QrCode className="size-3.5" />
@@ -442,13 +640,7 @@ export default function Swap() {
                     </button>
                     <button
                       type="button"
-                      onClick={() =>
-                        window.dispatchEvent(
-                          new CustomEvent("shaggy:open-wallet-connect", {
-                            detail: { view: "list" },
-                          })
-                        )
-                      }
+                      onClick={() => openWalletConnect("list")}
                       className="inline-flex items-center gap-1.5 rounded-xl border border-purple-300 bg-white px-3.5 py-2 text-xs font-semibold text-purple-800 shadow-sm transition hover:bg-purple-50"
                     >
                       <Wallet className="size-3.5" />
@@ -464,25 +656,33 @@ export default function Swap() {
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 text-xs font-bold text-emerald-800">
-                    <ShieldCheck className="size-4 text-emerald-600" /> Base · Non-custodial
+                    <ShieldCheck className="size-4 text-emerald-600" />{" "}
+                    {displayChainId === 1 ? "Ethereum" : "Base"} · Non-custodial
                   </div>
                   <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 font-mono text-[10px] font-semibold text-emerald-700">
                     <Lock className="size-2.5" /> Direct Settlement
                   </span>
                 </div>
                 <p className="mt-1.5 text-xs leading-relaxed text-slate-600">
-                  Trades and approvals are signed in your wallet. Contracts have not received an
-                  independent third-party audit.
+                  Trades and approvals are signed in your wallet and settle atomically against the
+                  selected DEX router. Contracts have not received an independent third-party audit.
                 </p>
                 <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 border-t border-slate-100 pt-2 text-xs font-medium">
                   <a
                     className="inline-flex items-center gap-1 text-purple-700 underline-offset-2 hover:underline"
-                    href={`https://basescan.org/address/${getUniswapV2Router(8453)}#code`}
+                    href={`${explorerBaseUrl}/address/${activeRouterAddress}#code`}
                     target="_blank"
                     rel="noreferrer"
                   >
-                    Configured router <ExternalLink className="size-3" />
+                    {activeSwap.quote?.bestVenue ? "Active route router" : "Configured router"}{" "}
+                    <ExternalLink className="size-3" />
                   </a>
+                  <Link
+                    to="/stake/paymaster"
+                    className="inline-flex items-center gap-1 text-purple-700 underline-offset-2 hover:underline"
+                  >
+                    Gasless Paymaster
+                  </Link>
                   <a
                     className="inline-flex items-center gap-1 text-purple-700 underline-offset-2 hover:underline"
                     href="https://revoke.cash/"
@@ -500,7 +700,7 @@ export default function Swap() {
           <div className="order-2 min-w-0 space-y-5 lg:col-span-7">
             <PriceChart swap={activeSwap} />
 
-            <MarketScanner />
+            <MarketScanner defaultEnabled onSelectToken={handleScannerSelectToken} />
           </div>
         </div>
       </div>

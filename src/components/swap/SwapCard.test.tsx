@@ -255,4 +255,51 @@ describe("Swap impact review", () => {
       /price movement/
     );
   });
+
+  it("shows a clickable Connect Wallet to Swap CTA instead of Insufficient balance when disconnected", () => {
+    const swap = makeSwap();
+    swap.swap.canSwap = false;
+    const onConnectWallet = vi.fn();
+    render(
+      <SwapCard
+        {...props}
+        swap={swap}
+        isConnected={false}
+        onConnectWallet={onConnectWallet}
+      />
+    );
+    const cta = screen.getByRole("button", { name: "Connect Wallet to Swap" });
+    expect(cta).toBeEnabled();
+    fireEvent.click(cta);
+    expect(onConnectWallet).toHaveBeenCalledOnce();
+  });
+
+  it("links Base swap and approval receipts to BaseScan instead of Etherscan", () => {
+    const swap = makeSwap();
+    render(
+      <SwapCard
+        {...props}
+        swap={swap}
+        approveHash="0x1111111111111111111111111111111111111111111111111111111111111111"
+        swapHash="0x2222222222222222222222222222222222222222222222222222222222222222"
+      />
+    );
+    const links = screen.getAllByRole("link", { name: /View on BaseScan/i });
+    expect(links).toHaveLength(2);
+    expect(links[0]).toHaveAttribute(
+      "href",
+      "https://basescan.org/tx/0x1111111111111111111111111111111111111111111111111111111111111111"
+    );
+  });
+
+  it("renders Smart Router savings callout and venue fee tier badges in PriceChart", () => {
+    const swap = makeSwap();
+    swap.quote.savingsAmount = "12.65";
+    swap.quote.savingsComparedTo = "Aerodrome";
+    swap.quote.venueRouteLabels = { "Uniswap V2": "0.3% · 1 pool" };
+    render(<PriceChart swap={swap} />);
+    expect(screen.getByText(/Smart Router saves/i)).toBeInTheDocument();
+    expect(screen.getByText("+12.65 SD")).toBeInTheDocument();
+    expect(screen.getByText("0.3% · 1 pool")).toBeInTheDocument();
+  });
 });

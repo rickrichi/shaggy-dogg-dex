@@ -95,4 +95,15 @@ describe("useSwap", () => {
     expect(result.current.state.sellAmount).toBe("");
     expect(result.current.state.buyAmount).toBe("");
   });
+
+  it("reserves a gas buffer when clicking MAX on native ETH", () => {
+    const { result } = renderHook(() => useSwap(MOCK_ETH, MOCK_USDC), { wrapper: AllProviders });
+
+    act(() => {
+      result.current.actions.setMaxSellAmount();
+    });
+
+    // 10 ETH minus 0.003 ETH L1 gas buffer = 9.997 ETH
+    expect(result.current.state.sellAmount).toBe("9.997");
+  });
 });

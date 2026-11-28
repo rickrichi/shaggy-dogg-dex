@@ -91,16 +91,17 @@ const PRIMARY = ["Swap", "Liquidity", "Stake", "Markets", "Portfolio"];
 const NavButton = ({ item, active }: { item: NavItem; active: boolean }) => {
   const Icon = item.icon;
   return (
-    <Link to={item.href}>
-      <Button
-        variant={active ? "default" : "ghost"}
-        size="sm"
-        className={active ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white" : "hover:bg-purple-100"}
-      >
+    <Button
+      asChild
+      variant={active ? "default" : "ghost"}
+      size="sm"
+      className={active ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white" : "hover:bg-purple-100"}
+    >
+      <Link to={item.href}>
         <Icon className="mr-2 size-4" />
         {item.name}
-      </Button>
-    </Link>
+      </Link>
+    </Button>
   );
 };
 

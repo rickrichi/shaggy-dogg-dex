@@ -118,14 +118,19 @@ function describeScannerError(error: unknown): string {
 // COMPONENT
 // ══════════════════════════════════════════════════════════════════════════════
 
-export function MarketScanner() {
+export interface MarketScannerProps {
+  readonly defaultEnabled?: boolean;
+  readonly onSelectToken?: (token: Token) => void;
+}
+
+export function MarketScanner({ defaultEnabled = false, onSelectToken }: MarketScannerProps = {}) {
   const { address, chain, isConnected } = useAccount();
   // The swap dropdown mixes in Ethereum tokens; the scanner prices only the connected chain's own list.
   const scannerChainId = chain?.id ?? 8453;
   const publicClient = usePublicClient({ chainId: scannerChainId });
   const scannerTokens = useMemo(() => getTokensForChain(scannerChainId), [scannerChainId]);
 
-  const [enabled, setEnabled] = useState(false);
+  const [enabled, setEnabled] = useState(defaultEnabled);
   const [view, setView] = useState<ScannerView>("movers");
   const [rows, setRows] = useState<readonly ScannerRow[]>([]);
   const [balances, setBalances] = useState<ReadonlyMap<string, number> | null>(null);
@@ -438,6 +443,7 @@ export function MarketScanner() {
                 </div>
                 {movers.map((row) => {
                   const isUp = row.change24hPercent >= 0;
+                  const matchedToken = scannerTokens.find((t) => tokenKey(t) === row.key);
                   return (
                     <div
                       key={row.key}
@@ -448,7 +454,18 @@ export function MarketScanner() {
                           {row.symbol.slice(0, 3)}
                         </span>
                         <div className="min-w-0">
-                          <p className="font-bold text-slate-900">{row.symbol}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="font-bold text-slate-900">{row.symbol}</p>
+                            {onSelectToken && matchedToken && (
+                              <button
+                                type="button"
+                                onClick={() => onSelectToken(matchedToken)}
+                                className="rounded-md border border-purple-200 bg-purple-50 px-1.5 py-0.5 font-sans text-[10px] font-semibold text-purple-700 transition hover:border-purple-400 hover:bg-purple-100"
+                              >
+                                Swap →
+                              </button>
+                            )}
+                          </div>
                           <p className="truncate text-xs text-slate-500">{row.name}</p>
                         </div>
                       </div>
@@ -500,7 +517,18 @@ export function MarketScanner() {
                   className="grid grid-cols-[1fr_auto_auto] items-center gap-3 bg-white px-4 py-2.5 text-sm transition hover:bg-purple-50/30"
                 >
                   <div className="min-w-0">
-                    <p className="font-bold text-slate-900">{token.symbol}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="font-bold text-slate-900">{token.symbol}</p>
+                      {onSelectToken && (
+                        <button
+                          type="button"
+                          onClick={() => onSelectToken(token)}
+                          className="rounded-md border border-purple-200 bg-purple-50 px-1.5 py-0.5 font-sans text-[10px] font-semibold text-purple-700 transition hover:border-purple-400 hover:bg-purple-100"
+                        >
+                          Swap →
+                        </button>
+                      )}
+                    </div>
                     <p className="truncate font-mono text-xs text-slate-500">
                       {amountFormat.format(amount)} {token.symbol}
                     </p>
