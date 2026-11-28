@@ -52,3 +52,9 @@ live trades, transaction broadcasts, deployments, or credential changes.
 
 Keep shared settings in `.claude/settings.json`. Personal overrides belong in
 `.claude/settings.local.json`; ensure it is git-ignored before creating it.
+
+## Recommendations
+
+"Stop recommending stuff that you wouldn't recommend doing." Only offer or
+list next steps you would actually back; drop suggestions that later evidence
+weakens instead of carrying them forward as open decisions.
