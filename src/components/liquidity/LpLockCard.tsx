@@ -125,7 +125,7 @@ interface LockerControlsProps {
 
 function LockerControls({ position, positions, onSelect, onChanged }: LockerControlsProps) {
   const { address: userAddress, isConnected } = useAccount();
-  const publicClient = usePublicClient();
+  const publicClient = usePublicClient({ chainId: 8453 });
   const { writeContractAsync } = useWriteContract();
 
   const selectedTokenId = BigInt(position.tokenId);

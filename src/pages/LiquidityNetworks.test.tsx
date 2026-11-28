@@ -76,4 +76,16 @@ describe("Liquidity page by network", () => {
     expect(screen.getByText("Switch network")).toBeTruthy();
     expect(screen.getByText(/works on Base and Ethereum/)).toBeTruthy();
   });
+
+  it("wires valid aria-controls tabpanels for every rendered tab", () => {
+    onNetwork(8453, "Base");
+    open("?version=v2");
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs.length).toBeGreaterThanOrEqual(5);
+    for (const t of tabs) {
+      const targetId = t.getAttribute("aria-controls");
+      expect(targetId).toBeTruthy();
+      expect(document.getElementById(targetId!)).not.toBeNull();
+    }
+  });
 });

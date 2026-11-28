@@ -107,6 +107,27 @@ export function getFullRangeTicks(fee: number): { tickLower: number; tickUpper: 
   return { tickLower, tickUpper };
 }
 
+const Q192 = 2n ** 192n;
+
+/**
+ * Quotes the matching counterparty raw token amount for a Full-Range Uniswap V3 deposit
+ * given the pool's live `slot0.sqrtPriceX96`.
+ */
+export function quoteV3FullRangeCounterparty(params: {
+  inputToken: Address;
+  otherToken: Address;
+  inputAmount: bigint;
+  sqrtPriceX96: bigint;
+}): bigint {
+  const { inputToken, otherToken, inputAmount, sqrtPriceX96 } = params;
+  if (inputAmount <= 0n || sqrtPriceX96 <= 0n) return 0n;
+  const [token0] = sortTokens(inputToken, otherToken);
+  const ratioX192 = sqrtPriceX96 * sqrtPriceX96;
+  if (ratioX192 === 0n) return 0n;
+  const isInputToken0 = token0.toLowerCase() === inputToken.toLowerCase();
+  return isInputToken0 ? (inputAmount * ratioX192) / Q192 : (inputAmount * Q192) / ratioX192;
+}
+
 /** Initialize (including an existing uninitialized pool) and mint atomically.
  * Both desired amounts express the user's intended ratio. Reject a deposit if
  * the pool cannot consume at least 99.5% of each; never silently disable protection.
@@ -118,12 +139,16 @@ export function buildV3MintCall(
   amountB: bigint,
   fee: number,
   recipient: Address,
-  deadline: bigint
+  deadline: bigint,
+  existingSqrtPriceX96?: bigint
 ) {
   const [token0, token1] = sortTokens(tokenA, tokenB);
   const [amount0Desired, amount1Desired] =
     token0.toLowerCase() === tokenA.toLowerCase() ? [amountA, amountB] : [amountB, amountA];
-  const sqrtPriceX96 = encodeSqrtPriceX96(amount0Desired, amount1Desired);
+  const sqrtPriceX96 =
+    existingSqrtPriceX96 && existingSqrtPriceX96 > 0n
+      ? existingSqrtPriceX96
+      : encodeSqrtPriceX96(amount0Desired, amount1Desired);
   const minimum = (amount: bigint) => (amount * 9950n + 9999n) / 10000n;
   const mint = {
     token0,

@@ -2,8 +2,9 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
-import { Coins, ExternalLink, Layers, Loader2, RefreshCw } from "lucide-react";
+import { Coins, ExternalLink, Layers, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { zeroAddress } from "viem";
 import { base } from "viem/chains";
 import { useAccount, usePublicClient, useWalletClient } from "wagmi";
 
@@ -23,6 +24,23 @@ const CUSTODY_LABEL: Record<PositionCustody, string> = {
   staker: "Staked",
   timelock: "Timelocked",
 };
+
+function formatLiquidityUnits(raw: string): string {
+  try {
+    const n = BigInt(raw);
+    if (n >= 1_000_000_000_000_000_000n) {
+      return `${(Number(n / 1_000_000_000_000_000n) / 1000).toLocaleString(undefined, {
+        maximumFractionDigits: 2,
+      })}e18`;
+    }
+    if (n >= 1_000_000n) {
+      return n.toLocaleString();
+    }
+    return raw;
+  } catch {
+    return raw;
+  }
+}
 
 export function V3LiquidityManager() {
   const { address: userAddress, isConnected, chainId } = useAccount();
@@ -85,11 +103,16 @@ export function V3LiquidityManager() {
   return (
     <Card className="border-indigo-100 bg-white shadow-sm">
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <CardTitle className="flex items-center gap-2 text-lg font-bold text-gray-900">
               <Layers className="size-5 text-indigo-600" />
               Your Uniswap V3 Positions
+              {positions.length > 0 && (
+                <Badge variant="secondary" className="ml-1 text-[11px] font-bold">
+                  {positions.length}
+                </Badge>
+              )}
             </CardTitle>
             <CardDescription className="text-xs text-gray-500">
               Every position you hold, stake, or lock on Base Mainnet. Collected WETH remains WETH.
@@ -132,7 +155,7 @@ export function V3LiquidityManager() {
                   No Uniswap V3 Positions Found
                 </p>
                 <p className="text-xs text-gray-500">
-                  Use the Migration Assistant to supply liquidity.
+                  Use the Migration &amp; Supply Assistant to mint a Base V3 position.
                 </p>
               </>
             )}
@@ -141,6 +164,10 @@ export function V3LiquidityManager() {
           <div className="space-y-3">
             {positions.map((p) => {
               const isFullRange = p.tickLower <= -887000 && p.tickUpper >= 887000;
+              const isZeroLiq = p.liquidity === "0";
+              const isMrwdPair =
+                p.token0Symbol.toUpperCase() === "MRWD" || p.token1Symbol.toUpperCase() === "MRWD";
+              const hasPool = Boolean(p.pool && p.pool !== zeroAddress);
               return (
                 <div
                   key={p.tokenId}
@@ -154,24 +181,46 @@ export function V3LiquidityManager() {
                       <Badge className="border-indigo-200 bg-indigo-50 text-[10px] text-indigo-700">
                         {p.fee / 10000}% Fee
                       </Badge>
-                      {isFullRange && (
+                      {isFullRange ? (
                         <Badge className="border-purple-200 bg-purple-50 text-[10px] text-purple-700">
                           Full Range
+                        </Badge>
+                      ) : (
+                        <Badge
+                          variant="outline"
+                          className="border-blue-200 bg-blue-50/70 font-mono text-[10px] text-blue-700"
+                        >
+                          Ticks [{p.tickLower} → {p.tickUpper}]
                         </Badge>
                       )}
                       <Badge className="border-slate-200 bg-slate-50 text-[10px] text-slate-700">
                         {CUSTODY_LABEL[p.custody]}
                       </Badge>
+                      {!isZeroLiq && isFullRange && (
+                        <Badge className="border-emerald-200 bg-emerald-50 text-[10px] text-emerald-700">
+                          Active Range
+                        </Badge>
+                      )}
                     </div>
                     <p className="mt-1 text-xs font-semibold text-gray-700">
                       {p.token0Symbol} / {p.token1Symbol}
                     </p>
-                    <p className="text-xs text-gray-600">
-                      Liquidity units: <span className="font-mono">{p.liquidity}</span>
+                    <p className="text-xs text-gray-600" title={`Raw liquidity: ${p.liquidity}`}>
+                      Liquidity units:{" "}
+                      <span className="font-mono">{formatLiquidityUnits(p.liquidity)}</span>
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {p.custody === "wallet" && isMrwdPair && (
+                      <Link
+                        to="/stake"
+                        className="inline-flex items-center gap-1 rounded-md border border-purple-200 bg-purple-50 px-2.5 py-1 text-xs font-semibold text-purple-800 hover:bg-purple-100"
+                      >
+                        <Sparkles className="size-3" />
+                        Earn $MRWD
+                      </Link>
+                    )}
                     {p.custody === "wallet" && (
                       <Button
                         size="sm"
@@ -193,6 +242,16 @@ export function V3LiquidityManager() {
                     )}
                     {p.custody === "timelock" && (
                       <span className="text-xs text-gray-500">Harvest in the locker below</span>
+                    )}
+                    {hasPool && (
+                      <a
+                        href={`https://basescan.org/address/${p.pool}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center text-xs text-slate-500 hover:text-indigo-700"
+                      >
+                        Pool <ExternalLink className="ml-0.5 size-3" />
+                      </a>
                     )}
                     <a
                       href={`https://basescan.org/token/${NONFUNGIBLE_POSITION_MANAGER_BASE}?a=${p.tokenId}`}
