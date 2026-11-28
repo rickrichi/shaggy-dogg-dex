@@ -27,6 +27,21 @@ describe("RPC relay guard", () => {
     expect(checkRpcBody(JSON.stringify(batch))).toMatchObject({ ok: false, status: 400 });
   });
 
+  it("accepts multicall bodies the size the Stake page sends, within the gateway's 1 MiB limit", () => {
+    // Ten eth_calls of ~30 KB calldata each: the ~296 KB batch the 64 KB cap used to refuse.
+    const data = `0x${"ab".repeat(15_000)}`;
+    const batch = Array.from({ length: 10 }, (_, i) => ({
+      jsonrpc: "2.0",
+      id: i,
+      method: "eth_call",
+      params: [{ to: "0xcA11bde05977b3631167028862bE2a173976CA11", data }, "latest"],
+    }));
+    const body = JSON.stringify(batch);
+    expect(body.length).toBeGreaterThan(296_000);
+    expect(checkRpcBody(body).ok).toBe(true);
+    expect(MAX_BODY_BYTES).toBeLessThan(1024 * 1024);
+  });
+
   it("serves only Ethereum, Base and Polygon", () => {
     expect(relayNetwork("/api/rpc/base")).toBe("base");
     expect(relayNetwork("/api/rpc/ethereum/")).toBe("ethereum");

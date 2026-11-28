@@ -2,14 +2,19 @@
  * Request checks for the browser-facing RPC relay (api/rpc/[network].ts).
  *
  * The relay holds a server-side API key, and anyone on the internet can reach it, so it forwards
- * only the read methods a swap page needs, from this site's own pages, in small requests.
+ * only the read methods a swap page needs, from this site's own pages, in bounded requests.
  * Transactions are never relayed: the user's wallet signs and broadcasts them itself.
  */
 
 export const RELAY_NETWORKS = ["ethereum", "base", "polygon"] as const;
 export type RelayNetwork = (typeof RELAY_NETWORKS)[number];
 
-export const MAX_BODY_BYTES = 64 * 1024;
+/**
+ * Just under the Golden-Fleas gateway's 1 MiB body limit (GATEWAY_BODY_LIMIT), so anything this
+ * relay forwards the gateway will also accept. The old 64 KB cap refused the Stake page's
+ * position multicalls (one ~296 KB request) and, with 20-request batches, the triangular quotes.
+ */
+export const MAX_BODY_BYTES = 1_000_000;
 export const MAX_BATCH = 50;
 
 export const ALLOWED_METHODS: ReadonlySet<string> = new Set([
